@@ -17,6 +17,8 @@ dependencies = [
     "psycopg[binary]>=3.3.4",
     "httpx>=0.28.1",
     "fpdf2>=2.8.7",
+    "litellm>=1.89.0",
+    "slowapi>=0.1.10",
 ]
 
 [dependency-groups]
@@ -77,6 +79,11 @@ warn_unused_ignores = true
 warn_redundant_casts = true
 no_implicit_reexport = true
 show_error_codes = true
+
+# Third-party libraries without type stubs.
+[[tool.mypy.overrides]]
+module = ["litellm.*", "slowapi.*"]
+ignore_missing_imports = true
 
 # ---------------------------------------------------------------------------
 # pytest + coverage — CLAUDE.md §7 (≥70% on business logic; hard gate from M3)

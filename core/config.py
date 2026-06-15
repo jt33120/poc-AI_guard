@@ -46,6 +46,13 @@ class Settings(BaseSettings):
     # psycopg DSN. Backend writes use a role that bypasses RLS (service_role).
     database_url: str | None = Field(default=None, max_length=500)
 
+    # --- LLM judge (M6) — LiteLLM -> Mistral, optional -------------------
+    mistral_api_key: str | None = Field(default=None, max_length=255)
+    mistral_model: str = Field(default="mistral/mistral-small-latest", max_length=120)
+    judge_max_calls: int = Field(default=200, ge=1, le=100_000)
+    # slowapi limit string for the costly export endpoint.
+    export_rate_limit: str = Field(default="30/minute", max_length=40)
+
     # --- HITL approval notifications (M4, optional) ----------------------
     smtp_host: str | None = Field(default=None, max_length=255)
     smtp_port: int = Field(default=587, ge=1, le=65535)
