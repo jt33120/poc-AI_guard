@@ -152,6 +152,28 @@ def _constraints_ok(rule: ToolRule, arguments: dict[str, Any]) -> bool:
     return True
 
 
+_APPROVAL_ORDER = {
+    Approval.auto: 0,
+    Approval.human_in_the_loop: 1,
+    Approval.human_dual: 2,
+    Approval.deny: 3,
+}
+
+
+def escalate_for_class(base: Approval, action_class: ActionClass) -> Approval:
+    """Raise an ambiguous tool's approval to a safe floor for the judged class.
+
+    The judge only sets a *minimum* (never relaxes): external_send/irreversible
+    force at least human-in-the-loop; it can never produce ``auto`` or ``deny``.
+    """
+    floor = (
+        Approval.human_in_the_loop
+        if action_class in (ActionClass.external_send, ActionClass.irreversible)
+        else Approval.auto
+    )
+    return base if _APPROVAL_ORDER[base] >= _APPROVAL_ORDER[floor] else floor
+
+
 def evaluate(policy: Policy, tool_name: str, arguments: dict[str, Any]) -> PolicyOutcome:
     """Full decision for a tool call: action class + authorization (fail-closed)."""
     rule = policy.rule_for(tool_name)
