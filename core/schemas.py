@@ -68,3 +68,27 @@ class ServerOut(BaseModel):
     transport: Transport
     config: dict[str, Any]
     enabled: bool
+
+
+class PolicyDocument(BaseModel):
+    """A tenant's policy document and its version."""
+
+    yaml: str
+    version: int
+
+
+class PolicyUpdate(BaseModel):
+    """Payload to replace a tenant's policy YAML."""
+
+    model_config = {"extra": "forbid"}
+
+    yaml: str = Field(min_length=1, max_length=100_000)
+
+
+class ToolView(BaseModel):
+    """A tool exposed to the agent with its effective policy classification."""
+
+    name: str
+    canonical: str
+    action_class: str | None
+    decision: str

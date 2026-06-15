@@ -18,6 +18,7 @@ from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.errors import register_exception_handlers
+from api.policy import router as policy_router
 from api.security import build_verifier, get_current_user
 from api.servers import router as servers_router
 from core.config import Settings, get_settings
@@ -89,6 +90,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         }
 
     app.include_router(servers_router)
+    app.include_router(policy_router)
 
     return app
 

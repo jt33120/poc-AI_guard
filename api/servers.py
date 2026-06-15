@@ -12,6 +12,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from psycopg import errors as pg_errors
 
+from api.deps import database_url as _database_url
+from api.deps import require_tenant as _require_tenant
 from api.security import get_current_user, require_role
 from core import db, servers
 from core.schemas import CurrentUser, Role, ServerCreate, ServerOut, ServerUpdate
@@ -20,21 +22,6 @@ router = APIRouter(prefix="/v1/servers", tags=["servers"])
 
 # Module-level dependency singletons (keeps the call out of argument defaults).
 _require_admin = require_role(Role.admin)
-
-
-def _database_url(request: Request) -> str:
-    url: str | None = request.app.state.database_url
-    if not url:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database not configured"
-        )
-    return url
-
-
-def _require_tenant(user: CurrentUser) -> str:
-    if not user.tenant_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tenant in token")
-    return user.tenant_id
 
 
 @router.get("", response_model=list[ServerOut])
