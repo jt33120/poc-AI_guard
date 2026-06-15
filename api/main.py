@@ -17,6 +17,7 @@ from collections.abc import Awaitable, Callable
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.approvals import router as approvals_router
 from api.errors import register_exception_handlers
 from api.policy import router as policy_router
 from api.security import build_verifier, get_current_user
@@ -91,6 +92,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(servers_router)
     app.include_router(policy_router)
+    app.include_router(approvals_router)
 
     return app
 

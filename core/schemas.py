@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -92,3 +92,28 @@ class ToolView(BaseModel):
     canonical: str
     action_class: str | None
     decision: str
+
+
+class ApprovalOut(BaseModel):
+    """An approval request as shown in the approval queue."""
+
+    id: str
+    request_id: str
+    tool_name: str
+    action_class: str | None
+    status: str
+    dry_run: dict[str, Any]
+    required_count: int
+    approved_by: list[str]
+    created_at: str | None
+    expires_at: str | None
+    decided_at: str | None
+    decided_by: str | None
+
+
+class DecisionRequest(BaseModel):
+    """Operator decision on a pending approval."""
+
+    model_config = {"extra": "forbid"}
+
+    decision: Literal["approve", "deny"]
