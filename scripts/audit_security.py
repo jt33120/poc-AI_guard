@@ -172,6 +172,19 @@ def check_rls_migrations(findings: list[Finding]) -> None:
         )
 
 
+def check_frontend_no_service_role(findings: list[Finding]) -> None:
+    # The Supabase service_role key must never reach the frontend (CLAUDE.md §4.6).
+    if not (REPO / "frontend").exists():
+        return
+    pattern = re.compile(r"(?i)service[_-]?role")
+    for path in _iter_code_files():
+        rel = _rel(path)
+        if rel.startswith("frontend/") and pattern.search(_read(path)):
+            findings.append(
+                Finding(CRITICAL, "FRONTEND_SERVICE_ROLE", f"service_role reference in {rel}")
+            )
+
+
 CHECKS = (
     check_env_gitignored,
     check_env_not_tracked,
@@ -180,6 +193,7 @@ CHECKS = (
     check_committed_secrets,
     check_docs_gated,
     check_rls_migrations,
+    check_frontend_no_service_role,
 )
 
 

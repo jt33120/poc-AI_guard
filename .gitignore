@@ -24,6 +24,8 @@ node_modules/
 frontend/.next/
 frontend/out/
 frontend/.turbo/
+frontend/test-results/
+frontend/playwright-report/
 *.tsbuildinfo
 
 # Editor / OS
