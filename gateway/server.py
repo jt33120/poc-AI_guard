@@ -11,10 +11,29 @@ high-level API does not fit as cleanly.
 
 from __future__ import annotations
 
+import os
+
 import mcp.types as types
 from mcp.server.lowlevel import Server
 
+from core import db
+from core.tenant_tokens import authenticate_gateway_session
+
 SERVER_NAME = "xsom-ai-guard"
+
+#: Environment variable carrying the tenant-scoped gateway token (stdio sessions).
+TENANT_TOKEN_ENV = "XSOM_TENANT_TOKEN"  # noqa: S105 - env var name, not a secret
+
+
+def authenticate_session(database_url: str, raw_token: str) -> str:
+    """Resolve the tenant for an MCP session, or raise PermissionError.
+
+    Fail-closed (CLAUDE.md §4.4): a missing/unknown/revoked token is refused.
+    """
+    with db.connection(database_url) as conn:
+        tenant_id = authenticate_gateway_session(conn, raw_token)
+        conn.commit()
+    return tenant_id
 
 
 async def list_available_tools() -> list[types.Tool]:
@@ -40,8 +59,19 @@ def build_server() -> Server:
 
 
 async def run_stdio() -> None:  # pragma: no cover - exercised via real MCP transport
-    """Run the gateway over stdio (how an agent launches it)."""
+    """Run the gateway over stdio (how an agent launches it).
+
+    Refuses to start without a valid tenant token (fail-closed).
+    """
     from mcp.server.stdio import stdio_server
+
+    from core.config import get_settings
+
+    settings = get_settings()
+    if not settings.database_url:
+        raise RuntimeError("DATABASE_URL is required to authenticate the gateway session")
+    raw_token = os.environ.get(TENANT_TOKEN_ENV, "")
+    authenticate_session(settings.database_url, raw_token)  # raises if invalid
 
     server = build_server()
     async with stdio_server() as (read_stream, write_stream):
