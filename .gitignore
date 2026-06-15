@@ -1,0 +1,35 @@
+# Secrets — CLAUDE.md §4.7 (never commit secrets; trufflehog enforces in CI)
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.egg-info/
+dist/
+build/
+
+# Node / Next.js (M7)
+node_modules/
+frontend/.next/
+frontend/out/
+frontend/.turbo/
+frontend/test-results/
+frontend/playwright-report/
+*.tsbuildinfo
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
