@@ -28,6 +28,7 @@ dev = [
     "mypy>=1.10",
     "pip-audit>=2.7",
     "types-python-jose>=3.5.0.20260408",
+    "types-pyyaml>=6.0.12.20260518",
 ]
 
 [tool.uv]
@@ -78,7 +79,7 @@ show_error_codes = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "-q --cov=core --cov=api --cov=gateway --cov-report=term-missing"
+addopts = "-q --cov=core --cov=api --cov=gateway --cov-report=term-missing --cov-fail-under=70"
 
 [tool.coverage.run]
 branch = true
