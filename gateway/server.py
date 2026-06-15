@@ -23,8 +23,9 @@ import mcp.types as types
 from mcp.server.lowlevel import Server
 
 from core import approvals, audit, db
+from core.judge import Judge
 from core.notify import Notifier
-from core.policy import Approval, Policy, PolicyOutcome, evaluate
+from core.policy import Approval, Policy, PolicyOutcome, escalate_for_class, evaluate
 from core.tenant_tokens import authenticate_gateway_session
 from gateway.downstream import DownstreamProxy, ServerSpec
 
@@ -84,10 +85,12 @@ class PolicyBackend:
         policy: Policy,
         proxy: DownstreamProxy,
         approval_ctx: ApprovalContext | None = None,
+        judge: Judge | None = None,
     ) -> None:
         self._policy = policy
         self._proxy = proxy
         self._approval_ctx = approval_ctx
+        self._judge = judge
 
     async def list_tools(self) -> list[types.Tool]:
         return await self._proxy.list_tools()
@@ -96,6 +99,18 @@ class PolicyBackend:
         resolved = await self._proxy.resolve(name)
         canonical = f"{resolved[0]}.{resolved[1]}" if resolved else name
         outcome = evaluate(self._policy, canonical, arguments)
+
+        # Ambiguous tools: ask the judge for an action class, then escalate the
+        # decision to a safe floor. The judge classifies only — never authorizes.
+        if outcome.ambiguous and self._judge is not None:
+            judged = self._judge.classify(canonical, approvals.redact(arguments))
+            outcome = PolicyOutcome(
+                action_class=judged,
+                decision=escalate_for_class(outcome.decision, judged),
+                rule_name=outcome.rule_name,
+                reason="judge",
+                ambiguous=True,
+            )
 
         if outcome.decision is Approval.auto:
             start = time.monotonic()
@@ -294,6 +309,7 @@ def _build_backend(
 ) -> PolicyBackend:  # pragma: no cover - I/O glue
     from core import policy_store, servers
     from core.config import get_settings
+    from core.judge import build_judge
     from core.notify import build_notifier
 
     settings = get_settings()
@@ -310,7 +326,7 @@ def _build_backend(
         timeout_seconds=policy.defaults.hitl_timeout_seconds,
         notifier=build_notifier(settings),
     )
-    return PolicyBackend(policy, DownstreamProxy(specs), ctx)
+    return PolicyBackend(policy, DownstreamProxy(specs), ctx, build_judge(settings))
 
 
 async def run_stdio() -> None:  # pragma: no cover - exercised via real MCP transport
