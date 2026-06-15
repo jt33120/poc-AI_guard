@@ -7,11 +7,27 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from api.deps import database_url, require_tenant
+from api.ratelimit import export_rate_limit, limiter
 from api.security import get_current_user
 from core import approvals, audit, db, export
+from core.export import Narrator
+from core.judge import Judge, build_judge
 from core.schemas import AuditEntry, CurrentUser, Role
 
 router = APIRouter(prefix="/v1/audit", tags=["audit"])
+
+
+def _narrator(judge: Judge | None) -> Narrator | None:
+    if judge is None:
+        return None
+
+    def narrate(framework: str, counts: dict[str, int], total: int) -> str:
+        try:
+            return judge.narrate(framework, counts, total)
+        except Exception:
+            return export.default_narrative(framework, counts, total)
+
+    return narrate
 
 
 @router.get("", response_model=list[AuditEntry])
@@ -32,6 +48,7 @@ def list_audit(
 
 
 @router.get("/export", response_model=None)
+@limiter.limit(export_rate_limit)
 def export_audit(
     request: Request,
     user: CurrentUser = Depends(get_current_user),
@@ -58,6 +75,7 @@ def export_audit(
         approvals=supervision,
         range_from=from_ts,
         range_to=to_ts,
+        narrator=_narrator(build_judge(request.app.state.settings)),
     )
     if render == "pdf":
         pdf = export.render_pdf(report)

@@ -16,11 +16,14 @@ from collections.abc import Awaitable, Callable
 
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from api.approvals import router as approvals_router
 from api.audit import router as audit_router
 from api.errors import register_exception_handlers
 from api.policy import router as policy_router
+from api.ratelimit import limiter
 from api.security import build_verifier, get_current_user
 from api.servers import router as servers_router
 from core.config import Settings, get_settings
@@ -73,9 +76,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     register_exception_handlers(app)
 
-    # Shared state read by dependencies (verifier, DB url).
+    # Shared state read by dependencies (settings, verifier, DB url, limiter).
+    app.state.settings = settings
     app.state.verifier = build_verifier(settings)
     app.state.database_url = settings.database_url
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
     @app.get("/health", tags=["meta"])
     async def health() -> dict[str, str]:
