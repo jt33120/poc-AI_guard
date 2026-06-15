@@ -1,47 +1,97 @@
 # xSOM AI Guard
 
 An **MCP action-control gateway** for AI agents. The agent calls its tools
-*through* the gateway, which authorizes each tool-call (auto / human-in-the-loop /
-deny), keeps a human in the loop for irreversible actions, and writes an
-**immutable, hash-chained audit log** — without touching the agent's code.
+*through* the gateway, which on every tool-call:
 
-> This README grows with the build. Right now we are at **M0 (bootstrap)**.
-> See `CLAUDE.md` (authority), `docs/SPEC.md` (detail), `docs/BUILD_PLAN.md` (milestones).
+- applies a deterministic **authorization policy** (auto / human-in-the-loop / deny),
+- keeps a **human in the loop** for irreversible actions (dry-run + approval),
+- writes an **immutable, hash-chained audit log** exportable for AI Act / GDPR.
 
-## Stack
+The differentiator: we control what the agent **does**, not just its prompts.
 
-Python 3.12 · MCP Python SDK · FastAPI + Pydantic v2 · Supabase (Postgres + Auth + RLS)
-· LiteLLM→Mistral (thin judge) · Next.js 14 (M7). Tooling: **uv**, ruff, mypy, pytest.
+```
+ Agent ──MCP──▶  xSOM AI Guard  ──MCP──▶  downstream tool servers (mail, CRM, fs…)
+                 policy → HITL → audit
+                       │
+        ┌──────────────┼─────────────────┐
+        ▼              ▼                  ▼
+   Supabase       LLM judge          Control API (FastAPI)
+   (Postgres+RLS, (Mistral, thin)    ◀── Next.js frontend
+    append-only audit)               (inspector, approvals, audit, policy)
+```
 
-## Quickstart (local)
+## Prerequisites
 
-Prerequisites: Python 3.12 and [uv](https://docs.astral.sh/uv/).
+- **Python 3.12** and [uv](https://docs.astral.sh/uv/)
+- **Node 20+** (frontend, M7)
+- **PostgreSQL 16** server binaries — used to spin an *ephemeral* cluster for the
+  hermetic RLS/HITL/audit tests and `make demo` (no live Supabase required).
+  On Debian/Ubuntu: `apt-get install -y postgresql-16`.
+
+## Quickstart (local, < 10 min)
 
 ```bash
-cp .env.example .env        # then edit if needed (no secrets are required to boot)
-make install                # create venv + install deps
-make verify                 # ruff + mypy + tests + security audit  ← must be green
-make dev                    # control API on http://localhost:8000  (GET /health)
+cp .env.example .env          # nothing is required to boot; fill in to enable features
+make install                  # backend (uv) + frontend (npm) + Playwright browser
+make verify                   # ruff + mypy + pytest + audit + eslint + tsc + Playwright
+make demo                     # the break-then-control story, end to end
+make dev                      # control API on :8000  (+ frontend on :3000)
 ```
+
+`make demo` runs entirely offline: it spins a throwaway Postgres, and shows an
+agent that (1) is **held** when it tries an irreversible action, (2) is **denied**
+when it mails outside the allowlist, (3) is **allowed** to read — then verifies the
+audit chain is intact.
+
+## Configuration
+
+All settings load from the environment / `.env` (gitignored). Everything is
+optional to boot; features light up as you configure them.
+
+| Variable | Purpose |
+|---|---|
+| `ENV` | `dev` / `staging` / `prod` (prod disables `/docs`). |
+| `CORS_ALLOW_ORIGINS` | Explicit comma-separated allowlist (no `*`). |
+| `DATABASE_URL` | Postgres DSN for the backend (service-role connection). |
+| `SUPABASE_URL` / `SUPABASE_JWKS_URL` | JWT verification (JWKS). |
+| `SUPABASE_JWT_AUDIENCE` / `SUPABASE_JWT_ISSUER` | JWT claims. |
+| `SMTP_HOST` / `SMTP_FROM` / `APPROVAL_NOTIFY_TO` … | HITL email notifications. |
+| `MISTRAL_API_KEY` / `MISTRAL_MODEL` | LLM judge (ambiguous tools + narratives). |
+| `JUDGE_MAX_CALLS` / `EXPORT_RATE_LIMIT` | Cost cap + rate limiting. |
+| `SENTRY_DSN` | Optional error reporting. |
+
+Frontend (`frontend/.env.local`): `NEXT_PUBLIC_SUPABASE_URL`,
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`, `CONTROL_API_URL`.
 
 ## Make targets
 
 | Target | What it does |
 |---|---|
-| `make install` | Create the venv and install dependencies (uv). |
-| `make dev` | Run the control API (gateway MCP runs over stdio; front in M7). |
-| `make test` | Run the test suite. |
-| `make verify` | ruff + mypy + tests + `scripts/audit_security.py` (+ eslint/tsc from M7). |
-| `make demo` | End-to-end "break-then-control" demo (M8). |
+| `make install` | Install backend + frontend deps + Playwright browser. |
+| `make dev` | Run the control API (+ frontend); the gateway runs over stdio. |
+| `make test` | pytest + Playwright smoke. |
+| `make verify` | ruff + mypy + tests + security audit + eslint + tsc. |
+| `make demo` | End-to-end break-then-control demo. |
 
 ## Layout
 
 ```
-api/         Control API (FastAPI, hardened) — consumed by the frontend
-gateway/     MCP gateway: MCP server (to the agent) + MCP client (to downstream tools)
-core/        Config, logging, observability; policy/judge/audit/approvals land later
-scripts/     Operational scripts (security audit, chain verification, ...)
-supabase/    SQL migrations (RLS) — from M1
-frontend/    Next.js app — from M7
-tests/       pytest suite (+ fixtures)
+gateway/   MCP gateway: server (to the agent) + client (downstream); policy→HITL→audit
+core/      config, db (RLS), policy, judge, approvals, audit, export, notify, schemas
+api/       hardened FastAPI control API (auth, servers, policy, approvals, audit)
+supabase/  SQL migrations (RLS, append-only audit)
+frontend/  Next.js 14 app (inspector, approvals, audit, admin)
+scripts/   audit_security, verify_chain, demo
+tests/     pytest suite (ephemeral Postgres harness) + Playwright e2e
 ```
+
+## Security
+
+See [`docs/SECURITY.md`](docs/SECURITY.md) for the threat model and pentest
+checklist. Highlights: HITL enforced at the gateway (never by the prompt),
+fail-closed defaults, tenant isolation by Postgres RLS, append-only hash-chained
+audit, httpOnly auth cookies, no secrets in git (trufflehog in CI).
+
+## Status
+
+MVP milestones **M0–M8 complete**. See `docs/BUILD_PLAN.md` and `docs/SPEC.md`.
