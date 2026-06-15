@@ -46,6 +46,15 @@ class Settings(BaseSettings):
     # psycopg DSN. Backend writes use a role that bypasses RLS (service_role).
     database_url: str | None = Field(default=None, max_length=500)
 
+    # --- HITL approval notifications (M4, optional) ----------------------
+    smtp_host: str | None = Field(default=None, max_length=255)
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_user: str | None = Field(default=None, max_length=255)
+    smtp_password: str | None = Field(default=None, max_length=255)
+    smtp_from: str | None = Field(default=None, max_length=255)
+    smtp_use_tls: bool = True
+    approval_notify_to: str | None = Field(default=None, max_length=255)
+
     # --- Observability (optional) ----------------------------------------
     sentry_dsn: str | None = None
     sentry_traces_sample_rate: float = Field(default=0.0, ge=0.0, le=1.0)
