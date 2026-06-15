@@ -14,13 +14,15 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 
-from fastapi import FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.errors import register_exception_handlers
+from api.security import build_verifier, get_current_user
 from core.config import Settings, get_settings
 from core.logging import configure_logging
 from core.observability import init_observability
+from core.schemas import CurrentUser
 
 _SECURITY_HEADERS: dict[str, str] = {
     "X-Content-Type-Options": "nosniff",
@@ -67,10 +69,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     register_exception_handlers(app)
 
+    # Token verifier for auth dependencies (read via request.app.state).
+    app.state.verifier = build_verifier(settings)
+
     @app.get("/health", tags=["meta"])
     async def health() -> dict[str, str]:
         """Liveness probe — the only unauthenticated route (SPEC §8)."""
         return {"status": "ok"}
+
+    @app.get("/v1/me", tags=["auth"])
+    async def me(user: CurrentUser = Depends(get_current_user)) -> dict[str, str | None]:
+        """Return the authenticated principal (protected route, requires JWT)."""
+        return {
+            "user_id": user.user_id,
+            "tenant_id": user.tenant_id,
+            "role": user.role.value if user.role else None,
+        }
 
     return app
 

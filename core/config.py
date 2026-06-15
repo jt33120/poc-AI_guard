@@ -35,6 +35,17 @@ class Settings(BaseSettings):
     # Explicit allowlist only; "*" is rejected (CLAUDE.md §4.8).
     cors_allow_origins: list[str] = Field(default_factory=list)
 
+    # --- Supabase auth (JWT verification via JWKS) — M1 ------------------
+    supabase_url: str | None = Field(default=None, max_length=300)
+    # Explicit JWKS URL; if unset it is derived from supabase_url.
+    supabase_jwks_url: str | None = Field(default=None, max_length=400)
+    supabase_jwt_audience: str = Field(default="authenticated", max_length=80)
+    supabase_jwt_issuer: str | None = Field(default=None, max_length=400)
+
+    # --- Database (backend / service_role connection) — M1 ---------------
+    # psycopg DSN. Backend writes use a role that bypasses RLS (service_role).
+    database_url: str | None = Field(default=None, max_length=500)
+
     # --- Observability (optional) ----------------------------------------
     sentry_dsn: str | None = None
     sentry_traces_sample_rate: float = Field(default=0.0, ge=0.0, le=1.0)
@@ -63,6 +74,15 @@ class Settings(BaseSettings):
     def docs_enabled(self) -> bool:
         """Interactive API docs are disabled in production (CLAUDE.md §4.8)."""
         return self.env != "prod"
+
+    @property
+    def jwks_url(self) -> str | None:
+        """Resolved JWKS endpoint (explicit override, else derived from URL)."""
+        if self.supabase_jwks_url:
+            return self.supabase_jwks_url
+        if self.supabase_url:
+            return f"{self.supabase_url.rstrip('/')}/auth/v1/.well-known/jwks.json"
+        return None
 
 
 @lru_cache
