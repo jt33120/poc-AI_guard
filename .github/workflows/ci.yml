@@ -20,6 +20,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Ensure PostgreSQL server binaries (ephemeral test cluster)
+        run: sudo apt-get update && sudo apt-get install -y postgresql
+
       - name: Set up uv + Python 3.12
         uses: astral-sh/setup-uv@v5
         with:
