@@ -7,6 +7,7 @@ known). Per-request, tenant-scoped reads set the role/JWT claims so RLS applies.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterator
 from contextlib import contextmanager
 
@@ -26,3 +27,26 @@ def connection(dsn: str) -> Iterator[psycopg.Connection]:
         yield conn
     finally:
         conn.close()
+
+
+@contextmanager
+def tenant_reader(
+    dsn: str, *, user_id: str, tenant_id: str | None, role: str = "viewer"
+) -> Iterator[psycopg.Connection]:
+    """A read connection scoped to the caller's tenant by RLS (defense in depth).
+
+    Switches to the ``authenticated`` role and sets the JWT claims for the
+    transaction, so Postgres RLS — not just application code — enforces tenant
+    isolation. A missing tenant_id yields a context that can read nothing.
+    """
+    claims = json.dumps(
+        {
+            "sub": user_id,
+            "role": "authenticated",
+            "app_metadata": {"tenant_id": tenant_id, "role": role},
+        }
+    )
+    with connection(dsn) as conn, conn.transaction():
+        conn.execute("set local role authenticated")
+        conn.execute("select set_config('request.jwt.claims', %s, true)", (claims,))
+        yield conn
