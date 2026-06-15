@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
@@ -21,7 +22,7 @@ from uuid import uuid4
 import mcp.types as types
 from mcp.server.lowlevel import Server
 
-from core import approvals, db
+from core import approvals, audit, db
 from core.notify import Notifier
 from core.policy import Approval, Policy, PolicyOutcome, evaluate
 from core.tenant_tokens import authenticate_gateway_session
@@ -97,14 +98,60 @@ class PolicyBackend:
         outcome = evaluate(self._policy, canonical, arguments)
 
         if outcome.decision is Approval.auto:
-            return await self._proxy.call_tool(name, arguments)
+            start = time.monotonic()
+            result = await self._proxy.call_tool(name, arguments)
+            latency_ms = int((time.monotonic() - start) * 1000)
+            self._audit(
+                "allow",
+                canonical,
+                outcome,
+                arguments,
+                latency_ms=latency_ms,
+                request_id=uuid4().hex,
+                error="downstream_error" if result.isError else None,
+            )
+            return result
         if outcome.decision is Approval.deny:
             logger.info(
                 "tool_denied",
                 extra={"tool": canonical, "decision": "deny", "reason": outcome.reason},
             )
+            self._audit("deny", canonical, outcome, arguments, request_id=uuid4().hex)
             return _denied_result(f"'{canonical}' not permitted by policy: deny ({outcome.reason})")
         return await self._handle_hitl(name, arguments, canonical, outcome)
+
+    def _audit(
+        self,
+        decision: str,
+        canonical: str,
+        outcome: PolicyOutcome,
+        arguments: dict[str, Any],
+        *,
+        latency_ms: int | None = None,
+        request_id: str | None = None,
+        error: str | None = None,
+    ) -> None:
+        ctx = self._approval_ctx
+        if ctx is None:
+            return
+        try:
+            with db.connection(ctx.database_url) as conn:
+                audit.log_event(
+                    conn,
+                    tenant_id=ctx.tenant_id,
+                    decision=decision,
+                    user_id=ctx.requested_by,
+                    request_id=request_id,
+                    tool_name=canonical,
+                    action_class=outcome.action_class.value if outcome.action_class else None,
+                    policy_rule_id=outcome.rule_name,
+                    judge_used=outcome.ambiguous,
+                    args_hash=approvals.args_hash(arguments),
+                    latency_ms=latency_ms,
+                    error=error,
+                )
+        except Exception:  # audit is best-effort; never break the call path
+            logger.warning("audit_write_failed", extra={"tool": canonical, "decision": decision})
 
     async def _handle_hitl(
         self, name: str, arguments: dict[str, Any], canonical: str, outcome: PolicyOutcome
@@ -144,17 +191,28 @@ class PolicyBackend:
                 )
                 summary = record.dry_run.get("summary", "")
                 _notify(ctx.notifier, record.id, summary, record.expires_at.isoformat())
+                self._audit("hitl_pending", canonical, outcome, arguments, request_id=record.id)
                 return _requires_approval_result(record.id, summary)
 
             if record.status == "pending":
+                # Repeated poll while awaiting humans: no new audit entry.
                 return _requires_approval_result(record.id, record.dry_run.get("summary", ""))
             if record.status == "approved":
                 if approvals.consume(conn, record.id):
                     conn.commit()
-                    logger.info("hitl_approved_relay", extra={"tool": canonical})
+                    self._audit(
+                        "hitl_approved", canonical, outcome, arguments, request_id=record.id
+                    )
                     return await self._proxy.call_tool(name, arguments)
                 conn.commit()
                 return _denied_result(f"'{canonical}' approval already consumed")
+
+            # Terminal (denied/expired): record once, then consume so a later
+            # re-invocation asks afresh instead of re-logging.
+            approvals.consume(conn, record.id)
+            conn.commit()
+            decision = "hitl_denied" if record.status == "denied" else "expired"
+            self._audit(decision, canonical, outcome, arguments, request_id=record.id)
             return _denied_result(f"'{canonical}' approval {record.status}")
 
     def _create_approval(
