@@ -13,13 +13,17 @@ from __future__ import annotations
 
 import logging
 import os
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
+from uuid import uuid4
 
 import mcp.types as types
 from mcp.server.lowlevel import Server
 
-from core import db
-from core.policy import Approval, Policy, evaluate
+from core import approvals, db
+from core.notify import Notifier
+from core.policy import Approval, Policy, PolicyOutcome, evaluate
 from core.tenant_tokens import authenticate_gateway_session
 from gateway.downstream import DownstreamProxy, ServerSpec
 
@@ -55,17 +59,34 @@ def _denied_result(message: str) -> types.CallToolResult:
     )
 
 
+@dataclass
+class ApprovalContext:
+    """What the gateway needs to run the HITL flow for a tenant."""
+
+    database_url: str
+    tenant_id: str
+    timeout_seconds: int = 3600
+    notifier: Notifier | None = None
+    requested_by: str | None = None
+
+
 class PolicyBackend:
-    """Enforces the policy over a downstream proxy (auto/deny; HITL added in M4).
+    """Enforces the policy over a downstream proxy: auto / deny / HITL.
 
     The agent-facing tool name may be bare; policy is always evaluated against the
-    canonical ``server.tool`` name. Anything not explicitly ``auto`` is refused
-    here (fail-closed) until the HITL approval flow lands.
+    canonical ``server.tool`` name. ``auto`` relays; ``deny`` refuses; ``human_*``
+    enters the approval flow (or, with no approval context, fails closed).
     """
 
-    def __init__(self, policy: Policy, proxy: DownstreamProxy) -> None:
+    def __init__(
+        self,
+        policy: Policy,
+        proxy: DownstreamProxy,
+        approval_ctx: ApprovalContext | None = None,
+    ) -> None:
         self._policy = policy
         self._proxy = proxy
+        self._approval_ctx = approval_ctx
 
     async def list_tools(self) -> list[types.Tool]:
         return await self._proxy.list_tools()
@@ -74,19 +95,110 @@ class PolicyBackend:
         resolved = await self._proxy.resolve(name)
         canonical = f"{resolved[0]}.{resolved[1]}" if resolved else name
         outcome = evaluate(self._policy, canonical, arguments)
+
         if outcome.decision is Approval.auto:
             return await self._proxy.call_tool(name, arguments)
-        logger.info(
-            "tool_denied",
-            extra={
-                "tool": canonical,
-                "decision": outcome.decision.value,
-                "reason": outcome.reason,
-            },
+        if outcome.decision is Approval.deny:
+            logger.info(
+                "tool_denied",
+                extra={"tool": canonical, "decision": "deny", "reason": outcome.reason},
+            )
+            return _denied_result(f"'{canonical}' not permitted by policy: deny ({outcome.reason})")
+        return await self._handle_hitl(name, arguments, canonical, outcome)
+
+    async def _handle_hitl(
+        self, name: str, arguments: dict[str, Any], canonical: str, outcome: PolicyOutcome
+    ) -> types.CallToolResult:
+        ctx = self._approval_ctx
+        if ctx is None:
+            return _denied_result(
+                f"'{canonical}' requires approval ({outcome.decision.value}); HITL not configured"
+            )
+        required = 2 if outcome.decision is Approval.human_dual else 1
+        try:
+            return await self._run_approval_flow(ctx, name, arguments, canonical, outcome, required)
+        except Exception:
+            # Approval service unavailable -> fail-closed (CLAUDE.md §4.4).
+            logger.exception("approval_service_error", extra={"tool": canonical})
+            return _denied_result(f"'{canonical}' held: approval service unavailable")
+
+    async def _run_approval_flow(
+        self,
+        ctx: ApprovalContext,
+        name: str,
+        arguments: dict[str, Any],
+        canonical: str,
+        outcome: PolicyOutcome,
+        required: int,
+    ) -> types.CallToolResult:
+        with db.connection(ctx.database_url) as conn:
+            ah = approvals.args_hash(arguments)
+            record = approvals.find_active(conn, ctx.tenant_id, canonical, ah)
+            if record is not None:
+                record = approvals.expire_if_needed(conn, record)
+                conn.commit()
+
+            if record is None:
+                record = self._create_approval(
+                    conn, ctx, canonical, outcome, arguments, ah, required
+                )
+                summary = record.dry_run.get("summary", "")
+                _notify(ctx.notifier, record.id, summary, record.expires_at.isoformat())
+                return _requires_approval_result(record.id, summary)
+
+            if record.status == "pending":
+                return _requires_approval_result(record.id, record.dry_run.get("summary", ""))
+            if record.status == "approved":
+                if approvals.consume(conn, record.id):
+                    conn.commit()
+                    logger.info("hitl_approved_relay", extra={"tool": canonical})
+                    return await self._proxy.call_tool(name, arguments)
+                conn.commit()
+                return _denied_result(f"'{canonical}' approval already consumed")
+            return _denied_result(f"'{canonical}' approval {record.status}")
+
+    def _create_approval(
+        self,
+        conn: Any,
+        ctx: ApprovalContext,
+        canonical: str,
+        outcome: PolicyOutcome,
+        arguments: dict[str, Any],
+        ah: str,
+        required: int,
+    ) -> approvals.ApprovalRecord:
+        action_class = outcome.action_class.value if outcome.action_class else None
+        dry_run = approvals.build_dry_run(canonical, action_class, arguments)
+        expires_at = datetime.now(UTC) + timedelta(seconds=ctx.timeout_seconds)
+        record = approvals.create(
+            conn,
+            tenant_id=ctx.tenant_id,
+            request_id=uuid4().hex,
+            tool_name=canonical,
+            action_class=action_class,
+            ah=ah,
+            arguments_summary=approvals.redact(arguments),
+            dry_run=dry_run,
+            required_count=required,
+            expires_at=expires_at,
+            requested_by=ctx.requested_by,
         )
-        return _denied_result(
-            f"'{canonical}' not permitted by policy: {outcome.decision.value} ({outcome.reason})"
-        )
+        conn.commit()
+        logger.info("approval_created", extra={"tool": canonical, "approval_id": record.id})
+        return record
+
+
+def _requires_approval_result(approval_id: str, summary: str) -> types.CallToolResult:
+    return _denied_result(f"requires_approval approval_id={approval_id} :: {summary}")
+
+
+def _notify(notifier: Notifier | None, approval_id: str, summary: str, expires_at: str) -> None:
+    if notifier is None:
+        return
+    try:
+        notifier.notify_approval(approval_id=approval_id, summary=summary, expires_at=expires_at)
+    except Exception:  # best-effort; a missed notification leaves the action pending (safe)
+        logger.warning("approval_notify_failed", extra={"approval_id": approval_id})
 
 
 def authenticate_session(database_url: str, raw_token: str) -> str:
@@ -123,7 +235,10 @@ def _build_backend(
     database_url: str, tenant_id: str
 ) -> PolicyBackend:  # pragma: no cover - I/O glue
     from core import policy_store, servers
+    from core.config import get_settings
+    from core.notify import build_notifier
 
+    settings = get_settings()
     with db.connection(database_url) as conn:
         rows = servers.enabled_specs(conn, tenant_id)
         policy = policy_store.load_policy(conn, tenant_id)
@@ -131,7 +246,13 @@ def _build_backend(
         ServerSpec(name=name, transport=transport, config=config)
         for name, transport, config in rows
     ]
-    return PolicyBackend(policy, DownstreamProxy(specs))
+    ctx = ApprovalContext(
+        database_url=database_url,
+        tenant_id=tenant_id,
+        timeout_seconds=policy.defaults.hitl_timeout_seconds,
+        notifier=build_notifier(settings),
+    )
+    return PolicyBackend(policy, DownstreamProxy(specs), ctx)
 
 
 async def run_stdio() -> None:  # pragma: no cover - exercised via real MCP transport
