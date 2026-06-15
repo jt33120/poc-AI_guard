@@ -117,3 +117,20 @@ class DecisionRequest(BaseModel):
     model_config = {"extra": "forbid"}
 
     decision: Literal["approve", "deny"]
+
+
+class AuditEntry(BaseModel):
+    """An immutable audit-log entry (metadata only)."""
+
+    id: int
+    ts: str | None
+    tool_name: str | None
+    action_class: str | None
+    decision: str | None
+    policy_rule_id: str | None
+    judge_used: bool
+    args_hash: str | None
+    latency_ms: int | None
+    error: str | None
+    user_id: str | None
+    request_id: str | None
