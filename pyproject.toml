@@ -16,6 +16,7 @@ dependencies = [
     "python-jose[cryptography]>=3.5.0",
     "psycopg[binary]>=3.3.4",
     "httpx>=0.28.1",
+    "fpdf2>=2.8.7",
 ]
 
 [dependency-groups]
@@ -57,9 +58,10 @@ select = [
 [tool.ruff.lint.per-file-ignores]
 # asserts + fake secrets are expected in tests; subprocess drives the PG cluster.
 "tests/**" = ["S101", "S603", "S607", "S105", "S106"]
-# S608: queries interpolate only trusted column-name constants; every dynamic
-# value is a bound parameter (%s), so there is no SQL-injection surface.
+# S608: queries interpolate only trusted column-name constants / fixed WHERE
+# clauses; every dynamic value is a bound parameter (%s) — no injection surface.
 "core/approvals.py" = ["S608"]
+"core/audit.py" = ["S608"]
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI dependency-injection idiom: Depends/Security in argument defaults.
