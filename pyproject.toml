@@ -13,6 +13,9 @@ dependencies = [
     "pydantic-settings>=2.3",
     "mcp>=1.2",
     "sentry-sdk>=2.0",
+    "python-jose[cryptography]>=3.5.0",
+    "psycopg[binary]>=3.3.4",
+    "httpx>=0.28.1",
 ]
 
 [dependency-groups]
@@ -24,6 +27,7 @@ dev = [
     "ruff>=0.5",
     "mypy>=1.10",
     "pip-audit>=2.7",
+    "types-python-jose>=3.5.0.20260408",
 ]
 
 [tool.uv]
@@ -50,7 +54,12 @@ select = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]  # asserts are expected in tests
+# asserts are expected in tests; subprocess calls drive the ephemeral PG cluster.
+"tests/**" = ["S101", "S603", "S607"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI dependency-injection idiom: Depends/Security in argument defaults.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Security"]
 
 # ---------------------------------------------------------------------------
 # mypy (strict typing) — CLAUDE.md §5
