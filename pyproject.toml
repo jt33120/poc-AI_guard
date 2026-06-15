@@ -85,6 +85,11 @@ show_error_codes = true
 module = ["litellm.*", "slowapi.*"]
 ignore_missing_imports = true
 
+# Test/demo PG harness is followed by scripts/demo.py but not type-gated.
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+ignore_errors = true
+
 # ---------------------------------------------------------------------------
 # pytest + coverage — CLAUDE.md §7 (≥70% on business logic; hard gate from M3)
 # ---------------------------------------------------------------------------

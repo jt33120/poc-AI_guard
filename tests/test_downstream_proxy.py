@@ -23,7 +23,7 @@ def _spec(name: str) -> ServerSpec:
 async def test_lists_union_of_downstream_tools() -> None:
     proxy = DownstreamProxy([_spec("mock")])
     names = {tool.name for tool in await proxy.list_tools()}
-    assert names == {"echo", "delete_contact"}
+    assert names == {"echo", "delete_contact", "mail_send"}
 
 
 async def test_relays_call_and_returns_result() -> None:
@@ -49,12 +49,14 @@ async def test_unknown_tool_raises() -> None:
 async def test_name_collisions_are_prefixed() -> None:
     proxy = DownstreamProxy([_spec("alpha"), _spec("beta")])
     names = {tool.name for tool in await proxy.list_tools()}
-    # Both servers expose echo/delete_contact -> all colliding names get namespaced.
+    # Both servers expose the same tools -> all colliding names get namespaced.
     assert names == {
         "alpha.echo",
         "alpha.delete_contact",
+        "alpha.mail_send",
         "beta.echo",
         "beta.delete_contact",
+        "beta.mail_send",
     }
     result = await proxy.call_tool("beta.echo", {"text": "x"})
     assert "x" in result.content[0].text  # type: ignore[union-attr]

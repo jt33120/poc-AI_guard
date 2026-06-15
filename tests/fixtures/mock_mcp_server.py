@@ -23,5 +23,11 @@ def delete_contact(contact_id: str) -> str:
     return f"deleted {contact_id}"
 
 
+@mcp.tool()
+def mail_send(to: str, subject: str) -> str:
+    """Pretend to send an email (external send)."""
+    return f"sent to {to}: {subject}"
+
+
 if __name__ == "__main__":
     mcp.run()

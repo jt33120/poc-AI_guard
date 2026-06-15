@@ -59,8 +59,8 @@ verify-frontend:
 		echo ">> frontend not scaffolded yet (M7): eslint/tsc skipped"; \
 	fi
 
-demo:              ## End-to-end break-then-control story (implemented in M8)
-	@echo ">> make demo is implemented in M8 (see docs/BUILD_PLAN.md)."
+demo:              ## End-to-end break-then-control story
+	$(UV) run python scripts/demo.py
 
 clean:
 	rm -rf .pytest_cache .mypy_cache .ruff_cache .coverage htmlcov coverage.xml
