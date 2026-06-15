@@ -55,8 +55,11 @@ select = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# asserts are expected in tests; subprocess calls drive the ephemeral PG cluster.
-"tests/**" = ["S101", "S603", "S607"]
+# asserts + fake secrets are expected in tests; subprocess drives the PG cluster.
+"tests/**" = ["S101", "S603", "S607", "S105", "S106"]
+# S608: queries interpolate only trusted column-name constants; every dynamic
+# value is a bound parameter (%s), so there is no SQL-injection surface.
+"core/approvals.py" = ["S608"]
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI dependency-injection idiom: Depends/Security in argument defaults.

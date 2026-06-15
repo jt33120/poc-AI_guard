@@ -131,9 +131,11 @@ def check_debug_true(findings: list[Finding]) -> None:
 
 
 def check_committed_secrets(findings: list[Finding]) -> None:
-    # Heuristic: a service-role / secret variable assigned a long literal value.
+    # Heuristic: a secret-named field assigned a long *quoted literal* value.
+    # Requiring quotes avoids flagging variable references (e.g. password=cfg.pw);
+    # trufflehog in CI is the entropy-based secret scanner.
     pattern = re.compile(
-        r"""(?i)(service_role|secret_key|api_key|access_token|password)\s*[=:]\s*["']?[A-Za-z0-9._\-]{20,}"""
+        r"""(?i)(service_role|secret_key|api_key|access_token|password)\s*[=:]\s*["'][A-Za-z0-9._\-]{20,}"""
     )
     for path in _iter_code_files():
         if pattern.search(_read(path)):
