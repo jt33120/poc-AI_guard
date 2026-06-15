@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.errors import register_exception_handlers
 from api.security import build_verifier, get_current_user
+from api.servers import router as servers_router
 from core.config import Settings, get_settings
 from core.logging import configure_logging
 from core.observability import init_observability
@@ -69,8 +70,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     register_exception_handlers(app)
 
-    # Token verifier for auth dependencies (read via request.app.state).
+    # Shared state read by dependencies (verifier, DB url).
     app.state.verifier = build_verifier(settings)
+    app.state.database_url = settings.database_url
 
     @app.get("/health", tags=["meta"])
     async def health() -> dict[str, str]:
@@ -85,6 +87,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "tenant_id": user.tenant_id,
             "role": user.role.value if user.role else None,
         }
+
+    app.include_router(servers_router)
 
     return app
 
