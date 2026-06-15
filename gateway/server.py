@@ -11,6 +11,7 @@ The low-level ``Server`` is used on purpose: the tool list is dynamic.
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any, Protocol
 
@@ -18,8 +19,11 @@ import mcp.types as types
 from mcp.server.lowlevel import Server
 
 from core import db
+from core.policy import Approval, Policy, evaluate
 from core.tenant_tokens import authenticate_gateway_session
 from gateway.downstream import DownstreamProxy, ServerSpec
+
+logger = logging.getLogger("xsom.gateway")
 
 SERVER_NAME = "xsom-ai-guard"
 
@@ -43,6 +47,46 @@ class EmptyBackend:
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> types.CallToolResult:
         raise ValueError(f"no such tool: {name}")
+
+
+def _denied_result(message: str) -> types.CallToolResult:
+    return types.CallToolResult(
+        content=[types.TextContent(type="text", text=message)], isError=True
+    )
+
+
+class PolicyBackend:
+    """Enforces the policy over a downstream proxy (auto/deny; HITL added in M4).
+
+    The agent-facing tool name may be bare; policy is always evaluated against the
+    canonical ``server.tool`` name. Anything not explicitly ``auto`` is refused
+    here (fail-closed) until the HITL approval flow lands.
+    """
+
+    def __init__(self, policy: Policy, proxy: DownstreamProxy) -> None:
+        self._policy = policy
+        self._proxy = proxy
+
+    async def list_tools(self) -> list[types.Tool]:
+        return await self._proxy.list_tools()
+
+    async def call_tool(self, name: str, arguments: dict[str, Any]) -> types.CallToolResult:
+        resolved = await self._proxy.resolve(name)
+        canonical = f"{resolved[0]}.{resolved[1]}" if resolved else name
+        outcome = evaluate(self._policy, canonical, arguments)
+        if outcome.decision is Approval.auto:
+            return await self._proxy.call_tool(name, arguments)
+        logger.info(
+            "tool_denied",
+            extra={
+                "tool": canonical,
+                "decision": outcome.decision.value,
+                "reason": outcome.reason,
+            },
+        )
+        return _denied_result(
+            f"'{canonical}' not permitted by policy: {outcome.decision.value} ({outcome.reason})"
+        )
 
 
 def authenticate_session(database_url: str, raw_token: str) -> str:
@@ -75,18 +119,19 @@ def build_server(backend: ToolBackend | None = None) -> Server:
     return server
 
 
-def _load_proxy(
+def _build_backend(
     database_url: str, tenant_id: str
-) -> DownstreamProxy:  # pragma: no cover - I/O glue
-    from core import servers
+) -> PolicyBackend:  # pragma: no cover - I/O glue
+    from core import policy_store, servers
 
     with db.connection(database_url) as conn:
         rows = servers.enabled_specs(conn, tenant_id)
+        policy = policy_store.load_policy(conn, tenant_id)
     specs = [
         ServerSpec(name=name, transport=transport, config=config)
         for name, transport, config in rows
     ]
-    return DownstreamProxy(specs)
+    return PolicyBackend(policy, DownstreamProxy(specs))
 
 
 async def run_stdio() -> None:  # pragma: no cover - exercised via real MCP transport
@@ -104,7 +149,7 @@ async def run_stdio() -> None:  # pragma: no cover - exercised via real MCP tran
     raw_token = os.environ.get(TENANT_TOKEN_ENV, "")
     tenant_id = authenticate_session(settings.database_url, raw_token)  # raises if invalid
 
-    server = build_server(_load_proxy(settings.database_url, tenant_id))
+    server = build_server(_build_backend(settings.database_url, tenant_id))
     async with stdio_server() as (read_stream, write_stream):
         await server.run(read_stream, write_stream, server.create_initialization_options())
 

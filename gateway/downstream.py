@@ -103,6 +103,12 @@ class DownstreamProxy:
         self._routing = routing
         return public
 
+    async def resolve(self, public_name: str) -> tuple[str, str] | None:
+        """Map a public tool name to (server, original tool), building routing if needed."""
+        if public_name not in self._routing:
+            await self.list_tools()
+        return self._routing.get(public_name)
+
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> types.CallToolResult:
         if name not in self._routing:
             await self.list_tools()  # (re)build the routing table
