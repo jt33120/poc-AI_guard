@@ -2,17 +2,34 @@
 # Canonical targets: dev / test / verify / demo.
 UV ?= uv
 
-.PHONY: install dev test verify demo lint fmt fmt-check typecheck audit verify-frontend clean
+.PHONY: install frontend-install dev test verify demo lint fmt fmt-check typecheck audit \
+        verify-frontend test-frontend clean
 
-install:           ## Install deps into the project venv
+install:           ## Install backend + frontend deps
 	$(UV) sync
+	@$(MAKE) frontend-install
 
-dev:               ## Run control API (gateway MCP runs over stdio; front lands in M7)
+frontend-install:
+	@if [ -f frontend/package.json ]; then \
+		npm --prefix frontend install && \
+		npm --prefix frontend exec playwright install --with-deps chromium; \
+	fi
+
+dev:               ## Run control API (+ frontend if scaffolded); gateway MCP runs over stdio
 	@echo ">> control API on http://localhost:8000 (gateway MCP: stdio, see gateway/server.py)"
+	@if [ -f frontend/package.json ]; then npm --prefix frontend run dev & fi
 	$(UV) run uvicorn api.main:app --reload --port 8000
 
-test:              ## Run the test suite (Playwright smoke added in M7)
+test: test-frontend  ## Run pytest (+ Playwright smoke when the frontend is installed)
 	$(UV) run pytest
+
+test-frontend:
+	@if [ -d frontend/node_modules ]; then \
+		echo ">> frontend e2e (Playwright smoke)"; \
+		npm --prefix frontend run test:e2e; \
+	else \
+		echo ">> frontend deps not installed: Playwright smoke skipped (run 'make install')"; \
+	fi
 
 lint:              ## ruff lint
 	$(UV) run ruff check .
