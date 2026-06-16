@@ -54,7 +54,7 @@ export default function AuditPage() {
         </div>
       </header>
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
-      <div className="card overflow-hidden">
+      <div className="card overflow-x-auto">
         <table className="data-table">
           <thead>
             <tr>
