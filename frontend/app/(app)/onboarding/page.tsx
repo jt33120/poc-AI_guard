@@ -62,14 +62,23 @@ from openai import OpenAI
 client = OpenAI(
     base_url="${XSOM_API}/proxy/openai/v1",
     default_headers={"X-Gateway-Token": "${key}"},
+    # add "X-XSOM-Mode": "enforce" to also block non-allowed tool-calls
 )
 # Use the client exactly as before — xSOM audits every tool-call it makes.`;
   }
-  const note =
-    stack === "anthropic"
-      ? "# OpenAI base_url proxy is live; the Anthropic proxy is coming.\n# Until then, gate tool execution like this:\n"
-      : "";
-  return `${note}import requests
+  if (stack === "anthropic") {
+    return `# Zero-code monitoring — point the Anthropic SDK at xSOM.
+# Your ANTHROPIC_API_KEY is still used and forwarded to Anthropic.
+from anthropic import Anthropic
+
+client = Anthropic(
+    base_url="${XSOM_API}/proxy/anthropic",
+    default_headers={"X-Gateway-Token": "${key}"},
+    # add "X-XSOM-Mode": "enforce" to also block non-allowed tool-calls
+)
+# Use the client exactly as before — xSOM audits every tool_use it makes.`;
+  }
+  return `import requests
 
 XSOM_API = "${XSOM_API}"
 XSOM_KEY = "${key}"
@@ -290,7 +299,7 @@ export default function OnboardingPage() {
               <CopyButton text={snippet(stack, apiKey)} label={t("onb.copy")} />
             </div>
             <p className="muted mt-1 text-xs">
-              {t(stack === "openai" ? "onb.snippet.proxy" : "onb.snippet.note")}
+              {t(stack === "openai" || stack === "anthropic" ? "onb.snippet.proxy" : "onb.snippet.note")}
             </p>
             <pre className="mt-2 overflow-x-auto rounded-xl bg-navy-mid/70 p-4 text-xs text-white/80">
               {snippet(stack, apiKey)}
