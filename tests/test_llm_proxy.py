@@ -155,3 +155,87 @@ def test_proxy_requires_gateway_token(db: DBHandle, test_verifier: TokenVerifier
     client = _client(db.url, test_verifier)
     resp = client.post("/proxy/openai/v1/chat/completions", json={"model": "gpt-4o"})
     assert resp.status_code == 401
+
+
+# --- Anthropic + enforcement -------------------------------------------------
+
+ANTHROPIC_BODY = {
+    "id": "msg_test",
+    "type": "message",
+    "role": "assistant",
+    "content": [
+        {"type": "text", "text": "Sure."},
+        {"type": "tool_use", "id": "tu_1", "name": "crm.delete_contact", "input": {"id": 42}},
+        {"type": "tool_use", "id": "tu_2", "name": "crm.get_contact", "input": {"id": 7}},
+    ],
+}
+
+
+def test_extract_tool_use_anthropic() -> None:
+    assert llm_proxy._extract_tool_use(ANTHROPIC_BODY) == [
+        ("crm.delete_contact", {"id": 42}),
+        ("crm.get_contact", {"id": 7}),
+    ]
+
+
+def test_anthropic_proxy_forwards_and_audits(
+    db: DBHandle,
+    test_verifier: TokenVerifier,
+    make_token: Callable[..., str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tid = _tenant(db)
+    client = _client(db.url, test_verifier)
+    admin = make_token(tenant_id=tid, role="admin")
+    client.put(
+        "/v1/policy", headers={"Authorization": f"Bearer {admin}"}, json={"yaml": AUTO_POLICY}
+    )
+    raw = client.post(
+        "/v1/gateway-tokens", headers={"Authorization": f"Bearer {admin}"}, json={"name": "bot"}
+    ).json()["token"]
+
+    fake = _FakeClient(_FakeResp(ANTHROPIC_BODY))
+    monkeypatch.setattr(llm_proxy, "_http", lambda: fake)
+    resp = client.post(
+        "/proxy/anthropic/v1/messages",
+        headers={"X-Gateway-Token": raw, "x-api-key": "sk-ant-agent"},
+        json={"model": "claude-3-5-sonnet", "messages": [{"role": "user", "content": "x"}]},
+    )
+    assert resp.status_code == 200
+    assert fake.captured["headers"]["x-api-key"] == "sk-ant-agent"
+    import psycopg
+
+    with psycopg.connect(db.url) as check:
+        rows = dict(
+            check.execute(
+                "select tool_name, decision from audit_log where tenant_id = %s", (tid,)
+            ).fetchall()
+        )
+    assert rows == {"crm.delete_contact": "hold", "crm.get_contact": "allow"}
+
+
+def test_enforce_mode_strips_non_allowed_tool_calls(
+    db: DBHandle,
+    test_verifier: TokenVerifier,
+    make_token: Callable[..., str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tid = _tenant(db)
+    client = _client(db.url, test_verifier)
+    admin = make_token(tenant_id=tid, role="admin")
+    client.put(
+        "/v1/policy", headers={"Authorization": f"Bearer {admin}"}, json={"yaml": AUTO_POLICY}
+    )
+    raw = client.post(
+        "/v1/gateway-tokens", headers={"Authorization": f"Bearer {admin}"}, json={"name": "bot"}
+    ).json()["token"]
+
+    monkeypatch.setattr(llm_proxy, "_http", lambda: _FakeClient(_FakeResp(UPSTREAM_BODY)))
+    resp = client.post(
+        "/proxy/openai/v1/chat/completions",
+        headers={"X-Gateway-Token": raw, "Authorization": "Bearer sk", "X-XSOM-Mode": "enforce"},
+        json={"model": "gpt-4o", "messages": [{"role": "user", "content": "remove 42"}]},
+    )
+    # The irreversible delete (hold) is stripped; the read (allow) remains.
+    kept = [c["function"]["name"] for c in resp.json()["choices"][0]["message"]["tool_calls"]]
+    assert kept == ["crm.get_contact"]

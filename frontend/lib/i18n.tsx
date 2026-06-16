@@ -411,6 +411,12 @@ export const STR = {
     fr: "Les écritures requièrent un humain ; envois et actions irréversibles, deux validateurs.",
   },
   "onb.recommended": { en: "Recommended", fr: "Recommandé" },
+  "onb.tpl.mode.template": { en: "Use a template", fr: "Utiliser un modèle" },
+  "onb.tpl.mode.ai": { en: "Describe it (AI)", fr: "Décrire (IA)" },
+  "onb.ai.ready": {
+    en: "Policy drafted — continue to get your key.",
+    fr: "Politique générée — continuez pour obtenir votre clé.",
+  },
   "onb.generate": { en: "Generate key & apply", fr: "Générer la clé & appliquer" },
   "onb.generating": { en: "Setting up…", fr: "Configuration…" },
   "onb.warn": {

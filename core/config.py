@@ -58,6 +58,7 @@ class Settings(BaseSettings):
     # --- LLM provider proxy (zero-code monitoring) -----------------------
     # Upstream provider base; the agent points its OpenAI base_url at xSOM.
     openai_base_url: str = Field(default="https://api.openai.com", max_length=300)
+    anthropic_base_url: str = Field(default="https://api.anthropic.com", max_length=300)
     llm_proxy_rate_limit: str = Field(default="240/minute", max_length=40)
     # slowapi limit for the natural-language policy assistant (LLM-backed).
     policy_draft_rate_limit: str = Field(default="20/minute", max_length=40)
