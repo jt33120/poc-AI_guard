@@ -6,7 +6,9 @@ import { config as appConfig } from "@/lib/config";
 const PROTECTED = ["/home", "/executive", "/inspector", "/approvals", "/audit", "/admin"];
 
 export async function middleware(request: NextRequest) {
-  const isProtected = PROTECTED.some((p) => request.nextUrl.pathname.startsWith(p));
+  // Segment-aware match so e.g. /executive-preview (public) is NOT caught by /executive.
+  const path = request.nextUrl.pathname;
+  const isProtected = PROTECTED.some((p) => path === p || path.startsWith(`${p}/`));
 
   // Hermetic E2E mode: gate on a marker cookie instead of a real session.
   if (appConfig.e2e) {
