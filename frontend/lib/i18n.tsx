@@ -67,7 +67,32 @@ export const STR = {
   "login.submitting": { en: "Signing in…", fr: "Connexion…" },
   "login.securing": { en: "Securing your session", fr: "Sécurisation de votre session" },
   "login.failed": { en: "Sign in failed", fr: "Échec de la connexion" },
+  "login.forgot": { en: "Forgot password?", fr: "Mot de passe oublié ?" },
   "login.footer": { en: "Every agent action — authorized, gated, and logged.", fr: "Chaque action d'agent — autorisée, contrôlée et journalisée." },
+
+  // Forgot / reset password
+  "forgot.title": { en: "Reset your password", fr: "Réinitialiser le mot de passe" },
+  "forgot.subtitle": {
+    en: "Enter your email and we'll send you a reset link.",
+    fr: "Saisissez votre email et nous vous enverrons un lien de réinitialisation.",
+  },
+  "forgot.submit": { en: "Send reset link", fr: "Envoyer le lien" },
+  "forgot.sending": { en: "Sending…", fr: "Envoi…" },
+  "forgot.sent": {
+    en: "If an account exists for that email, a reset link is on its way. Check your inbox (and spam).",
+    fr: "Si un compte existe pour cet email, un lien de réinitialisation arrive. Vérifiez votre boîte (et les spams).",
+  },
+  "forgot.back": { en: "Back to sign in", fr: "Retour à la connexion" },
+  "reset.title": { en: "Choose a new password", fr: "Choisir un nouveau mot de passe" },
+  "reset.subtitle": { en: "Set a new password for your account.", fr: "Définissez un nouveau mot de passe pour votre compte." },
+  "reset.password": { en: "New password", fr: "Nouveau mot de passe" },
+  "reset.confirm": { en: "Confirm password", fr: "Confirmer le mot de passe" },
+  "reset.submit": { en: "Update password", fr: "Mettre à jour" },
+  "reset.saving": { en: "Updating…", fr: "Mise à jour…" },
+  "reset.success": { en: "Password updated — redirecting you to sign in…", fr: "Mot de passe mis à jour — redirection vers la connexion…" },
+  "reset.tooshort": { en: "Password must be at least 8 characters.", fr: "Le mot de passe doit comporter au moins 8 caractères." },
+  "reset.mismatch": { en: "The two passwords don't match.", fr: "Les deux mots de passe ne correspondent pas." },
+  "reset.invalid": { en: "This reset link is invalid or has expired — request a new one.", fr: "Ce lien est invalide ou expiré — demandez-en un nouveau." },
 
   // Inspector
   "inspector.title": { en: "Inspector", fr: "Inspecteur" },
