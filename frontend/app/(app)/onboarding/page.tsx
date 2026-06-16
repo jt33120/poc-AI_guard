@@ -122,15 +122,38 @@ export default function OnboardingPage() {
   const [name, setName] = useState("");
   const [stack, setStack] = useState<Stack>("http");
   const [tpl, setTpl] = useState<Tpl>("balanced");
+  const [mode, setMode] = useState<"template" | "ai">("template");
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiYaml, setAiYaml] = useState<string | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState<string | null>(null);
+
+  const effectiveYaml = mode === "ai" && aiYaml ? aiYaml : policyYaml(tpl, name.trim());
+
+  async function draftAI() {
+    if (!aiPrompt.trim()) return;
+    setAiBusy(true);
+    setAiError(null);
+    try {
+      const doc = await apiSend<{ yaml: string }>("v1/policy/draft", "POST", {
+        prompt: aiPrompt.trim(),
+      });
+      setAiYaml(doc.yaml);
+    } catch (e: unknown) {
+      setAiError(String(e).includes("503") ? t("admin.ai.unavailable") : t("admin.ai.error"));
+    } finally {
+      setAiBusy(false);
+    }
+  }
 
   async function finish() {
     setBusy(true);
     setError(null);
     try {
-      await apiSend("v1/policy", "PUT", { yaml: policyYaml(tpl, name.trim()) });
+      await apiSend("v1/policy", "PUT", { yaml: effectiveYaml });
       const tok = await apiSend<{ token: string }>("v1/gateway-tokens", "POST", {
         name: name.trim() || "agent",
       });
@@ -214,37 +237,94 @@ export default function OnboardingPage() {
         </div>
       ) : null}
 
-      {/* Step 2 — protection template */}
+      {/* Step 2 — protection: template or AI prompt */}
       {step === 2 ? (
         <div className="card flex flex-col gap-5 p-6">
-          <label className="label">{t("onb.tpl.label")}</label>
-          <div className="flex flex-col gap-2">
-            {TEMPLATES.map((opt) => (
+          {/* mode toggle */}
+          <div className="flex w-fit rounded-pill border border-white/15 bg-white/[0.04] p-0.5 text-sm font-semibold">
+            {(["template", "ai"] as const).map((m) => (
               <button
-                key={opt.id}
+                key={m}
                 type="button"
-                onClick={() => setTpl(opt.id)}
-                className={`rounded-xl border p-4 text-left transition ${
-                  tpl === opt.id
-                    ? "border-brand bg-brand/10"
-                    : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"
+                onClick={() => setMode(m)}
+                className={`rounded-pill px-3.5 py-1 transition ${
+                  mode === m ? "bg-brand text-white" : "text-white/55 hover:text-white"
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold">{t(opt.t)}</span>
-                  {opt.id === "balanced" ? (
-                    <span className="badge badge-blue">{t("onb.recommended")}</span>
-                  ) : null}
-                </div>
-                <p className="muted mt-1 text-sm">{t(opt.d)}</p>
+                {t(m === "template" ? "onb.tpl.mode.template" : "onb.tpl.mode.ai")}
               </button>
             ))}
           </div>
+
+          {mode === "template" ? (
+            <>
+              <label className="label">{t("onb.tpl.label")}</label>
+              <div className="flex flex-col gap-2">
+                {TEMPLATES.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setTpl(opt.id)}
+                    className={`rounded-xl border p-4 text-left transition ${
+                      tpl === opt.id
+                        ? "border-brand bg-brand/10"
+                        : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{t(opt.t)}</span>
+                      {opt.id === "balanced" ? (
+                        <span className="badge badge-blue">{t("onb.recommended")}</span>
+                      ) : null}
+                    </div>
+                    <p className="muted mt-1 text-sm">{t(opt.d)}</p>
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <textarea
+                aria-label={t("onb.tpl.mode.ai")}
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                rows={3}
+                placeholder={t("admin.ai.ph")}
+                className="input resize-y text-sm"
+              />
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={draftAI}
+                  disabled={aiBusy || !aiPrompt.trim()}
+                  className="btn btn-primary px-4 py-1.5"
+                >
+                  {aiBusy ? t("admin.ai.generating") : t("admin.ai.generate")}
+                </button>
+                <p className="muted text-xs">{t("admin.ai.hint")}</p>
+              </div>
+              {aiError ? <p className="text-sm text-red-300">{aiError}</p> : null}
+              {aiYaml ? (
+                <>
+                  <p className="text-sm text-emerald-300">{t("onb.ai.ready")}</p>
+                  <pre className="overflow-x-auto rounded-xl bg-navy-mid/70 p-4 text-xs text-white/80">
+                    {aiYaml}
+                  </pre>
+                </>
+              ) : null}
+            </div>
+          )}
+
           <div className="flex justify-between">
             <button type="button" className="btn btn-ghost" onClick={() => setStep(1)}>
               {t("onb.back")}
             </button>
-            <button type="button" className="btn btn-primary" onClick={() => setStep(3)}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => setStep(3)}
+              disabled={mode === "ai" && !aiYaml}
+            >
               {t("onb.next")}
             </button>
           </div>
@@ -257,7 +337,7 @@ export default function OnboardingPage() {
           <div>
             <span className="label">{t("onb.s2")}</span>
             <pre className="mt-2 overflow-x-auto rounded-xl bg-navy-mid/70 p-4 text-xs text-white/80">
-              {policyYaml(tpl, name.trim())}
+              {effectiveYaml}
             </pre>
           </div>
           <p className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-300">
