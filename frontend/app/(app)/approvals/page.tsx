@@ -65,7 +65,7 @@ export default function ApprovalsPage() {
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
       {loading ? (
         <div className="card">
-          <Spinner label={t("common.loading")} />
+          <Spinner label={t("common.loading")} slowLabel={t("common.waking")} />
         </div>
       ) : items.length === 0 ? (
         <div className="card p-8 text-center">

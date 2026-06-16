@@ -16,6 +16,10 @@ export const STR = {
   "nav.norole": { en: "no role", fr: "aucun rôle" },
 
   "common.loading": { en: "Loading…", fr: "Chargement…" },
+  "common.waking": {
+    en: "Waking the secure backend — the first load after a quiet period can take up to a minute.",
+    fr: "Réveil du serveur sécurisé — le premier chargement après une période d'inactivité peut prendre jusqu'à une minute.",
+  },
 
   // Welcome / landing
   "welcome.badge": {

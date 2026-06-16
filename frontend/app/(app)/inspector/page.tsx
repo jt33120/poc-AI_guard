@@ -90,7 +90,7 @@ export default function InspectorPage() {
           </tbody>
         </table>
         {loading ? (
-          <Spinner label={t("common.loading")} />
+          <Spinner label={t("common.loading")} slowLabel={t("common.waking")} />
         ) : tools.length === 0 && !error ? (
           <p className="muted p-4">{t("inspector.empty")}</p>
         ) : null}

@@ -38,7 +38,9 @@ export default function LoginPage() {
 
   return (
     <>
-      {redirecting ? <FullScreenLoader label={t("login.securing")} /> : null}
+      {redirecting ? (
+        <FullScreenLoader label={t("login.securing")} slowLabel={t("common.waking")} />
+      ) : null}
       <div className="absolute right-6 top-6">
         <LanguageToggle />
       </div>
