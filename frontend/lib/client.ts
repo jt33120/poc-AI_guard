@@ -20,5 +20,12 @@ export async function apiSend<T>(path: string, method: string, body?: unknown): 
   return (await res.json()) as T;
 }
 
+export async function apiDelete(path: string): Promise<void> {
+  const res = await fetch(`/api/control/${path}`, { method: "DELETE" });
+  if (!res.ok) {
+    throw new Error(`Request failed (${res.status})`);
+  }
+}
+
 export const exportUrl = (format: string, render: string): string =>
   `/api/control/v1/audit/export?format=${format}&render=${render}`;

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { ApiKeys } from "@/components/ApiKeys";
 import { apiGet, apiSend } from "@/lib/client";
 
 interface PolicyDoc {
@@ -93,6 +94,8 @@ export default function AdminPage() {
           {servers.length === 0 ? <li className="muted">No servers declared.</li> : null}
         </ul>
       </div>
+
+      <ApiKeys />
     </section>
   );
 }
