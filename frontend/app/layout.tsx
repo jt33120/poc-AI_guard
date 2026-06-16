@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 
+import { LanguageProvider } from "@/lib/i18n";
 import "./globals.css";
 
 // Brand typeface used across xsom.fr.
@@ -19,7 +20,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={jakarta.variable}>
-      <body className="min-h-screen font-sans antialiased">{children}</body>
+      <body className="min-h-screen font-sans antialiased">
+        <LanguageProvider>{children}</LanguageProvider>
+      </body>
     </html>
   );
 }

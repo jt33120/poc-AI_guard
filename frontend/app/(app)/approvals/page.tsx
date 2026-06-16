@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Spinner } from "@/components/Spinner";
 import { apiGet, apiSend } from "@/lib/client";
+import { useT } from "@/lib/i18n";
 
 interface Approval {
   id: string;
@@ -15,8 +16,10 @@ interface Approval {
 }
 
 export default function ApprovalsPage() {
+  const { t } = useT();
   const [items, setItems] = useState<Approval[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(() => {
@@ -30,8 +33,18 @@ export default function ApprovalsPage() {
 
   async function decide(id: string, decision: "approve" | "deny") {
     setError(null);
+    setMessage(null);
     try {
-      await apiSend(`v1/approvals/${id}/decision`, "POST", { decision });
+      const r = await apiSend<{ status: string }>(`v1/approvals/${id}/decision`, "POST", {
+        decision,
+      });
+      setMessage(
+        r.status === "approved"
+          ? t("approvals.approved")
+          : r.status === "denied"
+            ? t("approvals.denied")
+            : t("approvals.recorded"),
+      );
       reload();
     } catch (e: unknown) {
       setError(String(e));
@@ -41,17 +54,22 @@ export default function ApprovalsPage() {
   return (
     <section className="flex animate-fade-up flex-col gap-5">
       <header>
-        <h1 className="text-2xl font-bold">Approval queue</h1>
-        <p className="muted mt-1">Irreversible actions held for a human decision.</p>
+        <h1 className="text-2xl font-bold">{t("approvals.title")}</h1>
+        <p className="muted mt-1">{t("approvals.subtitle")}</p>
       </header>
+      {message ? (
+        <div className="rounded-xl border border-brand/30 bg-brand/10 px-4 py-2.5 text-sm text-brand-bright">
+          {message}
+        </div>
+      ) : null}
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
       {loading ? (
         <div className="card">
-          <Spinner />
+          <Spinner label={t("common.loading")} />
         </div>
       ) : items.length === 0 ? (
         <div className="card p-8 text-center">
-          <p className="muted">No pending approvals.</p>
+          <p className="muted">{t("approvals.empty")}</p>
         </div>
       ) : null}
       <ul className="flex flex-col gap-3">
@@ -66,7 +84,7 @@ export default function ApprovalsPage() {
             </div>
             <div className="mt-4 flex items-center justify-between">
               <span className="label">
-                approvals {item.approved_by.length}/{item.required_count}
+                {t("approvals.count")} {item.approved_by.length}/{item.required_count}
               </span>
               <div className="flex gap-2">
                 <button
@@ -74,14 +92,14 @@ export default function ApprovalsPage() {
                   onClick={() => decide(item.id, "approve")}
                   className="btn btn-success px-4 py-1.5"
                 >
-                  Approve
+                  {t("approvals.approve")}
                 </button>
                 <button
                   type="button"
                   onClick={() => decide(item.id, "deny")}
                   className="btn btn-danger px-4 py-1.5"
                 >
-                  Deny
+                  {t("approvals.deny")}
                 </button>
               </div>
             </div>

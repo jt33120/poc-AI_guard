@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 
-import { DecisionBadge } from "@/components/brand";
 import { Spinner } from "@/components/Spinner";
+import { Tooltip } from "@/components/Tooltip";
 import { apiGet } from "@/lib/client";
+import { type StrKey, useT } from "@/lib/i18n";
 
 interface ToolView {
   name: string;
@@ -13,7 +14,22 @@ interface ToolView {
   decision: string;
 }
 
+const CLASS_KEY: Record<string, StrKey> = {
+  read: "class.read",
+  write: "class.write",
+  external_send: "class.external_send",
+  irreversible: "class.irreversible",
+};
+
+const DECISION: Record<string, { cls: string; desc: StrKey }> = {
+  auto: { cls: "badge-green", desc: "dec.auto" },
+  human_in_the_loop: { cls: "badge-amber", desc: "dec.human_in_the_loop" },
+  human_dual: { cls: "badge-amber", desc: "dec.human_dual" },
+  deny: { cls: "badge-red", desc: "dec.deny" },
+};
+
 export default function InspectorPage() {
+  const { t } = useT();
   const [tools, setTools] = useState<ToolView[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,43 +44,57 @@ export default function InspectorPage() {
   return (
     <section className="flex animate-fade-up flex-col gap-5">
       <header>
-        <h1 className="text-2xl font-bold">Inspector</h1>
-        <p className="muted mt-1">Tools exposed to the agent and their effective policy.</p>
+        <h1 className="text-2xl font-bold">{t("inspector.title")}</h1>
+        <p className="muted mt-1">{t("inspector.subtitle")}</p>
       </header>
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
       <div className="card overflow-hidden">
         <table className="data-table">
           <thead>
             <tr>
-              <th>Tool</th>
-              <th>Canonical</th>
-              <th>Class</th>
-              <th>Decision</th>
+              <th>{t("inspector.col.tool")}</th>
+              <th>{t("inspector.col.class")}</th>
+              <th>{t("inspector.col.decision")}</th>
             </tr>
           </thead>
           <tbody>
-            {tools.map((tool) => (
-              <tr key={tool.canonical}>
-                <td className="font-mono text-white">{tool.name}</td>
-                <td className="font-mono text-white/45">{tool.canonical}</td>
-                <td>
-                  {tool.action_class ? (
-                    <span className="badge badge-neutral">{tool.action_class}</span>
-                  ) : (
-                    <span className="text-white/30">—</span>
-                  )}
-                </td>
-                <td>
-                  <DecisionBadge value={tool.decision} />
-                </td>
-              </tr>
-            ))}
+            {tools.map((tool) => {
+              const ck = tool.action_class ? CLASS_KEY[tool.action_class] : undefined;
+              const dec = DECISION[tool.decision];
+              return (
+                <tr key={tool.canonical}>
+                  <td className="font-mono text-white">{tool.name}</td>
+                  <td>
+                    {ck ? (
+                      <Tooltip label={t(`${ck}.desc` as StrKey)}>
+                        <span className="badge badge-neutral">{t(ck)}</span>
+                      </Tooltip>
+                    ) : tool.action_class ? (
+                      <span className="badge badge-neutral">{tool.action_class}</span>
+                    ) : (
+                      <span className="text-white/30">—</span>
+                    )}
+                  </td>
+                  <td>
+                    {dec ? (
+                      <Tooltip label={t(dec.desc)}>
+                        <span className={`badge ${dec.cls} capitalize`}>
+                          {tool.decision.replace(/_/g, " ")}
+                        </span>
+                      </Tooltip>
+                    ) : (
+                      <span className="badge badge-neutral">{tool.decision}</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         {loading ? (
-          <Spinner />
+          <Spinner label={t("common.loading")} />
         ) : tools.length === 0 && !error ? (
-          <p className="muted p-4">No tools exposed.</p>
+          <p className="muted p-4">{t("inspector.empty")}</p>
         ) : null}
       </div>
     </section>

@@ -4,12 +4,14 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 import { Logo, Wordmark } from "@/components/brand";
+import { LanguageToggle, type StrKey, useT } from "@/lib/i18n";
 
-const BASE_LINKS = [
-  { href: "/inspector", label: "Inspector" },
-  { href: "/approvals", label: "Approvals" },
-  { href: "/audit", label: "Audit" },
+const LINKS: { href: string; key: StrKey }[] = [
+  { href: "/inspector", key: "nav.inspector" },
+  { href: "/approvals", key: "nav.approvals" },
+  { href: "/audit", key: "nav.audit" },
 ];
+const ADMIN_LINK: { href: string; key: StrKey } = { href: "/admin", key: "nav.admin" };
 
 export function AppShell({
   role,
@@ -18,9 +20,10 @@ export function AppShell({
   role: string | null;
   children: React.ReactNode;
 }) {
+  const { t } = useT();
   const pathname = usePathname();
   const router = useRouter();
-  const links = role === "admin" ? [...BASE_LINKS, { href: "/admin", label: "Admin" }] : BASE_LINKS;
+  const links = role === "admin" ? [...LINKS, ADMIN_LINK] : LINKS;
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -50,16 +53,17 @@ export function AppShell({
                         : "text-white/55 hover:bg-white/[0.05] hover:text-white"
                     }`}
                   >
-                    {link.label}
+                    {t(link.key)}
                   </Link>
                 );
               })}
             </nav>
           </div>
           <div className="flex items-center gap-3">
-            <span className="badge badge-blue capitalize">{role ?? "no role"}</span>
+            <LanguageToggle />
+            <span className="badge badge-blue capitalize">{role ?? t("nav.norole")}</span>
             <button type="button" onClick={logout} className="btn btn-ghost px-4 py-1.5">
-              Sign out
+              {t("nav.signout")}
             </button>
           </div>
         </div>

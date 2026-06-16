@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { ApiKeys } from "@/components/ApiKeys";
 import { apiGet, apiSend } from "@/lib/client";
+import { useT } from "@/lib/i18n";
 
 interface PolicyDoc {
   yaml: string;
@@ -18,6 +19,7 @@ interface ServerRow {
 }
 
 export default function AdminPage() {
+  const { t } = useT();
   const [yaml, setYaml] = useState("");
   const [version, setVersion] = useState<number | null>(null);
   const [servers, setServers] = useState<ServerRow[]>([]);
@@ -42,22 +44,22 @@ export default function AdminPage() {
     try {
       const doc = await apiSend<PolicyDoc>("v1/policy", "PUT", { yaml });
       setVersion(doc.version);
-      setMessage(`Policy saved (version ${doc.version}).`);
+      setMessage(t("admin.policy.saved", { v: doc.version }));
     } catch (e: unknown) {
-      setError(`Invalid policy: ${String(e)}`);
+      setError(`${t("admin.policy.invalid")} ${String(e)}`);
     }
   }
 
   return (
     <section className="flex animate-fade-up flex-col gap-6">
       <header>
-        <h1 className="text-2xl font-bold">Admin</h1>
-        <p className="muted mt-1">Authorization policy and downstream tool servers.</p>
+        <h1 className="text-2xl font-bold">{t("admin.title")}</h1>
+        <p className="muted mt-1">{t("admin.subtitle")}</p>
       </header>
 
       <div className="card p-5">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Policy editor</h2>
+          <h2 className="text-lg font-semibold">{t("admin.policy.title")}</h2>
           <span className="badge badge-neutral">version {version ?? "—"}</span>
         </div>
         <textarea
@@ -69,7 +71,7 @@ export default function AdminPage() {
         />
         <div className="mt-3 flex items-center gap-3">
           <button type="button" onClick={save} className="btn btn-primary">
-            Save policy
+            {t("admin.policy.save")}
           </button>
           {message ? <span className="text-sm text-emerald-300">{message}</span> : null}
           {error ? <span className="text-sm text-red-300">{error}</span> : null}
@@ -77,7 +79,7 @@ export default function AdminPage() {
       </div>
 
       <div className="card p-5">
-        <h2 className="text-lg font-semibold">Downstream servers</h2>
+        <h2 className="text-lg font-semibold">{t("admin.servers.title")}</h2>
         <ul className="mt-3 flex flex-col gap-1.5 text-sm">
           {servers.map((server) => (
             <li
@@ -91,7 +93,7 @@ export default function AdminPage() {
               </span>
             </li>
           ))}
-          {servers.length === 0 ? <li className="muted">No servers declared.</li> : null}
+          {servers.length === 0 ? <li className="muted">{t("admin.servers.empty")}</li> : null}
         </ul>
       </div>
 
