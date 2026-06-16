@@ -93,7 +93,7 @@ export default function AuditPage() {
           </tbody>
         </table>
         {loading ? (
-          <Spinner label={t("common.loading")} />
+          <Spinner label={t("common.loading")} slowLabel={t("common.waking")} />
         ) : entries.length === 0 && !error ? (
           <p className="muted p-4">{t("audit.empty")}</p>
         ) : null}
