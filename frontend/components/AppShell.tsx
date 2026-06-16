@@ -14,7 +14,10 @@ const LINKS: { href: string; key: StrKey }[] = [
   { href: "/approvals", key: "nav.approvals" },
   { href: "/audit", key: "nav.audit" },
 ];
-const ADMIN_LINK: { href: string; key: StrKey } = { href: "/admin", key: "nav.admin" };
+const ADMIN_LINKS: { href: string; key: StrKey }[] = [
+  { href: "/onboarding", key: "nav.onboard" },
+  { href: "/admin", key: "nav.admin" },
+];
 
 export function AppShell({
   role,
@@ -27,7 +30,7 @@ export function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const links = role === "admin" ? [...LINKS, ADMIN_LINK] : LINKS;
+  const links = role === "admin" ? [...LINKS, ...ADMIN_LINKS] : LINKS;
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });

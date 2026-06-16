@@ -33,6 +33,63 @@ class Approval(StrEnum):
     deny = "deny"
 
 
+#: Safe per-class approvals used when ``auto_classify`` is on and a class isn't
+#: explicitly overridden — reads/writes run, external sends and irreversible
+#: actions pause for a human (fail toward review).
+_CLASS_DEFAULTS: dict[ActionClass, Approval] = {
+    ActionClass.read: Approval.auto,
+    ActionClass.write: Approval.auto,
+    ActionClass.external_send: Approval.human_in_the_loop,
+    ActionClass.irreversible: Approval.human_in_the_loop,
+}
+
+#: Name heuristics for zero-config onboarding. Checked in order of decreasing
+#: risk so an ambiguous name errs toward the safer class (irreversible/send win
+#: over read/write — misclassifying never *relaxes* control).
+_NAME_HEURISTICS: tuple[tuple[re.Pattern[str], ActionClass], ...] = (
+    (
+        re.compile(
+            r"delet|destroy|drop|wipe|purge|remove|terminat|deploy|revoke|truncat|reset|cancel",
+            re.I,
+        ),
+        ActionClass.irreversible,
+    ),
+    (
+        re.compile(
+            r"send|email|mail|publish|post|notify|messag|sms|charge"
+            r"|payment|pay|transfer|tweet|webhook|dispatch|invite",
+            re.I,
+        ),
+        ActionClass.external_send,
+    ),
+    (
+        re.compile(
+            r"get|list|read|search|find|fetch|query|view|describ"
+            r"|show|lookup|count|browse|inspect|retriev",
+            re.I,
+        ),
+        ActionClass.read,
+    ),
+    (
+        re.compile(
+            r"creat|updat|write|insert|set|add|edit|modif|upsert|put"
+            r"|patch|move|renam|tag|assign|shortlist|save|upload",
+            re.I,
+        ),
+        ActionClass.write,
+    ),
+)
+
+
+def classify_by_name(tool_name: str) -> ActionClass | None:
+    """Best-effort action class from the tool name (server prefix ignored)."""
+    base = tool_name.rsplit(".", 1)[-1]
+    for pattern, action_class in _NAME_HEURISTICS:
+        if pattern.search(base):
+            return action_class
+    return None
+
+
 class PolicyError(ValueError):
     """Raised when a policy document is invalid (API maps this to HTTP 422)."""
 
@@ -61,6 +118,15 @@ class PolicyDefaults(BaseModel):
     unknown_tool: Approval = Approval.deny
     hitl_timeout_seconds: int = Field(default=3600, ge=1, le=86400)
     on_approval_service_down: Approval = Approval.deny
+    # Zero-config onboarding: classify un-listed tools by name and gate them by
+    # class. Off by default so existing policies are unaffected (backward compat).
+    auto_classify: bool = False
+    class_approvals: dict[ActionClass, Approval] = Field(
+        default_factory=lambda: dict(_CLASS_DEFAULTS)
+    )
+
+    def approval_for_class(self, action_class: ActionClass) -> Approval:
+        return self.class_approvals.get(action_class, _CLASS_DEFAULTS[action_class])
 
 
 class Policy(BaseModel):
@@ -113,7 +179,9 @@ def parse_policy(text: str) -> Policy:
 def classify(policy: Policy, tool_name: str, arguments: dict[str, Any]) -> ActionClass | None:
     """Return the deterministic action class, or None if unknown / needs the judge."""
     rule = policy.rule_for(tool_name)
-    if rule is None or rule.classify == "ambiguous":
+    if rule is None:
+        return classify_by_name(tool_name) if policy.defaults.auto_classify else None
+    if rule.classify == "ambiguous":
         return None
     return rule.action_class
 
@@ -122,6 +190,10 @@ def authorize(policy: Policy, tool_name: str) -> Approval:
     """Return the policy decision for a tool (defaults.unknown_tool if unknown)."""
     rule = policy.rule_for(tool_name)
     if rule is None:
+        if policy.defaults.auto_classify:
+            action_class = classify_by_name(tool_name)
+            if action_class is not None:
+                return policy.defaults.approval_for_class(action_class)
         return policy.defaults.unknown_tool
     return rule.approval
 
@@ -178,6 +250,15 @@ def evaluate(policy: Policy, tool_name: str, arguments: dict[str, Any]) -> Polic
     """Full decision for a tool call: action class + authorization (fail-closed)."""
     rule = policy.rule_for(tool_name)
     if rule is None:
+        if policy.defaults.auto_classify:
+            action_class = classify_by_name(tool_name)
+            if action_class is not None:
+                return PolicyOutcome(
+                    action_class,
+                    policy.defaults.approval_for_class(action_class),
+                    None,
+                    "auto-classified by name",
+                )
         return PolicyOutcome(None, policy.defaults.unknown_tool, None, "unknown tool")
     if rule.classify == "ambiguous":
         return PolicyOutcome(

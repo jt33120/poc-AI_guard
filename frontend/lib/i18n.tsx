@@ -376,6 +376,70 @@ export const STR = {
   },
   "land.exec.link": { en: "Executive snapshot", fr: "Synthèse pour dirigeants" },
 
+  // ── Onboarding wizard ────────────────────────────────────────────────
+  "nav.onboard": { en: "Connect agent", fr: "Connecter un agent" },
+  "onb.title": { en: "Connect an agent", fr: "Connecter un agent" },
+  "onb.subtitle": {
+    en: "Put your agent under control in three steps — no YAML to write.",
+    fr: "Mettez votre agent sous contrôle en trois étapes — sans écrire de YAML.",
+  },
+  "onb.s1": { en: "Agent", fr: "Agent" },
+  "onb.s2": { en: "Protection", fr: "Protection" },
+  "onb.s3": { en: "Connect", fr: "Connexion" },
+  "onb.name.label": { en: "Agent name", fr: "Nom de l'agent" },
+  "onb.name.ph": { en: "e.g. support-bot", fr: "ex. support-bot" },
+  "onb.stack.label": {
+    en: "How does your agent run its tools?",
+    fr: "Comment votre agent exécute-t-il ses outils ?",
+  },
+  "onb.next": { en: "Next", fr: "Suivant" },
+  "onb.back": { en: "Back", fr: "Retour" },
+  "onb.tpl.label": { en: "Choose a protection level", fr: "Choisissez un niveau de protection" },
+  "onb.tpl.monitor.t": { en: "Monitor only", fr: "Observation seule" },
+  "onb.tpl.monitor.d": {
+    en: "Audit everything, block nothing. Great to start.",
+    fr: "Tout auditer, ne rien bloquer. Idéal pour commencer.",
+  },
+  "onb.tpl.balanced.t": { en: "Balanced", fr: "Équilibré" },
+  "onb.tpl.balanced.d": {
+    en: "Reads & writes run; external sends and irreversible actions need a human.",
+    fr: "Lectures et écritures passent ; envois externes et actions irréversibles requièrent un humain.",
+  },
+  "onb.tpl.strict.t": { en: "Strict", fr: "Strict" },
+  "onb.tpl.strict.d": {
+    en: "Writes need a human; sends and irreversible actions need two approvers.",
+    fr: "Les écritures requièrent un humain ; envois et actions irréversibles, deux validateurs.",
+  },
+  "onb.recommended": { en: "Recommended", fr: "Recommandé" },
+  "onb.generate": { en: "Generate key & apply", fr: "Générer la clé & appliquer" },
+  "onb.generating": { en: "Setting up…", fr: "Configuration…" },
+  "onb.warn": {
+    en: "This sets your account's protection policy (replaces the current one).",
+    fr: "Ceci définit la politique de protection du compte (remplace l'actuelle).",
+  },
+  "onb.key.title": { en: "Your agent's API key", fr: "La clé d'API de votre agent" },
+  "onb.key.note": {
+    en: "Copy it now — it's shown only once.",
+    fr: "Copiez-la maintenant — affichée une seule fois.",
+  },
+  "onb.snippet.title": { en: "Drop this into your agent", fr: "Ajoutez ceci à votre agent" },
+  "onb.snippet.note": {
+    en: "Call xSOM right before your agent runs a tool; if it isn't allowed, don't run it.",
+    fr: "Appelez xSOM juste avant que votre agent exécute un outil ; si ce n'est pas autorisé, ne l'exécutez pas.",
+  },
+  "onb.snippet.proxy": {
+    en: "Zero-code monitoring: just change the base_url. xSOM sees and audits every tool-call the model makes (your provider key is forwarded, never stored).",
+    fr: "Monitoring zéro-code : changez seulement le base_url. xSOM voit et audite chaque tool-call du modèle (votre clé provider est transmise, jamais stockée).",
+  },
+  "onb.copy": { en: "Copy", fr: "Copier" },
+  "onb.copied": { en: "Copied", fr: "Copié" },
+  "onb.done.t": { en: "You're connected 🎉", fr: "Vous êtes connecté 🎉" },
+  "onb.done.d": {
+    en: "Watch actions in the Inspector and approve the risky ones in Approvals.",
+    fr: "Suivez les actions dans l'Inspecteur et validez les sensibles dans Approbations.",
+  },
+  "onb.error": { en: "Setup failed", fr: "Échec de la configuration" },
+
   // Login
   "login.title": { en: "Sign in", fr: "Se connecter" },
   "login.subtitle": { en: "Access the action-control console.", fr: "Accédez à la console de contrôle des actions." },
@@ -450,6 +514,26 @@ export const STR = {
   "admin.policy.save": { en: "Save policy", fr: "Enregistrer la politique" },
   "admin.policy.saved": { en: "Policy saved (version {v}).", fr: "Politique enregistrée (version {v})." },
   "admin.policy.invalid": { en: "Invalid policy:", fr: "Politique invalide :" },
+  "admin.ai.title": { en: "Describe it, we'll write the policy", fr: "Décrivez-la, on écrit la politique" },
+  "admin.ai.hint": {
+    en: "Plain words — e.g. “reads the CRM and emails candidates; never delete anything; deleting a database needs two approvers”.",
+    fr: "En langage courant — ex. « lit le CRM et envoie des emails aux candidats ; ne jamais supprimer ; supprimer une base demande deux validateurs ».",
+  },
+  "admin.ai.ph": {
+    en: "Describe what your agent does and your rules…",
+    fr: "Décrivez ce que fait votre agent et vos règles…",
+  },
+  "admin.ai.generate": { en: "Generate with AI", fr: "Générer avec l'IA" },
+  "admin.ai.generating": { en: "Generating…", fr: "Génération…" },
+  "admin.ai.review": {
+    en: "Draft ready below — review it, then Save policy to apply.",
+    fr: "Brouillon prêt ci-dessous — vérifiez-le, puis Enregistrer pour appliquer.",
+  },
+  "admin.ai.unavailable": {
+    en: "The AI assistant isn't configured yet (no Mistral key on the server).",
+    fr: "L'assistant IA n'est pas encore configuré (pas de clé Mistral sur le serveur).",
+  },
+  "admin.ai.error": { en: "Couldn't generate a policy — try rephrasing.", fr: "Génération impossible — reformulez." },
   "admin.servers.title": { en: "Downstream servers", fr: "Serveurs en aval" },
   "admin.servers.empty": { en: "No servers declared.", fr: "Aucun serveur déclaré." },
 

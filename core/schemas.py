@@ -85,6 +85,14 @@ class PolicyUpdate(BaseModel):
     yaml: str = Field(min_length=1, max_length=100_000)
 
 
+class PolicyDraftRequest(BaseModel):
+    """Natural-language description to draft a policy from (LLM assistant)."""
+
+    model_config = {"extra": "forbid"}
+
+    prompt: str = Field(min_length=1, max_length=2000)
+
+
 class ToolView(BaseModel):
     """A tool exposed to the agent with its effective policy classification."""
 
