@@ -370,6 +370,11 @@ export const STR = {
     en: "The bottom line: the productivity of autonomous AI — without the blind trust.",
     fr: "En résumé : la productivité de l'IA autonome — sans la confiance aveugle.",
   },
+  "exec.preview.note": {
+    en: "Preview — illustrative sample data. Your live numbers appear once your agents are connected.",
+    fr: "Aperçu — données d'exemple illustratives. Vos chiffres réels s'affichent une fois vos agents connectés.",
+  },
+  "land.exec.link": { en: "Executive snapshot", fr: "Synthèse pour dirigeants" },
 
   // Login
   "login.title": { en: "Sign in", fr: "Se connecter" },
