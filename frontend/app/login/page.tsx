@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Logo, Wordmark } from "@/components/brand";
+import { FullScreenLoader } from "@/components/Loader";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,6 +12,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -21,17 +23,21 @@ export default function LoginPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
-    setBusy(false);
     if (res.ok) {
+      // Keep the loader up through the redirect + first console paint.
+      setRedirecting(true);
       router.push("/inspector");
       router.refresh();
     } else {
+      setBusy(false);
       const data = (await res.json().catch(() => ({}))) as { detail?: string };
       setError(data.detail ?? "Sign in failed");
     }
   }
 
   return (
+    <>
+      {redirecting ? <FullScreenLoader label="Securing your session" /> : null}
     <main className="flex min-h-screen items-center justify-center p-6">
       <div className="w-full max-w-sm animate-fade-up">
         <div className="mb-6 flex items-center gap-2.5">
@@ -71,5 +77,6 @@ export default function LoginPage() {
         </p>
       </div>
     </main>
+    </>
   );
 }
