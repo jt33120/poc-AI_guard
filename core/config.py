@@ -55,6 +55,11 @@ class Settings(BaseSettings):
     # slowapi limit string for the agent authorization endpoint (machine-to-machine).
     authorize_rate_limit: str = Field(default="120/minute", max_length=40)
 
+    # --- LLM provider proxy (zero-code monitoring) -----------------------
+    # Upstream provider base; the agent points its OpenAI base_url at xSOM.
+    openai_base_url: str = Field(default="https://api.openai.com", max_length=300)
+    llm_proxy_rate_limit: str = Field(default="240/minute", max_length=40)
+
     # --- HITL approval notifications (M4, optional) ----------------------
     smtp_host: str | None = Field(default=None, max_length=255)
     smtp_port: int = Field(default=587, ge=1, le=65535)

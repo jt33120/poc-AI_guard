@@ -24,6 +24,7 @@ from api.audit import router as audit_router
 from api.authorize import router as authorize_router
 from api.errors import register_exception_handlers
 from api.gateway_tokens import router as gateway_tokens_router
+from api.llm_proxy import router as llm_proxy_router
 from api.policy import router as policy_router
 from api.ratelimit import limiter
 from api.security import build_verifier, get_current_user
@@ -105,6 +106,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(audit_router)
     app.include_router(gateway_tokens_router)
     app.include_router(authorize_router)
+    app.include_router(llm_proxy_router)
 
     return app
 

@@ -54,9 +54,20 @@ function snippet(stack: Stack, key: string): string {
 export XSOM_GATEWAY_TOKEN="${key}"
 # (configure the xSOM MCP server as your agent's tools endpoint)`;
   }
+  if (stack === "openai") {
+    return `# Zero-code monitoring — just point the OpenAI SDK at xSOM.
+# Your OPENAI_API_KEY is still used and forwarded to OpenAI.
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="${XSOM_API}/proxy/openai/v1",
+    default_headers={"X-Gateway-Token": "${key}"},
+)
+# Use the client exactly as before — xSOM audits every tool-call it makes.`;
+  }
   const note =
-    stack === "openai" || stack === "anthropic"
-      ? "# Native base_url proxy is coming; for now gate tool execution like this:\n"
+    stack === "anthropic"
+      ? "# OpenAI base_url proxy is live; the Anthropic proxy is coming.\n# Until then, gate tool execution like this:\n"
       : "";
   return `${note}import requests
 
@@ -278,7 +289,9 @@ export default function OnboardingPage() {
               <h3 className="text-sm font-semibold">{t("onb.snippet.title")}</h3>
               <CopyButton text={snippet(stack, apiKey)} label={t("onb.copy")} />
             </div>
-            <p className="muted mt-1 text-xs">{t("onb.snippet.note")}</p>
+            <p className="muted mt-1 text-xs">
+              {t(stack === "openai" ? "onb.snippet.proxy" : "onb.snippet.note")}
+            </p>
             <pre className="mt-2 overflow-x-auto rounded-xl bg-navy-mid/70 p-4 text-xs text-white/80">
               {snippet(stack, apiKey)}
             </pre>

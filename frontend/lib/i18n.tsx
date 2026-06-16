@@ -427,6 +427,10 @@ export const STR = {
     en: "Call xSOM right before your agent runs a tool; if it isn't allowed, don't run it.",
     fr: "Appelez xSOM juste avant que votre agent exécute un outil ; si ce n'est pas autorisé, ne l'exécutez pas.",
   },
+  "onb.snippet.proxy": {
+    en: "Zero-code monitoring: just change the base_url. xSOM sees and audits every tool-call the model makes (your provider key is forwarded, never stored).",
+    fr: "Monitoring zéro-code : changez seulement le base_url. xSOM voit et audite chaque tool-call du modèle (votre clé provider est transmise, jamais stockée).",
+  },
   "onb.copy": { en: "Copy", fr: "Copier" },
   "onb.copied": { en: "Copied", fr: "Copié" },
   "onb.done.t": { en: "You're connected 🎉", fr: "Vous êtes connecté 🎉" },

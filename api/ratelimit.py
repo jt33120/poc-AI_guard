@@ -18,3 +18,8 @@ def export_rate_limit() -> str:
 def authorize_rate_limit() -> str:
     """Dynamic limit string for the agent authorization endpoint (from settings)."""
     return get_settings().authorize_rate_limit
+
+
+def llm_proxy_rate_limit() -> str:
+    """Dynamic limit string for the LLM monitoring proxy (from settings)."""
+    return get_settings().llm_proxy_rate_limit
