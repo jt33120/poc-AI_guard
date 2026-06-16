@@ -130,3 +130,72 @@ def test_allowed_domains_constraint_denies_foreign_domain() -> None:
     outcome = evaluate(_policy(), "mail.send", {"to": "attacker@evil.com"})
     assert outcome.decision is Approval.deny
     assert outcome.reason == "constraint violated"
+
+
+# --- auto-classification (zero-config onboarding) ----------------------------
+
+_AUTO_YAML = """
+tools:
+  - name: billing.refund
+    class: irreversible
+    approval: human_dual
+defaults:
+  unknown_tool: deny
+  auto_classify: true
+  class_approvals:
+    read: auto
+    write: auto
+    external_send: human_in_the_loop
+    irreversible: human_in_the_loop
+"""
+
+
+def _auto_policy():
+    return parse_policy(_AUTO_YAML)
+
+
+def test_auto_classify_reads_run_automatically() -> None:
+    outcome = evaluate(_auto_policy(), "crm.get_contact", {})
+    assert outcome.action_class is ActionClass.read
+    assert outcome.decision is Approval.auto
+    assert outcome.reason == "auto-classified by name"
+
+
+def test_auto_classify_sends_need_human() -> None:
+    outcome = evaluate(_auto_policy(), "slack.send_message", {})
+    assert outcome.action_class is ActionClass.external_send
+    assert outcome.decision is Approval.human_in_the_loop
+
+
+def test_auto_classify_deletes_are_irreversible() -> None:
+    outcome = evaluate(_auto_policy(), "db.delete_row", {})
+    assert outcome.action_class is ActionClass.irreversible
+    assert outcome.decision is Approval.human_in_the_loop
+
+
+def test_auto_classify_unrecognized_name_fails_closed() -> None:
+    outcome = evaluate(_auto_policy(), "frobnicate", {})
+    assert outcome.action_class is None
+    assert outcome.decision is Approval.deny
+
+
+def test_explicit_rule_overrides_auto_classify() -> None:
+    # billing.refund would heuristically be 'irreversible' too, but the explicit
+    # rule's human_dual must win over the class default.
+    outcome = evaluate(_auto_policy(), "billing.refund", {})
+    assert outcome.decision is Approval.human_dual
+
+
+def test_auto_classify_off_by_default_keeps_unknown_deny() -> None:
+    # The baseline policy has no auto_classify -> unknown tools still deny.
+    assert authorize(_policy(), "anything.get_thing") is Approval.deny
+
+
+def test_classify_by_name_safety_ordering() -> None:
+    from core.policy import classify_by_name
+
+    assert classify_by_name("user.delete_and_notify") is ActionClass.irreversible
+    assert classify_by_name("report.send_summary") is ActionClass.external_send
+    assert classify_by_name("candidate.search") is ActionClass.read
+    assert classify_by_name("candidate.update") is ActionClass.write
+    assert classify_by_name("xyzzy") is None
