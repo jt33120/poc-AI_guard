@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from api.deps import database_url, require_tenant
 from api.security import get_current_user, require_role
-from core import db, policy_store, servers
+from core import audit, db, policy_store, servers
 from core.policy import PolicyError, evaluate, parse_policy
 from core.schemas import CurrentUser, PolicyDocument, PolicyUpdate, Role, ToolView
 from gateway.downstream import DownstreamProxy, ServerSpec
@@ -55,6 +55,7 @@ async def list_tools(
     with db.connection(url) as conn:
         rows = servers.enabled_specs(conn, tenant_id)
         policy = policy_store.load_policy(conn, tenant_id)
+        observed = audit.distinct_tools(conn, tenant_id)
 
     proxy = DownstreamProxy(
         [
@@ -96,4 +97,21 @@ async def list_tools(
             }
         )
         seen.add(rule.name)
+
+    # Observed actions: tools the agent actually called (from the audit trail),
+    # auto-classified when there's no explicit rule — the Inspector discovers the
+    # agent's real surface without any manual declaration.
+    for name in observed:
+        if name in seen:
+            continue
+        outcome = evaluate(policy, name, {})
+        views.append(
+            {
+                "name": name,
+                "canonical": name,
+                "action_class": outcome.action_class.value if outcome.action_class else None,
+                "decision": outcome.decision.value,
+            }
+        )
+        seen.add(name)
     return views

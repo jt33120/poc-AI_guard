@@ -147,6 +147,14 @@ export default function HomePage() {
                   <div>
                     <h3 className="text-sm font-semibold">{t(title)}</h3>
                     <p className="muted mt-1 text-sm leading-relaxed">{t(body)}</p>
+                    {i === 0 ? (
+                      <Link
+                        href="/onboarding"
+                        className="mt-2 inline-flex text-sm font-semibold text-brand-bright hover:underline"
+                      >
+                        {t("nav.onboard")} →
+                      </Link>
+                    ) : null}
                   </div>
                 </li>
               ))}

@@ -173,6 +173,16 @@ def verify_chain(conn: psycopg.Connection, tenant_id: str | None = None) -> Chai
     return ChainResult(ok=True, broken_id=None, count=len(rows))
 
 
+def distinct_tools(conn: psycopg.Connection, tenant_id: str) -> list[str]:
+    """Distinct tool names a tenant's agents have actually invoked (observed catalogue)."""
+    rows = conn.execute(
+        "select distinct tool_name from audit_log "
+        "where tenant_id = %s and tool_name is not null order by tool_name",
+        (tenant_id,),
+    ).fetchall()
+    return [r[0] for r in rows]
+
+
 def list_events(
     conn: psycopg.Connection,
     *,
