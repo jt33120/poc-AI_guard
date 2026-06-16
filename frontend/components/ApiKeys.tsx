@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { apiDelete, apiGet, apiSend } from "@/lib/client";
+import { useT } from "@/lib/i18n";
 
 interface GatewayToken {
   id: string;
@@ -17,6 +18,7 @@ interface CreatedToken extends GatewayToken {
 }
 
 export function ApiKeys() {
+  const { t } = useT();
   const [tokens, setTokens] = useState<GatewayToken[]>([]);
   const [name, setName] = useState("");
   const [created, setCreated] = useState<CreatedToken | null>(null);
@@ -59,17 +61,14 @@ export function ApiKeys() {
 
   return (
     <div className="card p-5">
-      <h2 className="text-lg font-semibold">API keys</h2>
-      <p className="muted mt-1 text-sm">
-        Tenant gateway tokens for agents calling <span className="font-mono">/v1/authorize</span>.
-        The secret is shown once at creation.
-      </p>
+      <h2 className="text-lg font-semibold">{t("keys.title")}</h2>
+      <p className="muted mt-1 text-sm">{t("keys.subtitle")}</p>
 
       <div className="mt-4 flex gap-2">
         <input
-          aria-label="API key name"
+          aria-label={t("keys.title")}
           className="input"
-          placeholder="Key name (e.g. uti-agent)"
+          placeholder={t("keys.placeholder")}
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
@@ -79,14 +78,14 @@ export function ApiKeys() {
           onClick={create}
           disabled={busy || !name.trim()}
         >
-          Generate
+          {t("keys.generate")}
         </button>
       </div>
 
       {created ? (
         <div className="mt-4 rounded-xl border border-brand/40 bg-brand/10 p-4">
           <p className="text-sm font-medium text-brand-bright">
-            New key “{created.name}” — copy it now, it won’t be shown again.
+            {t("keys.created", { name: created.name })}
           </p>
           <code className="mt-2 block break-all rounded-lg bg-navy-mid/70 px-3 py-2 font-mono text-xs text-white">
             {created.token}
@@ -104,14 +103,14 @@ export function ApiKeys() {
           >
             <span className="font-mono text-white/90">{token.name}</span>
             {token.revoked_at ? (
-              <span className="badge badge-red">revoked</span>
+              <span className="badge badge-red">{t("keys.revoked")}</span>
             ) : (
-              <span className="badge badge-green">active</span>
+              <span className="badge badge-green">{t("keys.active")}</span>
             )}
             <span className="muted ml-auto text-xs">
               {token.last_used_at
-                ? `used ${new Date(token.last_used_at).toLocaleDateString()}`
-                : "never used"}
+                ? t("keys.used", { date: new Date(token.last_used_at).toLocaleDateString() })
+                : t("keys.never")}
             </span>
             {!token.revoked_at ? (
               <button
@@ -119,12 +118,12 @@ export function ApiKeys() {
                 className="btn btn-ghost px-3 py-1 text-xs"
                 onClick={() => revoke(token.id)}
               >
-                Revoke
+                {t("keys.revoke")}
               </button>
             ) : null}
           </li>
         ))}
-        {tokens.length === 0 ? <li className="muted">No API keys yet.</li> : null}
+        {tokens.length === 0 ? <li className="muted">{t("keys.empty")}</li> : null}
       </ul>
     </div>
   );

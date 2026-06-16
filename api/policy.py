@@ -63,6 +63,7 @@ async def list_tools(
         ]
     )
     views: list[dict[str, Any]] = []
+    seen: set[str] = set()
     for tool in await proxy.list_tools():
         resolved = await proxy.resolve(tool.name)
         canonical = f"{resolved[0]}.{resolved[1]}" if resolved else tool.name
@@ -75,4 +76,24 @@ async def list_tools(
                 "decision": outcome.decision.value,
             }
         )
+        seen.add(canonical)
+
+    # Policy-declared actions: agents using the cooperative /v1/authorize path have
+    # no MCP downstream server, so the policy itself is the catalogue of actions.
+    for rule in policy.tools:
+        if rule.name in seen:
+            continue
+        outcome = evaluate(policy, rule.name, {})
+        action_class = outcome.action_class.value if outcome.action_class else None
+        if action_class is None and rule.classify == "ambiguous":
+            action_class = "ambiguous"
+        views.append(
+            {
+                "name": rule.name,
+                "canonical": rule.name,
+                "action_class": action_class,
+                "decision": outcome.decision.value,
+            }
+        )
+        seen.add(rule.name)
     return views

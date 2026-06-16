@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 
 import { DecisionBadge } from "@/components/brand";
+import { Spinner } from "@/components/Spinner";
+import { Tooltip } from "@/components/Tooltip";
 import { apiGet, exportUrl } from "@/lib/client";
+import { type StrKey, useT } from "@/lib/i18n";
 
 interface AuditEntry {
   id: number;
@@ -14,29 +17,39 @@ interface AuditEntry {
   args_hash: string | null;
 }
 
+const CLASS_KEY: Record<string, StrKey> = {
+  read: "class.read",
+  write: "class.write",
+  external_send: "class.external_send",
+  irreversible: "class.irreversible",
+};
+
 export default function AuditPage() {
+  const { t } = useT();
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     apiGet<AuditEntry[]>("v1/audit")
       .then(setEntries)
-      .catch((e: unknown) => setError(String(e)));
+      .catch((e: unknown) => setError(String(e)))
+      .finally(() => setLoading(false));
   }, []);
 
   return (
     <section className="flex animate-fade-up flex-col gap-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Audit explorer</h1>
-          <p className="muted mt-1">Immutable, hash-chained record of every decision.</p>
+          <h1 className="text-2xl font-bold">{t("audit.title")}</h1>
+          <p className="muted mt-1">{t("audit.subtitle")}</p>
         </div>
         <div className="flex gap-2">
           <a className="btn btn-ghost px-4 py-1.5" href={exportUrl("ai_act", "pdf")}>
-            Export AI Act (PDF)
+            {t("audit.export.aiact")}
           </a>
           <a className="btn btn-ghost px-4 py-1.5" href={exportUrl("rgpd", "json")}>
-            Export GDPR (JSON)
+            {t("audit.export.gdpr")}
           </a>
         </div>
       </header>
@@ -46,29 +59,44 @@ export default function AuditPage() {
           <thead>
             <tr>
               <th>#</th>
-              <th>Tool</th>
-              <th>Class</th>
-              <th>Decision</th>
+              <th>{t("audit.col.tool")}</th>
+              <th>{t("audit.col.class")}</th>
+              <th>{t("audit.col.decision")}</th>
               <th>args_hash</th>
             </tr>
           </thead>
           <tbody>
-            {entries.map((entry) => (
-              <tr key={entry.id}>
-                <td className="text-white/45">{entry.id}</td>
-                <td className="font-mono">{entry.tool_name ?? "—"}</td>
-                <td>{entry.action_class ?? "—"}</td>
-                <td>
-                  <DecisionBadge value={entry.decision} />
-                </td>
-                <td className="font-mono text-xs text-white/35">
-                  {entry.args_hash ? entry.args_hash.slice(0, 12) : "—"}
-                </td>
-              </tr>
-            ))}
+            {entries.map((entry) => {
+              const ck = entry.action_class ? CLASS_KEY[entry.action_class] : undefined;
+              return (
+                <tr key={entry.id}>
+                  <td className="text-white/45">{entry.id}</td>
+                  <td className="font-mono">{entry.tool_name ?? "—"}</td>
+                  <td>
+                    {ck ? (
+                      <Tooltip label={t(`${ck}.desc` as StrKey)}>
+                        <span className="text-white/70">{t(ck)}</span>
+                      </Tooltip>
+                    ) : (
+                      (entry.action_class ?? "—")
+                    )}
+                  </td>
+                  <td>
+                    <DecisionBadge value={entry.decision} />
+                  </td>
+                  <td className="font-mono text-xs text-white/35">
+                    {entry.args_hash ? entry.args_hash.slice(0, 12) : "—"}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
-        {entries.length === 0 && !error ? <p className="muted p-4">No audit entries.</p> : null}
+        {loading ? (
+          <Spinner label={t("common.loading")} />
+        ) : entries.length === 0 && !error ? (
+          <p className="muted p-4">{t("audit.empty")}</p>
+        ) : null}
       </div>
     </section>
   );
