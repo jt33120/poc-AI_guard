@@ -307,6 +307,70 @@ export const STR = {
     fr: "Une passerelle MCP basée sur des standards, un moteur de politique déterministe, un journal d'audit chaîné par hash, et un juge LLM léger pour les cas ambigus. Notre façon de classer, chaîner et décider à grande échelle reste notre secret de fabrication.",
   },
 
+  // ── Executive summary (non-technical, for execs & sales) ─────────────
+  "nav.exec": { en: "Executive", fr: "Synthèse" },
+  "exec.title": { en: "Executive summary", fr: "Synthèse exécutive" },
+  "exec.subtitle": {
+    en: "How xSOM keeps your AI agents productive, safe, and compliant — at a glance.",
+    fr: "Comment xSOM garde vos agents IA productifs, sûrs et conformes — en un coup d'œil.",
+  },
+  "exec.kpi.governed.l": { en: "Actions under governance", fr: "Actions sous gouvernance" },
+  "exec.kpi.governed.s": {
+    en: "Every action your agents can take follows your rules.",
+    fr: "Chaque action possible de vos agents suit vos règles.",
+  },
+  "exec.kpi.review.l": { en: "Sent for human review", fr: "Soumises à un humain" },
+  "exec.kpi.review.s": {
+    en: "Risky actions paused before running.",
+    fr: "Actions sensibles suspendues avant exécution.",
+  },
+  "exec.kpi.blocked.l": { en: "Blocked automatically", fr: "Bloquées automatiquement" },
+  "exec.kpi.blocked.s": {
+    en: "Off-policy actions stopped cold.",
+    fr: "Actions hors politique arrêtées net.",
+  },
+  "exec.kpi.coverage.l": { en: "Audit coverage", fr: "Couverture d'audit" },
+  "exec.kpi.coverage.s": {
+    en: "Every decision recorded, tamper-proof.",
+    fr: "Chaque décision enregistrée, inviolable.",
+  },
+  "exec.means.title": { en: "What this means for you", fr: "Ce que cela signifie pour vous" },
+  "exec.means.1.t": { en: "You stay in control", fr: "Vous gardez le contrôle" },
+  "exec.means.1.b": {
+    en: "You decide what your AI can and can't do — enforced automatically on every action, not left to the model.",
+    fr: "Vous décidez ce que votre IA peut faire ou non — appliqué automatiquement à chaque action, sans dépendre du modèle.",
+  },
+  "exec.means.2.t": { en: "Nothing risky slips through", fr: "Rien de risqué ne passe" },
+  "exec.means.2.b": {
+    en: "No irreversible action runs without a person approving it first.",
+    fr: "Aucune action irréversible ne s'exécute sans qu'une personne l'approuve d'abord.",
+  },
+  "exec.means.3.t": { en: "You can prove it", fr: "Vous pouvez le prouver" },
+  "exec.means.3.b": {
+    en: "A complete, tamper-proof record of every decision — ready for auditors and regulators in one click.",
+    fr: "Un registre complet et inviolable de chaque décision — prêt pour auditeurs et régulateurs en un clic.",
+  },
+  "exec.chart.title": {
+    en: "What happened to your agents' actions",
+    fr: "Ce qu'il est advenu des actions de vos agents",
+  },
+  "exec.chart.allow": { en: "Ran automatically", fr: "Exécutées automatiquement" },
+  "exec.chart.review": { en: "Paused for a human", fr: "Suspendues pour un humain" },
+  "exec.chart.block": { en: "Blocked", fr: "Bloquées" },
+  "exec.chart.empty": {
+    en: "No agent activity recorded yet.",
+    fr: "Aucune activité d'agent enregistrée pour l'instant.",
+  },
+  "exec.comp.title": { en: "Compliance-ready", fr: "Prêt pour la conformité" },
+  "exec.comp.body": {
+    en: "EU AI Act human-oversight and record-keeping, plus GDPR-friendly data handling — evidence you can export anytime.",
+    fr: "Supervision humaine et traçabilité de l'AI Act européen, plus un traitement des données conforme au RGPD — des preuves exportables à tout moment.",
+  },
+  "exec.bottom": {
+    en: "The bottom line: the productivity of autonomous AI — without the blind trust.",
+    fr: "En résumé : la productivité de l'IA autonome — sans la confiance aveugle.",
+  },
+
   // Login
   "login.title": { en: "Sign in", fr: "Se connecter" },
   "login.subtitle": { en: "Access the action-control console.", fr: "Accédez à la console de contrôle des actions." },
