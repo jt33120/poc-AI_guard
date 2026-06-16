@@ -73,7 +73,7 @@ def test_draft_route_generates_policy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     tid = _tenant(db)
-    monkeypatch.setattr(judge, "litellm_completer", lambda _m, _k: (lambda _s, _u: GOOD))
+    monkeypatch.setattr(judge, "litellm_completer", lambda _m, _k: lambda _s, _u: GOOD)
     client = _client(db.url, test_verifier, mistral="test-key")
     admin = make_token(tenant_id=tid, role="admin")
     resp = client.post(
