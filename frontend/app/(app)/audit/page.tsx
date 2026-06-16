@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { DecisionBadge } from "@/components/brand";
 import { apiGet, exportUrl } from "@/lib/client";
 
 interface AuditEntry {
@@ -24,44 +25,51 @@ export default function AuditPage() {
   }, []);
 
   return (
-    <section className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Audit explorer</h1>
-        <div className="flex gap-2 text-sm">
-          <a className="rounded border px-3 py-1 hover:bg-slate-100" href={exportUrl("ai_act", "pdf")}>
+    <section className="flex animate-fade-up flex-col gap-5">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Audit explorer</h1>
+          <p className="muted mt-1">Immutable, hash-chained record of every decision.</p>
+        </div>
+        <div className="flex gap-2">
+          <a className="btn btn-ghost px-4 py-1.5" href={exportUrl("ai_act", "pdf")}>
             Export AI Act (PDF)
           </a>
-          <a className="rounded border px-3 py-1 hover:bg-slate-100" href={exportUrl("rgpd", "json")}>
+          <a className="btn btn-ghost px-4 py-1.5" href={exportUrl("rgpd", "json")}>
             Export GDPR (JSON)
           </a>
         </div>
-      </div>
-      {error ? <p className="text-red-600">{error}</p> : null}
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="border-b text-left">
-            <th className="py-2">#</th>
-            <th>Tool</th>
-            <th>Class</th>
-            <th>Decision</th>
-            <th>args_hash</th>
-          </tr>
-        </thead>
-        <tbody>
-          {entries.map((entry) => (
-            <tr key={entry.id} className="border-b">
-              <td className="py-2">{entry.id}</td>
-              <td className="font-mono">{entry.tool_name ?? "—"}</td>
-              <td>{entry.action_class ?? "—"}</td>
-              <td>{entry.decision ?? "—"}</td>
-              <td className="font-mono text-xs text-slate-400">
-                {entry.args_hash ? entry.args_hash.slice(0, 12) : "—"}
-              </td>
+      </header>
+      {error ? <p className="text-sm text-red-300">{error}</p> : null}
+      <div className="card overflow-hidden">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Tool</th>
+              <th>Class</th>
+              <th>Decision</th>
+              <th>args_hash</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-      {entries.length === 0 && !error ? <p className="text-slate-500">No audit entries.</p> : null}
+          </thead>
+          <tbody>
+            {entries.map((entry) => (
+              <tr key={entry.id}>
+                <td className="text-white/45">{entry.id}</td>
+                <td className="font-mono">{entry.tool_name ?? "—"}</td>
+                <td>{entry.action_class ?? "—"}</td>
+                <td>
+                  <DecisionBadge value={entry.decision} />
+                </td>
+                <td className="font-mono text-xs text-white/35">
+                  {entry.args_hash ? entry.args_hash.slice(0, 12) : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {entries.length === 0 && !error ? <p className="muted p-4">No audit entries.</p> : null}
+      </div>
     </section>
   );
 }

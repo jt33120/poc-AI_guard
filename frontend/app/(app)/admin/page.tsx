@@ -48,44 +48,49 @@ export default function AdminPage() {
   }
 
   return (
-    <section className="flex flex-col gap-6">
-      <h1 className="text-2xl font-bold">Admin</h1>
+    <section className="flex animate-fade-up flex-col gap-6">
+      <header>
+        <h1 className="text-2xl font-bold">Admin</h1>
+        <p className="muted mt-1">Authorization policy and downstream tool servers.</p>
+      </header>
 
-      <div className="flex flex-col gap-2">
+      <div className="card p-5">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Policy editor</h2>
-          <span className="text-sm text-slate-500">version {version ?? "—"}</span>
+          <span className="badge badge-neutral">version {version ?? "—"}</span>
         </div>
         <textarea
           aria-label="Policy YAML"
           value={yaml}
           onChange={(e) => setYaml(e.target.value)}
           rows={14}
-          className="w-full rounded border border-slate-300 p-3 font-mono text-sm"
+          className="input mt-3 resize-y font-mono text-[13px] leading-relaxed"
         />
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={save}
-            className="rounded bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-700"
-          >
+        <div className="mt-3 flex items-center gap-3">
+          <button type="button" onClick={save} className="btn btn-primary">
             Save policy
           </button>
-          {message ? <span className="text-sm text-emerald-700">{message}</span> : null}
-          {error ? <span className="text-sm text-red-600">{error}</span> : null}
+          {message ? <span className="text-sm text-emerald-300">{message}</span> : null}
+          {error ? <span className="text-sm text-red-300">{error}</span> : null}
         </div>
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div className="card p-5">
         <h2 className="text-lg font-semibold">Downstream servers</h2>
-        <ul className="text-sm">
+        <ul className="mt-3 flex flex-col gap-1.5 text-sm">
           {servers.map((server) => (
-            <li key={server.id} className="border-b py-1">
-              <span className="font-mono">{server.name}</span> · {server.transport} ·{" "}
-              {server.enabled ? "enabled" : "disabled"}
+            <li
+              key={server.id}
+              className="flex items-center gap-2 border-b border-white/[0.06] py-2 last:border-0"
+            >
+              <span className="font-mono text-white/90">{server.name}</span>
+              <span className="badge badge-neutral">{server.transport}</span>
+              <span className={`badge ${server.enabled ? "badge-green" : "badge-red"}`}>
+                {server.enabled ? "enabled" : "disabled"}
+              </span>
             </li>
           ))}
-          {servers.length === 0 ? <li className="text-slate-500">No servers declared.</li> : null}
+          {servers.length === 0 ? <li className="muted">No servers declared.</li> : null}
         </ul>
       </div>
     </section>

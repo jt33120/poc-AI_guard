@@ -36,33 +36,47 @@ export default function ApprovalsPage() {
   }
 
   return (
-    <section className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold">Approval queue</h1>
-      {error ? <p className="text-red-600">{error}</p> : null}
-      {items.length === 0 ? <p className="text-slate-500">No pending approvals.</p> : null}
+    <section className="flex animate-fade-up flex-col gap-5">
+      <header>
+        <h1 className="text-2xl font-bold">Approval queue</h1>
+        <p className="muted mt-1">Irreversible actions held for a human decision.</p>
+      </header>
+      {error ? <p className="text-sm text-red-300">{error}</p> : null}
+      {items.length === 0 ? (
+        <div className="card p-8 text-center">
+          <p className="muted">No pending approvals.</p>
+        </div>
+      ) : null}
       <ul className="flex flex-col gap-3">
         {items.map((item) => (
-          <li key={item.id} className="rounded border border-slate-200 bg-white p-4">
-            <div className="font-mono text-sm text-slate-500">{item.tool_name}</div>
-            <div className="mt-1">{item.dry_run.summary ?? "(no dry-run)"}</div>
-            <div className="mt-1 text-xs text-slate-500">
-              approvals {item.approved_by.length}/{item.required_count}
+          <li key={item.id} className="card p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="font-mono text-xs text-brand-bright">{item.tool_name}</div>
+                <div className="mt-1.5 text-white/90">{item.dry_run.summary ?? "(no dry-run)"}</div>
+              </div>
+              <span className="badge badge-amber shrink-0 capitalize">{item.status}</span>
             </div>
-            <div className="mt-3 flex gap-2">
-              <button
-                type="button"
-                onClick={() => decide(item.id, "approve")}
-                className="rounded bg-emerald-600 px-3 py-1 text-sm font-medium text-white hover:bg-emerald-500"
-              >
-                Approve
-              </button>
-              <button
-                type="button"
-                onClick={() => decide(item.id, "deny")}
-                className="rounded bg-red-600 px-3 py-1 text-sm font-medium text-white hover:bg-red-500"
-              >
-                Deny
-              </button>
+            <div className="mt-4 flex items-center justify-between">
+              <span className="label">
+                approvals {item.approved_by.length}/{item.required_count}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => decide(item.id, "approve")}
+                  className="btn btn-success px-4 py-1.5"
+                >
+                  Approve
+                </button>
+                <button
+                  type="button"
+                  onClick={() => decide(item.id, "deny")}
+                  className="btn btn-danger px-4 py-1.5"
+                >
+                  Deny
+                </button>
+              </div>
             </div>
           </li>
         ))}
