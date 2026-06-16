@@ -52,6 +52,8 @@ class Settings(BaseSettings):
     judge_max_calls: int = Field(default=200, ge=1, le=100_000)
     # slowapi limit string for the costly export endpoint.
     export_rate_limit: str = Field(default="30/minute", max_length=40)
+    # slowapi limit string for the agent authorization endpoint (machine-to-machine).
+    authorize_rate_limit: str = Field(default="120/minute", max_length=40)
 
     # --- HITL approval notifications (M4, optional) ----------------------
     smtp_host: str | None = Field(default=None, max_length=255)

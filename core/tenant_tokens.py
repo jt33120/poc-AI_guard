@@ -10,13 +10,69 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+from datetime import datetime
+from typing import Any
 
 import psycopg
+
+#: Recognizable prefix for raw gateway tokens (the secret the agent presents).
+TOKEN_PREFIX = "xsg_"  # noqa: S105 - public token prefix, not a secret
 
 
 def generate_token() -> str:
     """Generate a new opaque tenant token (raw secret, shown once to the admin)."""
-    return secrets.token_urlsafe(32)
+    return TOKEN_PREFIX + secrets.token_urlsafe(32)
+
+
+def _iso(value: datetime | None) -> str | None:
+    return value.isoformat() if value else None
+
+
+def _token_view(row: tuple[Any, ...]) -> dict[str, Any]:
+    return {
+        "id": str(row[0]),
+        "name": row[1],
+        "created_at": _iso(row[2]),
+        "last_used_at": _iso(row[3]),
+        "revoked_at": _iso(row[4]),
+    }
+
+
+_VIEW_COLS = "id, name, created_at, last_used_at, revoked_at"
+
+
+def mint(conn: psycopg.Connection, *, tenant_id: str, name: str) -> tuple[str, dict[str, Any]]:
+    """Create a tenant gateway token: store only its hash, return the raw secret once."""
+    raw = generate_token()
+    row = conn.execute(
+        f"insert into gateway_tokens (tenant_id, name, token_hash) values (%s, %s, %s) "
+        f"returning {_VIEW_COLS}",
+        (tenant_id, name, hash_token(raw)),
+    ).fetchone()
+    conn.commit()
+    if row is None:  # pragma: no cover - INSERT ... RETURNING always yields a row
+        raise RuntimeError("gateway_token insert did not return a row")
+    return raw, _token_view(row)
+
+
+def list_tokens(conn: psycopg.Connection, tenant_id: str) -> list[dict[str, Any]]:
+    """List a tenant's gateway tokens (metadata only — never the raw secret)."""
+    rows = conn.execute(
+        f"select {_VIEW_COLS} from gateway_tokens where tenant_id = %s order by created_at desc",
+        (tenant_id,),
+    ).fetchall()
+    return [_token_view(r) for r in rows]
+
+
+def revoke(conn: psycopg.Connection, tenant_id: str, token_id: str) -> bool:
+    """Revoke an active token scoped to the tenant. True only if one was revoked."""
+    row = conn.execute(
+        "update gateway_tokens set revoked_at = now() "
+        "where id = %s and tenant_id = %s and revoked_at is null returning id",
+        (token_id, tenant_id),
+    ).fetchone()
+    conn.commit()
+    return row is not None
 
 
 def hash_token(raw: str) -> str:

@@ -119,6 +119,51 @@ class DecisionRequest(BaseModel):
     decision: Literal["approve", "deny"]
 
 
+class AuthorizeRequest(BaseModel):
+    """An agent asking permission to perform an action (cooperative gating)."""
+
+    model_config = {"extra": "forbid"}
+
+    tool: str = Field(min_length=1, max_length=200)
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    request_id: str | None = Field(default=None, max_length=128)
+
+
+class AuthorizeResponse(BaseModel):
+    """The verdict returned to the agent: allow / deny / hold (+ approval to poll)."""
+
+    decision: Literal["allow", "deny", "hold"]
+    status: str | None = None
+    approval_id: str | None = None
+    action_class: str | None = None
+    reason: str | None = None
+    summary: str | None = None
+
+
+class GatewayTokenCreate(BaseModel):
+    """Payload to mint a tenant gateway token."""
+
+    model_config = {"extra": "forbid"}
+
+    name: str = Field(min_length=1, max_length=80)
+
+
+class GatewayTokenOut(BaseModel):
+    """A gateway token's metadata (never the raw secret)."""
+
+    id: str
+    name: str
+    created_at: str | None
+    last_used_at: str | None
+    revoked_at: str | None
+
+
+class GatewayTokenCreated(GatewayTokenOut):
+    """A freshly minted token — includes the raw secret, shown exactly once."""
+
+    token: str
+
+
 class AuditEntry(BaseModel):
     """An immutable audit-log entry (metadata only)."""
 
