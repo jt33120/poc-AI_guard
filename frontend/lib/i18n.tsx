@@ -133,6 +133,11 @@ export const STR = {
   "dec.human_in_the_loop": { en: "Requires one human approval.", fr: "Nécessite une validation humaine." },
   "dec.human_dual": { en: "Requires two distinct approvers.", fr: "Nécessite deux validateurs distincts." },
   "dec.auto": { en: "Allowed automatically.", fr: "Autorisé automatiquement." },
+  // Short decision labels (badge text)
+  "decl.auto": { en: "Auto", fr: "Auto" },
+  "decl.human_in_the_loop": { en: "Human review", fr: "Validation humaine" },
+  "decl.human_dual": { en: "Dual approval", fr: "Double validation" },
+  "decl.deny": { en: "Blocked", fr: "Bloqué" },
 } satisfies Record<string, Entry>;
 
 export type StrKey = keyof typeof STR;

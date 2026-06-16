@@ -21,11 +21,11 @@ const CLASS_KEY: Record<string, StrKey> = {
   irreversible: "class.irreversible",
 };
 
-const DECISION: Record<string, { cls: string; desc: StrKey }> = {
-  auto: { cls: "badge-green", desc: "dec.auto" },
-  human_in_the_loop: { cls: "badge-amber", desc: "dec.human_in_the_loop" },
-  human_dual: { cls: "badge-amber", desc: "dec.human_dual" },
-  deny: { cls: "badge-red", desc: "dec.deny" },
+const DECISION: Record<string, { cls: string; label: StrKey; desc: StrKey }> = {
+  auto: { cls: "badge-green", label: "decl.auto", desc: "dec.auto" },
+  human_in_the_loop: { cls: "badge-amber", label: "decl.human_in_the_loop", desc: "dec.human_in_the_loop" },
+  human_dual: { cls: "badge-amber", label: "decl.human_dual", desc: "dec.human_dual" },
+  deny: { cls: "badge-red", label: "decl.deny", desc: "dec.deny" },
 };
 
 export default function InspectorPage() {
@@ -78,9 +78,7 @@ export default function InspectorPage() {
                   <td>
                     {dec ? (
                       <Tooltip label={t(dec.desc)}>
-                        <span className={`badge ${dec.cls} capitalize`}>
-                          {tool.decision.replace(/_/g, " ")}
-                        </span>
+                        <span className={`badge ${dec.cls}`}>{t(dec.label)}</span>
                       </Tooltip>
                     ) : (
                       <span className="badge badge-neutral">{tool.decision}</span>
