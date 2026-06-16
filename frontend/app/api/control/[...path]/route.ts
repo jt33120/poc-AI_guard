@@ -25,6 +25,11 @@ async function forward(request: NextRequest, path: string[]): Promise<NextRespon
     init.body = await request.text();
   }
   const upstream = await fetch(target, init);
+  // 204/304 carry no body — constructing a Response with a body for these
+  // statuses throws (which surfaced as a spurious 500 on token revocation).
+  if (upstream.status === 204 || upstream.status === 304) {
+    return new NextResponse(null, { status: upstream.status });
+  }
   const body = await upstream.arrayBuffer();
   return new NextResponse(body, {
     status: upstream.status,

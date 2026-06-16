@@ -21,6 +21,7 @@ export default function ApprovalsPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
 
   const reload = useCallback(() => {
     apiGet<Approval[]>("v1/approvals?status=pending")
@@ -32,8 +33,10 @@ export default function ApprovalsPage() {
   useEffect(() => reload(), [reload]);
 
   async function decide(id: string, decision: "approve" | "deny") {
+    if (busy) return;
     setError(null);
     setMessage(null);
+    setBusy(id);
     try {
       const r = await apiSend<{ status: string }>(`v1/approvals/${id}/decision`, "POST", {
         decision,
@@ -48,6 +51,8 @@ export default function ApprovalsPage() {
       reload();
     } catch (e: unknown) {
       setError(String(e));
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -80,7 +85,9 @@ export default function ApprovalsPage() {
                 <div className="font-mono text-xs text-brand-bright">{item.tool_name}</div>
                 <div className="mt-1.5 text-white/90">{item.dry_run.summary ?? "(no dry-run)"}</div>
               </div>
-              <span className="badge badge-amber shrink-0 capitalize">{item.status}</span>
+              <span className="badge badge-amber shrink-0">
+                {item.status === "pending" ? t("approvals.status.pending") : item.status}
+              </span>
             </div>
             <div className="mt-4 flex items-center justify-between">
               <span className="label">
@@ -90,13 +97,15 @@ export default function ApprovalsPage() {
                 <button
                   type="button"
                   onClick={() => decide(item.id, "approve")}
+                  disabled={busy === item.id}
                   className="btn btn-success px-4 py-1.5"
                 >
-                  {t("approvals.approve")}
+                  {busy === item.id ? t("approvals.deciding") : t("approvals.approve")}
                 </button>
                 <button
                   type="button"
                   onClick={() => decide(item.id, "deny")}
+                  disabled={busy === item.id}
                   className="btn btn-danger px-4 py-1.5"
                 >
                   {t("approvals.deny")}

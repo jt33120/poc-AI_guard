@@ -7,6 +7,7 @@ import { Logo, Wordmark } from "@/components/brand";
 import { LanguageToggle, type StrKey, useT } from "@/lib/i18n";
 
 const LINKS: { href: string; key: StrKey }[] = [
+  { href: "/home", key: "nav.home" },
   { href: "/inspector", key: "nav.inspector" },
   { href: "/approvals", key: "nav.approvals" },
   { href: "/audit", key: "nav.audit" },
@@ -36,7 +37,7 @@ export function AppShell({
       <header className="sticky top-0 z-30 border-b border-white/10 bg-navy/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <div className="flex items-center gap-8">
-            <Link href="/inspector" className="flex items-center gap-2.5">
+            <Link href="/home" className="flex items-center gap-2.5">
               <Logo />
               <Wordmark className="text-[15px]" />
             </Link>

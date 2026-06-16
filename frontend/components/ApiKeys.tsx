@@ -24,6 +24,7 @@ export function ApiKeys() {
   const [created, setCreated] = useState<CreatedToken | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [revoking, setRevoking] = useState<string | null>(null);
 
   const reload = useCallback(() => {
     apiGet<GatewayToken[]>("v1/gateway-tokens")
@@ -51,11 +52,15 @@ export function ApiKeys() {
 
   async function revoke(id: string) {
     setError(null);
+    setRevoking(id);
     try {
       await apiDelete(`v1/gateway-tokens/${id}`);
-      reload();
     } catch (e: unknown) {
-      setError(String(e));
+      // 404 means it was already revoked — that's the desired end state, not an error.
+      if (!String(e).includes("404")) setError(String(e));
+    } finally {
+      setRevoking(null);
+      reload();
     }
   }
 
@@ -117,8 +122,9 @@ export function ApiKeys() {
                 type="button"
                 className="btn btn-ghost px-3 py-1 text-xs"
                 onClick={() => revoke(token.id)}
+                disabled={revoking === token.id}
               >
-                {t("keys.revoke")}
+                {revoking === token.id ? t("keys.revoking") : t("keys.revoke")}
               </button>
             ) : null}
           </li>

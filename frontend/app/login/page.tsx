@@ -28,7 +28,7 @@ export default function LoginPage() {
     });
     if (res.ok) {
       setRedirecting(true);
-      router.push("/inspector");
+      router.push("/home");
       router.refresh();
     } else {
       setBusy(false);

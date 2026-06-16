@@ -58,6 +58,255 @@ export const STR = {
     fr: "Chaque appel d'outil de votre agent — les lectures passent automatiquement ; les envois sensibles et les opérations irréversibles sont contrôlés et journalisés.",
   },
 
+  // ── Public landing (pre-login marketing) ─────────────────────────────
+  "land.nav.signin": { en: "Sign in", fr: "Se connecter" },
+  "land.nav.demo": { en: "Request a demo", fr: "Demander une démo" },
+  "land.hero.badge": {
+    en: "Action governance for AI agents",
+    fr: "Gouvernance des actions pour agents IA",
+  },
+  "land.hero.title": {
+    en: "Ship AI agents to production — without losing control.",
+    fr: "Déployez vos agents IA en production — sans perdre le contrôle.",
+  },
+  "land.hero.sub": {
+    en: "xSOM AI Guard sits between your agent and the tools it uses. Every action is checked against your policy, paused for human approval when it's irreversible, and written to a tamper-proof audit trail — so you get the productivity of autonomous agents with the control your business and regulators require.",
+    fr: "xSOM AI Guard s'intercale entre votre agent et les outils qu'il utilise. Chaque action est vérifiée selon votre politique, suspendue pour validation humaine si elle est irréversible, et inscrite dans un journal d'audit inviolable — la productivité des agents autonomes, avec le contrôle qu'exigent votre entreprise et vos régulateurs.",
+  },
+  "land.hero.cta": { en: "Open the console", fr: "Ouvrir la console" },
+  "land.hero.cta2": { en: "See how it works", fr: "Voir comment ça marche" },
+  "land.hero.trust": {
+    en: "Designed for the EU AI Act & GDPR",
+    fr: "Conçu pour l'AI Act européen et le RGPD",
+  },
+
+  "land.stat.1.v": { en: "100%", fr: "100%" },
+  "land.stat.1.l": {
+    en: "of irreversible actions held for human approval",
+    fr: "des actions irréversibles soumises à validation humaine",
+  },
+  "land.stat.2.v": { en: "0", fr: "0" },
+  "land.stat.2.l": {
+    en: "actions executed without a policy decision",
+    fr: "action exécutée sans décision de politique",
+  },
+  "land.stat.3.v": { en: "< 1s", fr: "< 1s" },
+  "land.stat.3.l": {
+    en: "deterministic decision on every tool-call",
+    fr: "décision déterministe à chaque appel d'outil",
+  },
+  "land.stat.4.v": { en: "2 clicks", fr: "2 clics" },
+  "land.stat.4.l": {
+    en: "to export AI Act & GDPR evidence",
+    fr: "pour exporter les preuves AI Act & RGPD",
+  },
+
+  "land.problem.kicker": { en: "The problem", fr: "Le problème" },
+  "land.problem.title": {
+    en: "AI agents don't just talk. They act.",
+    fr: "Les agents IA ne font pas que parler. Ils agissent.",
+  },
+  "land.problem.body": {
+    en: "They send emails, update records, move money, delete data, call internal APIs. A prompt filter can't stop a bad action — by the time the text is generated, the action is one tool-call away. You need a control point on what the agent does, not just on what it says.",
+    fr: "Ils envoient des emails, modifient des enregistrements, déplacent de l'argent, suppriment des données, appellent des API internes. Un filtre de prompt ne peut pas arrêter une mauvaise action — quand le texte est généré, l'action n'est qu'à un appel d'outil. Il faut un point de contrôle sur ce que l'agent fait, pas seulement sur ce qu'il dit.",
+  },
+
+  "land.how.kicker": { en: "How it works", fr: "Comment ça marche" },
+  "land.how.title": {
+    en: "A control point on every action",
+    fr: "Un point de contrôle sur chaque action",
+  },
+  "land.how.agent": { en: "AI agent", fr: "Agent IA" },
+  "land.how.agent.sub": {
+    en: "Assistant, copilot, or autonomous workflow",
+    fr: "Assistant, copilote ou workflow autonome",
+  },
+  "land.how.guard": { en: "xSOM AI Guard", fr: "xSOM AI Guard" },
+  "land.how.guard.sub": {
+    en: "Policy · Human-in-the-loop · Audit",
+    fr: "Politique · Validation humaine · Audit",
+  },
+  "land.how.tools": { en: "Your tools & systems", fr: "Vos outils & systèmes" },
+  "land.how.tools.sub": {
+    en: "CRM, email, database, internal APIs",
+    fr: "CRM, email, base de données, API internes",
+  },
+  "land.how.s1.t": { en: "1 · Classify", fr: "1 · Classer" },
+  "land.how.s1.b": {
+    en: "Every tool-call is classified — read, write, external send, or irreversible.",
+    fr: "Chaque appel d'outil est classé — lecture, écriture, envoi externe ou irréversible.",
+  },
+  "land.how.s2.t": { en: "2 · Decide", fr: "2 · Décider" },
+  "land.how.s2.b": {
+    en: "A deterministic policy allows it, blocks it, or holds it for a human.",
+    fr: "Une politique déterministe l'autorise, la bloque, ou la met en attente d'un humain.",
+  },
+  "land.how.s3.t": { en: "3 · Prove", fr: "3 · Prouver" },
+  "land.how.s3.b": {
+    en: "Each decision is hash-chained into an immutable, exportable audit trail.",
+    fr: "Chaque décision est chaînée par hash dans un journal immuable et exportable.",
+  },
+
+  "land.feat.kicker": { en: "Key features", fr: "Fonctionnalités clés" },
+  "land.feat.title": { en: "Everything you need to trust an agent", fr: "Tout pour faire confiance à un agent" },
+  "land.feat.1.t": { en: "Control actions, not prompts", fr: "Contrôler les actions, pas les prompts" },
+  "land.feat.1.b": {
+    en: "A gate on real operations — not a text filter. Allow, block, or pause any tool-call.",
+    fr: "Un contrôle des opérations réelles — pas un filtre de texte. Autoriser, bloquer ou suspendre chaque appel d'outil.",
+  },
+  "land.feat.2.t": { en: "Human in the loop", fr: "L'humain dans la boucle" },
+  "land.feat.2.b": {
+    en: "Irreversible actions pause for explicit approval — with dual control for the riskiest moves.",
+    fr: "Les actions irréversibles s'arrêtent pour validation explicite — avec double validation pour les plus sensibles.",
+  },
+  "land.feat.3.t": { en: "Tamper-proof audit", fr: "Audit inviolable" },
+  "land.feat.3.b": {
+    en: "Every decision hash-chained and append-only. Prove what your agents did — and didn't do.",
+    fr: "Chaque décision chaînée par hash et append-only. Prouvez ce que vos agents ont fait — et n'ont pas fait.",
+  },
+  "land.feat.4.t": { en: "Compliance, exported", fr: "Conformité, exportée" },
+  "land.feat.4.b": {
+    en: "One-click evidence packs for the EU AI Act and GDPR, ready for your auditors.",
+    fr: "Des dossiers de preuve en un clic pour l'AI Act européen et le RGPD, prêts pour vos auditeurs.",
+  },
+  "land.feat.5.t": { en: "Deterministic + smart", fr: "Déterministe + intelligent" },
+  "land.feat.5.b": {
+    en: "A fast rules engine decides the clear cases; an LLM judge handles the ambiguous ones.",
+    fr: "Un moteur de règles rapide tranche les cas clairs ; un juge LLM gère les cas ambigus.",
+  },
+  "land.feat.6.t": { en: "Multi-tenant by design", fr: "Multi-tenant par conception" },
+  "land.feat.6.b": {
+    en: "Strict tenant isolation at the database level. Your data never crosses lines.",
+    fr: "Isolation stricte des locataires au niveau base de données. Vos données ne se croisent jamais.",
+  },
+
+  "land.comp.kicker": { en: "Built for compliance", fr: "Conçu pour la conformité" },
+  "land.comp.title": { en: "Evidence, not promises", fr: "Des preuves, pas des promesses" },
+  "land.comp.body": {
+    en: "The EU AI Act requires human oversight (Article 14) and record-keeping for high-risk AI. xSOM produces exactly that: a complete, verifiable trail of every decision and approval, exportable for auditors and regulators in one click.",
+    fr: "L'AI Act européen exige une supervision humaine (Article 14) et une traçabilité pour l'IA à haut risque. xSOM produit exactement cela : une trace complète et vérifiable de chaque décision et validation, exportable pour auditeurs et régulateurs en un clic.",
+  },
+
+  "land.who.kicker": { en: "Who it's for", fr: "Pour qui" },
+  "land.who.title": {
+    en: "For teams putting AI agents to work",
+    fr: "Pour les équipes qui mettent les agents IA au travail",
+  },
+  "land.who.1.t": { en: "Customer-facing assistants", fr: "Assistants clients" },
+  "land.who.1.b": {
+    en: "Keep autonomous support and sales agents on-policy.",
+    fr: "Gardez vos agents de support et de vente autonomes conformes à la politique.",
+  },
+  "land.who.2.t": { en: "Internal copilots", fr: "Copilotes internes" },
+  "land.who.2.b": {
+    en: "Let employees' AI tools act on real systems — safely.",
+    fr: "Laissez les outils IA des employés agir sur les vrais systèmes — en toute sécurité.",
+  },
+  "land.who.3.t": { en: "Back-office automation", fr: "Automatisation back-office" },
+  "land.who.3.b": {
+    en: "Gate the irreversible steps inside autonomous workflows.",
+    fr: "Contrôlez les étapes irréversibles des workflows autonomes.",
+  },
+
+  "land.cta.title": {
+    en: "Put your agents to work — under control.",
+    fr: "Mettez vos agents au travail — sous contrôle.",
+  },
+  "land.cta.body": {
+    en: "Explore the live console, or talk to us about your agents.",
+    fr: "Explorez la console en direct, ou parlez-nous de vos agents.",
+  },
+  "land.footer.tech": {
+    en: "Standards-based: MCP gateway · deterministic policy · hash-chained audit.",
+    fr: "Basé sur des standards : passerelle MCP · politique déterministe · audit chaîné par hash.",
+  },
+  "land.footer.rights": {
+    en: "© 2026 xSOM. All rights reserved.",
+    fr: "© 2026 xSOM. Tous droits réservés.",
+  },
+
+  // ── In-app Home / onboarding (post-login) ────────────────────────────
+  "nav.home": { en: "Home", fr: "Accueil" },
+  "home.title": { en: "Welcome to xSOM AI Guard", fr: "Bienvenue sur xSOM AI Guard" },
+  "home.subtitle": {
+    en: "Your control center for everything your AI agents do.",
+    fr: "Votre centre de contrôle pour tout ce que font vos agents IA.",
+  },
+  "home.kpi.actions": { en: "Monitored actions", fr: "Actions surveillées" },
+  "home.kpi.pending": { en: "Pending approvals", fr: "Validations en attente" },
+  "home.kpi.gated": { en: "Gated actions", fr: "Actions contrôlées" },
+  "home.kpi.audit": { en: "Audit entries", fr: "Entrées d'audit" },
+  "home.chart.title": { en: "Decisions recorded", fr: "Décisions enregistrées" },
+  "home.chart.allow": { en: "Allowed", fr: "Autorisées" },
+  "home.chart.hitl": { en: "Held / approved", fr: "En attente / validées" },
+  "home.chart.deny": { en: "Blocked", fr: "Bloquées" },
+  "home.chart.empty": { en: "No decisions recorded yet.", fr: "Aucune décision enregistrée pour l'instant." },
+
+  "home.start.kicker": { en: "Getting started", fr: "Pour commencer" },
+  "home.start.title": { en: "Onboard a client in 5 steps", fr: "Intégrer un client en 5 étapes" },
+  "home.start.s1.t": { en: "Connect a client", fr: "Connecter un client" },
+  "home.start.s1.b": {
+    en: "In Admin → API keys, generate a key for the client's agent. Their agent calls xSOM before each action.",
+    fr: "Dans Admin → Clés d'API, générez une clé pour l'agent du client. Son agent appelle xSOM avant chaque action.",
+  },
+  "home.start.s2.t": { en: "Set the policy", fr: "Définir la politique" },
+  "home.start.s2.b": {
+    en: "In Admin, edit the policy: which actions are automatic, which need approval, which are blocked.",
+    fr: "Dans Admin, modifiez la politique : quelles actions sont automatiques, lesquelles nécessitent une validation, lesquelles sont bloquées.",
+  },
+  "home.start.s3.t": { en: "Watch the actions", fr: "Observer les actions" },
+  "home.start.s3.b": {
+    en: "Open Inspector to see every action the agent can take and how each is handled.",
+    fr: "Ouvrez l'Inspecteur pour voir chaque action que l'agent peut effectuer et comment elle est traitée.",
+  },
+  "home.start.s4.t": { en: "Approve the risky ones", fr: "Valider les actions sensibles" },
+  "home.start.s4.b": {
+    en: "Irreversible actions appear in Approvals. Review the dry-run, then approve or deny.",
+    fr: "Les actions irréversibles apparaissent dans Approbations. Examinez le dry-run, puis approuvez ou refusez.",
+  },
+  "home.start.s5.t": { en: "Prove compliance", fr: "Prouver la conformité" },
+  "home.start.s5.b": {
+    en: "Open Audit to review the immutable trail and export AI Act / GDPR evidence.",
+    fr: "Ouvrez Audit pour consulter le journal immuable et exporter les preuves AI Act / RGPD.",
+  },
+
+  "home.pages.kicker": { en: "The console", fr: "La console" },
+  "home.pages.title": { en: "What each page is for", fr: "À quoi sert chaque page" },
+  "home.pages.inspector.b": {
+    en: "The catalogue of actions your agent can take, with the type and policy decision for each. Start here to see what's monitored.",
+    fr: "Le catalogue des actions que votre agent peut effectuer, avec le type et la décision de politique pour chacune. Commencez ici pour voir ce qui est surveillé.",
+  },
+  "home.pages.approvals.b": {
+    en: "The human-in-the-loop queue. Each card shows a dry-run of an irreversible action — approve or deny. Some require two distinct approvers.",
+    fr: "La file de validation humaine. Chaque carte montre un dry-run d'une action irréversible — approuvez ou refusez. Certaines exigent deux validateurs distincts.",
+  },
+  "home.pages.audit.b": {
+    en: "The immutable, hash-chained record of every decision. Read the chain and export compliance evidence in one click.",
+    fr: "Le journal immuable et chaîné par hash de chaque décision. Parcourez la chaîne et exportez les preuves de conformité en un clic.",
+  },
+  "home.pages.admin.b": {
+    en: "Edit the authorization policy and manage API keys for the agents (clients) you monitor.",
+    fr: "Modifiez la politique d'autorisation et gérez les clés d'API des agents (clients) que vous surveillez.",
+  },
+  "home.pages.open": { en: "Open", fr: "Ouvrir" },
+
+  "home.legend.title": { en: "Reading the badges", fr: "Lire les badges" },
+  "home.legend.green": {
+    en: "Green — allowed automatically",
+    fr: "Vert — autorisé automatiquement",
+  },
+  "home.legend.amber": {
+    en: "Amber — held for human approval",
+    fr: "Ambre — en attente de validation humaine",
+  },
+  "home.legend.red": { en: "Red — blocked by policy", fr: "Rouge — bloqué par la politique" },
+
+  "home.tech.title": { en: "Under the hood", fr: "Sous le capot" },
+  "home.tech.body": {
+    en: "A standards-based MCP gateway, a deterministic policy engine, a hash-chained audit log, and a lightweight LLM judge for the ambiguous cases. How we classify, chain, and decide at scale is our secret sauce.",
+    fr: "Une passerelle MCP basée sur des standards, un moteur de politique déterministe, un journal d'audit chaîné par hash, et un juge LLM léger pour les cas ambigus. Notre façon de classer, chaîner et décider à grande échelle reste notre secret de fabrication.",
+  },
+
   // Login
   "login.title": { en: "Sign in", fr: "Se connecter" },
   "login.subtitle": { en: "Access the action-control console.", fr: "Accédez à la console de contrôle des actions." },
@@ -112,6 +361,8 @@ export const STR = {
   "approvals.approved": { en: "Approved — the agent may proceed.", fr: "Approuvée — l'agent peut continuer." },
   "approvals.denied": { en: "Denied — the action is blocked.", fr: "Refusée — l'action est bloquée." },
   "approvals.recorded": { en: "Your approval is recorded — a second, different approver is still required.", fr: "Votre validation est enregistrée — un second validateur distinct est requis." },
+  "approvals.deciding": { en: "Working…", fr: "Traitement…" },
+  "approvals.status.pending": { en: "Pending", fr: "En attente" },
 
   // Audit
   "audit.title": { en: "Audit explorer", fr: "Explorateur d'audit" },
@@ -144,6 +395,7 @@ export const STR = {
   "keys.never": { en: "never used", fr: "jamais utilisée" },
   "keys.used": { en: "used {date}", fr: "utilisée {date}" },
   "keys.revoke": { en: "Revoke", fr: "Révoquer" },
+  "keys.revoking": { en: "Revoking…", fr: "Révocation…" },
   "keys.empty": { en: "No API keys yet.", fr: "Aucune clé d'API." },
 
   // Action-class explanations (tooltips)
