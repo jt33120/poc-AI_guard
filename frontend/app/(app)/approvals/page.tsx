@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { Spinner } from "@/components/Spinner";
 import { apiGet, apiSend } from "@/lib/client";
 
 interface Approval {
@@ -16,11 +17,13 @@ interface Approval {
 export default function ApprovalsPage() {
   const [items, setItems] = useState<Approval[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const reload = useCallback(() => {
     apiGet<Approval[]>("v1/approvals?status=pending")
       .then(setItems)
-      .catch((e: unknown) => setError(String(e)));
+      .catch((e: unknown) => setError(String(e)))
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => reload(), [reload]);
@@ -42,7 +45,11 @@ export default function ApprovalsPage() {
         <p className="muted mt-1">Irreversible actions held for a human decision.</p>
       </header>
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
-      {items.length === 0 ? (
+      {loading ? (
+        <div className="card">
+          <Spinner />
+        </div>
+      ) : items.length === 0 ? (
         <div className="card p-8 text-center">
           <p className="muted">No pending approvals.</p>
         </div>

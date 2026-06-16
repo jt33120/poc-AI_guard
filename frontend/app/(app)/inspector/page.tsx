@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { DecisionBadge } from "@/components/brand";
+import { Spinner } from "@/components/Spinner";
 import { apiGet } from "@/lib/client";
 
 interface ToolView {
@@ -15,11 +16,13 @@ interface ToolView {
 export default function InspectorPage() {
   const [tools, setTools] = useState<ToolView[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     apiGet<ToolView[]>("v1/tools")
       .then(setTools)
-      .catch((e: unknown) => setError(String(e)));
+      .catch((e: unknown) => setError(String(e)))
+      .finally(() => setLoading(false));
   }, []);
 
   return (
@@ -58,7 +61,11 @@ export default function InspectorPage() {
             ))}
           </tbody>
         </table>
-        {tools.length === 0 && !error ? <p className="muted p-4">No tools exposed.</p> : null}
+        {loading ? (
+          <Spinner />
+        ) : tools.length === 0 && !error ? (
+          <p className="muted p-4">No tools exposed.</p>
+        ) : null}
       </div>
     </section>
   );

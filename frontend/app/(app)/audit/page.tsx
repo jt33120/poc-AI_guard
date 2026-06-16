@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { DecisionBadge } from "@/components/brand";
+import { Spinner } from "@/components/Spinner";
 import { apiGet, exportUrl } from "@/lib/client";
 
 interface AuditEntry {
@@ -17,11 +18,13 @@ interface AuditEntry {
 export default function AuditPage() {
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     apiGet<AuditEntry[]>("v1/audit")
       .then(setEntries)
-      .catch((e: unknown) => setError(String(e)));
+      .catch((e: unknown) => setError(String(e)))
+      .finally(() => setLoading(false));
   }, []);
 
   return (
@@ -68,7 +71,11 @@ export default function AuditPage() {
             ))}
           </tbody>
         </table>
-        {entries.length === 0 && !error ? <p className="muted p-4">No audit entries.</p> : null}
+        {loading ? (
+          <Spinner />
+        ) : entries.length === 0 && !error ? (
+          <p className="muted p-4">No audit entries.</p>
+        ) : null}
       </div>
     </section>
   );
