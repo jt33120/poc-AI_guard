@@ -23,3 +23,8 @@ def authorize_rate_limit() -> str:
 def llm_proxy_rate_limit() -> str:
     """Dynamic limit string for the LLM monitoring proxy (from settings)."""
     return get_settings().llm_proxy_rate_limit
+
+
+def policy_draft_rate_limit() -> str:
+    """Dynamic limit string for the natural-language policy assistant."""
+    return get_settings().policy_draft_rate_limit

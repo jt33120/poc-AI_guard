@@ -25,6 +25,8 @@ export default function AdminPage() {
   const [servers, setServers] = useState<ServerRow[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [prompt, setPrompt] = useState("");
+  const [drafting, setDrafting] = useState(false);
 
   useEffect(() => {
     apiGet<PolicyDoc>("v1/policy")
@@ -50,6 +52,23 @@ export default function AdminPage() {
     }
   }
 
+  async function draftWithAI() {
+    if (!prompt.trim()) return;
+    setDrafting(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const doc = await apiSend<PolicyDoc>("v1/policy/draft", "POST", { prompt: prompt.trim() });
+      setYaml(doc.yaml);
+      setMessage(t("admin.ai.review"));
+    } catch (e: unknown) {
+      const s = String(e);
+      setError(s.includes("503") ? t("admin.ai.unavailable") : t("admin.ai.error"));
+    } finally {
+      setDrafting(false);
+    }
+  }
+
   return (
     <section className="flex animate-fade-up flex-col gap-6">
       <header>
@@ -62,6 +81,34 @@ export default function AdminPage() {
           <h2 className="text-lg font-semibold">{t("admin.policy.title")}</h2>
           <span className="badge badge-neutral">version {version ?? "—"}</span>
         </div>
+
+        {/* Natural-language → policy (Mistral assistant) */}
+        <div className="mt-3 rounded-xl border border-brand/30 bg-brand/[0.06] p-4">
+          <div className="flex items-center gap-2">
+            <span className="badge badge-blue">AI</span>
+            <h3 className="text-sm font-semibold">{t("admin.ai.title")}</h3>
+          </div>
+          <textarea
+            aria-label={t("admin.ai.title")}
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            rows={3}
+            placeholder={t("admin.ai.ph")}
+            className="input mt-2 resize-y text-sm"
+          />
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={draftWithAI}
+              disabled={drafting || !prompt.trim()}
+              className="btn btn-primary px-4 py-1.5"
+            >
+              {drafting ? t("admin.ai.generating") : t("admin.ai.generate")}
+            </button>
+            <p className="muted text-xs">{t("admin.ai.hint")}</p>
+          </div>
+        </div>
+
         <textarea
           aria-label="Policy YAML"
           value={yaml}

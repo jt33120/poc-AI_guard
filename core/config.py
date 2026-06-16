@@ -59,6 +59,8 @@ class Settings(BaseSettings):
     # Upstream provider base; the agent points its OpenAI base_url at xSOM.
     openai_base_url: str = Field(default="https://api.openai.com", max_length=300)
     llm_proxy_rate_limit: str = Field(default="240/minute", max_length=40)
+    # slowapi limit for the natural-language policy assistant (LLM-backed).
+    policy_draft_rate_limit: str = Field(default="20/minute", max_length=40)
 
     # --- HITL approval notifications (M4, optional) ----------------------
     smtp_host: str | None = Field(default=None, max_length=255)

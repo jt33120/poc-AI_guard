@@ -514,6 +514,26 @@ export const STR = {
   "admin.policy.save": { en: "Save policy", fr: "Enregistrer la politique" },
   "admin.policy.saved": { en: "Policy saved (version {v}).", fr: "Politique enregistrée (version {v})." },
   "admin.policy.invalid": { en: "Invalid policy:", fr: "Politique invalide :" },
+  "admin.ai.title": { en: "Describe it, we'll write the policy", fr: "Décrivez-la, on écrit la politique" },
+  "admin.ai.hint": {
+    en: "Plain words — e.g. “reads the CRM and emails candidates; never delete anything; deleting a database needs two approvers”.",
+    fr: "En langage courant — ex. « lit le CRM et envoie des emails aux candidats ; ne jamais supprimer ; supprimer une base demande deux validateurs ».",
+  },
+  "admin.ai.ph": {
+    en: "Describe what your agent does and your rules…",
+    fr: "Décrivez ce que fait votre agent et vos règles…",
+  },
+  "admin.ai.generate": { en: "Generate with AI", fr: "Générer avec l'IA" },
+  "admin.ai.generating": { en: "Generating…", fr: "Génération…" },
+  "admin.ai.review": {
+    en: "Draft ready below — review it, then Save policy to apply.",
+    fr: "Brouillon prêt ci-dessous — vérifiez-le, puis Enregistrer pour appliquer.",
+  },
+  "admin.ai.unavailable": {
+    en: "The AI assistant isn't configured yet (no Mistral key on the server).",
+    fr: "L'assistant IA n'est pas encore configuré (pas de clé Mistral sur le serveur).",
+  },
+  "admin.ai.error": { en: "Couldn't generate a policy — try rephrasing.", fr: "Génération impossible — reformulez." },
   "admin.servers.title": { en: "Downstream servers", fr: "Serveurs en aval" },
   "admin.servers.empty": { en: "No servers declared.", fr: "Aucun serveur déclaré." },
 

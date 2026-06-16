@@ -7,15 +7,47 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from api.deps import database_url, require_tenant
+from api.ratelimit import limiter, policy_draft_rate_limit
 from api.security import get_current_user, require_role
-from core import audit, db, policy_store, servers
+from core import audit, db, judge, policy_assistant, policy_store, servers
+from core.config import Settings
 from core.policy import PolicyError, evaluate, parse_policy
-from core.schemas import CurrentUser, PolicyDocument, PolicyUpdate, Role, ToolView
+from core.schemas import (
+    CurrentUser,
+    PolicyDocument,
+    PolicyDraftRequest,
+    PolicyUpdate,
+    Role,
+    ToolView,
+)
 from gateway.downstream import DownstreamProxy, ServerSpec
 
 router = APIRouter(prefix="/v1", tags=["policy"])
 
 _require_admin = require_role(Role.admin)
+
+
+@router.post("/policy/draft", response_model=PolicyDocument)
+@limiter.limit(policy_draft_rate_limit)
+def draft_policy(
+    payload: PolicyDraftRequest,
+    request: Request,
+    user: CurrentUser = Depends(_require_admin),
+) -> dict[str, Any]:
+    """Draft a validated policy YAML from a plain-language description (admin)."""
+    require_tenant(user)
+    settings: Settings = request.app.state.settings
+    if not settings.mistral_api_key:
+        raise HTTPException(status_code=503, detail="Policy assistant is not configured")
+    completer = judge.litellm_completer(settings.mistral_model, settings.mistral_api_key)
+    try:
+        yaml_text = policy_assistant.draft_policy(completer, payload.prompt)
+    except PolicyError as exc:
+        raise HTTPException(
+            status_code=422, detail="Could not turn that into a valid policy — try rephrasing."
+        ) from exc
+    # version 0 marks an unsaved draft; the admin reviews then saves via PUT.
+    return {"yaml": yaml_text, "version": 0}
 
 
 @router.get("/policy", response_model=PolicyDocument)
