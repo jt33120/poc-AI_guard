@@ -28,6 +28,9 @@ frontend/test-results/
 frontend/playwright-report/
 *.tsbuildinfo
 
+# Vercel CLI local link state (deploy config lives in the Vercel project, not git)
+.vercel/
+
 # Editor / OS
 .DS_Store
 .idea/

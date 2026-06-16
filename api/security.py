@@ -12,11 +12,12 @@ from collections.abc import Callable
 from typing import Any
 
 import httpx
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import jwt
 from jose.exceptions import JWTError
 
+from core import db, tenant_tokens
 from core.config import Settings
 from core.schemas import CurrentUser, Role
 
@@ -129,6 +130,35 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
         ) from None
     return _user_from_claims(claims)
+
+
+def get_gateway_tenant(
+    request: Request,
+    x_gateway_token: str | None = Header(default=None, alias="X-Gateway-Token"),
+) -> str:
+    """Resolve the tenant for a machine-to-machine call from its gateway token.
+
+    Fail-closed (CLAUDE.md §4.4): missing token, unconfigured DB, or an
+    unknown/revoked token all deny (401/503).
+    """
+    if not x_gateway_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing gateway token"
+        )
+    url: str | None = request.app.state.database_url
+    if not url:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database not configured"
+        )
+    try:
+        with db.connection(url) as conn:
+            tenant_id = tenant_tokens.authenticate_gateway_session(conn, x_gateway_token)
+            conn.commit()
+    except PermissionError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid gateway token"
+        ) from None
+    return tenant_id
 
 
 def require_role(*roles: Role) -> Callable[..., CurrentUser]:

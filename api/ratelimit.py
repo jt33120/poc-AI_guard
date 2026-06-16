@@ -13,3 +13,8 @@ limiter = Limiter(key_func=get_remote_address)
 def export_rate_limit() -> str:
     """Dynamic limit string for the audit-export endpoint (from settings)."""
     return get_settings().export_rate_limit
+
+
+def authorize_rate_limit() -> str:
+    """Dynamic limit string for the agent authorization endpoint (from settings)."""
+    return get_settings().authorize_rate_limit

@@ -3,9 +3,94 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: light dark;
+  color-scheme: dark;
 }
 
-body {
-  @apply bg-slate-50 text-slate-900;
+@layer base {
+  body {
+    @apply bg-navy text-white antialiased;
+    /* Soft brand glow on the navy canvas, matching the xSOM site mood. */
+    background-image:
+      radial-gradient(900px circle at 12% -10%, rgba(37, 99, 235, 0.18), transparent 45%),
+      radial-gradient(700px circle at 100% 0%, rgba(191, 197, 206, 0.06), transparent 42%);
+    background-attachment: fixed;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-bold tracking-tight;
+  }
+  ::selection {
+    @apply bg-brand/30 text-white;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-white/10 bg-white/[0.035] shadow-card backdrop-blur-sm;
+  }
+
+  .btn {
+    @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-pill border
+           border-transparent px-5 py-2 text-sm font-semibold transition-all duration-300
+           disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply border-brand bg-brand text-white shadow-glow hover:bg-brand-bright;
+  }
+  .btn-ghost {
+    @apply border-white/15 bg-white/[0.04] text-white/80 hover:bg-white/[0.09] hover:text-white;
+  }
+  .btn-success {
+    @apply bg-emerald-500/90 text-white hover:bg-emerald-400;
+  }
+  .btn-danger {
+    @apply bg-red-500/90 text-white hover:bg-red-400;
+  }
+
+  .input {
+    @apply w-full rounded-xl border border-white/10 bg-navy-mid/60 px-3.5 py-2.5 text-sm
+           text-white placeholder-white/30 outline-none transition
+           focus:border-brand/70 focus:ring-2 focus:ring-brand/25;
+  }
+
+  .label {
+    @apply text-xs font-medium uppercase tracking-wider text-white/45;
+  }
+  .muted {
+    @apply text-white/55;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-pill border px-2.5 py-0.5 text-xs font-medium;
+  }
+  .badge-neutral {
+    @apply border-white/15 bg-white/5 text-white/70;
+  }
+  .badge-green {
+    @apply border-emerald-400/30 bg-emerald-400/10 text-emerald-300;
+  }
+  .badge-red {
+    @apply border-red-400/30 bg-red-400/10 text-red-300;
+  }
+  .badge-amber {
+    @apply border-amber-400/30 bg-amber-400/10 text-amber-300;
+  }
+  .badge-blue {
+    @apply border-brand/40 bg-brand/15 text-brand-bright;
+  }
+
+  .data-table {
+    @apply w-full border-collapse text-sm;
+  }
+  .data-table thead th {
+    @apply border-b border-white/10 px-3 py-2.5 text-left text-xs font-semibold uppercase
+           tracking-wider text-white/45;
+  }
+  .data-table tbody td {
+    @apply border-b border-white/[0.06] px-3 py-2.5 text-white/85;
+  }
+  .data-table tbody tr:hover {
+    @apply bg-white/[0.025];
+  }
 }

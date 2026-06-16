@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
+import { Logo, Wordmark } from "@/components/brand";
+
 const BASE_LINKS = [
   { href: "/inspector", label: "Inspector" },
   { href: "/approvals", label: "Approvals" },
@@ -28,33 +30,41 @@ export function AppShell({
 
   return (
     <div className="min-h-screen">
-      <header className="flex items-center justify-between border-b bg-white px-6 py-3">
-        <div className="flex items-center gap-6">
-          <span className="font-bold">xSOM AI Guard</span>
-          <nav className="flex gap-4">
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={pathname.startsWith(link.href) ? "font-semibold" : "text-slate-600"}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-        </div>
-        <div className="flex items-center gap-3 text-sm text-slate-600">
-          <span>{role ?? "no role"}</span>
-          <button
-            type="button"
-            onClick={logout}
-            className="rounded border border-slate-300 px-3 py-1 hover:bg-slate-100"
-          >
-            Sign out
-          </button>
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-navy/80 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
+          <div className="flex items-center gap-8">
+            <Link href="/inspector" className="flex items-center gap-2.5">
+              <Logo />
+              <Wordmark className="text-[15px]" />
+            </Link>
+            <nav className="hidden items-center gap-1 md:flex">
+              {links.map((link) => {
+                const active = pathname.startsWith(link.href);
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`rounded-pill px-3.5 py-1.5 text-sm transition ${
+                      active
+                        ? "bg-white/10 text-white"
+                        : "text-white/55 hover:bg-white/[0.05] hover:text-white"
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="badge badge-blue capitalize">{role ?? "no role"}</span>
+            <button type="button" onClick={logout} className="btn btn-ghost px-4 py-1.5">
+              Sign out
+            </button>
+          </div>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl p-6">{children}</main>
+      <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
     </div>
   );
 }
