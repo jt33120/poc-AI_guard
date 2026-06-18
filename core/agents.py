@@ -34,7 +34,7 @@ def list_agents(conn: psycopg.Connection) -> list[dict[str, Any]]:
         "  from audit_log group by gateway_token_id) a on a.gateway_token_id = g.id "
         "left join (select gateway_token_id, sum(cost_usd) as cost, sum(total_tokens) as tokens "
         "  from usage_events group by gateway_token_id) u on u.gateway_token_id = g.id "
-        "order by g.created_at desc"
+        "order by (g.revoked_at is not null), coalesce(a.last_action, g.created_at) desc"
     ).fetchall()
     return [
         {
