@@ -14,8 +14,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ detail: "org, email and password are required" }, { status: 400 });
   }
 
-  // 1) Provision the tenant + admin user on the backend (holds the service-role
-  //    key — never the frontend, CLAUDE.md §4.6).
+  // 1) Provision the tenant + admin user on the backend, which holds the
+  //    privileged provisioning key — never the frontend (CLAUDE.md §4.6).
   const res = await fetch(`${config.controlApiUrl}/v1/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
