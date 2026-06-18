@@ -626,6 +626,37 @@ export const STR = {
     en: "LLM token cost governed in this view.",
     fr: "Coût des tokens LLM gouverné dans cette vue.",
   },
+
+  // ── Billed (exact) vs estimated reconciliation ───────────────────────────
+  "costs.billed.l": { en: "Billed (exact)", fr: "Facturé (exact)" },
+  "costs.estimated.l": { en: "Estimated", fr: "Estimé" },
+  "costs.recon": {
+    en: "Billed is the cost providers report themselves; estimated is tokens × list price.",
+    fr: "Le facturé est le coût rapporté par les providers ; l'estimé est tokens × tarif public.",
+  },
+  "costs.drift": { en: "drift", fr: "écart" },
+  "costs.billed.hint": {
+    en: "Route an agent through the OpenRouter proxy (or connect a provider in Admin) to populate exact billed cost.",
+    fr: "Faites passer un agent par le proxy OpenRouter (ou connectez un provider dans Admin) pour alimenter le coût facturé exact.",
+  },
+
+  // ── Provider billing credentials (Admin) ─────────────────────────────────
+  "creds.title": { en: "Provider billing", fr: "Facturation providers" },
+  "creds.subtitle": {
+    en: "Connect a provider so xSOM can pull the authoritative billed cost. Keys are envelope-encrypted (KMS) and never shown again.",
+    fr: "Connectez un provider pour que xSOM tire le coût facturé qui fait foi. Les clés sont chiffrées (enveloppe + KMS) et jamais réaffichées.",
+  },
+  "creds.provider": { en: "Provider", fr: "Provider" },
+  "creds.label": { en: "Label", fr: "Libellé" },
+  "creds.secret": { en: "API key / secret", fr: "Clé API / secret" },
+  "creds.connect": { en: "Connect", fr: "Connecter" },
+  "creds.revoke": { en: "Revoke", fr: "Révoquer" },
+  "creds.revoked": { en: "revoked", fr: "révoquée" },
+  "creds.none": { en: "No providers connected yet.", fr: "Aucun provider connecté." },
+  "creds.unavailable": {
+    en: "Secret storage isn't configured on the server yet.",
+    fr: "Le stockage des secrets n'est pas encore configuré sur le serveur.",
+  },
 } satisfies Record<string, Entry>;
 
 export type StrKey = keyof typeof STR;

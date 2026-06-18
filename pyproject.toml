@@ -67,6 +67,8 @@ select = [
 "core/tenant_tokens.py" = ["S608"]
 "core/usage.py" = ["S608"]
 "core/agents.py" = ["S608"]
+"core/credentials.py" = ["S608"]
+"core/billing.py" = ["S608"]
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI dependency-injection idiom: Depends/Security in argument defaults.
@@ -85,7 +87,7 @@ show_error_codes = true
 
 # Third-party libraries without type stubs.
 [[tool.mypy.overrides]]
-module = ["litellm.*", "slowapi.*"]
+module = ["litellm.*", "slowapi.*", "boto3.*"]
 ignore_missing_imports = true
 
 # Test/demo PG harness is followed by scripts/demo.py but not type-gated.

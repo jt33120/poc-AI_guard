@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, Query, Request
 
 from api.deps import database_url, require_tenant
 from api.security import get_current_user
-from core import db, usage
+from core import billing, db, usage
 from core.schemas import CurrentUser, Role, UsageSummary
 
 router = APIRouter(prefix="/v1/usage", tags=["usage"])
@@ -32,4 +32,8 @@ def get_usage(
     with db.tenant_reader(
         url, user_id=user.user_id, tenant_id=tenant_id, role=(user.role or Role.viewer)
     ) as conn:
-        return usage.summary(conn, agent_id=agent_id, from_ts=from_ts, to_ts=to_ts)
+        summary = usage.summary(conn, agent_id=agent_id, from_ts=from_ts, to_ts=to_ts)
+        summary["billed_cost_usd"] = billing.total_billed(
+            conn, agent_id=agent_id, from_ts=from_ts, to_ts=to_ts
+        )
+        return summary

@@ -65,6 +65,15 @@ class Settings(BaseSettings):
     # slowapi limit for the natural-language policy assistant (LLM-backed).
     policy_draft_rate_limit: str = Field(default="20/minute", max_length=40)
 
+    # --- Secrets (provider credentials) — envelope encryption -------------
+    # KMS backend that wraps per-tenant data keys: "aws" (prod) or "local"
+    # (dev/test only). Storing/decrypting a credential fails closed if this is
+    # unset, or if "local" is used in prod (CLAUDE.md §4.4/§4.7).
+    secrets_kms_provider: str | None = Field(default=None, max_length=20)
+    aws_kms_key_id: str | None = Field(default=None, max_length=400)
+    # Base64 32-byte key-encryption key for the local provider (NEVER in prod).
+    secrets_local_kek: str | None = Field(default=None, max_length=128)
+
     # --- HITL approval notifications (M4, optional) ----------------------
     smtp_host: str | None = Field(default=None, max_length=255)
     smtp_port: int = Field(default=587, ge=1, le=65535)

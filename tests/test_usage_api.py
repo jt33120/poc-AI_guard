@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from api.main import create_app
 from api.security import TokenVerifier
-from core import audit, usage
+from core import audit, billing, usage
 from core.config import Settings
 from tests.conftest import DBHandle
 
@@ -122,6 +122,32 @@ def test_audit_filter_by_agent(
     scoped = client.get(f"/v1/audit?agent_id={gid}", headers=_auth(viewer)).json()
     assert [e["tool_name"] for e in scoped] == ["crm.read"]
     assert scoped[0]["gateway_token_id"] == gid
+
+
+def test_usage_includes_authoritative_billed_cost(
+    db: DBHandle, test_verifier: TokenVerifier, make_token: Callable[..., str]
+) -> None:
+    tid, gid = _seed(db)
+    billing.record_billed(
+        db.conn,
+        tenant_id=tid,
+        gateway_token_id=gid,
+        provider="openrouter",
+        source="openrouter_inline",
+        model="openai/gpt-4o-mini",
+        amount_usd=0.5,
+        external_id="gen-x",
+    )
+    db.conn.commit()
+    client = _client(db.url, test_verifier)
+    viewer = make_token(tenant_id=tid, role="viewer")
+
+    us = client.get("/v1/usage", headers=_auth(viewer)).json()
+    assert round(us["billed_cost_usd"], 4) == 0.5  # exact, separate from the estimate
+    scoped = client.get(f"/v1/usage?agent_id={gid}", headers=_auth(viewer)).json()
+    assert round(scoped["billed_cost_usd"], 4) == 0.5
+    empty = client.get(f"/v1/usage?agent_id={uuid4()}", headers=_auth(viewer)).json()
+    assert empty["billed_cost_usd"] == 0.0
 
 
 def test_usage_and_agents_are_tenant_isolated(
