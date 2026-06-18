@@ -86,7 +86,7 @@ class _FakeClient:
         self.captured: dict[str, Any] = {}
 
     async def post(self, url: str, content: bytes, headers: dict[str, str]) -> _FakeResp:
-        self.captured = {"url": url, "headers": headers}
+        self.captured = {"url": url, "headers": headers, "content": content}
         return self._resp
 
 
@@ -312,6 +312,62 @@ def test_mistral_proxy_uses_openai_shape_and_base(
     assert "api.mistral.ai" in fake.captured["url"]
     assert fake.captured["url"].endswith("/v1/chat/completions")
     assert fake.captured["headers"]["Authorization"] == "Bearer sk-mistral"
+
+
+OPENROUTER_BODY = {
+    "id": "gen-or-1",
+    "object": "chat.completion",
+    "model": "openai/gpt-4o-mini",
+    "choices": [{"index": 0, "message": {"role": "assistant", "content": "hi"}}],
+    "usage": {
+        "prompt_tokens": 1000,
+        "completion_tokens": 500,
+        "total_tokens": 1500,
+        "cost": 0.00075,
+    },
+}
+
+
+def test_openrouter_records_exact_billed_cost_and_requests_usage(
+    db: DBHandle,
+    test_verifier: TokenVerifier,
+    make_token: Callable[..., str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tid = _tenant(db)
+    client = _client(db.url, test_verifier)
+    admin = make_token(tenant_id=tid, role="admin")
+    client.put(
+        "/v1/policy", headers={"Authorization": f"Bearer {admin}"}, json={"yaml": AUTO_POLICY}
+    )
+    created = client.post(
+        "/v1/gateway-tokens", headers={"Authorization": f"Bearer {admin}"}, json={"name": "bot"}
+    ).json()
+    raw, token_id = created["token"], created["id"]
+
+    fake = _FakeClient(_FakeResp(OPENROUTER_BODY))
+    monkeypatch.setattr(llm_proxy, "_http", lambda: fake)
+    resp = client.post(
+        "/proxy/openrouter/v1/chat/completions",
+        headers={"X-Gateway-Token": raw, "Authorization": "Bearer sk-or"},
+        json={"model": "openai/gpt-4o-mini", "messages": [{"role": "user", "content": "x"}]},
+    )
+    assert resp.status_code == 200
+    # We asked OpenRouter to include the real cost.
+    assert json.loads(fake.captured["content"])["usage"]["include"] is True
+
+    import psycopg
+
+    with psycopg.connect(db.url) as check:
+        billed = check.execute(
+            "select provider, source, amount_usd, gateway_token_id, external_id "
+            "from billed_cost where tenant_id = %s",
+            (tid,),
+        ).fetchone()
+    assert billed is not None
+    assert billed[0] == "openrouter" and billed[1] == "openrouter_inline"
+    assert float(billed[2]) == 0.00075  # the provider's real cost, not an estimate
+    assert str(billed[3]) == token_id and billed[4] == "gen-or-1"
 
 
 def test_enforce_mode_strips_non_allowed_tool_calls(

@@ -35,7 +35,7 @@ from starlette.concurrency import run_in_threadpool
 from api.deps import database_url
 from api.ratelimit import limiter, llm_proxy_rate_limit
 from api.security import GatewayPrincipal, get_gateway_principal
-from core import approvals, audit, db, policy_store, pricing
+from core import approvals, audit, billing, db, policy_store, pricing
 from core import usage as usage_store
 from core.config import Settings
 from core.policy import Approval, Policy, evaluate
@@ -104,6 +104,33 @@ def _extract_tool_use(data: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
                 (block["name"], block.get("input") if isinstance(block.get("input"), dict) else {})
             )
     return calls
+
+
+def _extract_billed(provider: str, data: dict[str, Any]) -> float | None:
+    """OpenRouter returns the *real* per-call cost (USD) inline; None otherwise."""
+    if provider != "openrouter":
+        return None
+    usage = data.get("usage")
+    if not isinstance(usage, dict):
+        return None
+    cost = usage.get("cost")
+    try:
+        return float(cost) if cost is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _augment_openrouter(body: bytes) -> bytes:
+    """Ask OpenRouter to include the real cost in the response (``usage.include``)."""
+    try:
+        payload = json.loads(body or b"{}")
+    except (ValueError, TypeError):
+        return body
+    if not isinstance(payload, dict):
+        return body
+    usage = payload.get("usage")
+    payload["usage"] = {**usage, "include": True} if isinstance(usage, dict) else {"include": True}
+    return json.dumps(payload).encode()
 
 
 def _extract_usage(style: str, data: dict[str, Any]) -> tuple[str | None, int, int] | None:
@@ -186,10 +213,13 @@ def _inspect(
         policy = policy_store.load_policy(conn, tenant_id)
     audited = _process(style, data, policy, enforce)
     usage = _extract_usage(style, data)
-    if not audited and usage is None:
+    billed = _extract_billed(provider, data)
+    if not audited and usage is None and billed is None:
         return
     raw_id = data.get("id")
     request_id = raw_id if isinstance(raw_id, str) else None
+    raw_model = data.get("model")
+    model_name = raw_model if isinstance(raw_model, str) else None
     # Fresh connection: each log_event is then a top-level, committed transaction.
     with db.connection(url) as conn:
         for name, action_class, decision, args_hash in audited:
@@ -216,7 +246,19 @@ def _inspect(
                 cost_usd=pricing.cost_usd(provider, model, prompt_tokens, completion_tokens),
                 request_id=request_id,
             )
-            conn.commit()
+        if billed is not None:
+            # Authoritative cost the provider itself reported (exact, not estimated).
+            billing.record_billed(
+                conn,
+                tenant_id=tenant_id,
+                gateway_token_id=gateway_token_id,
+                provider=provider,
+                source="openrouter_inline",
+                model=model_name,
+                amount_usd=billed,
+                external_id=request_id,
+            )
+        conn.commit()
 
 
 def _base_url(settings: Settings, provider: str) -> str:
@@ -254,6 +296,10 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
         streaming = bool(json.loads(body or b"{}").get("stream"))
     except (ValueError, TypeError):
         streaming = False
+
+    # OpenRouter returns the real per-call cost when asked (non-streaming only).
+    if provider == "openrouter" and not streaming:
+        body = _augment_openrouter(body)
 
     client = _http()
     if streaming:

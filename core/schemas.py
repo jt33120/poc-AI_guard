@@ -232,6 +232,8 @@ class UsageSummary(BaseModel):
     """Aggregated LLM token usage + estimated cost for the cost dashboard."""
 
     total_cost_usd: float
+    # Authoritative cost reported by providers (exact), 0 until a source feeds it.
+    billed_cost_usd: float = 0.0
     total_tokens: int
     prompt_tokens: int
     completion_tokens: int
@@ -240,3 +242,28 @@ class UsageSummary(BaseModel):
     by_model: list[UsageBucket]
     by_agent: list[UsageBucket]
     daily: list[UsageDaily]
+
+
+CredentialProvider = Literal["openai", "anthropic", "mistral", "openrouter", "azure", "aws", "gcp"]
+
+
+class CredentialCreate(BaseModel):
+    """Connect a customer provider credential (used only to pull authoritative cost)."""
+
+    model_config = {"extra": "forbid"}
+
+    provider: CredentialProvider
+    label: str = Field(min_length=1, max_length=80)
+    # Never logged or echoed back; repr is suppressed for defense in depth.
+    secret: str = Field(min_length=1, max_length=10_000, repr=False)
+
+
+class CredentialOut(BaseModel):
+    """A stored credential's metadata — never the secret."""
+
+    id: str
+    provider: str
+    label: str
+    created_at: str | None
+    last_used_at: str | None
+    revoked: bool

@@ -25,6 +25,7 @@ interface Daily {
 }
 interface Usage {
   total_cost_usd: number;
+  billed_cost_usd: number;
   total_tokens: number;
   prompt_tokens: number;
   completion_tokens: number;
@@ -99,6 +100,13 @@ export default function CostsPage() {
         </div>
       ) : (
         <>
+          {/* Billed (exact) vs estimated reconciliation */}
+          <Reconciliation
+            billed={usage.billed_cost_usd}
+            estimated={usage.total_cost_usd}
+            t={t}
+          />
+
           {/* Headline KPIs */}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {KPIS.map((k) => (
@@ -140,6 +148,45 @@ export default function CostsPage() {
         </>
       )}
     </section>
+  );
+}
+
+function Reconciliation({
+  billed,
+  estimated,
+  t,
+}: {
+  billed: number;
+  estimated: number;
+  t: (k: StrKey) => string;
+}) {
+  const drift = billed > 0 ? ((estimated - billed) / billed) * 100 : 0;
+  return (
+    <div className="card flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+        <div>
+          <div className="text-2xl font-extrabold tracking-tight text-emerald-300 sm:text-3xl">
+            {billed > 0 ? formatUsd(billed) : "—"}
+          </div>
+          <div className="muted mt-1 text-sm">{t("costs.billed.l")}</div>
+        </div>
+        <div>
+          <div className="text-2xl font-extrabold tracking-tight text-brand-bright sm:text-3xl">
+            {formatUsd(estimated)}
+          </div>
+          <div className="muted mt-1 text-sm">{t("costs.estimated.l")}</div>
+        </div>
+        {billed > 0 ? (
+          <span className="badge badge-neutral">
+            {drift >= 0 ? "+" : ""}
+            {drift.toFixed(1)}% {t("costs.drift")}
+          </span>
+        ) : null}
+      </div>
+      <p className="muted max-w-sm text-xs leading-relaxed">
+        {billed > 0 ? t("costs.recon") : t("costs.billed.hint")}
+      </p>
+    </div>
   );
 }
 
