@@ -27,14 +27,14 @@ import json
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
 from starlette.concurrency import run_in_threadpool
 
 from api.deps import database_url
 from api.ratelimit import limiter, llm_proxy_rate_limit
-from api.security import GatewayPrincipal, get_gateway_principal
+from api.security import GatewayPrincipal, get_gateway_principal, resolve_gateway_principal
 from core import approvals, audit, billing, db, policy_store, pricing
 from core import usage as usage_store
 from core.config import Settings
@@ -367,4 +367,29 @@ async def openrouter_chat_completions(
 async def anthropic_messages(
     request: Request, principal: GatewayPrincipal = Depends(get_gateway_principal)
 ) -> Response:
+    return await _forward(request, principal, "anthropic")
+
+
+# --- Token-in-URL variants -----------------------------------------------------
+# For tools that only let you set base_url + api_key (no custom header), the
+# gateway token travels as a path segment, e.g. base_url:
+#   .../proxy/openrouter/<xsg_token>/v1   (OpenAI-compatible SDKs)
+#   .../proxy/anthropic/<xsg_token>       (Anthropic SDK)
+# The agent's own provider key still rides in Authorization / x-api-key.
+_OPENAI_PATH_PROVIDERS = {"openai", "mistral", "openrouter"}
+
+
+@router.post("/{provider}/{token}/v1/chat/completions")
+@limiter.limit(llm_proxy_rate_limit)
+async def openai_style_token_path(provider: str, token: str, request: Request) -> Response:
+    if provider not in _OPENAI_PATH_PROVIDERS:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown provider")
+    principal = resolve_gateway_principal(request, token)
+    return await _forward(request, principal, provider)
+
+
+@router.post("/anthropic/{token}/v1/messages")
+@limiter.limit(llm_proxy_rate_limit)
+async def anthropic_token_path(token: str, request: Request) -> Response:
+    principal = resolve_gateway_principal(request, token)
     return await _forward(request, principal, "anthropic")

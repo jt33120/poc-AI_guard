@@ -711,6 +711,16 @@ export const STR = {
   "onb.project.none": { en: "No project", fr: "Aucun projet" },
   "onb.project.new": { en: "+ New project", fr: "+ Nouveau projet" },
   "onb.project.newph": { en: "New project name (e.g. Openclaw)", fr: "Nom du projet (ex. Openclaw)" },
+  "onb.url.title": { en: "Base URL — paste into any tool", fr: "Base URL — colle dans n'importe quel outil" },
+  "onb.url.note": {
+    en: "The gateway token is in the URL: no header, no code. Set this as your agent's base_url and keep your own provider key.",
+    fr: "Le token est dans l'URL : aucun header, aucun code. Mets-la comme base_url de ton agent et garde ta propre clé provider.",
+  },
+  "onb.prompt.title": { en: "Integration prompt (self-modifying agent)", fr: "Prompt d'intégration (agent auto-modifiable)" },
+  "onb.prompt.note": {
+    en: "Paste this to an agent that can edit its own config (openclaw, Claude Code…) to route itself through xSOM.",
+    fr: "Colle ça à un agent capable d'éditer sa config (openclaw, Claude Code…) pour qu'il passe par xSOM.",
+  },
 } satisfies Record<string, Entry>;
 
 export type StrKey = keyof typeof STR;
