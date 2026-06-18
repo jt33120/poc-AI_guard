@@ -705,6 +705,12 @@ export const STR = {
     fr: "En créant un compte, vous vous engagez à gouverner vos agents de façon responsable.",
   },
   "login.signup": { en: "New here? Create an account", fr: "Nouveau ? Créer un compte" },
+
+  // ── Onboarding: project picker ───────────────────────────────────────────
+  "onb.project.label": { en: "Project", fr: "Projet" },
+  "onb.project.none": { en: "No project", fr: "Aucun projet" },
+  "onb.project.new": { en: "+ New project", fr: "+ Nouveau projet" },
+  "onb.project.newph": { en: "New project name (e.g. Openclaw)", fr: "Nom du projet (ex. Openclaw)" },
 } satisfies Record<string, Entry>;
 
 export type StrKey = keyof typeof STR;
