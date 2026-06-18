@@ -141,16 +141,13 @@ class GatewayPrincipal:
     token_id: str
 
 
-def get_gateway_principal(
-    request: Request,
-    x_gateway_token: str | None = Header(default=None, alias="X-Gateway-Token"),
-) -> GatewayPrincipal:
-    """Resolve the tenant *and agent* for a machine-to-machine call by its token.
+def resolve_gateway_principal(request: Request, raw_token: str | None) -> GatewayPrincipal:
+    """Resolve the tenant + agent for a gateway token (from header OR URL path).
 
     Fail-closed (CLAUDE.md §4.4): missing token, unconfigured DB, or an
     unknown/revoked token all deny (401/503).
     """
-    if not x_gateway_token:
+    if not raw_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing gateway token"
         )
@@ -161,15 +158,21 @@ def get_gateway_principal(
         )
     try:
         with db.connection(url) as conn:
-            token_id, tenant_id = tenant_tokens.authenticate_gateway_principal(
-                conn, x_gateway_token
-            )
+            token_id, tenant_id = tenant_tokens.authenticate_gateway_principal(conn, raw_token)
             conn.commit()
     except PermissionError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid gateway token"
         ) from None
     return GatewayPrincipal(tenant_id=tenant_id, token_id=token_id)
+
+
+def get_gateway_principal(
+    request: Request,
+    x_gateway_token: str | None = Header(default=None, alias="X-Gateway-Token"),
+) -> GatewayPrincipal:
+    """FastAPI dependency: resolve the agent from the ``X-Gateway-Token`` header."""
+    return resolve_gateway_principal(request, x_gateway_token)
 
 
 def get_gateway_tenant(

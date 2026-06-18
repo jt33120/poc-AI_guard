@@ -30,6 +30,31 @@ const OPENAI_STYLE: Record<string, { sdkBase: string; keyEnv: string; keyHint: s
   mistral: { sdkBase: "mistral", keyEnv: "MISTRAL_API_KEY", keyHint: "Mistral" },
 };
 
+// Token-in-URL base_url — works with ANY tool that lets you set a base URL
+// (no custom header needed). Null for non-proxy stacks.
+function proxyBase(stack: Stack, key: string): string | null {
+  const oai = OPENAI_STYLE[stack];
+  if (oai) return `${XSOM_API}/proxy/${oai.sdkBase}/${key}/v1`;
+  if (stack === "anthropic") return `${XSOM_API}/proxy/anthropic/${key}`;
+  return null;
+}
+
+// A natural-language prompt for a self-modifying agent (openclaw, Claude Code…)
+// to reconfigure its own LLM endpoint. Null for non-proxy stacks.
+function integrationPrompt(stack: Stack, key: string): string | null {
+  const base = proxyBase(stack, key);
+  if (!base) return null;
+  const hint = OPENAI_STYLE[stack]?.keyHint ?? "Anthropic";
+  return `Reconfigure how you call the LLM so every model request goes through the xSOM proxy (for governance + cost tracking). Do NOT change your behavior, logic, prompts, or tools — only where the requests are sent.
+
+Set your LLM client's base_url to:
+  ${base}
+
+Keep using my existing ${hint} API key as the api_key (do not change it). The xSOM gateway token is already embedded in that URL, so you do NOT need any extra header.
+
+Apply the change, keep everything else identical, then tell me which file and line you changed and run one test call to confirm it still works.`;
+}
+
 const TEMPLATES: { id: Tpl; t: StrKey; d: StrKey }[] = [
   { id: "monitor", t: "onb.tpl.monitor.t", d: "onb.tpl.monitor.d" },
   { id: "balanced", t: "onb.tpl.balanced.t", d: "onb.tpl.balanced.d" },
@@ -68,26 +93,25 @@ export XSOM_GATEWAY_TOKEN="${key}"
   const oai = OPENAI_STYLE[stack];
   if (oai) {
     return `# Zero-code monitoring — point the OpenAI SDK at xSOM.
-# Your ${oai.keyEnv} is still used and forwarded to ${oai.keyHint} (never stored).
+# Your ${oai.keyHint} key is still used and forwarded upstream (never stored).
+# The gateway token is in the base_url, so no extra header is needed.
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="${XSOM_API}/proxy/${oai.sdkBase}/v1",
+    base_url="${proxyBase(stack, key)}",
     api_key="<your ${oai.keyHint} key>",  # forwarded upstream, never stored by xSOM
-    default_headers={"X-Gateway-Token": "${key}"},
-    # add "X-XSOM-Mode": "enforce" to also block non-allowed tool-calls
 )
 # Use the client exactly as before — xSOM audits every tool-call it makes.`;
   }
   if (stack === "anthropic") {
     return `# Zero-code monitoring — point the Anthropic SDK at xSOM.
-# Your ANTHROPIC_API_KEY is still used and forwarded to Anthropic.
+# Your Anthropic key is still used and forwarded (never stored). The gateway
+# token is in the base_url, so no extra header is needed.
 from anthropic import Anthropic
 
 client = Anthropic(
-    base_url="${XSOM_API}/proxy/anthropic",
-    default_headers={"X-Gateway-Token": "${key}"},
-    # add "X-XSOM-Mode": "enforce" to also block non-allowed tool-calls
+    base_url="${proxyBase(stack, key)}",
+    api_key="<your Anthropic key>",
 )
 # Use the client exactly as before — xSOM audits every tool_use it makes.`;
   }
@@ -432,6 +456,32 @@ export default function OnboardingPage() {
             </code>
             <p className="muted mt-2 text-xs">{t("onb.key.note")}</p>
           </div>
+
+          {proxyBase(stack, apiKey) ? (
+            <div className="card p-5">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold">{t("onb.url.title")}</h3>
+                <CopyButton text={proxyBase(stack, apiKey) ?? ""} label={t("onb.copy")} />
+              </div>
+              <p className="muted mt-1 text-xs">{t("onb.url.note")}</p>
+              <code className="mt-2 block break-all rounded-lg bg-navy-mid/70 px-3 py-2 font-mono text-xs text-brand-bright">
+                {proxyBase(stack, apiKey)}
+              </code>
+            </div>
+          ) : null}
+
+          {integrationPrompt(stack, apiKey) ? (
+            <div className="card p-5">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold">{t("onb.prompt.title")}</h3>
+                <CopyButton text={integrationPrompt(stack, apiKey) ?? ""} label={t("onb.copy")} />
+              </div>
+              <p className="muted mt-1 text-xs">{t("onb.prompt.note")}</p>
+              <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded-xl bg-navy-mid/70 p-4 text-xs text-white/80">
+                {integrationPrompt(stack, apiKey)}
+              </pre>
+            </div>
+          ) : null}
 
           <div className="card p-5">
             <div className="flex items-center justify-between">

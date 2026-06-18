@@ -370,6 +370,69 @@ def test_openrouter_records_exact_billed_cost_and_requests_usage(
     assert str(billed[3]) == token_id and billed[4] == "gen-or-1"
 
 
+def test_token_in_url_path_works_without_header(
+    db: DBHandle,
+    test_verifier: TokenVerifier,
+    make_token: Callable[..., str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tid = _tenant(db)
+    client = _client(db.url, test_verifier)
+    admin = make_token(tenant_id=tid, role="admin")
+    client.put(
+        "/v1/policy", headers={"Authorization": f"Bearer {admin}"}, json={"yaml": AUTO_POLICY}
+    )
+    created = client.post(
+        "/v1/gateway-tokens", headers={"Authorization": f"Bearer {admin}"}, json={"name": "bot"}
+    ).json()
+    raw, token_id = created["token"], created["id"]
+
+    fake = _FakeClient(_FakeResp(OPENROUTER_BODY))
+    monkeypatch.setattr(llm_proxy, "_http", lambda: fake)
+    # No X-Gateway-Token header — the token rides in the URL path.
+    resp = client.post(
+        f"/proxy/openrouter/{raw}/v1/chat/completions",
+        headers={"Authorization": "Bearer sk-or"},
+        json={"model": "openai/gpt-4o-mini", "messages": [{"role": "user", "content": "x"}]},
+    )
+    assert resp.status_code == 200
+    assert "openrouter.ai" in fake.captured["url"]
+    import psycopg
+
+    with psycopg.connect(db.url) as check:
+        billed = check.execute(
+            "select gateway_token_id from billed_cost where tenant_id = %s", (tid,)
+        ).fetchone()
+    assert billed is not None and str(billed[0]) == token_id  # attributed via path token
+
+
+def test_token_in_url_rejects_bad_token(db: DBHandle, test_verifier: TokenVerifier) -> None:
+    client = _client(db.url, test_verifier)
+    resp = client.post(
+        "/proxy/openrouter/xsg_bogus/v1/chat/completions",
+        headers={"Authorization": "Bearer x"},
+        json={"model": "m", "messages": []},
+    )
+    assert resp.status_code == 401
+
+
+def test_token_in_url_unknown_provider_404(
+    db: DBHandle, test_verifier: TokenVerifier, make_token: Callable[..., str]
+) -> None:
+    tid = _tenant(db)
+    client = _client(db.url, test_verifier)
+    admin = make_token(tenant_id=tid, role="admin")
+    raw = client.post(
+        "/v1/gateway-tokens", headers={"Authorization": f"Bearer {admin}"}, json={"name": "bot"}
+    ).json()["token"]
+    resp = client.post(
+        f"/proxy/bogusprovider/{raw}/v1/chat/completions",
+        headers={"Authorization": "Bearer x"},
+        json={"model": "m", "messages": []},
+    )
+    assert resp.status_code == 404
+
+
 def test_enforce_mode_strips_non_allowed_tool_calls(
     db: DBHandle,
     test_verifier: TokenVerifier,
