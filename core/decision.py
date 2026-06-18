@@ -48,6 +48,7 @@ def _audit(
     policy_rule_id: str | None = None,
     judge_used: bool = False,
     args_hash: str | None = None,
+    gateway_token_id: str | None = None,
 ) -> None:
     with db.connection(database_url) as conn:
         audit.log_event(
@@ -60,6 +61,7 @@ def _audit(
             policy_rule_id=policy_rule_id,
             judge_used=judge_used,
             args_hash=args_hash,
+            gateway_token_id=gateway_token_id,
         )
 
 
@@ -83,6 +85,7 @@ def authorize(
     requested_by: str | None = None,
     timeout_seconds: int = 3600,
     notifier: Notifier | None = None,
+    gateway_token_id: str | None = None,
 ) -> dict[str, Any]:
     """Decide whether the agent may perform ``tool`` with ``arguments``."""
     outcome = evaluate(policy, tool, arguments)
@@ -108,6 +111,7 @@ def authorize(
             policy_rule_id=outcome.rule_name,
             judge_used=outcome.ambiguous,
             args_hash=ah,
+            gateway_token_id=gateway_token_id,
         )
         return {"decision": "allow", "action_class": _class(outcome), "reason": outcome.reason}
 
@@ -123,6 +127,7 @@ def authorize(
             policy_rule_id=outcome.rule_name,
             judge_used=outcome.ambiguous,
             args_hash=ah,
+            gateway_token_id=gateway_token_id,
         )
         return {"decision": "deny", "action_class": _class(outcome), "reason": outcome.reason}
 
@@ -163,6 +168,7 @@ def authorize(
                 policy_rule_id=outcome.rule_name,
                 judge_used=outcome.ambiguous,
                 args_hash=ah,
+                gateway_token_id=gateway_token_id,
             )
             _notify(notifier, record.id, summary, record.expires_at.isoformat())
             return _hold(record.id, record.action_class, summary)
@@ -170,10 +176,16 @@ def authorize(
         if record.status == "pending":
             return _hold(record.id, record.action_class, str(record.dry_run.get("summary", "")))
 
-        return _resolve_terminal(database_url, conn, tenant_id, record)
+        return _resolve_terminal(database_url, conn, tenant_id, record, gateway_token_id)
 
 
-def poll(*, database_url: str, tenant_id: str, approval_id: str) -> dict[str, Any] | None:
+def poll(
+    *,
+    database_url: str,
+    tenant_id: str,
+    approval_id: str,
+    gateway_token_id: str | None = None,
+) -> dict[str, Any] | None:
     """Current verdict for a held action; None if the approval is unknown to the tenant."""
     with db.connection(database_url) as conn:
         record = approvals.get(conn, tenant_id, approval_id)
@@ -183,7 +195,7 @@ def poll(*, database_url: str, tenant_id: str, approval_id: str) -> dict[str, An
         conn.commit()
         if record.status == "pending":
             return _hold(record.id, record.action_class, str(record.dry_run.get("summary", "")))
-        return _resolve_terminal(database_url, conn, tenant_id, record)
+        return _resolve_terminal(database_url, conn, tenant_id, record, gateway_token_id)
 
 
 def _hold(approval_id: str, action_class: str | None, summary: str) -> dict[str, Any]:
@@ -202,6 +214,7 @@ def _resolve_terminal(
     conn: psycopg.Connection,
     tenant_id: str,
     record: approvals.ApprovalRecord,
+    gateway_token_id: str | None = None,
 ) -> dict[str, Any]:
     audit_decision, verdict = _TERMINAL[record.status]
     # Record the terminal decision once (the first consumer), then it is spent.
@@ -214,6 +227,7 @@ def _resolve_terminal(
             tool=record.tool_name,
             request_id=record.id,
             action_class=record.action_class,
+            gateway_token_id=gateway_token_id,
         )
     else:
         conn.commit()

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { AgentScopeBar, useAgentScope } from "@/components/AgentScope";
 import { Spinner } from "@/components/Spinner";
 import { apiGet } from "@/lib/client";
 import { type StrKey, useT } from "@/lib/i18n";
@@ -42,15 +43,18 @@ const TECH_KW = ["MCP gateway", "Policy engine", "Hash-chained audit", "LLM judg
 
 export default function HomePage() {
   const { t } = useT();
+  const { selected } = useAgentScope();
   const [loading, setLoading] = useState(true);
   const [kpi, setKpi] = useState({ actions: 0, pending: 0, gated: 0, audit: 0 });
   const [chart, setChart] = useState({ allow: 0, hitl: 0, deny: 0 });
 
   useEffect(() => {
+    const auditPath = selected === "all" ? "v1/audit" : `v1/audit?agent_id=${selected}`;
+    setLoading(true);
     Promise.allSettled([
       apiGet<ToolView[]>("v1/tools"),
       apiGet<unknown[]>("v1/approvals?status=pending"),
-      apiGet<AuditEntry[]>("v1/audit"),
+      apiGet<AuditEntry[]>(auditPath),
     ])
       .then(([tools, approvals, audit]) => {
         const toolList = tools.status === "fulfilled" ? tools.value : [];
@@ -67,7 +71,7 @@ export default function HomePage() {
         setChart(counts);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [selected]);
 
   const total = chart.allow + chart.hitl + chart.deny;
   const pct = (n: number) => (total ? `${(n / total) * 100}%` : "0%");
@@ -85,6 +89,8 @@ export default function HomePage() {
         <h1 className="text-2xl font-bold sm:text-3xl">{t("home.title")}</h1>
         <p className="muted mt-1.5">{t("home.subtitle")}</p>
       </header>
+
+      <AgentScopeBar />
 
       {loading ? (
         <div className="card">

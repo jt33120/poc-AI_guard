@@ -91,6 +91,37 @@ def resolve_tenant(conn: psycopg.Connection, raw_token: str) -> str | None:
     return str(row[0]) if row else None
 
 
+def resolve_principal(conn: psycopg.Connection, raw_token: str) -> tuple[str, str] | None:
+    """Return ``(token_id, tenant_id)`` for an active token, or None if invalid.
+
+    The token id lets the caller attribute audit/usage records to a specific
+    agent (the gateway token), not just its tenant.
+    """
+    if not raw_token:
+        return None
+    row = conn.execute(
+        "select id, tenant_id from gateway_tokens where token_hash = %s and revoked_at is null",
+        (hash_token(raw_token),),
+    ).fetchone()
+    return (str(row[0]), str(row[1])) if row else None
+
+
+def authenticate_gateway_principal(conn: psycopg.Connection, raw_token: str) -> tuple[str, str]:
+    """Resolve ``(token_id, tenant_id)`` for a session or raise — fail-closed.
+
+    Raises:
+        PermissionError: if the token is missing, unknown, or revoked.
+    """
+    principal = resolve_principal(conn, raw_token)
+    if principal is None:
+        raise PermissionError("invalid or missing tenant token")
+    conn.execute(
+        "update gateway_tokens set last_used_at = now() where token_hash = %s",
+        (hash_token(raw_token),),
+    )
+    return principal
+
+
 def authenticate_gateway_session(conn: psycopg.Connection, raw_token: str) -> str:
     """Resolve the tenant for an MCP session or raise — fail-closed.
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatUsd } from "@/components/AgentScope";
 import { ShieldMark } from "@/components/brand";
 import { type StrKey, useT } from "@/lib/i18n";
 
@@ -18,16 +19,42 @@ const MEANS: { t: StrKey; b: StrKey }[] = [
 // Presentation-only body of the executive summary. Both the authenticated
 // /executive page (live data) and the public /executive-preview (sample data)
 // render this so the two never drift apart.
-export function ExecutiveSummary({ governed, counts }: { governed: number; counts: ExecCounts }) {
+export function ExecutiveSummary({
+  governed,
+  counts,
+  spendUsd,
+}: {
+  governed: number;
+  counts: ExecCounts;
+  spendUsd?: number;
+}) {
   const { t } = useT();
   const total = counts.allow + counts.review + counts.block;
   const pct = (n: number) => (total ? `${(n / total) * 100}%` : "0%");
+
+  // When live spend is available (authenticated view), surface it as the 4th
+  // KPI — it speaks to both execs (governance) and builders (cost). The public
+  // preview has no spend and keeps the "100% coverage" reassurance.
+  const lastKpi =
+    spendUsd !== undefined
+      ? {
+          value: formatUsd(spendUsd),
+          label: "exec.kpi.cost.l" as StrKey,
+          sub: "exec.kpi.cost.s" as StrKey,
+          tone: "text-emerald-300",
+        }
+      : {
+          value: "100%",
+          label: "exec.kpi.coverage.l" as StrKey,
+          sub: "exec.kpi.coverage.s" as StrKey,
+          tone: "text-emerald-300",
+        };
 
   const KPIS: { value: string | number; label: StrKey; sub: StrKey; tone: string }[] = [
     { value: governed, label: "exec.kpi.governed.l", sub: "exec.kpi.governed.s", tone: "text-brand-bright" },
     { value: counts.review, label: "exec.kpi.review.l", sub: "exec.kpi.review.s", tone: "text-amber-300" },
     { value: counts.block, label: "exec.kpi.blocked.l", sub: "exec.kpi.blocked.s", tone: "text-red-300" },
-    { value: "100%", label: "exec.kpi.coverage.l", sub: "exec.kpi.coverage.s", tone: "text-emerald-300" },
+    lastKpi,
   ];
 
   return (

@@ -3,7 +3,16 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { config as appConfig } from "@/lib/config";
 
-const PROTECTED = ["/home", "/executive", "/inspector", "/approvals", "/audit", "/admin", "/onboarding"];
+const PROTECTED = [
+  "/home",
+  "/executive",
+  "/inspector",
+  "/approvals",
+  "/audit",
+  "/costs",
+  "/admin",
+  "/onboarding",
+];
 
 export async function middleware(request: NextRequest) {
   // Segment-aware match so e.g. /executive-preview (public) is NOT caught by /executive.

@@ -38,13 +38,16 @@ def list_audit(
     to_ts: str | None = Query(default=None, alias="to"),
     decision: str | None = Query(default=None),
     tool: str | None = Query(default=None),
+    agent_id: str | None = Query(default=None),
 ) -> list[dict[str, Any]]:
     tenant_id = require_tenant(user)
     url = database_url(request)
     with db.tenant_reader(
         url, user_id=user.user_id, tenant_id=tenant_id, role=(user.role or Role.viewer)
     ) as conn:
-        return audit.list_events(conn, from_ts=from_ts, to_ts=to_ts, decision=decision, tool=tool)
+        return audit.list_events(
+            conn, from_ts=from_ts, to_ts=to_ts, decision=decision, tool=tool, agent=agent_id
+        )
 
 
 @router.get("/export", response_model=None)
