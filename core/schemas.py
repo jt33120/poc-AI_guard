@@ -187,3 +187,56 @@ class AuditEntry(BaseModel):
     error: str | None
     user_id: str | None
     request_id: str | None
+    gateway_token_id: str | None = None
+
+
+class AgentOut(BaseModel):
+    """A monitored agent (gateway token) with its activity + spend rollup."""
+
+    id: str
+    name: str
+    revoked: bool
+    actions: int
+    spend_usd: float
+    tokens: int
+    last_active: str | None
+    created_at: str | None
+
+
+class AgentsOverview(BaseModel):
+    """The customer (tenant) and the agents it monitors."""
+
+    customer: str | None
+    agent_count: int
+    agents: list[AgentOut]
+
+
+class UsageBucket(BaseModel):
+    """Spend/tokens grouped by one dimension (provider, model, or agent id)."""
+
+    key: str
+    cost_usd: float
+    tokens: int
+    calls: int
+
+
+class UsageDaily(BaseModel):
+    """One day's spend/tokens for the cost trend line."""
+
+    date: str
+    cost_usd: float
+    tokens: int
+
+
+class UsageSummary(BaseModel):
+    """Aggregated LLM token usage + estimated cost for the cost dashboard."""
+
+    total_cost_usd: float
+    total_tokens: int
+    prompt_tokens: int
+    completion_tokens: int
+    calls: int
+    by_provider: list[UsageBucket]
+    by_model: list[UsageBucket]
+    by_agent: list[UsageBucket]
+    daily: list[UsageDaily]

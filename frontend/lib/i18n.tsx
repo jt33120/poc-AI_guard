@@ -309,6 +309,7 @@ export const STR = {
 
   // ── Executive summary (non-technical, for execs & sales) ─────────────
   "nav.exec": { en: "Executive", fr: "Synthèse" },
+  "nav.costs": { en: "Costs", fr: "Coûts" },
   "exec.title": { en: "Executive summary", fr: "Synthèse exécutive" },
   "exec.subtitle": {
     en: "How xSOM keeps your AI agents productive, safe, and compliant — at a glance.",
@@ -578,6 +579,53 @@ export const STR = {
   "decl.human_in_the_loop": { en: "Human review", fr: "Validation humaine" },
   "decl.human_dual": { en: "Dual approval", fr: "Double validation" },
   "decl.deny": { en: "Blocked", fr: "Bloqué" },
+
+  // ── Agent scope bar (customer + agent selector, shown across data views) ──
+  "scope.customer": { en: "Customer", fr: "Client" },
+  "scope.agents": { en: "{n} agents monitored", fr: "{n} agents surveillés" },
+  "scope.agent_one": { en: "1 agent monitored", fr: "1 agent surveillé" },
+  "scope.view": { en: "View", fr: "Vue" },
+  "scope.all": { en: "All agents", fr: "Tous les agents" },
+  "scope.actions": { en: "actions", fr: "actions" },
+  "scope.spend": { en: "spend", fr: "dépensé" },
+  "scope.tokens": { en: "tokens", fr: "tokens" },
+  "scope.none": { en: "No agents connected yet.", fr: "Aucun agent connecté pour l'instant." },
+  "scope.connect": { en: "Connect one", fr: "En connecter un" },
+
+  // ── Costs / token monitoring ─────────────────────────────────────────────
+  "costs.title": { en: "Token & cost monitoring", fr: "Suivi des tokens & des coûts" },
+  "costs.subtitle": {
+    en: "Every completion your agents run through xSOM — token usage and estimated spend, by provider, model and agent. One pane across OpenAI, Anthropic, Mistral and OpenRouter.",
+    fr: "Chaque complétion que vos agents passent par xSOM — consommation de tokens et coût estimé, par provider, modèle et agent. Une seule vue pour OpenAI, Anthropic, Mistral et OpenRouter.",
+  },
+  "costs.kpi.spend": { en: "Estimated spend", fr: "Coût estimé" },
+  "costs.kpi.tokens": { en: "Total tokens", fr: "Tokens totaux" },
+  "costs.kpi.calls": { en: "Completions", fr: "Complétions" },
+  "costs.kpi.io": { en: "Input / output", fr: "Entrée / sortie" },
+  "costs.empty.title": { en: "No usage recorded yet", fr: "Aucune consommation enregistrée" },
+  "costs.empty.body": {
+    en: "Route an agent's LLM calls through the xSOM proxy (set its base_url to /proxy/…) and token usage with estimated cost will appear here automatically.",
+    fr: "Routez les appels LLM d'un agent via le proxy xSOM (base_url vers /proxy/…) et la consommation de tokens avec le coût estimé apparaîtra ici automatiquement.",
+  },
+  "costs.by_provider": { en: "By provider", fr: "Par provider" },
+  "costs.by_model": { en: "By model", fr: "Par modèle" },
+  "costs.by_agent": { en: "By agent", fr: "Par agent" },
+  "costs.trend": { en: "Daily spend", fr: "Dépense quotidienne" },
+  "costs.col.tokens": { en: "Tokens", fr: "Tokens" },
+  "costs.col.calls": { en: "Calls", fr: "Appels" },
+  "costs.col.cost": { en: "Cost", fr: "Coût" },
+  "costs.estimate.note": {
+    en: "Costs are estimates from public list prices, for monitoring — not billing.",
+    fr: "Les coûts sont estimés d'après les tarifs publics, à titre indicatif — pas une facturation.",
+  },
+  "costs.unknown_agent": { en: "Unattributed", fr: "Non attribué" },
+
+  // Spend KPI reused on the executive view
+  "exec.kpi.cost.l": { en: "Estimated spend", fr: "Coût estimé" },
+  "exec.kpi.cost.s": {
+    en: "LLM token cost governed in this view.",
+    fr: "Coût des tokens LLM gouverné dans cette vue.",
+  },
 } satisfies Record<string, Entry>;
 
 export type StrKey = keyof typeof STR;

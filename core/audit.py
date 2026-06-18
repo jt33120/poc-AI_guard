@@ -85,6 +85,7 @@ def log_event(
     args_hash: str | None = None,
     latency_ms: int | None = None,
     error: str | None = None,
+    gateway_token_id: str | None = None,
 ) -> str:
     """Append one hash-chained audit entry for a decision. Returns its entry_hash."""
     ts = datetime.now(UTC)
@@ -111,11 +112,14 @@ def log_event(
             error=error,
         )
         entry_hash = compute_entry_hash(prev_hash, payload)
+        # gateway_token_id is an ANNEX column (agent attribution): it is NOT part
+        # of `payload`/the hash chain, so existing entries keep verifying (§4.2).
         conn.execute(
             "insert into audit_log "
             "(ts, tenant_id, user_id, request_id, tool_name, action_class, decision, "
-            " policy_rule_id, judge_used, args_hash, latency_ms, error, prev_hash, entry_hash) "
-            "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            " policy_rule_id, judge_used, args_hash, latency_ms, error, gateway_token_id, "
+            " prev_hash, entry_hash) "
+            "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
             (
                 ts,
                 tenant_id,
@@ -129,6 +133,7 @@ def log_event(
                 args_hash,
                 latency_ms,
                 error,
+                gateway_token_id,
                 prev_hash,
                 entry_hash,
             ),
@@ -190,6 +195,7 @@ def list_events(
     to_ts: str | None = None,
     decision: str | None = None,
     tool: str | None = None,
+    agent: str | None = None,
     limit: int = 500,
 ) -> list[dict[str, Any]]:
     """Tenant-scoped (RLS) audit events with optional filters; metadata only."""
@@ -207,11 +213,14 @@ def list_events(
     if tool:
         clauses.append("tool_name = %s")
         params.append(tool)
+    if agent:
+        clauses.append("gateway_token_id = %s")
+        params.append(agent)
     where = (" where " + " and ".join(clauses)) if clauses else ""
     params.append(limit)
     rows = conn.execute(
         "select id, ts, tool_name, action_class, decision, policy_rule_id, judge_used, "
-        "args_hash, latency_ms, error, user_id, request_id from audit_log"
+        "args_hash, latency_ms, error, user_id, request_id, gateway_token_id from audit_log"
         + where
         + " order by id desc limit %s",
         tuple(params),
@@ -230,6 +239,7 @@ def list_events(
             "error": r[9],
             "user_id": r[10],
             "request_id": r[11],
+            "gateway_token_id": str(r[12]) if r[12] else None,
         }
         for r in rows
     ]

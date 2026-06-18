@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { AgentScopeBar, useAgentScope } from "@/components/AgentScope";
 import { DecisionBadge } from "@/components/brand";
 import { Spinner } from "@/components/Spinner";
 import { Tooltip } from "@/components/Tooltip";
@@ -15,6 +16,7 @@ interface AuditEntry {
   action_class: string | null;
   decision: string | null;
   args_hash: string | null;
+  gateway_token_id: string | null;
 }
 
 const CLASS_KEY: Record<string, StrKey> = {
@@ -26,16 +28,22 @@ const CLASS_KEY: Record<string, StrKey> = {
 
 export default function AuditPage() {
   const { t } = useT();
+  const { selected, agents } = useAgentScope();
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiGet<AuditEntry[]>("v1/audit")
+    const path = selected === "all" ? "v1/audit" : `v1/audit?agent_id=${selected}`;
+    setLoading(true);
+    apiGet<AuditEntry[]>(path)
       .then(setEntries)
       .catch((e: unknown) => setError(String(e)))
       .finally(() => setLoading(false));
-  }, []);
+  }, [selected]);
+
+  const agentName = (id: string | null) =>
+    id ? (agents.find((a) => a.id === id)?.name ?? `${id.slice(0, 8)}…`) : "—";
 
   return (
     <section className="flex animate-fade-up flex-col gap-5">
@@ -53,6 +61,7 @@ export default function AuditPage() {
           </a>
         </div>
       </header>
+      <AgentScopeBar />
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
       <div className="card overflow-x-auto">
         <table className="data-table">
@@ -60,6 +69,7 @@ export default function AuditPage() {
             <tr>
               <th>#</th>
               <th>{t("audit.col.tool")}</th>
+              <th>{t("scope.view")}</th>
               <th>{t("audit.col.class")}</th>
               <th>{t("audit.col.decision")}</th>
               <th>args_hash</th>
@@ -72,6 +82,7 @@ export default function AuditPage() {
                 <tr key={entry.id}>
                   <td className="text-white/45">{entry.id}</td>
                   <td className="font-mono">{entry.tool_name ?? "—"}</td>
+                  <td className="text-white/60">{agentName(entry.gateway_token_id)}</td>
                   <td>
                     {ck ? (
                       <Tooltip label={t(`${ck}.desc` as StrKey)}>

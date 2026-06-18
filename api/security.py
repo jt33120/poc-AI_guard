@@ -9,6 +9,7 @@ JWKS, or missing role all deny access (401/403).
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
@@ -132,11 +133,19 @@ def get_current_user(
     return _user_from_claims(claims)
 
 
-def get_gateway_tenant(
+@dataclass(frozen=True)
+class GatewayPrincipal:
+    """A resolved machine-to-machine caller: its tenant and the agent (token id)."""
+
+    tenant_id: str
+    token_id: str
+
+
+def get_gateway_principal(
     request: Request,
     x_gateway_token: str | None = Header(default=None, alias="X-Gateway-Token"),
-) -> str:
-    """Resolve the tenant for a machine-to-machine call from its gateway token.
+) -> GatewayPrincipal:
+    """Resolve the tenant *and agent* for a machine-to-machine call by its token.
 
     Fail-closed (CLAUDE.md §4.4): missing token, unconfigured DB, or an
     unknown/revoked token all deny (401/503).
@@ -152,13 +161,22 @@ def get_gateway_tenant(
         )
     try:
         with db.connection(url) as conn:
-            tenant_id = tenant_tokens.authenticate_gateway_session(conn, x_gateway_token)
+            token_id, tenant_id = tenant_tokens.authenticate_gateway_principal(
+                conn, x_gateway_token
+            )
             conn.commit()
     except PermissionError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid gateway token"
         ) from None
-    return tenant_id
+    return GatewayPrincipal(tenant_id=tenant_id, token_id=token_id)
+
+
+def get_gateway_tenant(
+    principal: GatewayPrincipal = Depends(get_gateway_principal),
+) -> str:
+    """Resolve just the tenant for a machine-to-machine call (compat shim)."""
+    return principal.tenant_id
 
 
 def require_role(*roles: Role) -> Callable[..., CurrentUser]:

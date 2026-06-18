@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+from api.agents import router as agents_router
 from api.approvals import router as approvals_router
 from api.audit import router as audit_router
 from api.authorize import router as authorize_router
@@ -29,6 +30,7 @@ from api.policy import router as policy_router
 from api.ratelimit import limiter
 from api.security import build_verifier, get_current_user
 from api.servers import router as servers_router
+from api.usage import router as usage_router
 from core.config import Settings, get_settings
 from core.logging import configure_logging
 from core.observability import init_observability
@@ -107,6 +109,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(gateway_tokens_router)
     app.include_router(authorize_router)
     app.include_router(llm_proxy_router)
+    app.include_router(agents_router)
+    app.include_router(usage_router)
 
     return app
 

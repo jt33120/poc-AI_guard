@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from api.deps import database_url
 from api.ratelimit import authorize_rate_limit, limiter
-from api.security import get_gateway_tenant
+from api.security import GatewayPrincipal, get_gateway_principal
 from core import db, decision, policy_store
 from core.config import Settings
 from core.judge import build_judge
@@ -30,22 +30,23 @@ router = APIRouter(prefix="/v1/authorize", tags=["authorize"])
 def request_authorization(
     payload: AuthorizeRequest,
     request: Request,
-    tenant_id: str = Depends(get_gateway_tenant),
+    principal: GatewayPrincipal = Depends(get_gateway_principal),
 ) -> dict[str, Any]:
     url = database_url(request)
     settings: Settings = request.app.state.settings
     with db.connection(url) as conn:
-        policy = policy_store.load_policy(conn, tenant_id)
+        policy = policy_store.load_policy(conn, principal.tenant_id)
     return decision.authorize(
         database_url=url,
         policy=policy,
-        tenant_id=tenant_id,
+        tenant_id=principal.tenant_id,
         tool=payload.tool,
         arguments=payload.arguments,
         judge=build_judge(settings),
         requested_by="agent",
         timeout_seconds=policy.defaults.hitl_timeout_seconds,
         notifier=build_notifier(settings),
+        gateway_token_id=principal.token_id,
     )
 
 
@@ -53,7 +54,7 @@ def request_authorization(
 def poll_authorization(
     approval_id: str,
     request: Request,
-    tenant_id: str = Depends(get_gateway_tenant),
+    principal: GatewayPrincipal = Depends(get_gateway_principal),
 ) -> dict[str, Any]:
     try:
         UUID(approval_id)
@@ -62,7 +63,10 @@ def poll_authorization(
             status_code=status.HTTP_404_NOT_FOUND, detail="Authorization not found"
         ) from None
     result = decision.poll(
-        database_url=database_url(request), tenant_id=tenant_id, approval_id=approval_id
+        database_url=database_url(request),
+        tenant_id=principal.tenant_id,
+        approval_id=approval_id,
+        gateway_token_id=principal.token_id,
     )
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Authorization not found")

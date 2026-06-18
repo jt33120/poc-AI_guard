@@ -13,6 +13,7 @@ const LINKS: { href: string; key: StrKey }[] = [
   { href: "/inspector", key: "nav.inspector" },
   { href: "/approvals", key: "nav.approvals" },
   { href: "/audit", key: "nav.audit" },
+  { href: "/costs", key: "nav.costs" },
 ];
 const ADMIN_LINKS: { href: string; key: StrKey }[] = [
   { href: "/onboarding", key: "nav.onboard" },

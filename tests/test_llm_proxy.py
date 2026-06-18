@@ -214,6 +214,106 @@ def test_anthropic_proxy_forwards_and_audits(
     assert rows == {"crm.delete_contact": "hold", "crm.get_contact": "allow"}
 
 
+# --- usage capture + agent attribution + extra providers ---------------------
+
+USAGE_BODY = {
+    "id": "chatcmpl-usage",
+    "object": "chat.completion",
+    "model": "gpt-4o",
+    "choices": [
+        {
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "id": "c1",
+                        "type": "function",
+                        "function": {"name": "crm.get_contact", "arguments": "{}"},
+                    }
+                ],
+            },
+        }
+    ],
+    "usage": {"prompt_tokens": 1000, "completion_tokens": 500, "total_tokens": 1500},
+}
+
+
+def test_proxy_records_usage_and_attributes_the_agent(
+    db: DBHandle,
+    test_verifier: TokenVerifier,
+    make_token: Callable[..., str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tid = _tenant(db)
+    client = _client(db.url, test_verifier)
+    admin = make_token(tenant_id=tid, role="admin")
+    client.put(
+        "/v1/policy", headers={"Authorization": f"Bearer {admin}"}, json={"yaml": AUTO_POLICY}
+    )
+    created = client.post(
+        "/v1/gateway-tokens", headers={"Authorization": f"Bearer {admin}"}, json={"name": "bot"}
+    ).json()
+    raw, token_id = created["token"], created["id"]
+
+    monkeypatch.setattr(llm_proxy, "_http", lambda: _FakeClient(_FakeResp(USAGE_BODY)))
+    resp = client.post(
+        "/proxy/openai/v1/chat/completions",
+        headers={"X-Gateway-Token": raw, "Authorization": "Bearer sk"},
+        json={"model": "gpt-4o", "messages": [{"role": "user", "content": "x"}]},
+    )
+    assert resp.status_code == 200
+
+    import psycopg
+
+    with psycopg.connect(db.url) as check:
+        urow = check.execute(
+            "select provider, model, prompt_tokens, completion_tokens, total_tokens, "
+            "cost_usd, gateway_token_id from usage_events where tenant_id = %s",
+            (tid,),
+        ).fetchone()
+        arow = check.execute(
+            "select gateway_token_id from audit_log "
+            "where tenant_id = %s and tool_name = 'crm.get_contact'",
+            (tid,),
+        ).fetchone()
+    assert urow is not None and arow is not None
+    assert urow[0] == "openai" and urow[1] == "gpt-4o"
+    assert (urow[2], urow[3], urow[4]) == (1000, 500, 1500)
+    assert float(urow[5]) > 0  # gpt-4o is priced
+    assert str(urow[6]) == token_id  # usage attributed to the agent
+    assert str(arow[0]) == token_id  # so is the audited tool-call
+
+
+def test_mistral_proxy_uses_openai_shape_and_base(
+    db: DBHandle,
+    test_verifier: TokenVerifier,
+    make_token: Callable[..., str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tid = _tenant(db)
+    client = _client(db.url, test_verifier)
+    admin = make_token(tenant_id=tid, role="admin")
+    client.put(
+        "/v1/policy", headers={"Authorization": f"Bearer {admin}"}, json={"yaml": AUTO_POLICY}
+    )
+    raw = client.post(
+        "/v1/gateway-tokens", headers={"Authorization": f"Bearer {admin}"}, json={"name": "bot"}
+    ).json()["token"]
+
+    fake = _FakeClient(_FakeResp(UPSTREAM_BODY))
+    monkeypatch.setattr(llm_proxy, "_http", lambda: fake)
+    resp = client.post(
+        "/proxy/mistral/v1/chat/completions",
+        headers={"X-Gateway-Token": raw, "Authorization": "Bearer sk-mistral"},
+        json={"model": "mistral-large-latest", "messages": [{"role": "user", "content": "x"}]},
+    )
+    assert resp.status_code == 200
+    assert "api.mistral.ai" in fake.captured["url"]
+    assert fake.captured["url"].endswith("/v1/chat/completions")
+    assert fake.captured["headers"]["Authorization"] == "Bearer sk-mistral"
+
+
 def test_enforce_mode_strips_non_allowed_tool_calls(
     db: DBHandle,
     test_verifier: TokenVerifier,

@@ -65,6 +65,8 @@ select = [
 "core/approvals.py" = ["S608"]
 "core/audit.py" = ["S608"]
 "core/tenant_tokens.py" = ["S608"]
+"core/usage.py" = ["S608"]
+"core/agents.py" = ["S608"]
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI dependency-injection idiom: Depends/Security in argument defaults.

@@ -4,7 +4,11 @@ The agent points its provider ``base_url`` at this proxy and presents its tenant
 gateway token (``X-Gateway-Token``). xSOM forwards to the provider using the
 agent's *own* key (never stored), inspects the tool-calls the model requested,
 and writes one hash-chained audit entry per call (decision from the tenant
-policy). Supports OpenAI Chat Completions and Anthropic Messages.
+policy) attributed to the calling agent. It also records token usage + an
+estimated cost per completion for the usage dashboard.
+
+Providers: OpenAI / Mistral / OpenRouter (OpenAI-compatible Chat Completions)
+and Anthropic Messages.
 
 Modes (``X-XSOM-Mode`` header):
   * ``monitor`` (default) — the provider response is returned unchanged.
@@ -13,8 +17,8 @@ Modes (``X-XSOM-Mode`` header):
     human-in-the-loop *approval* still belongs on the cooperative
     ``/v1/authorize`` path (the proxy can't pause a single completion).
 
-Only metadata + ``args_hash`` is ever logged, never content or keys (§4.10).
-Streaming is passed through transparently (not inspected).
+Only metadata + ``args_hash`` and token *counts* are ever logged, never content
+or keys (§4.10). Streaming is passed through transparently (not inspected).
 """
 
 from __future__ import annotations
@@ -30,8 +34,9 @@ from starlette.concurrency import run_in_threadpool
 
 from api.deps import database_url
 from api.ratelimit import limiter, llm_proxy_rate_limit
-from api.security import get_gateway_tenant
-from core import approvals, audit, db, policy_store
+from api.security import GatewayPrincipal, get_gateway_principal
+from core import approvals, audit, db, policy_store, pricing
+from core import usage as usage_store
 from core.config import Settings
 from core.policy import Approval, Policy, evaluate
 
@@ -70,6 +75,13 @@ def _parse_args(raw: Any) -> dict[str, Any]:
     return {}
 
 
+def _as_int(value: Any) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _extract_tool_calls(data: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
     """OpenAI: (name, arguments) for every tool-call the model requested."""
     calls: list[tuple[str, dict[str, Any]]] = []
@@ -94,6 +106,24 @@ def _extract_tool_use(data: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
     return calls
 
 
+def _extract_usage(style: str, data: dict[str, Any]) -> tuple[str | None, int, int] | None:
+    """(model, prompt_tokens, completion_tokens) from the provider response, or None."""
+    usage = data.get("usage")
+    if not isinstance(usage, dict):
+        return None
+    raw_model = data.get("model")
+    model = raw_model if isinstance(raw_model, str) else None
+    if style == "anthropic":
+        prompt = _as_int(usage.get("input_tokens"))
+        completion = _as_int(usage.get("output_tokens"))
+    else:
+        prompt = _as_int(usage.get("prompt_tokens"))
+        completion = _as_int(usage.get("completion_tokens"))
+    if prompt == 0 and completion == 0:
+        return None
+    return (model, prompt, completion)
+
+
 def _verdict(policy: Policy, name: str, args: dict[str, Any]) -> tuple[str | None, str]:
     outcome = evaluate(policy, name, args)
     action_class = outcome.action_class.value if outcome.action_class else None
@@ -101,7 +131,7 @@ def _verdict(policy: Policy, name: str, args: dict[str, Any]) -> tuple[str | Non
 
 
 def _process(
-    provider: str, data: dict[str, Any], policy: Policy, enforce: bool
+    style: str, data: dict[str, Any], policy: Policy, enforce: bool
 ) -> list[tuple[str, str | None, str, str]]:
     """Audit rows [(tool, class, decision, args_hash)]; strip non-allowed calls if enforce."""
     audited: list[tuple[str, str | None, str, str]] = []
@@ -111,7 +141,7 @@ def _process(
         audited.append((name, action_class, decision, approvals.args_hash(args)))
         return decision
 
-    if provider == "openai":
+    if style == "openai":
         for choice in data.get("choices") or []:
             message = (choice or {}).get("message") or {}
             calls = message.get("tool_calls")
@@ -128,7 +158,7 @@ def _process(
                 message["tool_calls"] = kept
                 if not kept and not message.get("content"):
                     message["content"] = _BLOCKED_NOTE
-    elif provider == "anthropic":
+    elif style == "anthropic":
         content = data.get("content")
         if isinstance(content, list):
             kept = []
@@ -143,13 +173,23 @@ def _process(
     return audited
 
 
-def _inspect(url: str, tenant_id: str, provider: str, data: dict[str, Any], enforce: bool) -> None:
+def _inspect(
+    url: str,
+    tenant_id: str,
+    gateway_token_id: str | None,
+    provider: str,
+    style: str,
+    data: dict[str, Any],
+    enforce: bool,
+) -> None:
     with db.connection(url) as conn:
         policy = policy_store.load_policy(conn, tenant_id)
-    audited = _process(provider, data, policy, enforce)
-    if not audited:
+    audited = _process(style, data, policy, enforce)
+    usage = _extract_usage(style, data)
+    if not audited and usage is None:
         return
-    request_id = data.get("id")
+    raw_id = data.get("id")
+    request_id = raw_id if isinstance(raw_id, str) else None
     # Fresh connection: each log_event is then a top-level, committed transaction.
     with db.connection(url) as conn:
         for name, action_class, decision, args_hash in audited:
@@ -160,24 +200,50 @@ def _inspect(url: str, tenant_id: str, provider: str, data: dict[str, Any], enfo
                 tool_name=name,
                 action_class=action_class,
                 args_hash=args_hash,
-                request_id=request_id if isinstance(request_id, str) else None,
+                request_id=request_id,
+                gateway_token_id=gateway_token_id,
             )
+        if usage is not None:
+            model, prompt_tokens, completion_tokens = usage
+            usage_store.record_usage(
+                conn,
+                tenant_id=tenant_id,
+                gateway_token_id=gateway_token_id,
+                provider=provider,
+                model=model,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                cost_usd=pricing.cost_usd(provider, model, prompt_tokens, completion_tokens),
+                request_id=request_id,
+            )
+            conn.commit()
 
 
-async def _forward(request: Request, tenant_id: str, provider: str) -> Response:
+def _base_url(settings: Settings, provider: str) -> str:
+    return {
+        "openai": settings.openai_base_url,
+        "mistral": settings.mistral_base_url,
+        "openrouter": settings.openrouter_base_url,
+        "anthropic": settings.anthropic_base_url,
+    }[provider]
+
+
+async def _forward(request: Request, principal: GatewayPrincipal, provider: str) -> Response:
     settings: Settings = request.app.state.settings
     url = database_url(request)
     body = await request.body()
     enforce = request.headers.get("x-xsom-mode", "").lower() == "enforce"
+    style = "anthropic" if provider == "anthropic" else "openai"
+    base = _base_url(settings, provider).rstrip("/")
 
-    if provider == "openai":
-        upstream = settings.openai_base_url.rstrip("/") + "/v1/chat/completions"
+    if style == "openai":
+        upstream = base + "/v1/chat/completions"
         fwd_headers = {
             "Authorization": request.headers.get("authorization", ""),
             "Content-Type": "application/json",
         }
     else:
-        upstream = settings.anthropic_base_url.rstrip("/") + "/v1/messages"
+        upstream = base + "/v1/messages"
         fwd_headers = {
             "x-api-key": request.headers.get("x-api-key", ""),
             "anthropic-version": request.headers.get("anthropic-version", "2023-06-01"),
@@ -207,7 +273,16 @@ async def _forward(request: Request, tenant_id: str, provider: str) -> Response:
         except ValueError:
             data = None
         if isinstance(data, dict):
-            await run_in_threadpool(_inspect, url, tenant_id, provider, data, enforce)
+            await run_in_threadpool(
+                _inspect,
+                url,
+                principal.tenant_id,
+                principal.token_id,
+                provider,
+                style,
+                data,
+                enforce,
+            )
             if enforce:
                 return Response(content=json.dumps(data).encode(), media_type="application/json")
     return Response(
@@ -220,14 +295,30 @@ async def _forward(request: Request, tenant_id: str, provider: str) -> Response:
 @router.post("/openai/v1/chat/completions")
 @limiter.limit(llm_proxy_rate_limit)
 async def openai_chat_completions(
-    request: Request, tenant_id: str = Depends(get_gateway_tenant)
+    request: Request, principal: GatewayPrincipal = Depends(get_gateway_principal)
 ) -> Response:
-    return await _forward(request, tenant_id, "openai")
+    return await _forward(request, principal, "openai")
+
+
+@router.post("/mistral/v1/chat/completions")
+@limiter.limit(llm_proxy_rate_limit)
+async def mistral_chat_completions(
+    request: Request, principal: GatewayPrincipal = Depends(get_gateway_principal)
+) -> Response:
+    return await _forward(request, principal, "mistral")
+
+
+@router.post("/openrouter/v1/chat/completions")
+@limiter.limit(llm_proxy_rate_limit)
+async def openrouter_chat_completions(
+    request: Request, principal: GatewayPrincipal = Depends(get_gateway_principal)
+) -> Response:
+    return await _forward(request, principal, "openrouter")
 
 
 @router.post("/anthropic/v1/messages")
 @limiter.limit(llm_proxy_rate_limit)
 async def anthropic_messages(
-    request: Request, tenant_id: str = Depends(get_gateway_tenant)
+    request: Request, principal: GatewayPrincipal = Depends(get_gateway_principal)
 ) -> Response:
-    return await _forward(request, tenant_id, "anthropic")
+    return await _forward(request, principal, "anthropic")
