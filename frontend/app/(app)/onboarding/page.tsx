@@ -1,23 +1,34 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import { apiSend } from "@/lib/client";
+import { useClientScope } from "@/components/ClientScope";
+import { ProviderIcon } from "@/components/ProviderIcon";
+import { apiSend, apiSendVoid } from "@/lib/client";
 import { type StrKey, useT } from "@/lib/i18n";
 
 const XSOM_API = "https://xsom-ai-guard-production.up.railway.app";
 
 type Tpl = "monitor" | "balanced" | "strict";
-type Stack = "http" | "langchain" | "mcp" | "openai" | "anthropic";
+type Stack = "openai" | "anthropic" | "openrouter" | "mistral" | "langchain" | "mcp" | "http";
 
 const STACKS: { id: Stack; label: string }[] = [
-  { id: "http", label: "Custom (HTTP API)" },
+  { id: "openai", label: "OpenAI" },
+  { id: "anthropic", label: "Anthropic" },
+  { id: "openrouter", label: "OpenRouter" },
+  { id: "mistral", label: "Mistral" },
   { id: "langchain", label: "LangChain / LangGraph" },
   { id: "mcp", label: "MCP tools" },
-  { id: "openai", label: "OpenAI (direct)" },
-  { id: "anthropic", label: "Anthropic (direct)" },
+  { id: "http", label: "Custom (HTTP API)" },
 ];
+
+// OpenAI-compatible providers: same SDK, different proxy path + key.
+const OPENAI_STYLE: Record<string, { sdkBase: string; keyEnv: string; keyHint: string }> = {
+  openai: { sdkBase: "openai", keyEnv: "OPENAI_API_KEY", keyHint: "OpenAI" },
+  openrouter: { sdkBase: "openrouter", keyEnv: "OPENROUTER_API_KEY", keyHint: "OpenRouter" },
+  mistral: { sdkBase: "mistral", keyEnv: "MISTRAL_API_KEY", keyHint: "Mistral" },
+};
 
 const TEMPLATES: { id: Tpl; t: StrKey; d: StrKey }[] = [
   { id: "monitor", t: "onb.tpl.monitor.t", d: "onb.tpl.monitor.d" },
@@ -54,13 +65,15 @@ function snippet(stack: Stack, key: string): string {
 export XSOM_GATEWAY_TOKEN="${key}"
 # (configure the xSOM MCP server as your agent's tools endpoint)`;
   }
-  if (stack === "openai") {
-    return `# Zero-code monitoring — just point the OpenAI SDK at xSOM.
-# Your OPENAI_API_KEY is still used and forwarded to OpenAI.
+  const oai = OPENAI_STYLE[stack];
+  if (oai) {
+    return `# Zero-code monitoring — point the OpenAI SDK at xSOM.
+# Your ${oai.keyEnv} is still used and forwarded to ${oai.keyHint} (never stored).
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="${XSOM_API}/proxy/openai/v1",
+    base_url="${XSOM_API}/proxy/${oai.sdkBase}/v1",
+    api_key="<your ${oai.keyHint} key>",  # forwarded upstream, never stored by xSOM
     default_headers={"X-Gateway-Token": "${key}"},
     # add "X-XSOM-Mode": "enforce" to also block non-allowed tool-calls
 )
@@ -130,6 +143,14 @@ export default function OnboardingPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState<string | null>(null);
+  const { clients, reload } = useClientScope();
+  const [projectId, setProjectId] = useState("");
+  const [newProject, setNewProject] = useState("");
+
+  // First-time users have no project yet — default to creating one.
+  useEffect(() => {
+    if (clients.length === 0) setProjectId("__new__");
+  }, [clients.length]);
 
   const effectiveYaml = mode === "ai" && aiYaml ? aiYaml : policyYaml(tpl, name.trim());
 
@@ -154,10 +175,24 @@ export default function OnboardingPage() {
     setError(null);
     try {
       await apiSend("v1/policy", "PUT", { yaml: effectiveYaml });
-      const tok = await apiSend<{ token: string }>("v1/gateway-tokens", "POST", {
+      // Resolve the project (create it if the user typed a new one).
+      let clientId: string | null = null;
+      if (projectId === "__new__" && newProject.trim()) {
+        const created = await apiSend<{ id: string }>("v1/clients", "POST", {
+          name: newProject.trim(),
+        });
+        clientId = created.id;
+      } else if (projectId && projectId !== "__new__") {
+        clientId = projectId;
+      }
+      const tok = await apiSend<{ id: string; token: string }>("v1/gateway-tokens", "POST", {
         name: name.trim() || "agent",
       });
+      if (clientId) {
+        await apiSendVoid("v1/clients/assign", "POST", { token_id: tok.id, client_id: clientId });
+      }
       setApiKey(tok.token);
+      reload();
       setStep(4);
     } catch (e: unknown) {
       setError(`${t("onb.error")}: ${String(e)}`);
@@ -211,6 +246,30 @@ export default function OnboardingPage() {
             />
           </div>
           <div>
+            <label className="label">{t("onb.project.label")}</label>
+            <select
+              className="input mt-1.5"
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
+            >
+              <option value="">{t("onb.project.none")}</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+              <option value="__new__">{t("onb.project.new")}</option>
+            </select>
+            {projectId === "__new__" ? (
+              <input
+                className="input mt-2"
+                placeholder={t("onb.project.newph")}
+                value={newProject}
+                onChange={(e) => setNewProject(e.target.value)}
+              />
+            ) : null}
+          </div>
+          <div>
             <label className="label">{t("onb.stack.label")}</label>
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
               {STACKS.map((s) => (
@@ -218,13 +277,14 @@ export default function OnboardingPage() {
                   key={s.id}
                   type="button"
                   onClick={() => setStack(s.id)}
-                  className={`rounded-xl border px-3.5 py-2.5 text-left text-sm transition ${
+                  className={`flex items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-left text-sm transition ${
                     stack === s.id
                       ? "border-brand bg-brand/10 text-white"
                       : "border-white/10 bg-white/[0.03] text-white/70 hover:bg-white/[0.06]"
                   }`}
                 >
-                  {s.label}
+                  <ProviderIcon id={s.id} />
+                  <span>{s.label}</span>
                 </button>
               ))}
             </div>
@@ -379,7 +439,7 @@ export default function OnboardingPage() {
               <CopyButton text={snippet(stack, apiKey)} label={t("onb.copy")} />
             </div>
             <p className="muted mt-1 text-xs">
-              {t(stack === "openai" || stack === "anthropic" ? "onb.snippet.proxy" : "onb.snippet.note")}
+              {t(OPENAI_STYLE[stack] || stack === "anthropic" ? "onb.snippet.proxy" : "onb.snippet.note")}
             </p>
             <pre className="mt-2 overflow-x-auto rounded-xl bg-navy-mid/70 p-4 text-xs text-white/80">
               {snippet(stack, apiKey)}
