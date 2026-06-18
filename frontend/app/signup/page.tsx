@@ -8,9 +8,10 @@ import { Logo, Wordmark } from "@/components/brand";
 import { FullScreenLoader } from "@/components/Loader";
 import { LanguageToggle, useT } from "@/lib/i18n";
 
-export default function LoginPage() {
+export default function SignupPage() {
   const { t } = useT();
   const router = useRouter();
+  const [org, setOrg] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -21,10 +22,10 @@ export default function LoginPage() {
     event.preventDefault();
     setBusy(true);
     setError(null);
-    const res = await fetch("/api/auth/login", {
+    const res = await fetch("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ org, email, password }),
     });
     if (res.ok) {
       setRedirecting(true);
@@ -33,7 +34,7 @@ export default function LoginPage() {
     } else {
       setBusy(false);
       const data = (await res.json().catch(() => ({}))) as { detail?: string };
-      setError(data.detail ?? t("login.failed"));
+      setError(data.detail ?? t("signup.failed"));
     }
   }
 
@@ -52,12 +53,20 @@ export default function LoginPage() {
             <Wordmark className="text-lg" />
           </div>
           <div className="card p-6">
-            <h1 className="text-xl font-bold">{t("login.title")}</h1>
-            <p className="muted mt-1 text-sm">{t("login.subtitle")}</p>
+            <h1 className="text-xl font-bold">{t("signup.title")}</h1>
+            <p className="muted mt-1 text-sm">{t("signup.subtitle")}</p>
             <form className="mt-5 flex flex-col gap-3" onSubmit={onSubmit}>
               <input
+                aria-label={t("signup.org")}
+                placeholder={t("signup.org")}
+                value={org}
+                onChange={(e) => setOrg(e.target.value)}
+                className="input"
+                required
+              />
+              <input
                 type="email"
-                aria-label={t("login.email")}
+                aria-label={t("signup.email")}
                 placeholder="you@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -66,30 +75,27 @@ export default function LoginPage() {
               />
               <input
                 type="password"
-                aria-label={t("login.password")}
-                placeholder={t("login.password")}
+                aria-label={t("signup.password")}
+                placeholder={t("signup.password")}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="input"
+                minLength={8}
                 required
               />
               <button type="submit" disabled={busy} className="btn btn-primary mt-1 w-full">
-                {busy ? t("login.submitting") : t("login.submit")}
+                {busy ? t("signup.submitting") : t("signup.submit")}
               </button>
               {error ? <p className="text-sm text-red-300">{error}</p> : null}
             </form>
             <p className="mt-4 text-center text-sm">
-              <Link href="/forgot-password" className="text-brand-bright hover:underline">
-                {t("login.forgot")}
-              </Link>
-            </p>
-            <p className="mt-2 text-center text-sm">
-              <Link href="/signup" className="text-brand-bright hover:underline">
-                {t("login.signup")}
+              <span className="muted">{t("signup.haveaccount")} </span>
+              <Link href="/login" className="text-brand-bright hover:underline">
+                {t("signup.signin")}
               </Link>
             </p>
           </div>
-          <p className="muted mt-4 text-center text-xs">{t("login.footer")}</p>
+          <p className="muted mt-4 text-center text-xs">{t("signup.footer")}</p>
         </div>
       </main>
     </>

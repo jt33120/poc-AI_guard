@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     supabase_jwks_url: str | None = Field(default=None, max_length=400)
     supabase_jwt_audience: str = Field(default="authenticated", max_length=80)
     supabase_jwt_issuer: str | None = Field(default=None, max_length=400)
+    # Service-role key for admin operations (self-serve signup). Backend ONLY,
+    # never the frontend (CLAUDE.md §4.6). Signup is disabled if unset.
+    supabase_service_role_key: str | None = Field(default=None, max_length=600)
+    signup_rate_limit: str = Field(default="10/hour", max_length=40)
 
     # --- Database (backend / service_role connection) — M1 ---------------
     # psycopg DSN. Backend writes use a role that bypasses RLS (service_role).
