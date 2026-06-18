@@ -24,6 +24,7 @@ def get_usage(
     request: Request,
     user: CurrentUser = Depends(get_current_user),
     agent_id: str | None = Query(default=None),
+    client_id: str | None = Query(default=None),
     from_ts: str | None = Query(default=None, alias="from"),
     to_ts: str | None = Query(default=None, alias="to"),
 ) -> dict[str, Any]:
@@ -32,8 +33,10 @@ def get_usage(
     with db.tenant_reader(
         url, user_id=user.user_id, tenant_id=tenant_id, role=(user.role or Role.viewer)
     ) as conn:
-        summary = usage.summary(conn, agent_id=agent_id, from_ts=from_ts, to_ts=to_ts)
+        summary = usage.summary(
+            conn, agent_id=agent_id, from_ts=from_ts, to_ts=to_ts, client_id=client_id
+        )
         summary["billed_cost_usd"] = billing.total_billed(
-            conn, agent_id=agent_id, from_ts=from_ts, to_ts=to_ts
+            conn, agent_id=agent_id, from_ts=from_ts, to_ts=to_ts, client_id=client_id
         )
         return summary

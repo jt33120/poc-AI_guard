@@ -13,8 +13,7 @@ from typing import Any
 
 import psycopg
 
-from core import secrets
-from core.secrets import EncryptedBlob, KeyProvider
+from core.secrets import SecretRecord, SecretStore
 
 #: Providers we can hold a billing/admin credential for.
 SUPPORTED_PROVIDERS = ("openai", "anthropic", "mistral", "openrouter", "azure", "aws", "gcp")
@@ -40,7 +39,7 @@ _VIEW_COLS = "id, provider, label, created_at, last_used_at, revoked_at"
 
 def store_credential(
     conn: psycopg.Connection,
-    provider_kp: KeyProvider,
+    store: SecretStore,
     *,
     tenant_id: str,
     provider: str,
@@ -48,20 +47,23 @@ def store_credential(
     secret: str,
     created_by: str | None = None,
 ) -> dict[str, Any]:
-    """Envelope-encrypt and persist a credential; return metadata only."""
-    blob = secrets.encrypt_secret(provider_kp, secret, context=tenant_id)
+    """Persist a credential via the configured secret store; return metadata only."""
+    rec = store.put(conn, tenant_id=tenant_id, plaintext=secret)
     row = conn.execute(
         "insert into provider_credentials "
-        "(tenant_id, provider, label, key_id, wrapped_dek, nonce, ciphertext, created_by) "
-        f"values (%s, %s, %s, %s, %s, %s, %s, %s) returning {_VIEW_COLS}",
+        "(tenant_id, provider, label, backend, key_id, wrapped_dek, nonce, ciphertext, "
+        " vault_secret_id, created_by) "
+        f"values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) returning {_VIEW_COLS}",
         (
             tenant_id,
             provider,
             label,
-            blob.key_id,
-            blob.wrapped_dek,
-            blob.nonce,
-            blob.ciphertext,
+            rec.backend,
+            rec.key_id,
+            rec.wrapped_dek,
+            rec.nonce,
+            rec.ciphertext,
+            rec.vault_secret_id,
             created_by,
         ),
     ).fetchone()
@@ -93,11 +95,12 @@ def revoke_credential(conn: psycopg.Connection, tenant_id: str, cred_id: str) ->
 
 
 def reveal_secret(
-    conn: psycopg.Connection, provider_kp: KeyProvider, tenant_id: str, provider: str
+    conn: psycopg.Connection, store: SecretStore, tenant_id: str, provider: str
 ) -> str | None:
-    """Decrypt the most recent active credential for a provider (backend-only)."""
+    """Recover the most recent active credential for a provider (backend-only)."""
     row = conn.execute(
-        "select id, key_id, wrapped_dek, nonce, ciphertext from provider_credentials "
+        "select id, backend, key_id, wrapped_dek, nonce, ciphertext, vault_secret_id "
+        "from provider_credentials "
         "where tenant_id = %s and provider = %s and revoked_at is null "
         "order by created_at desc limit 1",
         (tenant_id, provider),
@@ -106,5 +109,12 @@ def reveal_secret(
         return None
     conn.execute("update provider_credentials set last_used_at = now() where id = %s", (row[0],))
     conn.commit()
-    blob = EncryptedBlob(key_id=row[1], wrapped_dek=row[2], nonce=row[3], ciphertext=row[4])
-    return secrets.decrypt_secret(provider_kp, blob, context=tenant_id)
+    record = SecretRecord(
+        backend=row[1],
+        key_id=row[2],
+        wrapped_dek=row[3],
+        nonce=row[4],
+        ciphertext=row[5],
+        vault_secret_id=str(row[6]) if row[6] else None,
+    )
+    return store.get(conn, tenant_id=tenant_id, record=record)

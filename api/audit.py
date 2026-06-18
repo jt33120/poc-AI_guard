@@ -39,6 +39,7 @@ def list_audit(
     decision: str | None = Query(default=None),
     tool: str | None = Query(default=None),
     agent_id: str | None = Query(default=None),
+    client_id: str | None = Query(default=None),
 ) -> list[dict[str, Any]]:
     tenant_id = require_tenant(user)
     url = database_url(request)
@@ -46,7 +47,13 @@ def list_audit(
         url, user_id=user.user_id, tenant_id=tenant_id, role=(user.role or Role.viewer)
     ) as conn:
         return audit.list_events(
-            conn, from_ts=from_ts, to_ts=to_ts, decision=decision, tool=tool, agent=agent_id
+            conn,
+            from_ts=from_ts,
+            to_ts=to_ts,
+            decision=decision,
+            tool=tool,
+            agent=agent_id,
+            client_id=client_id,
         )
 
 

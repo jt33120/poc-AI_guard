@@ -46,12 +46,20 @@ def record_usage(
     )
 
 
-def _filters(agent_id: str | None, from_ts: str | None, to_ts: str | None) -> tuple[str, list[Any]]:
+def _filters(
+    agent_id: str | None,
+    from_ts: str | None,
+    to_ts: str | None,
+    client_id: str | None = None,
+) -> tuple[str, list[Any]]:
     clauses: list[str] = []
     params: list[Any] = []
     if agent_id:
         clauses.append("gateway_token_id = %s")
         params.append(agent_id)
+    if client_id:
+        clauses.append("gateway_token_id in (select id from gateway_tokens where client_id = %s)")
+        params.append(client_id)
     if from_ts:
         clauses.append("ts >= %s")
         params.append(from_ts)
@@ -68,9 +76,10 @@ def summary(
     agent_id: str | None = None,
     from_ts: str | None = None,
     to_ts: str | None = None,
+    client_id: str | None = None,
 ) -> dict[str, Any]:
-    """Aggregate spend/tokens for the tenant (RLS-scoped), optionally per agent."""
-    where, params = _filters(agent_id, from_ts, to_ts)
+    """Aggregate spend/tokens for the tenant (RLS-scoped), optionally per agent/client."""
+    where, params = _filters(agent_id, from_ts, to_ts, client_id)
     totals = conn.execute(
         "select coalesce(sum(cost_usd), 0)::float8, coalesce(sum(total_tokens), 0), "
         "coalesce(sum(prompt_tokens), 0), coalesce(sum(completion_tokens), 0), count(*) "

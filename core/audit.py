@@ -196,6 +196,7 @@ def list_events(
     decision: str | None = None,
     tool: str | None = None,
     agent: str | None = None,
+    client_id: str | None = None,
     limit: int = 500,
 ) -> list[dict[str, Any]]:
     """Tenant-scoped (RLS) audit events with optional filters; metadata only."""
@@ -216,6 +217,9 @@ def list_events(
     if agent:
         clauses.append("gateway_token_id = %s")
         params.append(agent)
+    if client_id:
+        clauses.append("gateway_token_id in (select id from gateway_tokens where client_id = %s)")
+        params.append(client_id)
     where = (" where " + " and ".join(clauses)) if clauses else ""
     params.append(limit)
     rows = conn.execute(

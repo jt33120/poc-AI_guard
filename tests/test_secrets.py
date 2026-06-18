@@ -69,3 +69,59 @@ def test_aws_requires_key_id() -> None:
     settings = Settings(_env_file=None, env="dev", secrets_kms_provider="aws")
     with pytest.raises(SecretsError):
         secrets.build_key_provider(settings)
+
+
+# --- SecretStore (envelope vs Vault) -----------------------------------------
+
+
+class _FakeResult:
+    def __init__(self, row: object) -> None:
+        self._row = row
+
+    def fetchone(self) -> object:
+        return self._row
+
+
+class _FakeConn:
+    """Minimal psycopg-like stub to exercise VaultSecretStore without Supabase."""
+
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+        self.secret = "sk-vault-live"
+
+    def execute(self, sql: str, params: object = ()) -> _FakeResult:
+        self.calls.append(sql)
+        if "create_secret" in sql:
+            return _FakeResult(("11111111-1111-1111-1111-111111111111",))
+        if "decrypted_secrets" in sql:
+            return _FakeResult((self.secret,))
+        return _FakeResult(None)
+
+    def commit(self) -> None:
+        pass
+
+
+def test_envelope_store_round_trip() -> None:
+    store = secrets.EnvelopeSecretStore(_provider())
+    rec = store.put(None, tenant_id="t", plaintext="sk-x")  # type: ignore[arg-type]
+    assert rec.backend == "envelope" and rec.ciphertext and "sk-x" not in rec.ciphertext
+    assert store.get(None, tenant_id="t", record=rec) == "sk-x"  # type: ignore[arg-type]
+
+
+def test_vault_store_round_trips_via_vault_sql() -> None:
+    conn = _FakeConn()
+    store = secrets.VaultSecretStore()
+    rec = store.put(conn, tenant_id="t1", plaintext="sk-vault-live")  # type: ignore[arg-type]
+    assert rec.backend == "vault" and rec.vault_secret_id
+    assert any("vault.create_secret" in c for c in conn.calls)
+    assert store.get(conn, tenant_id="t1", record=rec) == "sk-vault-live"  # type: ignore[arg-type]
+    assert any("vault.decrypted_secrets" in c for c in conn.calls)
+
+
+def test_build_secret_store_selects_backend() -> None:
+    vault = Settings(_env_file=None, env="prod", secrets_kms_provider="vault")
+    assert isinstance(secrets.build_secret_store(vault), secrets.VaultSecretStore)
+    local = Settings(_env_file=None, env="dev", secrets_kms_provider="local", secrets_local_kek=KEK)
+    assert isinstance(secrets.build_secret_store(local), secrets.EnvelopeSecretStore)
+    with pytest.raises(SecretsError):
+        secrets.build_secret_store(Settings(_env_file=None, env="dev"))

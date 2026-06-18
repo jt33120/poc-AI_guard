@@ -28,8 +28,10 @@ def list_agents(conn: psycopg.Connection) -> list[dict[str, Any]]:
     """Each gateway token with its audited-action count, last activity and spend."""
     rows = conn.execute(
         "select g.id, g.name, g.created_at, g.last_used_at, g.revoked_at, "
-        "coalesce(a.actions, 0), a.last_action, coalesce(u.cost, 0)::float8, coalesce(u.tokens, 0) "
+        "coalesce(a.actions, 0), a.last_action, coalesce(u.cost, 0)::float8, "
+        "coalesce(u.tokens, 0), g.client_id, cl.name "
         "from gateway_tokens g "
+        "left join clients cl on cl.id = g.client_id "
         "left join (select gateway_token_id, count(*) as actions, max(ts) as last_action "
         "  from audit_log group by gateway_token_id) a on a.gateway_token_id = g.id "
         "left join (select gateway_token_id, sum(cost_usd) as cost, sum(total_tokens) as tokens "
@@ -46,6 +48,8 @@ def list_agents(conn: psycopg.Connection) -> list[dict[str, Any]]:
             "actions": int(r[5]),
             "spend_usd": float(r[7]),
             "tokens": int(r[8]),
+            "client_id": str(r[9]) if r[9] else None,
+            "client_name": r[10],
         }
         for r in rows
     ]

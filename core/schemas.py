@@ -201,6 +201,49 @@ class AgentOut(BaseModel):
     tokens: int
     last_active: str | None
     created_at: str | None
+    client_id: str | None = None
+    client_name: str | None = None
+
+
+class ClientCreate(BaseModel):
+    """Create a monitored client/project."""
+
+    model_config = {"extra": "forbid"}
+
+    name: str = Field(min_length=1, max_length=80)
+    website: str | None = Field(default=None, max_length=300)
+
+
+class ClientUpdate(BaseModel):
+    """Patch a client's name/website."""
+
+    model_config = {"extra": "forbid"}
+
+    name: str | None = Field(default=None, min_length=1, max_length=80)
+    website: str | None = Field(default=None, max_length=300)
+
+
+class ClientAssign(BaseModel):
+    """Attach/detach an agent (gateway token) to a client."""
+
+    model_config = {"extra": "forbid"}
+
+    token_id: str = Field(max_length=64)
+    client_id: str | None = Field(default=None, max_length=64)
+
+
+class ClientOut(BaseModel):
+    """A client/project with its per-client rollup."""
+
+    id: str
+    name: str
+    website: str | None
+    created_at: str | None
+    agents: int = 0
+    actions: int = 0
+    est_cost_usd: float = 0.0
+    billed_cost_usd: float = 0.0
+    tokens: int = 0
 
 
 class AgentsOverview(BaseModel):

@@ -42,13 +42,17 @@ def total_billed(
     agent_id: str | None = None,
     from_ts: str | None = None,
     to_ts: str | None = None,
+    client_id: str | None = None,
 ) -> float:
-    """Sum of authoritative billed cost for the tenant (RLS-scoped), optionally per agent."""
+    """Sum of authoritative billed cost for the tenant (RLS-scoped), per agent/client."""
     clauses: list[str] = []
     params: list[Any] = []
     if agent_id:
         clauses.append("gateway_token_id = %s")
         params.append(agent_id)
+    if client_id:
+        clauses.append("gateway_token_id in (select id from gateway_tokens where client_id = %s)")
+        params.append(client_id)
     if from_ts:
         clauses.append("ts >= %s")
         params.append(from_ts)

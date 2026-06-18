@@ -41,7 +41,7 @@ def connect_credential(
     tenant_id = require_tenant(user)
     settings: Settings = request.app.state.settings
     try:
-        provider_kp = secrets.build_key_provider(settings)
+        store = secrets.build_secret_store(settings)
     except secrets.SecretsError:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -50,7 +50,7 @@ def connect_credential(
     with db.connection(database_url(request)) as conn:
         return credentials.store_credential(
             conn,
-            provider_kp,
+            store,
             tenant_id=tenant_id,
             provider=payload.provider,
             label=payload.label,
