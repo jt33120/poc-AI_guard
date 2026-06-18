@@ -1,6 +1,6 @@
 "use client";
 
-import { formatUsd } from "@/components/AgentScope";
+import { formatUsd } from "@/components/ClientScope";
 import { ShieldMark } from "@/components/brand";
 import { type StrKey, useT } from "@/lib/i18n";
 

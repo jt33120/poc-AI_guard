@@ -27,5 +27,17 @@ export async function apiDelete(path: string): Promise<void> {
   }
 }
 
+// Like apiSend but for endpoints that return no body (e.g. 204).
+export async function apiSendVoid(path: string, method: string, body?: unknown): Promise<void> {
+  const res = await fetch(`/api/control/${path}`, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw new Error(`Request failed (${res.status})`);
+  }
+}
+
 export const exportUrl = (format: string, render: string): string =>
   `/api/control/v1/audit/export?format=${format}&render=${render}`;

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { AgentScopeBar, useAgentScope } from "@/components/AgentScope";
+import { ClientScopeBar, clientSuffix, useClientScope } from "@/components/ClientScope";
 import { DecisionBadge } from "@/components/brand";
 import { Spinner } from "@/components/Spinner";
 import { Tooltip } from "@/components/Tooltip";
@@ -28,13 +28,13 @@ const CLASS_KEY: Record<string, StrKey> = {
 
 export default function AuditPage() {
   const { t } = useT();
-  const { selected, agents } = useAgentScope();
+  const { selected, agents } = useClientScope();
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const path = selected === "all" ? "v1/audit" : `v1/audit?agent_id=${selected}`;
+    const path = `v1/audit${clientSuffix(selected)}`;
     setLoading(true);
     apiGet<AuditEntry[]>(path)
       .then(setEntries)
@@ -61,7 +61,7 @@ export default function AuditPage() {
           </a>
         </div>
       </header>
-      <AgentScopeBar />
+      <ClientScopeBar />
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
       <div className="card overflow-x-auto">
         <table className="data-table">

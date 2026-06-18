@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 
 import {
-  AgentScopeBar,
+  ClientScopeBar,
+  clientSuffix,
   formatTokens,
   formatUsd,
-  useAgentScope,
-} from "@/components/AgentScope";
+  useClientScope,
+} from "@/components/ClientScope";
 import { Spinner } from "@/components/Spinner";
 import { apiGet } from "@/lib/client";
 import { type StrKey, useT } from "@/lib/i18n";
@@ -45,13 +46,13 @@ const PROVIDER_LABEL: Record<string, string> = {
 
 export default function CostsPage() {
   const { t } = useT();
-  const { selected, agents } = useAgentScope();
+  const { selected, agents } = useClientScope();
   const [usage, setUsage] = useState<Usage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const path = selected === "all" ? "v1/usage" : `v1/usage?agent_id=${selected}`;
+    const path = `v1/usage${clientSuffix(selected)}`;
     setLoading(true);
     setError(null);
     apiGet<Usage>(path)
@@ -85,7 +86,7 @@ export default function CostsPage() {
         <p className="muted mt-1.5 max-w-3xl">{t("costs.subtitle")}</p>
       </header>
 
-      <AgentScopeBar />
+      <ClientScopeBar />
 
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
 
