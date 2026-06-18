@@ -657,6 +657,34 @@ export const STR = {
     en: "Secret storage isn't configured on the server yet.",
     fr: "Le stockage des secrets n'est pas encore configuré sur le serveur.",
   },
+
+  // ── Client / project scope (the monitored entity) ────────────────────────
+  "scope.clientlabel": { en: "Client / project", fr: "Client / projet" },
+  "scope.allclients": { en: "All clients", fr: "Tous les clients" },
+  "scope.nclients": { en: "{n} clients", fr: "{n} clients" },
+  "scope.nagents": { en: "{n} agents", fr: "{n} agents" },
+  "scope.noclient": { en: "No clients yet", fr: "Aucun client" },
+  "scope.manage": { en: "Manage", fr: "Gérer" },
+  "scope.billed": { en: "billed", fr: "facturé" },
+
+  // ── Clients manager (Admin) ──────────────────────────────────────────────
+  "clients.title": { en: "Clients / projects", fr: "Clients / projets" },
+  "clients.subtitle": {
+    en: "The entities you monitor. Each agent belongs to a client, so cost rolls up per client.",
+    fr: "Les entités que tu surveilles. Chaque agent appartient à un client, donc le coût s'agrège par client.",
+  },
+  "clients.name": { en: "Client name", fr: "Nom du client" },
+  "clients.website": { en: "Website URL", fr: "URL du site" },
+  "clients.add": { en: "Add client", fr: "Ajouter" },
+  "clients.archive": { en: "Archive", fr: "Archiver" },
+  "clients.none": { en: "No clients yet — add one above.", fr: "Aucun client — ajoutes-en un." },
+  "clients.agents.title": { en: "Assign agents", fr: "Affecter les agents" },
+  "clients.unassigned": { en: "— unassigned —", fr: "— non affecté —" },
+  "clients.save": { en: "Save", fr: "Enregistrer" },
+  "clients.empty.agents": {
+    en: "No agents yet. Create one in Connect agent.",
+    fr: "Aucun agent. Crées-en un dans Connecter un agent.",
+  },
 } satisfies Record<string, Entry>;
 
 export type StrKey = keyof typeof STR;

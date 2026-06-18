@@ -20,7 +20,9 @@ import base64
 import os
 from dataclasses import dataclass
 from typing import Any, Protocol
+from uuid import uuid4
 
+import psycopg
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from core.config import Settings
@@ -157,3 +159,89 @@ def decrypt_secret(provider: KeyProvider, blob: EncryptedBlob, *, context: str) 
         base64.b64decode(blob.nonce), base64.b64decode(blob.ciphertext), aad
     )
     return plaintext.decode()
+
+
+# ---------------------------------------------------------------------------
+# Secret store: how a credential is persisted/recovered (envelope vs Vault).
+# ---------------------------------------------------------------------------
+@dataclass(frozen=True)
+class SecretRecord:
+    """The columns to persist for a stored secret (no plaintext)."""
+
+    backend: str
+    key_id: str | None = None
+    wrapped_dek: str | None = None
+    nonce: str | None = None
+    ciphertext: str | None = None
+    vault_secret_id: str | None = None
+
+
+class SecretStore(Protocol):
+    """Stores/recovers a tenant secret. ``conn`` lets DB-backed stores (Vault) work."""
+
+    def put(self, conn: psycopg.Connection, *, tenant_id: str, plaintext: str) -> SecretRecord: ...
+
+    def get(self, conn: psycopg.Connection, *, tenant_id: str, record: SecretRecord) -> str: ...
+
+
+class EnvelopeSecretStore:
+    """Stores the ciphertext in our own table, wrapping the DEK via a KMS KeyProvider."""
+
+    def __init__(self, provider: KeyProvider) -> None:
+        self._provider = provider
+
+    def put(self, conn: psycopg.Connection, *, tenant_id: str, plaintext: str) -> SecretRecord:
+        blob = encrypt_secret(self._provider, plaintext, context=tenant_id)
+        return SecretRecord(
+            backend="envelope",
+            key_id=blob.key_id,
+            wrapped_dek=blob.wrapped_dek,
+            nonce=blob.nonce,
+            ciphertext=blob.ciphertext,
+        )
+
+    def get(self, conn: psycopg.Connection, *, tenant_id: str, record: SecretRecord) -> str:
+        if not (record.key_id and record.wrapped_dek and record.nonce and record.ciphertext):
+            raise SecretsError("incomplete envelope secret record")
+        blob = EncryptedBlob(record.key_id, record.wrapped_dek, record.nonce, record.ciphertext)
+        return decrypt_secret(self._provider, blob, context=tenant_id)
+
+
+class VaultSecretStore:
+    """Delegates storage to Supabase Vault: the root key stays outside the DB."""
+
+    def put(self, conn: psycopg.Connection, *, tenant_id: str, plaintext: str) -> SecretRecord:
+        name = f"xsom:{tenant_id}:{uuid4().hex}"
+        row = conn.execute(
+            "select vault.create_secret(%s, %s, %s)",
+            (plaintext, name, f"xSOM provider credential (tenant {tenant_id})"),
+        ).fetchone()
+        conn.commit()
+        if row is None:  # pragma: no cover - create_secret always returns the id
+            raise SecretsError("vault.create_secret returned no id")
+        return SecretRecord(backend="vault", vault_secret_id=str(row[0]))
+
+    def get(self, conn: psycopg.Connection, *, tenant_id: str, record: SecretRecord) -> str:
+        if not record.vault_secret_id:
+            raise SecretsError("missing vault_secret_id")
+        row = conn.execute(
+            "select decrypted_secret from vault.decrypted_secrets where id = %s",
+            (record.vault_secret_id,),
+        ).fetchone()
+        if row is None:
+            raise SecretsError("vault secret not found")
+        return str(row[0])
+
+
+def build_secret_store(settings: Settings) -> SecretStore:
+    """Construct the configured secret store, fail-closed (CLAUDE.md §4.4).
+
+    ``vault`` (Supabase Vault) is the production default; ``aws``/``local`` use
+    in-app envelope encryption with the matching KMS key provider.
+    """
+    provider = (settings.secrets_kms_provider or "").lower()
+    if provider == "vault":
+        return VaultSecretStore()
+    if provider in ("aws", "local"):
+        return EnvelopeSecretStore(build_key_provider(settings))
+    raise SecretsError("no secrets backend configured")

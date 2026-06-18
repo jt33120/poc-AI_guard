@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { AgentScopeBar, useAgentScope } from "@/components/AgentScope";
+import { ClientScopeBar, clientSuffix, useClientScope } from "@/components/ClientScope";
 import { Spinner } from "@/components/Spinner";
 import { apiGet } from "@/lib/client";
 import { type StrKey, useT } from "@/lib/i18n";
@@ -43,13 +43,13 @@ const TECH_KW = ["MCP gateway", "Policy engine", "Hash-chained audit", "LLM judg
 
 export default function HomePage() {
   const { t } = useT();
-  const { selected } = useAgentScope();
+  const { selected } = useClientScope();
   const [loading, setLoading] = useState(true);
   const [kpi, setKpi] = useState({ actions: 0, pending: 0, gated: 0, audit: 0 });
   const [chart, setChart] = useState({ allow: 0, hitl: 0, deny: 0 });
 
   useEffect(() => {
-    const auditPath = selected === "all" ? "v1/audit" : `v1/audit?agent_id=${selected}`;
+    const auditPath = `v1/audit${clientSuffix(selected)}`;
     setLoading(true);
     Promise.allSettled([
       apiGet<ToolView[]>("v1/tools"),
@@ -90,7 +90,7 @@ export default function HomePage() {
         <p className="muted mt-1.5">{t("home.subtitle")}</p>
       </header>
 
-      <AgentScopeBar />
+      <ClientScopeBar />
 
       {loading ? (
         <div className="card">

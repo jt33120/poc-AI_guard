@@ -23,6 +23,7 @@ from api.agents import router as agents_router
 from api.approvals import router as approvals_router
 from api.audit import router as audit_router
 from api.authorize import router as authorize_router
+from api.clients import router as clients_router
 from api.credentials import router as credentials_router
 from api.errors import register_exception_handlers
 from api.gateway_tokens import router as gateway_tokens_router
@@ -113,6 +114,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(agents_router)
     app.include_router(usage_router)
     app.include_router(credentials_router)
+    app.include_router(clients_router)
 
     return app
 

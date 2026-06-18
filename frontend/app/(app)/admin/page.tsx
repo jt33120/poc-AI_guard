@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { ApiKeys } from "@/components/ApiKeys";
+import { ClientsManager } from "@/components/ClientsManager";
 import { ProviderCredentials } from "@/components/ProviderCredentials";
 import { apiGet, apiSend } from "@/lib/client";
 import { useT } from "@/lib/i18n";
@@ -146,6 +147,7 @@ export default function AdminPage() {
       </div>
 
       <ApiKeys />
+      <ClientsManager />
       <ProviderCredentials />
     </section>
   );

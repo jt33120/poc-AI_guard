@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { AgentScopeBar, useAgentScope } from "@/components/AgentScope";
+import { ClientScopeBar, clientSuffix, useClientScope } from "@/components/ClientScope";
 import { type ExecCounts, ExecutiveSummary } from "@/components/ExecutiveSummary";
 import { Spinner } from "@/components/Spinner";
 import { apiGet } from "@/lib/client";
@@ -24,14 +24,14 @@ function bucket(decision: string | null): keyof ExecCounts {
 
 export default function ExecutivePage() {
   const { t } = useT();
-  const { selected } = useAgentScope();
+  const { selected } = useClientScope();
   const [loading, setLoading] = useState(true);
   const [governed, setGoverned] = useState(0);
   const [counts, setCounts] = useState<ExecCounts>({ allow: 0, review: 0, block: 0 });
   const [spend, setSpend] = useState(0);
 
   useEffect(() => {
-    const suffix = selected === "all" ? "" : `?agent_id=${selected}`;
+    const suffix = clientSuffix(selected);
     setLoading(true);
     Promise.allSettled([
       apiGet<unknown[]>("v1/tools"),
@@ -54,7 +54,7 @@ export default function ExecutivePage() {
         <h1 className="text-2xl font-bold sm:text-3xl">{t("exec.title")}</h1>
         <p className="muted mt-1.5 max-w-2xl">{t("exec.subtitle")}</p>
       </header>
-      <AgentScopeBar />
+      <ClientScopeBar />
       {loading ? (
         <div className="card">
           <Spinner label={t("common.loading")} slowLabel={t("common.waking")} />

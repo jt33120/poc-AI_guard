@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
-import { AgentScopeProvider } from "@/components/AgentScope";
 import { AppShell } from "@/components/AppShell";
+import { ClientScopeProvider } from "@/components/ClientScope";
 import { getSession } from "@/lib/session";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -11,7 +11,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
   return (
     <AppShell role={session.role}>
-      <AgentScopeProvider>{children}</AgentScopeProvider>
+      <ClientScopeProvider>{children}</ClientScopeProvider>
     </AppShell>
   );
 }

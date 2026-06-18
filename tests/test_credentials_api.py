@@ -66,8 +66,8 @@ def test_connect_list_revoke_never_exposes_secret(
         "select ciphertext from provider_credentials where tenant_id = %s", (tid,)
     ).fetchone()
     assert row is not None and "sk-or-LIVE-123" not in row[0]
-    kp = secrets.build_key_provider(_settings(db.url))
-    assert credentials.reveal_secret(db.conn, kp, tid, "openrouter") == "sk-or-LIVE-123"
+    store = secrets.build_secret_store(_settings(db.url))
+    assert credentials.reveal_secret(db.conn, store, tid, "openrouter") == "sk-or-LIVE-123"
 
     cred_id = body["id"]
     assert client.delete(f"/v1/credentials/{cred_id}", headers=_auth(admin)).status_code == 204
