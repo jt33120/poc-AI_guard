@@ -28,3 +28,8 @@ def llm_proxy_rate_limit() -> str:
 def policy_draft_rate_limit() -> str:
     """Dynamic limit string for the natural-language policy assistant."""
     return get_settings().policy_draft_rate_limit
+
+
+def signup_rate_limit() -> str:
+    """Dynamic limit string for the public self-serve signup endpoint."""
+    return get_settings().signup_rate_limit

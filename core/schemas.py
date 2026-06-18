@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class Role(StrEnum):
@@ -14,6 +14,25 @@ class Role(StrEnum):
     admin = "admin"
     operator = "operator"
     viewer = "viewer"
+
+
+class SignupRequest(BaseModel):
+    """Self-serve account signup: an org and an admin login."""
+
+    model_config = {"extra": "forbid"}
+
+    org: str = Field(min_length=1, max_length=80)
+    email: str = Field(min_length=3, max_length=255)
+    password: str = Field(min_length=8, max_length=128, repr=False)
+
+    @field_validator("email")
+    @classmethod
+    def _email_shape(cls, value: str) -> str:
+        cleaned = value.strip().lower()
+        local, _, domain = cleaned.partition("@")
+        if not local or "." not in domain:
+            raise ValueError("invalid email")
+        return cleaned
 
 
 class CurrentUser(BaseModel):

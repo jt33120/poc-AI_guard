@@ -685,6 +685,26 @@ export const STR = {
     en: "No agents yet. Create one in Connect agent.",
     fr: "Aucun agent. Crées-en un dans Connecter un agent.",
   },
+
+  // ── Self-serve signup ────────────────────────────────────────────────────
+  "signup.title": { en: "Create your account", fr: "Créer votre compte" },
+  "signup.subtitle": {
+    en: "Spin up a workspace in seconds — you'll be its admin.",
+    fr: "Créez un espace en quelques secondes — vous en serez l'admin.",
+  },
+  "signup.org": { en: "Company / workspace name", fr: "Nom de l'entreprise / espace" },
+  "signup.email": { en: "Work email", fr: "Email professionnel" },
+  "signup.password": { en: "Password (min 8 chars)", fr: "Mot de passe (8 car. min)" },
+  "signup.submit": { en: "Create account", fr: "Créer le compte" },
+  "signup.submitting": { en: "Creating…", fr: "Création…" },
+  "signup.failed": { en: "Could not create the account.", fr: "Impossible de créer le compte." },
+  "signup.haveaccount": { en: "Already have an account?", fr: "Déjà un compte ?" },
+  "signup.signin": { en: "Sign in", fr: "Se connecter" },
+  "signup.footer": {
+    en: "By creating an account you agree to govern your agents responsibly.",
+    fr: "En créant un compte, vous vous engagez à gouverner vos agents de façon responsable.",
+  },
+  "login.signup": { en: "New here? Create an account", fr: "Nouveau ? Créer un compte" },
 } satisfies Record<string, Entry>;
 
 export type StrKey = keyof typeof STR;

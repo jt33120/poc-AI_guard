@@ -32,11 +32,13 @@ from api.policy import router as policy_router
 from api.ratelimit import limiter
 from api.security import build_verifier, get_current_user
 from api.servers import router as servers_router
+from api.signup import router as signup_router
 from api.usage import router as usage_router
 from core.config import Settings, get_settings
 from core.logging import configure_logging
 from core.observability import init_observability
 from core.schemas import CurrentUser
+from core.signup import build_auth_admin
 
 _SECURITY_HEADERS: dict[str, str] = {
     "X-Content-Type-Options": "nosniff",
@@ -86,6 +88,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Shared state read by dependencies (settings, verifier, DB url, limiter).
     app.state.settings = settings
     app.state.verifier = build_verifier(settings)
+    app.state.auth_admin = build_auth_admin(settings)
     app.state.database_url = settings.database_url
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
@@ -115,6 +118,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(usage_router)
     app.include_router(credentials_router)
     app.include_router(clients_router)
+    app.include_router(signup_router)
 
     return app
 
