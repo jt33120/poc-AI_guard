@@ -20,6 +20,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from api.agents import router as agents_router
+from api.ai import router as ai_router
 from api.approvals import router as approvals_router
 from api.audit import router as audit_router
 from api.authorize import router as authorize_router
@@ -120,6 +121,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(credentials_router)
     app.include_router(clients_router)
     app.include_router(dlp_router)
+    app.include_router(ai_router)
     app.include_router(signup_router)
 
     return app

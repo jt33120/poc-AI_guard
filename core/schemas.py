@@ -330,6 +330,75 @@ class DlpConfigUpdate(BaseModel):
     entropy_action: Literal["flag", "off"] = "off"
 
 
+class AiModelBucket(BaseModel):
+    """LLM calls grouped by provider+model."""
+
+    provider: str | None
+    model: str | None
+    calls: int
+    tokens: int
+    cost_usd: float
+
+
+class AiUserBucket(BaseModel):
+    """Spend grouped by end-user (hashed)."""
+
+    user_hash: str
+    calls: int
+    cost_usd: float
+
+
+class AiOperationStat(BaseModel):
+    """Per-operation x route stats. Quality fields are null until wired (ADR-0001)."""
+
+    operation: str | None
+    route: str | None
+    calls: int
+    cost_usd: float
+    tokens: int
+    p75_latency_ms: float | None
+    ttft_p75_ms: float | None
+    error_rate: float | None
+    anomaly: bool = False
+    anomaly_score: float | None = None
+    refusal_rate: float | None = None
+    regen_rate: float | None = None
+    thumbs_down_rate: float | None = None
+    csat: float | None = None
+
+
+class AiSeriesPoint(BaseModel):
+    """One day of the AI cost/latency trend."""
+
+    date: str
+    calls: int
+    cost_usd: float
+    p75_latency_ms: float | None
+    error_rate: float | None
+
+
+class AiSummary(BaseModel):
+    """AI-observability summary (mirrors mip-rum's RumSummary AI sub-object)."""
+
+    window: str
+    ai_calls: int
+    ai_tokens: int
+    ai_cost_usd: float
+    ai_p75_latency_ms: float | None
+    ai_error_rate: float | None
+    ai_by_model: list[AiModelBucket]
+    ai_top_users: list[AiUserBucket]
+    ai_by_operation: list[AiOperationStat]
+    ai_series: list[AiSeriesPoint]
+
+
+class AiIngestResult(BaseModel):
+    """Outcome of an OTLP gen_ai ingestion request."""
+
+    ingested: int
+    rejected: int
+
+
 CredentialProvider = Literal["openai", "anthropic", "mistral", "openrouter", "azure", "aws", "gcp"]
 
 
