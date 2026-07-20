@@ -34,6 +34,7 @@ class AiCall:
     span_id: str
     trace_id: str | None
     session_id: str | None
+    app_id: str | None
     route: str | None
     provider: str | None
     model: str | None
@@ -187,6 +188,7 @@ def _build_call(span: dict[str, Any], a: dict[str, Any], now: datetime) -> AiCal
         span_id=str(span_id),
         trace_id=span.get("traceId") or a.get("mip.trace_id"),
         session_id=_session_from_tracestate(span.get("traceState")) or a.get("mip.session_id"),
+        app_id=a.get("mip.app_id") if isinstance(a.get("mip.app_id"), str) else None,
         route=_normalize_route(a.get("gen_ai.route") or a.get("mip.route")),
         provider=provider,
         model=model,

@@ -38,6 +38,7 @@ def _otlp(
     operation: str = "chat",
     route: str = "/v1/chat",
     session_id: str | None = None,
+    app: str | None = None,
     in_tok: int = 1000,
     out_tok: int = 500,
     latency_ms: float = 250.0,
@@ -61,7 +62,10 @@ def _otlp(
     }
     if session_id is not None:
         span["traceState"] = f"mip=s:{session_id}"
-    return {"resourceSpans": [{"resource": {"attributes": []}, "scopeSpans": [{"spans": [span]}]}]}
+    resource = [{"key": "mip.app_id", "value": {"stringValue": app}}] if app else []
+    return {
+        "resourceSpans": [{"resource": {"attributes": resource}, "scopeSpans": [{"spans": [span]}]}]
+    }
 
 
 def _token(client: TestClient, admin: str) -> str:
@@ -179,6 +183,42 @@ def test_anomalies_empty_on_sparse_data(db: DBHandle) -> None:
     # so with no history the query returns empty — and, crucially, never raises.
     with psycopg.connect(db.url) as conn:
         assert ai_summary.anomalies(conn) == {}
+
+
+def test_app_filter_and_read_token_auth(
+    db: DBHandle, test_verifier: TokenVerifier, make_token: Callable[..., str]
+) -> None:
+    tid = _tenant(db)
+    client = _client(db.url, test_verifier)
+    admin = make_token(tenant_id=tid, role="admin")
+    raw = _token(client, admin)
+    auth = {"Authorization": f"Bearer {admin}"}
+    # Two apps' calls under the same tenant.
+    gw = {"X-Gateway-Token": raw}
+    client.post("/v1/ai-traces", headers=gw, json=_otlp(span_id="a1", app="uti"))
+    client.post("/v1/ai-traces", headers=gw, json=_otlp(span_id="b1", app="other"))
+
+    # Mint a server-to-server read token (shown once).
+    minted = client.post("/v1/read-tokens", headers=auth, json={"name": "mip-rum"})
+    read_tok = minted.json()["token"]
+    assert read_tok.startswith("xsr_")
+    s2s = {"Authorization": f"Bearer {read_tok}"}
+
+    # The read token authorizes /ai/summary and ?app= scopes to one app.
+    uti = client.get("/v1/ai/summary?app=uti", headers=s2s).json()
+    assert uti["ai_calls"] == 1
+    both = client.get("/v1/ai/summary", headers=s2s).json()
+    assert both["ai_calls"] == 2  # no app filter → the whole tenant
+
+    # A read token cannot ingest (it's read-only): not in gateway_tokens → 401.
+    ingest = client.post(
+        "/v1/ai-traces", headers={"X-Gateway-Token": read_tok}, json=_otlp(span_id="z")
+    )
+    assert ingest.status_code == 401
+    # Revoking the read token makes it stop working.
+    tid_row = client.get("/v1/read-tokens", headers=auth).json()[0]["id"]
+    assert client.delete(f"/v1/read-tokens/{tid_row}", headers=auth).status_code == 204
+    assert client.get("/v1/ai/summary", headers=s2s).status_code == 401
 
 
 def test_retention_and_session_erasure(

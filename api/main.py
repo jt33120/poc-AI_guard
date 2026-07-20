@@ -32,6 +32,7 @@ from api.gateway_tokens import router as gateway_tokens_router
 from api.llm_proxy import router as llm_proxy_router
 from api.policy import router as policy_router
 from api.ratelimit import limiter
+from api.read_tokens import router as read_tokens_router
 from api.security import build_verifier, get_current_user
 from api.servers import router as servers_router
 from api.signup import router as signup_router
@@ -122,6 +123,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(clients_router)
     app.include_router(dlp_router)
     app.include_router(ai_router)
+    app.include_router(read_tokens_router)
     app.include_router(signup_router)
 
     return app

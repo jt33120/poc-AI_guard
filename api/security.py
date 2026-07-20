@@ -18,7 +18,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import jwt
 from jose.exceptions import JWTError
 
-from core import db, tenant_tokens
+from core import db, read_tokens, tenant_tokens
 from core.config import Settings
 from core.schemas import CurrentUser, Role
 
@@ -126,6 +126,41 @@ def get_current_user(
     verifier: TokenVerifier = request.app.state.verifier
     try:
         claims = verifier.verify(credentials.credentials)
+    except (JWTError, httpx.HTTPError, KeyError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
+        ) from None
+    return _user_from_claims(claims)
+
+
+def get_ai_reader(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+) -> CurrentUser:
+    """Resolve the caller for the /ai read API: a console JWT OR a read token.
+
+    Server-to-server callers (the mip-rum facade) present an ``xsr_`` read token;
+    console users present a Supabase JWT. Both resolve to a tenant; fail-closed.
+    """
+    if credentials is None or not credentials.credentials:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token")
+    raw = credentials.credentials
+    if raw.startswith(read_tokens.TOKEN_PREFIX):
+        url: str | None = request.app.state.database_url
+        if not url:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database not configured"
+            )
+        with db.connection(url) as conn:
+            tenant_id = read_tokens.resolve_tenant(conn, raw)
+        if tenant_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid read token"
+            )
+        return CurrentUser(user_id="read_token", tenant_id=tenant_id, role=Role.viewer)
+    verifier: TokenVerifier = request.app.state.verifier
+    try:
+        claims = verifier.verify(raw)
     except (JWTError, httpx.HTTPError, KeyError, ValueError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
