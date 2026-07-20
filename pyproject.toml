@@ -66,6 +66,7 @@ select = [
 "core/audit.py" = ["S608"]
 "core/tenant_tokens.py" = ["S608"]
 "core/usage.py" = ["S608"]
+"core/ai_summary.py" = ["S608"]
 "core/agents.py" = ["S608"]
 "core/credentials.py" = ["S608"]
 "core/billing.py" = ["S608"]

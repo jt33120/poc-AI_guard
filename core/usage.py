@@ -13,6 +13,8 @@ from typing import Any
 
 import psycopg
 
+from core.otlp_genai import AiCall
+
 
 def record_usage(
     conn: psycopg.Connection,
@@ -44,6 +46,72 @@ def record_usage(
             request_id,
         ),
     )
+
+
+def record_ai_calls(
+    conn: psycopg.Connection,
+    *,
+    tenant_id: str,
+    gateway_token_id: str | None,
+    calls: list[AiCall],
+) -> int:
+    """Insert OTLP-sourced LLM calls, idempotent on span_id. Returns rows inserted."""
+    inserted = 0
+    for c in calls:
+        row = conn.execute(
+            "insert into usage_events "
+            "(tenant_id, gateway_token_id, source, span_id, trace_id, session_id, provider, "
+            " model, operation, route, prompt_tokens, completion_tokens, total_tokens, cost_usd, "
+            " latency_ms, ttft_ms, status, error_type, user_hash, request_id, ts) "
+            "values (%s, %s, 'otlp', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
+            " %s, %s, %s) "
+            "on conflict (span_id) where span_id is not null do nothing returning id",
+            (
+                tenant_id,
+                gateway_token_id,
+                c.span_id,
+                c.trace_id,
+                c.session_id,
+                c.provider,
+                c.model,
+                c.operation,
+                c.route,
+                c.prompt_tokens,
+                c.completion_tokens,
+                c.total_tokens,
+                c.cost_usd,
+                c.latency_ms,
+                c.ttft_ms,
+                c.status,
+                c.error_type,
+                c.user_hash,
+                c.trace_id,
+                c.ts,
+            ),
+        ).fetchone()
+        if row is not None:
+            inserted += 1
+    return inserted
+
+
+def purge_older_than(conn: psycopg.Connection, *, days: int) -> int:
+    """Retention: delete usage rows older than ``days``. Returns rows removed."""
+    row = conn.execute(
+        "with d as (delete from usage_events where ts < now() - make_interval(days => %s) "
+        "returning 1) select count(*) from d",
+        (days,),
+    ).fetchone()
+    return int(row[0]) if row else 0
+
+
+def erase_session(conn: psycopg.Connection, *, session_id: str) -> int:
+    """RGPD erasure: delete every usage row for a session id. Returns rows removed."""
+    row = conn.execute(
+        "with d as (delete from usage_events where session_id = %s returning 1) "
+        "select count(*) from d",
+        (session_id,),
+    ).fetchone()
+    return int(row[0]) if row else 0
 
 
 def _filters(
