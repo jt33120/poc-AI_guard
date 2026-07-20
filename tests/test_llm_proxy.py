@@ -269,7 +269,7 @@ def test_proxy_records_usage_and_attributes_the_agent(
     with psycopg.connect(db.url) as check:
         urow = check.execute(
             "select provider, model, prompt_tokens, completion_tokens, total_tokens, "
-            "cost_usd, gateway_token_id from usage_events where tenant_id = %s",
+            "cost_usd, gateway_token_id, latency_ms, source from usage_events where tenant_id = %s",
             (tid,),
         ).fetchone()
         arow = check.execute(
@@ -282,6 +282,8 @@ def test_proxy_records_usage_and_attributes_the_agent(
     assert (urow[2], urow[3], urow[4]) == (1000, 500, 1500)
     assert float(urow[5]) > 0  # gpt-4o is priced
     assert str(urow[6]) == token_id  # usage attributed to the agent
+    assert urow[7] is not None and float(urow[7]) >= 0  # proxy latency measured (Phase 2)
+    assert urow[8] == "proxy"  # inline-proxy provenance
     assert str(arow[0]) == token_id  # so is the audited tool-call
 
 

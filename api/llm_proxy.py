@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import Any
 
 import httpx
@@ -211,6 +212,7 @@ def _inspect(
     style: str,
     data: dict[str, Any],
     enforce: bool,
+    latency_ms: float | None = None,
 ) -> None:
     with db.connection(url) as conn:
         policy = policy_store.load_policy(conn, tenant_id)
@@ -248,6 +250,7 @@ def _inspect(
                 completion_tokens=completion_tokens,
                 cost_usd=pricing.cost_usd(provider, model, prompt_tokens, completion_tokens),
                 request_id=request_id,
+                latency_ms=latency_ms,
             )
         if billed is not None:
             # Authoritative cost the provider itself reported (exact, not estimated).
@@ -367,7 +370,9 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
             background=BackgroundTask(upstream_resp.aclose),
         )
 
+    started = time.monotonic()
     upstream_resp = await client.post(upstream, content=body, headers=fwd_headers)
+    latency_ms = (time.monotonic() - started) * 1000
     if upstream_resp.status_code == 200:
         try:
             data = upstream_resp.json()
@@ -383,6 +388,7 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
                 style,
                 data,
                 enforce,
+                latency_ms,
             )
             if enforce:
                 return Response(content=json.dumps(data).encode(), media_type="application/json")
