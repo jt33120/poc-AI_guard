@@ -27,13 +27,14 @@ def record_usage(
     completion_tokens: int,
     cost_usd: float,
     request_id: str | None = None,
+    latency_ms: float | None = None,
 ) -> None:
     """Append a usage row (caller commits)."""
     conn.execute(
         "insert into usage_events "
         "(tenant_id, gateway_token_id, provider, model, prompt_tokens, completion_tokens, "
-        " total_tokens, cost_usd, request_id) "
-        "values (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+        " total_tokens, cost_usd, request_id, latency_ms) "
+        "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
         (
             tenant_id,
             gateway_token_id,
@@ -44,6 +45,7 @@ def record_usage(
             prompt_tokens + completion_tokens,
             cost_usd,
             request_id,
+            latency_ms,
         ),
     )
 

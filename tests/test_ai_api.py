@@ -143,6 +143,44 @@ def test_summary_defaults_window_and_empty_is_zero(
     assert body["window"] == "30d" and body["ai_calls"] == 0 and body["ai_by_model"] == []
 
 
+def test_ai_detail_and_costs_endpoints(
+    db: DBHandle, test_verifier: TokenVerifier, make_token: Callable[..., str]
+) -> None:
+    tid = _tenant(db)
+    client = _client(db.url, test_verifier)
+    admin = make_token(tenant_id=tid, role="admin")
+    raw = _token(client, admin)
+    client.post("/v1/ai-traces", headers={"X-Gateway-Token": raw}, json=_otlp(span_id="d1"))
+    client.post(
+        "/v1/ai-traces",
+        headers={"X-Gateway-Token": raw},
+        json=_otlp(span_id="d2", route="/v1/embeddings", operation="embeddings"),
+    )
+    auth = {"Authorization": f"Bearer {admin}"}
+
+    detail = client.get("/v1/ai?window=7d&recent=10", headers=auth).json()
+    assert detail["overview"]["calls"] == 2
+    assert {b["route"] for b in detail["by_route"]} == {"/v1/chat", "/v1/embeddings"}
+    assert len(detail["recent"]) == 2
+    assert detail["recent"][0]["status"] == "ok"
+
+    costs = client.get("/v1/ai/costs?group_by=route", headers=auth).json()
+    assert costs["group_by"] == "route"
+    assert {r["key"] for r in costs["rows"]} == {"/v1/chat", "/v1/embeddings"}
+    # An unknown group_by falls back to model (allowlist), never injects.
+    bad = client.get("/v1/ai/costs?group_by=DROP", headers=auth).json()
+    assert bad["group_by"] == "model"
+
+
+def test_anomalies_empty_on_sparse_data(db: DBHandle) -> None:
+    from core import ai_summary
+
+    # The z-score baseline needs >=3 prior *complete* days; today's rows are excluded,
+    # so with no history the query returns empty — and, crucially, never raises.
+    with psycopg.connect(db.url) as conn:
+        assert ai_summary.anomalies(conn) == {}
+
+
 def test_retention_and_session_erasure(
     db: DBHandle, test_verifier: TokenVerifier, make_token: Callable[..., str]
 ) -> None:

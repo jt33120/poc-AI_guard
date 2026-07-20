@@ -20,7 +20,7 @@ from api.ratelimit import limiter, llm_proxy_rate_limit
 from api.security import GatewayPrincipal, get_current_user, get_gateway_principal
 from core import ai_summary, db, otlp_genai
 from core import usage as usage_store
-from core.schemas import AiIngestResult, AiSummary, CurrentUser, Role
+from core.schemas import AiCosts, AiDetail, AiIngestResult, AiSummary, CurrentUser, Role
 
 router = APIRouter(prefix="/v1", tags=["ai-observability"])
 
@@ -68,3 +68,41 @@ def get_ai_summary(
         url, user_id=user.user_id, tenant_id=tenant_id, role=(user.role or Role.viewer)
     ) as conn:
         return ai_summary.summary(conn, window=window, agent_id=agent_id, client_id=client_id)
+
+
+@router.get("/ai", response_model=AiDetail)
+def get_ai_detail(
+    request: Request,
+    user: CurrentUser = Depends(get_current_user),
+    window: str | None = Query(default=None),
+    agent_id: str | None = Query(default=None),
+    client_id: str | None = Query(default=None),
+    recent: int = Query(default=50, ge=1, le=200),
+) -> dict[str, Any]:
+    tenant_id = require_tenant(user)
+    url = database_url(request)
+    with db.tenant_reader(
+        url, user_id=user.user_id, tenant_id=tenant_id, role=(user.role or Role.viewer)
+    ) as conn:
+        return ai_summary.overview(
+            conn, window=window, agent_id=agent_id, client_id=client_id, recent_limit=recent
+        )
+
+
+@router.get("/ai/costs", response_model=AiCosts)
+def get_ai_costs(
+    request: Request,
+    user: CurrentUser = Depends(get_current_user),
+    window: str | None = Query(default=None),
+    group_by: str = Query(default="model"),
+    agent_id: str | None = Query(default=None),
+    client_id: str | None = Query(default=None),
+) -> dict[str, Any]:
+    tenant_id = require_tenant(user)
+    url = database_url(request)
+    with db.tenant_reader(
+        url, user_id=user.user_id, tenant_id=tenant_id, role=(user.role or Role.viewer)
+    ) as conn:
+        return ai_summary.costs(
+            conn, window=window, group_by=group_by, agent_id=agent_id, client_id=client_id
+        )

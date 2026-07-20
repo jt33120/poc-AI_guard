@@ -399,6 +399,60 @@ class AiIngestResult(BaseModel):
     rejected: int
 
 
+class AiOverviewKpis(BaseModel):
+    calls: int
+    tokens: int
+    cost_usd: float
+    p75_latency_ms: float | None
+    error_rate: float | None
+
+
+class AiRouteBucket(BaseModel):
+    route: str | None
+    calls: int
+    cost_usd: float
+    tokens: int
+    p75_latency_ms: float | None
+    error_rate: float | None
+
+
+class AiCallRow(BaseModel):
+    ts: str | None
+    provider: str | None
+    model: str | None
+    operation: str | None
+    route: str | None
+    total_tokens: int | None
+    cost_usd: float | None
+    latency_ms: float | None
+    status: str
+
+
+class AiDetail(BaseModel):
+    """The /ai detail view: KPIs + groupings + recent calls."""
+
+    window: str
+    overview: AiOverviewKpis
+    by_model: list[AiModelBucket]
+    by_route: list[AiRouteBucket]
+    daily: list[AiSeriesPoint]
+    recent: list[AiCallRow]
+
+
+class AiCostRow(BaseModel):
+    key: str
+    calls: int
+    cost_usd: float
+    tokens: int
+
+
+class AiCosts(BaseModel):
+    """Spend grouped by user | model | route."""
+
+    group_by: str
+    rows: list[AiCostRow]
+
+
 CredentialProvider = Literal["openai", "anthropic", "mistral", "openrouter", "azure", "aws", "gcp"]
 
 
