@@ -24,6 +24,7 @@ or keys (§4.10). Streaming is passed through transparently (not inspected).
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 import httpx
@@ -35,10 +36,12 @@ from starlette.concurrency import run_in_threadpool
 from api.deps import database_url
 from api.ratelimit import limiter, llm_proxy_rate_limit
 from api.security import GatewayPrincipal, get_gateway_principal, resolve_gateway_principal
-from core import approvals, audit, billing, db, policy_store, pricing
+from core import approvals, audit, billing, db, dlp, policy_store, pricing
 from core import usage as usage_store
 from core.config import Settings
 from core.policy import Approval, Policy, evaluate
+
+logger = logging.getLogger("xsom.llm_proxy")
 
 router = APIRouter(prefix="/proxy", tags=["llm-proxy"])
 
@@ -261,6 +264,31 @@ def _inspect(
         conn.commit()
 
 
+def _audit_egress(
+    url: str,
+    tenant_id: str,
+    gateway_token_id: str | None,
+    provider: str,
+    scan: dlp.ScanResult,
+) -> None:
+    """Record an egress DLP event (best-effort). Only kinds + a hash — no value."""
+    try:
+        with db.connection(url) as conn:
+            audit.log_event(
+                conn,
+                tenant_id=tenant_id,
+                decision=scan.decision,
+                tool_name=f"{provider}.egress",
+                action_class="external_send",
+                args_hash=scan.digest(),
+                error="dlp:" + ",".join(scan.kinds),
+                gateway_token_id=gateway_token_id,
+            )
+            conn.commit()
+    except Exception:  # audit is best-effort; a blocked call stays blocked regardless
+        logger.warning("dlp_audit_failed", extra={"provider": provider})
+
+
 def _base_url(settings: Settings, provider: str) -> str:
     return {
         "openai": settings.openai_base_url,
@@ -274,6 +302,24 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
     settings: Settings = request.app.state.settings
     url = database_url(request)
     body = await request.body()
+
+    # Egress data-loss guard: scan the outbound prompt for secrets/PII BEFORE it
+    # leaves for the provider. Blocks fixed-form secrets, flags/redacts PII per
+    # policy. Off by default (zero overhead). Value never logged — kind + hash.
+    if settings.dlp_enabled:
+        scan = await run_in_threadpool(dlp.scan_request, body, dlp.policy_from_settings(settings))
+        if scan.findings:
+            await run_in_threadpool(
+                _audit_egress, url, principal.tenant_id, principal.token_id, provider, scan
+            )
+        if scan.blocked:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Egress blocked by DLP: sensitive data ({', '.join(scan.kinds)})",
+            )
+        if scan.redacted_body is not None:
+            body = scan.redacted_body
+
     enforce = request.headers.get("x-xsom-mode", "").lower() == "enforce"
     style = "anthropic" if provider == "anthropic" else "openai"
     base = _base_url(settings, provider).rstrip("/")
