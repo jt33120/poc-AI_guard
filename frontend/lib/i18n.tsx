@@ -721,6 +721,28 @@ export const STR = {
     en: "Paste this to an agent that can edit its own config (openclaw, Claude Code…) to route itself through xSOM.",
     fr: "Colle ça à un agent capable d'éditer sa config (openclaw, Claude Code…) pour qu'il passe par xSOM.",
   },
+
+  // Egress data-loss guard (DLP)
+  "dlp.title": { en: "Data-loss guard (egress)", fr: "Garde-fou de fuite (egress)" },
+  "dlp.subtitle": {
+    en: "Scan outbound prompts before they reach the model: block secrets, flag or mask personal data. Metadata only — the value is never stored.",
+    fr: "Scanne les prompts sortants avant qu'ils n'atteignent le modèle : bloque les secrets, signale ou masque les données personnelles. Métadonnées seules — la valeur n'est jamais stockée.",
+  },
+  "dlp.enabled": { en: "Enabled", fr: "Activé" },
+  "dlp.platform.off": {
+    en: "DLP is off platform-wide — your settings are saved but stay dormant until an operator enables the feature.",
+    fr: "Le DLP est désactivé au niveau plateforme — vos réglages sont sauvegardés mais restent dormants jusqu'à activation par un opérateur.",
+  },
+  "dlp.cat.secret": { en: "Secrets (API keys, tokens)", fr: "Secrets (clés API, tokens)" },
+  "dlp.cat.pii": { en: "Personal data (email, card, IBAN…)", fr: "Données personnelles (email, carte, IBAN…)" },
+  "dlp.cat.entropy": { en: "Unknown high-entropy blobs", fr: "Blobs à haute entropie inconnus" },
+  "dlp.act.block": { en: "Block", fr: "Bloquer" },
+  "dlp.act.redact": { en: "Mask", fr: "Masquer" },
+  "dlp.act.flag": { en: "Flag", fr: "Signaler" },
+  "dlp.act.off": { en: "Off", fr: "Désactivé" },
+  "dlp.save": { en: "Save DLP settings", fr: "Enregistrer le DLP" },
+  "dlp.saved": { en: "Saved.", fr: "Enregistré." },
+  "dlp.egress": { en: "DLP", fr: "DLP" },
 } satisfies Record<string, Entry>;
 
 export type StrKey = keyof typeof STR;

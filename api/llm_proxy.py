@@ -36,7 +36,7 @@ from starlette.concurrency import run_in_threadpool
 from api.deps import database_url
 from api.ratelimit import limiter, llm_proxy_rate_limit
 from api.security import GatewayPrincipal, get_gateway_principal, resolve_gateway_principal
-from core import approvals, audit, billing, db, dlp, policy_store, pricing
+from core import approvals, audit, billing, db, dlp, dlp_config, policy_store, pricing
 from core import usage as usage_store
 from core.config import Settings
 from core.policy import Approval, Policy, evaluate
@@ -264,6 +264,12 @@ def _inspect(
         conn.commit()
 
 
+def _load_dlp_state(url: str, tenant_id: str, settings: Settings) -> dlp_config.DlpState:
+    """Load the tenant's effective DLP config (its row, else env defaults)."""
+    with db.connection(url) as conn:
+        return dlp_config.load(conn, tenant_id, settings)
+
+
 def _audit_egress(
     url: str,
     tenant_id: str,
@@ -304,21 +310,24 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
     body = await request.body()
 
     # Egress data-loss guard: scan the outbound prompt for secrets/PII BEFORE it
-    # leaves for the provider. Blocks fixed-form secrets, flags/redacts PII per
-    # policy. Off by default (zero overhead). Value never logged — kind + hash.
+    # leaves for the provider. Blocks fixed-form secrets, flags/redacts PII per the
+    # tenant's config. Platform-gated by DLP_ENABLED (zero overhead when off); when
+    # on, the tenant's console config decides verdicts. Value never logged.
     if settings.dlp_enabled:
-        scan = await run_in_threadpool(dlp.scan_request, body, dlp.policy_from_settings(settings))
-        if scan.findings:
-            await run_in_threadpool(
-                _audit_egress, url, principal.tenant_id, principal.token_id, provider, scan
-            )
-        if scan.blocked:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Egress blocked by DLP: sensitive data ({', '.join(scan.kinds)})",
-            )
-        if scan.redacted_body is not None:
-            body = scan.redacted_body
+        state = await run_in_threadpool(_load_dlp_state, url, principal.tenant_id, settings)
+        if state.enabled:
+            scan = await run_in_threadpool(dlp.scan_request, body, state.policy)
+            if scan.findings:
+                await run_in_threadpool(
+                    _audit_egress, url, principal.tenant_id, principal.token_id, provider, scan
+                )
+            if scan.blocked:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Egress blocked by DLP: sensitive data ({', '.join(scan.kinds)})",
+                )
+            if scan.redacted_body is not None:
+                body = scan.redacted_body
 
     enforce = request.headers.get("x-xsom-mode", "").lower() == "enforce"
     style = "anthropic" if provider == "anthropic" else "openai"

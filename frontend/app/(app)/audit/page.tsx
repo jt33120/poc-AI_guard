@@ -17,7 +17,14 @@ interface AuditEntry {
   decision: string | null;
   args_hash: string | null;
   gateway_token_id: string | null;
+  error: string | null;
 }
+
+// Egress DLP events are audited as "<provider>.egress" with the detected kinds
+// carried in `error` as "dlp:aws_access_key_id,email" — never the value.
+const isEgress = (e: AuditEntry) => !!e.tool_name?.endsWith(".egress");
+const dlpKinds = (e: AuditEntry): string =>
+  e.error?.startsWith("dlp:") ? e.error.slice(4).split(",").join(", ") : "";
 
 const CLASS_KEY: Record<string, StrKey> = {
   read: "class.read",
@@ -81,7 +88,16 @@ export default function AuditPage() {
               return (
                 <tr key={entry.id}>
                   <td className="text-white/45">{entry.id}</td>
-                  <td className="font-mono">{entry.tool_name ?? "—"}</td>
+                  <td className="font-mono">
+                    {isEgress(entry) ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="badge badge-amber">{t("dlp.egress")}</span>
+                        <span>{entry.tool_name}</span>
+                      </span>
+                    ) : (
+                      (entry.tool_name ?? "—")
+                    )}
+                  </td>
                   <td className="text-white/60">{agentName(entry.gateway_token_id)}</td>
                   <td>
                     {ck ? (
@@ -96,7 +112,13 @@ export default function AuditPage() {
                     <DecisionBadge value={entry.decision} />
                   </td>
                   <td className="font-mono text-xs text-white/35">
-                    {entry.args_hash ? entry.args_hash.slice(0, 12) : "—"}
+                    {isEgress(entry) && dlpKinds(entry) ? (
+                      <span className="text-amber-200/80">{dlpKinds(entry)}</span>
+                    ) : entry.args_hash ? (
+                      entry.args_hash.slice(0, 12)
+                    ) : (
+                      "—"
+                    )}
                   </td>
                 </tr>
               );
