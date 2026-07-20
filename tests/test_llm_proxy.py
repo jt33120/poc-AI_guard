@@ -458,3 +458,141 @@ def test_enforce_mode_strips_non_allowed_tool_calls(
     # The irreversible delete (hold) is stripped; the read (allow) remains.
     kept = [c["function"]["name"] for c in resp.json()["choices"][0]["message"]["tool_calls"]]
     assert kept == ["crm.get_contact"]
+
+
+# --- Egress DLP guard --------------------------------------------------------
+
+AWS_KEY = "AKIAIOSFODNN7EXAMPLE"  # fake, well-formed
+
+
+def _client_dlp(db_url: str, verifier: TokenVerifier, **dlp_kw: str) -> TestClient:
+    app = create_app(
+        Settings(_env_file=None, env="dev", database_url=db_url, dlp_enabled=True, **dlp_kw)
+    )
+    app.state.verifier = verifier
+    return TestClient(app)
+
+
+def _mint(client: TestClient, admin: str) -> str:
+    auth = {"Authorization": f"Bearer {admin}"}
+    client.put("/v1/policy", headers=auth, json={"yaml": AUTO_POLICY})
+    return client.post("/v1/gateway-tokens", headers=auth, json={"name": "bot"}).json()["token"]
+
+
+def test_dlp_blocks_secret_before_forwarding(
+    db: DBHandle,
+    test_verifier: TokenVerifier,
+    make_token: Callable[..., str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tid = _tenant(db)
+    client = _client_dlp(db.url, test_verifier)  # secrets block by default
+    raw = _mint(client, make_token(tenant_id=tid, role="admin"))
+
+    fake = _FakeClient(_FakeResp(UPSTREAM_BODY))
+    monkeypatch.setattr(llm_proxy, "_http", lambda: fake)
+    resp = client.post(
+        "/proxy/openai/v1/chat/completions",
+        headers={"X-Gateway-Token": raw, "Authorization": "Bearer sk-agent"},
+        json={
+            "model": "gpt-4o",
+            "messages": [{"role": "user", "content": f"deploy with {AWS_KEY}"}],
+        },
+    )
+    assert resp.status_code == 403
+    assert "DLP" in resp.json()["detail"]
+    assert fake.captured == {}  # the secret never left for the provider
+
+    import psycopg
+
+    with psycopg.connect(db.url) as check:
+        row = check.execute(
+            "select decision, action_class, error from audit_log "
+            "where tenant_id = %s and tool_name = 'openai.egress'",
+            (tid,),
+        ).fetchone()
+    assert row is not None
+    assert row[0] == "deny" and row[1] == "external_send"
+    assert "aws_access_key_id" in row[2] and AWS_KEY not in row[2]
+
+
+def test_dlp_flags_pii_but_forwards_unchanged(
+    db: DBHandle,
+    test_verifier: TokenVerifier,
+    make_token: Callable[..., str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tid = _tenant(db)
+    client = _client_dlp(db.url, test_verifier)  # pii flags by default
+    raw = _mint(client, make_token(tenant_id=tid, role="admin"))
+
+    fake = _FakeClient(_FakeResp(UPSTREAM_BODY))
+    monkeypatch.setattr(llm_proxy, "_http", lambda: fake)
+    resp = client.post(
+        "/proxy/openai/v1/chat/completions",
+        headers={"X-Gateway-Token": raw, "Authorization": "Bearer sk-agent"},
+        json={
+            "model": "gpt-4o",
+            "messages": [{"role": "user", "content": "mail alice@example.com"}],
+        },
+    )
+    assert resp.status_code == 200
+    assert b"alice@example.com" in fake.captured["content"]  # forwarded as-is
+
+    import psycopg
+
+    with psycopg.connect(db.url) as check:
+        decision = check.execute(
+            "select decision from audit_log where tenant_id = %s and tool_name = 'openai.egress'",
+            (tid,),
+        ).fetchone()
+    assert decision is not None and decision[0] == "flag"
+
+
+def test_dlp_redacts_pii_when_configured(
+    db: DBHandle,
+    test_verifier: TokenVerifier,
+    make_token: Callable[..., str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tid = _tenant(db)
+    client = _client_dlp(db.url, test_verifier, dlp_pii_action="redact")
+    raw = _mint(client, make_token(tenant_id=tid, role="admin"))
+
+    fake = _FakeClient(_FakeResp(UPSTREAM_BODY))
+    monkeypatch.setattr(llm_proxy, "_http", lambda: fake)
+    resp = client.post(
+        "/proxy/openai/v1/chat/completions",
+        headers={"X-Gateway-Token": raw, "Authorization": "Bearer sk-agent"},
+        json={
+            "model": "gpt-4o",
+            "messages": [{"role": "user", "content": "mail alice@example.com"}],
+        },
+    )
+    assert resp.status_code == 200
+    sent = fake.captured["content"].decode()
+    assert "alice@example.com" not in sent and "[REDACTED:email]" in sent
+
+
+def test_dlp_disabled_lets_secret_through(
+    db: DBHandle,
+    test_verifier: TokenVerifier,
+    make_token: Callable[..., str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tid = _tenant(db)
+    client = _client(db.url, test_verifier)  # DLP off (default): backward compatible
+    raw = _mint(client, make_token(tenant_id=tid, role="admin"))
+
+    fake = _FakeClient(_FakeResp(UPSTREAM_BODY))
+    monkeypatch.setattr(llm_proxy, "_http", lambda: fake)
+    resp = client.post(
+        "/proxy/openai/v1/chat/completions",
+        headers={"X-Gateway-Token": raw, "Authorization": "Bearer sk-agent"},
+        json={
+            "model": "gpt-4o",
+            "messages": [{"role": "user", "content": f"deploy with {AWS_KEY}"}],
+        },
+    )
+    assert resp.status_code == 200
+    assert fake.captured != {}  # forwarded untouched

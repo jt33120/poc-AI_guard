@@ -69,6 +69,16 @@ class Settings(BaseSettings):
     # slowapi limit for the natural-language policy assistant (LLM-backed).
     policy_draft_rate_limit: str = Field(default="20/minute", max_length=40)
 
+    # --- Egress data-loss guard (DLP) — block secrets / flag PII in prompts --
+    # Scans the LLM proxy's outbound request body. OFF by default (backward
+    # compatible; zero overhead when disabled). When on: fixed-form secrets are
+    # blocked, structured PII is flagged (observe, don't break the agent), and
+    # the high-entropy scan is opt-in. Never logs the value — kind + hash only.
+    dlp_enabled: bool = False
+    dlp_secret_action: Literal["block", "redact", "flag", "off"] = "block"  # noqa: S105
+    dlp_pii_action: Literal["block", "redact", "flag", "off"] = "flag"
+    dlp_entropy_action: Literal["flag", "off"] = "off"
+
     # --- Secrets (provider credentials) — envelope encryption -------------
     # KMS backend that wraps per-tenant data keys: "aws" (prod) or "local"
     # (dev/test only). Storing/decrypting a credential fails closed if this is
