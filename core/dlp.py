@@ -3,12 +3,16 @@
 This is the outbound (egress) complement to the action guard. On the LLM proxy's
 *request* path we scan the outgoing prompt for:
 
-  * **L0 — fixed-form secrets** (AWS keys, PEM private keys, GitHub/Stripe/OpenAI/
-    Anthropic tokens, JWTs, …). These have a fixed shape, sometimes a checksum, so
-    they are matched with high confidence and **blocked** by default.
+  * **L0 — fixed-form secrets** (AWS, PEM private keys, GitHub/Stripe/OpenAI/
+    Anthropic/OpenRouter/Google/Slack/HuggingFace/Databricks/Shopify/Postman/
+    Telegram/Azure/… tokens, JWTs, xSOM gateway tokens). Fixed shape, sometimes a
+    checksum → matched with high confidence and **blocked** by default. A final
+    keyword-anchored heuristic catches unknown-format keys (``token: <20+ mixed>``)
+    without tripping on plain prose.
   * **L2 — structured PII** (email, credit card [Luhn], IBAN [mod-97], French NIR
-    [INSEE key]). Arithmetic validators cut false positives; **flagged** by default
-    (observe, don't break the agent) — redaction is opt-in.
+    [INSEE key], US SSN). Arithmetic validators / format constraints cut false
+    positives; **flagged** by default (observe, don't break the agent) — redaction
+    is opt-in.
   * **L1 — high-entropy blobs** (possible unknown-format secrets). Noisy, so it is
     **off** by default and can only *flag*, never block.
 
@@ -175,6 +179,20 @@ _RULES: tuple[_Rule, ...] = (
     _rule("twilio_account_sid", Category.secret, r"\bAC[0-9a-fA-F]{32}\b"),
     _rule("npm_token", Category.secret, r"\bnpm_[A-Za-z0-9]{36}\b"),
     _rule("mailgun_key", Category.secret, r"\bkey-[0-9a-f]{32}\b"),
+    _rule("huggingface_token", Category.secret, r"\bhf_[A-Za-z0-9]{34}\b"),
+    _rule("databricks_pat", Category.secret, r"\bdapi[0-9a-f]{32}\b"),
+    _rule("digitalocean_token", Category.secret, r"\bdop_v1_[0-9a-f]{64}\b"),
+    _rule("shopify_token", Category.secret, r"\bshp(?:at|ss|ca|pa)_[0-9a-fA-F]{32}\b"),
+    _rule("postman_key", Category.secret, r"\bPMAK-[0-9a-fA-F]{24}-[0-9a-fA-F]{34}\b"),
+    _rule("linear_key", Category.secret, r"\blin_api_[0-9A-Za-z]{40}\b"),
+    _rule(
+        "doppler_token", Category.secret, r"\bdp\.(?:pt|st|ct|sa|scim|audit)\.[A-Za-z0-9]{40,44}\b"
+    ),
+    _rule("telegram_bot_token", Category.secret, r"\b\d{8,10}:[A-Za-z0-9_-]{35}\b"),
+    _rule("azure_storage_key", Category.secret, r"AccountKey=[A-Za-z0-9+/]{86,88}={0,2}"),
+    _rule("xsom_gateway_token", Category.secret, r"\bxsg_[A-Za-z0-9_\-]{20,}\b"),
+    # sk- family: most-specific prefix first so overlap dedup keeps the precise label.
+    _rule("openrouter_key", Category.secret, r"\bsk-or-v1-[A-Za-z0-9]{32,}\b"),
     _rule("anthropic_key", Category.secret, r"\bsk-ant-(?:api03-)?[A-Za-z0-9_\-]{20,}\b"),
     _rule("openai_key", Category.secret, r"\bsk-(?:proj-|svcacct-)?[A-Za-z0-9_\-]{20,}\b"),
     _rule(
@@ -183,9 +201,24 @@ _RULES: tuple[_Rule, ...] = (
         r"\beyJ[A-Za-z0-9_\-]{10,}\.eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\b",
     ),
     _rule("basic_auth_url", Category.secret, r"\b[a-z][a-z0-9+.\-]*://[^\s:/@]+:[^\s:/@]+@"),
+    # Keyword-anchored catch-all for unknown-format keys. Kept LAST so a specific
+    # rule (aws/stripe/…) always wins the overlap. To stay precise on the hot path
+    # the value must be >=20 chars AND mixed letters+digits (lookaheads), so plain
+    # prose after "token:" doesn't trip it. Whole match (incl. keyword) is redacted.
+    _rule(
+        "generic_secret_assignment",
+        Category.secret,
+        r"(?i)(?:api[_-]?key|secret|token|access[_-]?key|client[_-]?secret|password|passwd)"
+        r"[\"']?\s*[:=]\s*[\"']?(?=[\w-]*\d)(?=[\w-]*[A-Za-z])[\w-]{20,}",
+    ),
     # L2 structured PII (validated). Most-specific/checksummed first so overlap
     # dedup prefers the precise label over the generic Luhn card matcher.
     _rule("iban", Category.pii, r"\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]){11,30}\b", _iban_ok),
+    _rule(
+        "us_ssn",
+        Category.pii,
+        r"\b(?!000|666|9\d\d)[0-8]\d\d-(?!00)\d\d-(?!0000)\d{4}\b",
+    ),
     _rule(
         "fr_nir",
         Category.pii,
@@ -242,15 +275,16 @@ def _entropy_findings(text: str, covered: list[Finding]) -> list[Finding]:
 
 
 def _dedupe_overlaps(findings: list[Finding]) -> list[Finding]:
-    """Keep the earliest, then longest, then earliest-declared finding per span."""
-    order = sorted(
-        range(len(findings)),
-        key=lambda i: (findings[i].start, -(findings[i].end - findings[i].start), i),
-    )
+    """Drop overlapping findings, keeping the most-specific rule per span.
+
+    ``findings`` arrive in rule-catalogue order (specific rules first, the generic
+    catch-all and entropy last), so iterating in that order and skipping anything
+    that overlaps an already-kept span means a precise label (e.g. ``aws_access_key
+    _id``) always wins over ``generic_secret_assignment`` on the same text.
+    """
     kept: list[Finding] = []
     spans: list[tuple[int, int]] = []
-    for i in order:
-        f = findings[i]
+    for f in findings:
         if _overlaps(f.start, f.end, spans):
             continue
         kept.append(f)
