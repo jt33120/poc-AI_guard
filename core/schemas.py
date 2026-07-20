@@ -306,6 +306,30 @@ class UsageSummary(BaseModel):
     daily: list[UsageDaily]
 
 
+DlpAction = Literal["block", "redact", "flag", "off"]
+
+
+class DlpConfigOut(BaseModel):
+    """A tenant's egress-DLP config + the platform master-switch state (UI hint)."""
+
+    enabled: bool
+    secret_action: str
+    pii_action: str
+    entropy_action: str
+    platform_enabled: bool = False
+
+
+class DlpConfigUpdate(BaseModel):
+    """Set a tenant's egress-DLP verdicts (admin)."""
+
+    model_config = {"extra": "forbid"}
+
+    enabled: bool
+    secret_action: DlpAction = "block"  # noqa: S105 - action name, not a credential
+    pii_action: DlpAction = "flag"
+    entropy_action: Literal["flag", "off"] = "off"
+
+
 CredentialProvider = Literal["openai", "anthropic", "mistral", "openrouter", "azure", "aws", "gcp"]
 
 

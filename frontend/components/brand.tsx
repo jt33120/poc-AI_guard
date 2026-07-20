@@ -42,6 +42,7 @@ function badgeClass(value: string | null | undefined): string {
   if (v.includes("deny") || v.includes("denied") || v.includes("error")) return "badge-red";
   if (v.includes("allow") || v.includes("approved") || v.includes("auto")) return "badge-green";
   if (v.includes("pending") || v.includes("hitl") || v.includes("expired")) return "badge-amber";
+  if (v.includes("flag") || v.includes("redact")) return "badge-amber";
   return "badge-neutral";
 }
 

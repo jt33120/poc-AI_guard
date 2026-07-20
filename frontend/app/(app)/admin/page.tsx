@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { ApiKeys } from "@/components/ApiKeys";
 import { ClientsManager } from "@/components/ClientsManager";
+import { DlpSettings } from "@/components/DlpSettings";
 import { ProviderCredentials } from "@/components/ProviderCredentials";
 import { apiGet, apiSend } from "@/lib/client";
 import { useT } from "@/lib/i18n";
@@ -148,6 +149,7 @@ export default function AdminPage() {
 
       <ApiKeys />
       <ClientsManager />
+      <DlpSettings />
       <ProviderCredentials />
     </section>
   );

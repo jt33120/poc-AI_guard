@@ -50,6 +50,34 @@ def test_findings_never_carry_the_raw_value() -> None:
     assert finding.value_sha256 and AWS_KEY not in finding.value_sha256
 
 
+def test_detects_expanded_secret_catalogue() -> None:
+    assert "openrouter_key" in _rules("or sk-or-v1-" + "a" * 40)
+    assert "huggingface_token" in _rules("hf hf_" + "b" * 34)
+    assert "xsom_gateway_token" in _rules("tok xsg_" + "c" * 30)
+    assert "telegram_bot_token" in _rules("bot 123456789:" + "d" * 35)
+    assert "postman_key" in _rules("PMAK-" + "a" * 24 + "-" + "b" * 34)
+
+
+def test_openrouter_prefix_wins_over_generic_openai() -> None:
+    # sk-or-v1-... also matches the broad openai sk- rule; precise label must win.
+    assert _rules("k sk-or-v1-" + "a" * 40) == {"openrouter_key"}
+
+
+def test_generic_heuristic_precision_and_specificity() -> None:
+    assert "generic_secret_assignment" in _rules("token: aB12cd34ef56gh78ij90")
+    # prose / no assignment / no digits must NOT trip the catch-all (precision).
+    assert "generic_secret_assignment" not in _rules("please rotate the token now")
+    assert "generic_secret_assignment" not in _rules("secret: onlyletternodigitvalue")
+    # a specific rule still wins over the generic catch-all on the same span.
+    assert _rules("secret = AKIAIOSFODNN7EXAMPLE") == {"aws_access_key_id"}
+
+
+def test_us_ssn_format_and_invalid_ranges() -> None:
+    assert "us_ssn" in _rules("ssn 123-45-6789")
+    assert "us_ssn" not in _rules("area 000-45-6789")  # area 000 invalid
+    assert "us_ssn" not in _rules("serial 123-45-0000")  # serial 0000 invalid
+
+
 # --- L2 structured PII (validators) -------------------------------------------
 
 
