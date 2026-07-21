@@ -62,11 +62,11 @@ def record_ai_calls(
     for c in calls:
         row = conn.execute(
             "insert into usage_events "
-            "(tenant_id, gateway_token_id, source, span_id, trace_id, session_id, provider, "
-            " model, operation, route, prompt_tokens, completion_tokens, total_tokens, cost_usd, "
-            " latency_ms, ttft_ms, status, error_type, user_hash, request_id, ts) "
+            "(tenant_id, gateway_token_id, source, span_id, trace_id, session_id, app_id, "
+            " provider, model, operation, route, prompt_tokens, completion_tokens, total_tokens, "
+            " cost_usd, latency_ms, ttft_ms, status, error_type, user_hash, request_id, ts) "
             "values (%s, %s, 'otlp', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
-            " %s, %s, %s) "
+            " %s, %s, %s, %s) "
             "on conflict (span_id) where span_id is not null do nothing returning id",
             (
                 tenant_id,
@@ -74,6 +74,7 @@ def record_ai_calls(
                 c.span_id,
                 c.trace_id,
                 c.session_id,
+                c.app_id,
                 c.provider,
                 c.model,
                 c.operation,

@@ -27,19 +27,23 @@ def _round(value: Any) -> float | None:
     return round(float(value), 4) if value is not None else None
 
 
-def anomalies(conn: psycopg.Connection) -> dict[tuple[str | None, str | None], float]:
+def anomalies(
+    conn: psycopg.Connection, app: str | None = None
+) -> dict[tuple[str | None, str | None], float]:
     """Cost anomalies by operation x route: z-score of 24h cost vs the prior 8 days.
 
     Runs on the caller's (RLS-scoped) connection, so it only sees the tenant's rows
     — no cross-tenant leak, unlike a service-owned view. Returns {(op, route): z}
     for z > 3 only. Ported from mip-rum's v_ai_op_anomaly (ADR-0001, brief §3.3).
     """
+    app_clause = " and app_id = %s" if app else ""
+    params: tuple[Any, ...] = (app, app) if app else ()
     rows = conn.execute(
         "with daily as ("
         "  select coalesce(operation, '') op, coalesce(route, '') rt, "
         "         date_trunc('day', ts)::date d, sum(cost_usd) cost "
         "  from usage_events "
-        "  where ts >= current_date - interval '8 days' and ts < current_date "
+        "  where ts >= current_date - interval '8 days' and ts < current_date" + app_clause + " "
         "  group by 1, 2, 3), "
         "stats as ("
         "  select op, rt, avg(cost) mean, stddev_samp(cost) sd "
@@ -47,17 +51,24 @@ def anomalies(conn: psycopg.Connection) -> dict[tuple[str | None, str | None], f
         "recent as ("
         "  select coalesce(operation, '') op, coalesce(route, '') rt, "
         "         coalesce(sum(cost_usd), 0) cost "
-        "  from usage_events where ts >= now() - interval '24 hours' group by 1, 2) "
+        "  from usage_events where ts >= now() - interval '24 hours'" + app_clause + " "
+        "  group by 1, 2) "
         "select nullif(r.op, ''), nullif(r.rt, ''), "
         "       round(((r.cost - s.mean) / s.sd)::numeric, 1) "
-        "from recent r join stats s using (op, rt) where (r.cost - s.mean) / s.sd > 3"
+        "from recent r join stats s using (op, rt) where (r.cost - s.mean) / s.sd > 3",
+        params,
     ).fetchall()
     return {(r[0], r[1]): float(r[2]) for r in rows}
 
 
-def _where(window: str, agent_id: str | None, client_id: str | None) -> tuple[str, list[Any]]:
+def _where(
+    window: str, agent_id: str | None, client_id: str | None, app: str | None = None
+) -> tuple[str, list[Any]]:
     clauses = [f"ts >= now() - interval '{_WINDOWS[window]}'"]
     params: list[Any] = []
+    if app:
+        clauses.append("app_id = %s")
+        params.append(app)
     if agent_id:
         clauses.append("gateway_token_id = %s")
         params.append(agent_id)
@@ -73,10 +84,11 @@ def summary(
     window: str | None = None,
     agent_id: str | None = None,
     client_id: str | None = None,
+    app: str | None = None,
 ) -> dict[str, Any]:
     """Aggregate LLM calls for the tenant (RLS) into the AI-summary contract."""
     w = normalize_window(window)
-    where, params = _where(w, agent_id, client_id)
+    where, params = _where(w, agent_id, client_id, app)
     p = tuple(params)
 
     kpi = conn.execute(
@@ -113,7 +125,7 @@ def summary(
         ).fetchall()
     ]
 
-    anom = anomalies(conn)
+    anom = anomalies(conn, app)
     by_operation = [
         {
             "operation": r[0],
@@ -191,11 +203,12 @@ def overview(
     window: str | None = None,
     agent_id: str | None = None,
     client_id: str | None = None,
+    app: str | None = None,
     recent_limit: int = 50,
 ) -> dict[str, Any]:
     """Detail view: KPIs + by model/route + daily trend + the most recent calls."""
     w = normalize_window(window)
-    where, params = _where(w, agent_id, client_id)
+    where, params = _where(w, agent_id, client_id, app)
     p = tuple(params)
     kpi = conn.execute(
         "select count(*), coalesce(sum(total_tokens), 0), coalesce(sum(cost_usd), 0)::float8, "
@@ -296,12 +309,13 @@ def costs(
     group_by: str = "model",
     agent_id: str | None = None,
     client_id: str | None = None,
+    app: str | None = None,
 ) -> dict[str, Any]:
     """Spend grouped by one allowlisted dimension (user | model | route)."""
     gb = group_by if group_by in _COST_GROUPS else "model"
     col = _COST_GROUPS[gb]  # allowlisted expression, never raw input
     w = normalize_window(window)
-    where, params = _where(w, agent_id, client_id)
+    where, params = _where(w, agent_id, client_id, app)
     rows = conn.execute(
         f"select {col} k, count(*), coalesce(sum(cost_usd), 0)::float8, "
         "coalesce(sum(total_tokens), 0) "
