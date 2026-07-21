@@ -743,6 +743,23 @@ export const STR = {
   "dlp.save": { en: "Save DLP settings", fr: "Enregistrer le DLP" },
   "dlp.saved": { en: "Saved.", fr: "Enregistré." },
   "dlp.egress": { en: "DLP", fr: "DLP" },
+
+  // Read tokens (server-to-server /ai read credentials)
+  "rtok.title": { en: "Read tokens (AI API)", fr: "Read tokens (API IA)" },
+  "rtok.subtitle": {
+    en: "Read-only, server-to-server credentials for the /ai read API (e.g. the mip-rum facade). They cannot ingest. The secret is shown once.",
+    fr: "Identifiants lecture seule, serveur-à-serveur, pour l'API de lecture /ai (ex. la facade mip-rum). Ils ne peuvent pas ingérer. Le secret n'est affiché qu'une fois.",
+  },
+  "rtok.placeholder": { en: "Name (e.g. mip-rum)", fr: "Nom (ex. mip-rum)" },
+  "rtok.generate": { en: "Generate", fr: "Générer" },
+  "rtok.created": { en: "Read token “{name}” created — copy it now:", fr: "Read token « {name} » créé — copie-le maintenant :" },
+  "rtok.active": { en: "active", fr: "actif" },
+  "rtok.revoked": { en: "revoked", fr: "révoqué" },
+  "rtok.revoke": { en: "Revoke", fr: "Révoquer" },
+  "rtok.revoking": { en: "Revoking…", fr: "Révocation…" },
+  "rtok.used": { en: "used {date}", fr: "utilisé {date}" },
+  "rtok.never": { en: "never used", fr: "jamais utilisé" },
+  "rtok.empty": { en: "No read tokens yet.", fr: "Aucun read token pour l'instant." },
 } satisfies Record<string, Entry>;
 
 export type StrKey = keyof typeof STR;
