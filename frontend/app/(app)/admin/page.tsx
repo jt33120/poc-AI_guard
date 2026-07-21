@@ -6,6 +6,7 @@ import { ApiKeys } from "@/components/ApiKeys";
 import { ClientsManager } from "@/components/ClientsManager";
 import { DlpSettings } from "@/components/DlpSettings";
 import { ProviderCredentials } from "@/components/ProviderCredentials";
+import { ReadTokens } from "@/components/ReadTokens";
 import { apiGet, apiSend } from "@/lib/client";
 import { useT } from "@/lib/i18n";
 
@@ -148,6 +149,7 @@ export default function AdminPage() {
       </div>
 
       <ApiKeys />
+      <ReadTokens />
       <ClientsManager />
       <DlpSettings />
       <ProviderCredentials />
