@@ -121,6 +121,12 @@ class PolicyDefaults(BaseModel):
     # Zero-config onboarding: classify un-listed tools by name and gate them by
     # class. Off by default so existing policies are unaffected (backward compat).
     auto_classify: bool = False
+    # Supply-chain integrity (M10): fingerprint downstream tools and quarantine
+    # drifted / poisoned ones. Off by default (backward compatible). When on and
+    # auto_approve_tools is false, a newly-seen tool is quarantined until an
+    # operator approves it; when true, a first sighting is auto-approved.
+    integrity_enabled: bool = False
+    auto_approve_tools: bool = False
     class_approvals: dict[ActionClass, Approval] = Field(
         default_factory=lambda: dict(_CLASS_DEFAULTS)
     )
