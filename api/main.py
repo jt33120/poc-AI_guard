@@ -25,6 +25,7 @@ from api.approvals import router as approvals_router
 from api.audit import router as audit_router
 from api.authorize import router as authorize_router
 from api.clients import router as clients_router
+from api.compliance import router as compliance_router
 from api.credentials import router as credentials_router
 from api.dlp import router as dlp_router
 from api.errors import register_exception_handlers
@@ -124,6 +125,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(dlp_router)
     app.include_router(ai_router)
     app.include_router(read_tokens_router)
+    app.include_router(compliance_router)
     app.include_router(signup_router)
 
     return app

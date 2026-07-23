@@ -97,6 +97,12 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = True
     approval_notify_to: str | None = Field(default=None, max_length=255)
 
+    # --- Compliance (EU AI Act, M9) --------------------------------------
+    # Retention floor for operational data purges (days). EU AI Act art. 12
+    # mandates >= 6 months (183 days) for high-risk logs; the compliance guard
+    # refuses any purge below this, and readiness is not "ready" if it is lower.
+    audit_retention_days: int = Field(default=183, ge=1)
+
     # --- Observability (optional) ----------------------------------------
     sentry_dsn: str | None = None
     sentry_traces_sample_rate: float = Field(default=0.0, ge=0.0, le=1.0)
