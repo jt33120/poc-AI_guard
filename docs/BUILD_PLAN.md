@@ -53,3 +53,7 @@ Construire dans l'ordre. Un milestone n'est terminé que si ses **critères d'ac
 
 ### Ordre de dépendances
 M0 → M1 → M2 → M3 → M4 → M5 → (M6 ∥ M7) → M8. Ne pas démarrer M7 avant M5 vert.
+
+---
+
+**Post-MVP** : la suite (M9→M12, axes A/B/C/D) vit dans `docs/BUILD_PLAN_V1.1.md`.
