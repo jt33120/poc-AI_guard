@@ -453,6 +453,21 @@ class AiCosts(BaseModel):
     rows: list[AiCostRow]
 
 
+class ComplianceStatus(BaseModel):
+    """EU AI Act readiness snapshot (M9): record-keeping + oversight + retention."""
+
+    chain_ok: bool
+    entries: int
+    first_broken_id: int | None
+    oversight_gated: int
+    oversight_auto_allowed: int
+    oversight_coverage_ok: bool
+    retention_floor_days: int
+    oldest_entry_age_days: int | None
+    retention_ok: bool
+    ready: bool
+
+
 CredentialProvider = Literal["openai", "anthropic", "mistral", "openrouter", "azure", "aws", "gcp"]
 
 
