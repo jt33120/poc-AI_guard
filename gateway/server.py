@@ -22,7 +22,7 @@ from uuid import uuid4
 import mcp.types as types
 from mcp.server.lowlevel import Server
 
-from core import approvals, audit, db, integrity, tenant_tokens
+from core import approvals, audit, db, integrity, risk, tenant_tokens, trust
 from core.judge import Judge
 from core.notify import Notifier
 from core.policy import Approval, Policy, PolicyOutcome, escalate_for_class, evaluate
@@ -145,6 +145,9 @@ class PolicyBackend:
                 ambiguous=True,
             )
 
+        # Graduated autonomy (M11): risk-score an `auto` outcome and tighten it.
+        outcome = self._apply_risk(canonical, outcome, arguments)
+
         if outcome.decision in (Approval.auto, Approval.notify):
             # notify-and-proceed (M11) relays like auto but is recorded distinctly.
             decision = "allow" if outcome.decision is Approval.auto else "notify"
@@ -234,6 +237,30 @@ class PolicyBackend:
         if stored is None or not stored.approved:
             return "unapproved"
         return None
+
+    def _apply_risk(
+        self, canonical: str, outcome: PolicyOutcome, arguments: dict[str, Any]
+    ) -> PolicyOutcome:
+        """Tighten an `auto` outcome by its deterministic risk score (opt-in)."""
+        bands = self._policy.defaults.risk_bands
+        ctx = self._approval_ctx
+        if bands is None or ctx is None or outcome.decision is not Approval.auto:
+            return outcome
+        with db.connection(ctx.database_url) as conn:
+            seen, streak = trust.observed(conn, tenant_id=ctx.tenant_id, tool=canonical)
+        tier = risk.escalate_by_risk(
+            outcome.decision,
+            outcome.action_class,
+            arguments,
+            bands,
+            seen_before=seen,
+            clean_streak=streak,
+        )
+        if tier is outcome.decision:
+            return outcome
+        return PolicyOutcome(
+            outcome.action_class, tier, outcome.rule_name, "risk", outcome.ambiguous
+        )
 
     def _audit_gate(self, tool_name: str, decision: str, reason: str | None) -> None:
         """Best-effort audit of a pre-policy gate decision (integrity / rbac)."""

@@ -113,6 +113,23 @@ class ToolRule(BaseModel):
         return self
 
 
+class RiskBands(BaseModel):
+    """Ascending score ceilings (1-100) that map a risk score to an approval tier:
+    ``<auto`` → auto, ``<notify`` → notify, ``<hitl`` → human_in_the_loop, else deny."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    auto: int = Field(default=30, ge=1, le=100)
+    notify: int = Field(default=60, ge=1, le=100)
+    hitl: int = Field(default=85, ge=1, le=100)
+
+    @model_validator(mode="after")
+    def _ascending(self) -> RiskBands:
+        if not self.auto <= self.notify <= self.hitl:
+            raise ValueError("risk_bands must be ascending: auto <= notify <= hitl")
+        return self
+
+
 class PolicyDefaults(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -128,6 +145,9 @@ class PolicyDefaults(BaseModel):
     # operator approves it; when true, a first sighting is auto-approved.
     integrity_enabled: bool = False
     auto_approve_tools: bool = False
+    # Graduated autonomy (M11): when set, an `auto` decision is risk-scored and
+    # may be tightened to notify / human review / deny. Off by default (opt-in).
+    risk_bands: RiskBands | None = None
     class_approvals: dict[ActionClass, Approval] = Field(
         default_factory=lambda: dict(_CLASS_DEFAULTS)
     )

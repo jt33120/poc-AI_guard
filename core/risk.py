@@ -16,11 +16,19 @@ values (§4.10).
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
 from typing import Any
 
 from core import dlp
-from core.policy import ActionClass, Approval
+from core.policy import ActionClass, Approval, RiskBands
+
+#: Approval severity order (higher = stricter); risk may only move *up* it.
+_ORDER = {
+    Approval.auto: 0,
+    Approval.notify: 1,
+    Approval.human_in_the_loop: 2,
+    Approval.human_dual: 3,
+    Approval.deny: 4,
+}
 
 #: Base risk by reversibility of the action class.
 _BASE: dict[ActionClass, int] = {
@@ -29,6 +37,10 @@ _BASE: dict[ActionClass, int] = {
     ActionClass.external_send: 55,
     ActionClass.irreversible: 75,
 }
+
+#: Consecutive clean approvals before an (agent, tool) earns a one-band discount.
+TRUST_THRESHOLD = 5
+_TRUST_STEP = 30  # ~ one band width
 _DEFAULT_BASE = 25  # unknown class → treat like a write
 
 _EMAIL = re.compile(r"[^\s@]+@[^\s@]+\.[^\s@]+")
@@ -83,16 +95,6 @@ def risk_score(
     return max(0, min(100, score))
 
 
-@dataclass(frozen=True)
-class RiskBands:
-    """Ascending score ceilings per tier: <auto→auto, <notify→notify,
-    <hitl→human_in_the_loop, else deny."""
-
-    auto: int = 30
-    notify: int = 60
-    hitl: int = 85
-
-
 #: Default bands (immutable singleton, safe to share as an argument default).
 DEFAULT_BANDS = RiskBands()
 
@@ -113,3 +115,31 @@ def band(
     if action_class is ActionClass.irreversible and tier in (Approval.auto, Approval.notify):
         return Approval.human_in_the_loop
     return tier
+
+
+def trust_discount(clean_streak: int, *, threshold: int = TRUST_THRESHOLD) -> int:
+    """Points to subtract once an (agent, tool) has earned trust (N clean approvals)."""
+    return _TRUST_STEP if clean_streak >= threshold else 0
+
+
+def escalate_by_risk(
+    base: Approval,
+    action_class: ActionClass | None,
+    arguments: dict[str, Any],
+    bands: RiskBands | None,
+    *,
+    seen_before: bool,
+    clean_streak: int,
+) -> Approval:
+    """Tighten an ``auto`` decision to its risk-scored tier — never relaxes (opt-in).
+
+    Only an ``auto`` outcome is scored (an explicit stricter policy rule always
+    wins); the result can only move *up* the severity order. Earned trust lowers
+    the score, but the irreversible floor in :func:`band` still holds.
+    """
+    if bands is None or base is not Approval.auto:
+        return base
+    score = risk_score(action_class, arguments, seen_before=seen_before)
+    score = max(0, score - trust_discount(clean_streak))
+    tier = band(score, bands, action_class)
+    return tier if _ORDER[tier] > _ORDER[base] else base
