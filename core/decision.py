@@ -18,7 +18,7 @@ from uuid import uuid4
 
 import psycopg
 
-from core import approvals, audit, db
+from core import approvals, audit, db, risk, trust
 from core.judge import Judge
 from core.notify import Notifier
 from core.policy import Approval, Policy, PolicyOutcome, escalate_for_class, evaluate
@@ -96,6 +96,23 @@ def authorize(
         outcome = PolicyOutcome(
             judged, escalate_for_class(outcome.decision, judged), outcome.rule_name, "judge", True
         )
+
+    # Graduated autonomy (M11): risk-score an `auto` outcome and tighten it (opt-in).
+    if policy.defaults.risk_bands is not None and outcome.decision is Approval.auto:
+        with db.connection(database_url) as conn:
+            seen, streak = trust.observed(conn, tenant_id=tenant_id, tool=tool)
+        tier = risk.escalate_by_risk(
+            outcome.decision,
+            outcome.action_class,
+            arguments,
+            policy.defaults.risk_bands,
+            seen_before=seen,
+            clean_streak=streak,
+        )
+        if tier is not outcome.decision:
+            outcome = PolicyOutcome(
+                outcome.action_class, tier, outcome.rule_name, "risk", outcome.ambiguous
+            )
 
     ah = approvals.args_hash(arguments)
 
