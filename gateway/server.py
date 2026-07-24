@@ -22,7 +22,7 @@ from uuid import uuid4
 import mcp.types as types
 from mcp.server.lowlevel import Server
 
-from core import approvals, audit, db
+from core import approvals, audit, db, integrity
 from core.judge import Judge
 from core.notify import Notifier
 from core.policy import Approval, Policy, PolicyOutcome, escalate_for_class, evaluate
@@ -61,6 +61,14 @@ def _denied_result(message: str) -> types.CallToolResult:
     )
 
 
+#: Map a quarantine status to its audit decision string.
+_INTEGRITY_DECISION: dict[integrity.ToolStatus, str] = {
+    integrity.ToolStatus.drift: "tool_drift",
+    integrity.ToolStatus.poison: "poison_suspected",
+    integrity.ToolStatus.new: "tool_quarantined",
+}
+
+
 @dataclass
 class ApprovalContext:
     """What the gateway needs to run the HITL flow for a tenant."""
@@ -91,11 +99,25 @@ class PolicyBackend:
         self._proxy = proxy
         self._approval_ctx = approval_ctx
         self._judge = judge
+        # Tools quarantined by the integrity guard during the last list_tools.
+        self._quarantined: set[str] = set()
+
+    @property
+    def _integrity_on(self) -> bool:
+        return self._approval_ctx is not None and self._policy.defaults.integrity_enabled
 
     async def list_tools(self) -> list[types.Tool]:
-        return await self._proxy.list_tools()
+        tools = await self._proxy.list_tools()
+        if not self._integrity_on:
+            return tools
+        return await self._screen_tools(tools)
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> types.CallToolResult:
+        if self._integrity_on:
+            blocked = await self._integrity_blocks(name)
+            if blocked is not None:
+                logger.info("tool_quarantined", extra={"tool": name, "reason": blocked})
+                return _denied_result(f"'{name}' quarantined by integrity guard: {blocked}")
         resolved = await self._proxy.resolve(name)
         canonical = f"{resolved[0]}.{resolved[1]}" if resolved else name
         outcome = evaluate(self._policy, canonical, arguments)
@@ -134,6 +156,71 @@ class PolicyBackend:
             self._audit("deny", canonical, outcome, arguments, request_id=uuid4().hex)
             return _denied_result(f"'{canonical}' not permitted by policy: deny ({outcome.reason})")
         return await self._handle_hitl(name, arguments, canonical, outcome)
+
+    async def _screen_tools(self, tools: list[types.Tool]) -> list[types.Tool]:
+        """Fingerprint each tool; expose only approved/unchanged ones, quarantine the rest."""
+        ctx = self._approval_ctx
+        if ctx is None:  # pragma: no cover - guaranteed non-None by _integrity_on
+            return list(tools)
+        exposed: list[types.Tool] = []
+        quarantined: dict[str, tuple[integrity.ToolStatus, str | None]] = {}
+        with db.connection(ctx.database_url) as conn:
+            stored = integrity.get_fingerprints(conn, ctx.tenant_id)
+            for tool in tools:
+                resolved = await self._proxy.resolve(tool.name)
+                server = resolved[0] if resolved else "?"
+                fp = integrity.fingerprint(tool.name, tool.description, tool.inputSchema)
+                poison = integrity.detect_poison(tool.description)
+                status = integrity.evaluate_tool(fp, poison, stored.get((server, tool.name)))
+                integrity.record_sighting(
+                    conn, tenant_id=ctx.tenant_id, server=server, tool_name=tool.name, fp=fp
+                )
+                if status is integrity.ToolStatus.new and self._policy.defaults.auto_approve_tools:
+                    integrity.approve(
+                        conn, tenant_id=ctx.tenant_id, server=server, tool_name=tool.name, fp=fp
+                    )
+                    status = integrity.ToolStatus.ok
+                if status is integrity.ToolStatus.ok:
+                    exposed.append(tool)
+                else:
+                    quarantined[tool.name] = (status, poison)
+            conn.commit()
+        self._quarantined = set(quarantined)
+        for tool_name, (status, reason) in quarantined.items():
+            self._audit_integrity(tool_name, _INTEGRITY_DECISION[status], reason)
+        return exposed
+
+    async def _integrity_blocks(self, name: str) -> str | None:
+        """Reason a call must be refused by the integrity guard, or None if clear."""
+        if name in self._quarantined:
+            return "quarantined"
+        ctx = self._approval_ctx
+        if ctx is None:  # pragma: no cover - guaranteed non-None by _integrity_on
+            return None
+        resolved = await self._proxy.resolve(name)
+        server = resolved[0] if resolved else "?"
+        with db.connection(ctx.database_url) as conn:
+            stored = integrity.get_fingerprints(conn, ctx.tenant_id).get((server, name))
+        # Fail-closed: only an approved, unchanged baseline is callable.
+        if stored is None or not stored.approved:
+            return "unapproved"
+        return None
+
+    def _audit_integrity(self, tool_name: str, decision: str, reason: str | None) -> None:
+        ctx = self._approval_ctx
+        if ctx is None:  # pragma: no cover - only called when integrity is on
+            return
+        try:
+            with db.connection(ctx.database_url) as conn:
+                audit.log_event(
+                    conn,
+                    tenant_id=ctx.tenant_id,
+                    decision=decision,
+                    tool_name=tool_name,
+                    error=reason,
+                )
+        except Exception:  # audit is best-effort; never break the call path
+            logger.warning("integrity_audit_failed", extra={"tool": tool_name})
 
     def _audit(
         self,
