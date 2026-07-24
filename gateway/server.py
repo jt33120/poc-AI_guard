@@ -25,9 +25,10 @@ from mcp.server.lowlevel import Server
 from core import approvals, audit, db, integrity, risk, tenant_tokens, trust
 from core.judge import Judge
 from core.notify import Notifier
-from core.policy import Approval, Policy, PolicyOutcome, escalate_for_class, evaluate
+from core.policy import ActionClass, Approval, Policy, PolicyOutcome, escalate_for_class, evaluate
 from core.tenant_tokens import authenticate_gateway_session
 from gateway.downstream import DownstreamProxy, ServerSpec
+from gateway.taint import TaintState, taints_result
 
 logger = logging.getLogger("xsom.gateway")
 
@@ -59,6 +60,12 @@ def _denied_result(message: str) -> types.CallToolResult:
     return types.CallToolResult(
         content=[types.TextContent(type="text", text=message)], isError=True
     )
+
+
+def _result_text(result: types.CallToolResult) -> str:
+    """Concatenate a tool result's text parts (for taint scanning only, never stored)."""
+    parts = [item.text for item in result.content if isinstance(item, types.TextContent)]
+    return "\n".join(parts)
 
 
 #: Map a quarantine status to its audit decision string.
@@ -103,6 +110,9 @@ class PolicyBackend:
         self._judge = judge
         # Tools quarantined by the integrity guard during the last list_tools.
         self._quarantined: set[str] = set()
+        # Indirect-injection taint state for this session (M12).
+        self._call_seq = 0
+        self._taint = TaintState()
 
     @property
     def _integrity_on(self) -> bool:
@@ -115,6 +125,7 @@ class PolicyBackend:
         return await self._screen_tools(tools)
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> types.CallToolResult:
+        self._call_seq += 1
         if self._integrity_on:
             blocked = await self._integrity_blocks(name)
             if blocked is not None:
@@ -148,6 +159,23 @@ class PolicyBackend:
         # Graduated autonomy (M11): risk-score an `auto` outcome and tighten it.
         outcome = self._apply_risk(canonical, outcome, arguments)
 
+        # Indirect-injection guard (M12): a risky action in a tainted session is
+        # escalated to a human or denied, before anything runs.
+        if self._taint_blocks(outcome):
+            self._audit_gate(canonical, "tainted_action", self._taint.reason)
+            if self._policy.defaults.taint_policy == "deny":
+                logger.info("tainted_action_denied", extra={"tool": canonical})
+                return _denied_result(
+                    f"'{canonical}' denied: session tainted by a prior tool result"
+                )
+            outcome = PolicyOutcome(
+                outcome.action_class,
+                Approval.human_in_the_loop,
+                outcome.rule_name,
+                "taint",
+                outcome.ambiguous,
+            )
+
         if outcome.decision in (Approval.auto, Approval.notify):
             # notify-and-proceed (M11) relays like auto but is recorded distinctly.
             decision = "allow" if outcome.decision is Approval.auto else "notify"
@@ -163,6 +191,7 @@ class PolicyBackend:
                 request_id=uuid4().hex,
                 error="downstream_error" if result.isError else None,
             )
+            self._mark_taint(canonical, result)
             return result
         if outcome.decision is Approval.deny:
             logger.info(
@@ -261,6 +290,24 @@ class PolicyBackend:
         return PolicyOutcome(
             outcome.action_class, tier, outcome.rule_name, "risk", outcome.ambiguous
         )
+
+    def _taint_blocks(self, outcome: PolicyOutcome) -> bool:
+        """Whether a risky action is gated because the session is tainted (M12)."""
+        defaults = self._policy.defaults
+        if defaults.taint_policy == "off":
+            return False
+        if outcome.action_class not in (ActionClass.irreversible, ActionClass.external_send):
+            return False
+        return self._taint.active(call_seq=self._call_seq, window=defaults.taint_window)
+
+    def _mark_taint(self, canonical: str, result: types.CallToolResult) -> None:
+        """Taint the session if a relayed tool result looks like an injection (M12)."""
+        if self._policy.defaults.taint_policy == "off":
+            return
+        reason = taints_result(_result_text(result))
+        if reason is not None:
+            self._taint.mark(call_seq=self._call_seq, source_tool=canonical, reason=reason)
+            self._audit_gate(canonical, "taint_marked", reason)
 
     def _audit_gate(self, tool_name: str, decision: str, reason: str | None) -> None:
         """Best-effort audit of a pre-policy gate decision (integrity / rbac)."""

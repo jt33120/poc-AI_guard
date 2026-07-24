@@ -148,6 +148,11 @@ class PolicyDefaults(BaseModel):
     # Graduated autonomy (M11): when set, an `auto` decision is risk-scored and
     # may be tightened to notify / human review / deny. Off by default (opt-in).
     risk_bands: RiskBands | None = None
+    # Indirect prompt-injection guard (M12): when a tool result looks injected the
+    # session is tainted, and a following irreversible/external action within the
+    # window is escalated to a human or denied. Off by default (opt-in).
+    taint_policy: Literal["off", "escalate", "deny"] = "off"
+    taint_window: int = Field(default=5, ge=1, le=100)
     class_approvals: dict[ActionClass, Approval] = Field(
         default_factory=lambda: dict(_CLASS_DEFAULTS)
     )
