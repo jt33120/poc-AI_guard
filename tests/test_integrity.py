@@ -71,7 +71,7 @@ def test_record_sighting_inserts_unapproved(db: DBHandle) -> None:
 def test_sighting_never_overwrites_approved_fingerprint(db: DBHandle) -> None:
     _seed_tenant(db)
     integrity.record_sighting(db.conn, tenant_id=_TENANT, server="s", tool_name="echo", fp="A")
-    assert integrity.approve(db.conn, tenant_id=_TENANT, server="s", tool_name="echo", fp="A")
+    assert integrity.approve(db.conn, tenant_id=_TENANT, server="s", tool_name="echo")
     # A rug-pull: the live tool now hashes to B, but the approved baseline stays A.
     integrity.record_sighting(db.conn, tenant_id=_TENANT, server="s", tool_name="echo", fp="B")
     db.conn.commit()
@@ -83,19 +83,30 @@ def test_sighting_never_overwrites_approved_fingerprint(db: DBHandle) -> None:
 def test_approve_clears_drift(db: DBHandle) -> None:
     _seed_tenant(db)
     integrity.record_sighting(db.conn, tenant_id=_TENANT, server="s", tool_name="echo", fp="A")
-    integrity.approve(db.conn, tenant_id=_TENANT, server="s", tool_name="echo", fp="A")
-    # Re-approve at the new fingerprint after reviewing the change.
-    assert integrity.approve(db.conn, tenant_id=_TENANT, server="s", tool_name="echo", fp="B")
+    integrity.approve(db.conn, tenant_id=_TENANT, server="s", tool_name="echo")  # baseline A
+    integrity.record_sighting(db.conn, tenant_id=_TENANT, server="s", tool_name="echo", fp="B")
+    # Re-approve promotes the last-seen fingerprint (B) after an operator reviews it.
+    assert integrity.approve(db.conn, tenant_id=_TENANT, server="s", tool_name="echo")
     db.conn.commit()
     stored = integrity.get_fingerprints(db.conn, _TENANT)[("s", "echo")]
+    assert stored.fingerprint == "B"
     assert integrity.evaluate_tool("B", None, stored) is ToolStatus.ok
 
 
-def test_list_status(db: DBHandle) -> None:
+def test_list_status_derives_state(db: DBHandle) -> None:
     _seed_tenant(db)
     integrity.record_sighting(db.conn, tenant_id=_TENANT, server="s", tool_name="echo", fp="A")
     db.conn.commit()
     rows = integrity.list_status(db.conn, _TENANT)
     assert len(rows) == 1
     assert rows[0]["server"] == "s" and rows[0]["tool_name"] == "echo"
-    assert rows[0]["approved"] is False and rows[0]["first_seen"] is not None
+    assert rows[0]["approved"] is False and rows[0]["status"] == "new"
+    assert rows[0]["first_seen"] is not None
+
+    integrity.approve(db.conn, tenant_id=_TENANT, server="s", tool_name="echo")
+    db.conn.commit()
+    assert integrity.list_status(db.conn, _TENANT)[0]["status"] == "ok"
+
+    integrity.record_sighting(db.conn, tenant_id=_TENANT, server="s", tool_name="echo", fp="B")
+    db.conn.commit()
+    assert integrity.list_status(db.conn, _TENANT)[0]["status"] == "drift"

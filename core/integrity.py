@@ -114,45 +114,60 @@ def get_fingerprints(
 def record_sighting(
     conn: psycopg.Connection, *, tenant_id: str, server: str, tool_name: str, fp: str
 ) -> None:
-    """Upsert a sighting: insert a new (unapproved) tool, else bump last_seen.
+    """Upsert a sighting: track the live hash in ``last_fingerprint``, bump last_seen.
 
-    Never overwrites an existing fingerprint or the approved flag — drift is
-    detected against the stored *approved* fingerprint and re-approved explicitly.
+    Never overwrites the *approved* ``fingerprint`` baseline or the approved flag —
+    drift is detected against that baseline and re-approved explicitly.
     """
     conn.execute(
-        "insert into tool_fingerprints (tenant_id, server, tool_name, fingerprint) "
-        "values (%s, %s, %s, %s) "
-        "on conflict (tenant_id, server, tool_name) do update set last_seen = now()",
-        (tenant_id, server, tool_name, fp),
+        "insert into tool_fingerprints "
+        "(tenant_id, server, tool_name, fingerprint, last_fingerprint) "
+        "values (%s, %s, %s, %s, %s) "
+        "on conflict (tenant_id, server, tool_name) "
+        "do update set last_fingerprint = excluded.last_fingerprint, last_seen = now()",
+        (tenant_id, server, tool_name, fp, fp),
     )
 
 
-def approve(
-    conn: psycopg.Connection, *, tenant_id: str, server: str, tool_name: str, fp: str
-) -> bool:
-    """Approve a tool at fingerprint ``fp`` (also clears a prior drift)."""
+def approve(conn: psycopg.Connection, *, tenant_id: str, server: str, tool_name: str) -> bool:
+    """Approve a tool at its last-seen fingerprint (promotes it to the baseline).
+
+    Idempotent for an unchanged tool; clears a prior drift by re-baselining to the
+    version an operator just reviewed. Returns False if the tool is unknown.
+    """
     row = conn.execute(
-        "update tool_fingerprints set approved = true, fingerprint = %s, last_seen = now() "
+        "update tool_fingerprints "
+        "set approved = true, fingerprint = last_fingerprint, last_seen = now() "
         "where tenant_id = %s and server = %s and tool_name = %s returning id",
-        (fp, tenant_id, server, tool_name),
+        (tenant_id, server, tool_name),
     ).fetchone()
     return row is not None
 
 
 def list_status(conn: psycopg.Connection, tenant_id: str) -> list[dict[str, Any]]:
-    """Tenant-scoped view of stored tool fingerprints (for the read API)."""
+    """Tenant-scoped view of stored tool fingerprints + derived status (read API)."""
     rows = conn.execute(
-        "select server, tool_name, approved, first_seen, last_seen "
+        "select server, tool_name, approved, fingerprint, last_fingerprint, first_seen, last_seen "
         "from tool_fingerprints where tenant_id = %s order by server, tool_name",
         (tenant_id,),
     ).fetchall()
-    return [
-        {
-            "server": r[0],
-            "tool_name": r[1],
-            "approved": r[2],
-            "first_seen": r[3].isoformat() if r[3] else None,
-            "last_seen": r[4].isoformat() if r[4] else None,
-        }
-        for r in rows
-    ]
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        approved, fp, last_fp = r[2], r[3], r[4]
+        if not approved:
+            derived = ToolStatus.new.value
+        elif fp != last_fp:
+            derived = ToolStatus.drift.value
+        else:
+            derived = ToolStatus.ok.value
+        out.append(
+            {
+                "server": r[0],
+                "tool_name": r[1],
+                "approved": approved,
+                "status": derived,
+                "first_seen": r[5].isoformat() if r[5] else None,
+                "last_seen": r[6].isoformat() if r[6] else None,
+            }
+        )
+    return out

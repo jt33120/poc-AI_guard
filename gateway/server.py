@@ -177,7 +177,7 @@ class PolicyBackend:
                 )
                 if status is integrity.ToolStatus.new and self._policy.defaults.auto_approve_tools:
                     integrity.approve(
-                        conn, tenant_id=ctx.tenant_id, server=server, tool_name=tool.name, fp=fp
+                        conn, tenant_id=ctx.tenant_id, server=server, tool_name=tool.name
                     )
                     status = integrity.ToolStatus.ok
                 if status is integrity.ToolStatus.ok:
