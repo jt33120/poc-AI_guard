@@ -145,12 +145,14 @@ class PolicyBackend:
                 ambiguous=True,
             )
 
-        if outcome.decision is Approval.auto:
+        if outcome.decision in (Approval.auto, Approval.notify):
+            # notify-and-proceed (M11) relays like auto but is recorded distinctly.
+            decision = "allow" if outcome.decision is Approval.auto else "notify"
             start = time.monotonic()
             result = await self._proxy.call_tool(name, arguments)
             latency_ms = int((time.monotonic() - start) * 1000)
             self._audit(
-                "allow",
+                decision,
                 canonical,
                 outcome,
                 arguments,

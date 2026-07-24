@@ -115,6 +115,29 @@ def authorize(
         )
         return {"decision": "allow", "action_class": _class(outcome), "reason": outcome.reason}
 
+    if outcome.decision is Approval.notify:
+        # Notify-and-proceed (M11): the agent may act, but the action is recorded
+        # distinctly ("notify") so ops can watch it — no human gate.
+        request_id = uuid4().hex
+        _audit(
+            database_url,
+            tenant_id=tenant_id,
+            decision="notify",
+            tool=tool,
+            request_id=request_id,
+            action_class=_class(outcome),
+            policy_rule_id=outcome.rule_name,
+            judge_used=outcome.ambiguous,
+            args_hash=ah,
+            gateway_token_id=gateway_token_id,
+        )
+        return {
+            "decision": "allow",
+            "action_class": _class(outcome),
+            "reason": outcome.reason,
+            "notified": True,
+        }
+
     if outcome.decision is Approval.deny:
         request_id = uuid4().hex
         _audit(
