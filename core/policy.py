@@ -28,6 +28,7 @@ class ActionClass(StrEnum):
 
 class Approval(StrEnum):
     auto = "auto"
+    notify = "notify"  # relay, but record it distinctly (notify-and-proceed, M11)
     human_in_the_loop = "human_in_the_loop"
     human_dual = "human_dual"
     deny = "deny"
@@ -232,9 +233,10 @@ def _constraints_ok(rule: ToolRule, arguments: dict[str, Any]) -> bool:
 
 _APPROVAL_ORDER = {
     Approval.auto: 0,
-    Approval.human_in_the_loop: 1,
-    Approval.human_dual: 2,
-    Approval.deny: 3,
+    Approval.notify: 1,
+    Approval.human_in_the_loop: 2,
+    Approval.human_dual: 3,
+    Approval.deny: 4,
 }
 
 
