@@ -106,6 +106,17 @@ def resolve_principal(conn: psycopg.Connection, raw_token: str) -> tuple[str, st
     return (str(row[0]), str(row[1])) if row else None
 
 
+def resolve_client_id(conn: psycopg.Connection, raw_token: str) -> str | None:
+    """Return the client id an active token belongs to (for per-tool RBAC), or None."""
+    if not raw_token:
+        return None
+    row = conn.execute(
+        "select client_id from gateway_tokens where token_hash = %s and revoked_at is null",
+        (hash_token(raw_token),),
+    ).fetchone()
+    return str(row[0]) if row and row[0] is not None else None
+
+
 def authenticate_gateway_principal(conn: psycopg.Connection, raw_token: str) -> tuple[str, str]:
     """Resolve ``(token_id, tenant_id)`` for a session or raise — fail-closed.
 

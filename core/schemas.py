@@ -453,6 +453,17 @@ class AiCosts(BaseModel):
     rows: list[AiCostRow]
 
 
+class ToolIntegrityRow(BaseModel):
+    """A tenant's MCP tool fingerprint + derived integrity status (M10)."""
+
+    server: str
+    tool_name: str
+    approved: bool
+    status: str  # ok | new | drift
+    first_seen: str | None
+    last_seen: str | None
+
+
 class ComplianceStatus(BaseModel):
     """EU AI Act readiness snapshot (M9): record-keeping + oversight + retention."""
 

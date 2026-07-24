@@ -22,7 +22,7 @@ from uuid import uuid4
 import mcp.types as types
 from mcp.server.lowlevel import Server
 
-from core import approvals, audit, db, integrity
+from core import approvals, audit, db, integrity, tenant_tokens
 from core.judge import Judge
 from core.notify import Notifier
 from core.policy import Approval, Policy, PolicyOutcome, escalate_for_class, evaluate
@@ -78,6 +78,8 @@ class ApprovalContext:
     timeout_seconds: int = 3600
     notifier: Notifier | None = None
     requested_by: str | None = None
+    #: The calling agent's client id, for per-tool RBAC (None = no client scope).
+    client_id: str | None = None
 
 
 class PolicyBackend:
@@ -120,6 +122,15 @@ class PolicyBackend:
                 return _denied_result(f"'{name}' quarantined by integrity guard: {blocked}")
         resolved = await self._proxy.resolve(name)
         canonical = f"{resolved[0]}.{resolved[1]}" if resolved else name
+
+        # Per-tool RBAC / confused-deputy guard: an agent outside a tool's client
+        # allowlist can never invoke it, regardless of the action class (fail-closed).
+        rbac = self._rbac_blocks(canonical)
+        if rbac is not None:
+            logger.info("tool_rbac_denied", extra={"tool": canonical, "reason": rbac})
+            self._audit_gate(canonical, "rbac_denied", rbac)
+            return _denied_result(f"'{canonical}' denied: agent not authorized ({rbac})")
+
         outcome = evaluate(self._policy, canonical, arguments)
 
         # Ambiguous tools: ask the judge for an action class, then escalate the
@@ -177,7 +188,7 @@ class PolicyBackend:
                 )
                 if status is integrity.ToolStatus.new and self._policy.defaults.auto_approve_tools:
                     integrity.approve(
-                        conn, tenant_id=ctx.tenant_id, server=server, tool_name=tool.name, fp=fp
+                        conn, tenant_id=ctx.tenant_id, server=server, tool_name=tool.name
                     )
                     status = integrity.ToolStatus.ok
                 if status is integrity.ToolStatus.ok:
@@ -187,8 +198,24 @@ class PolicyBackend:
             conn.commit()
         self._quarantined = set(quarantined)
         for tool_name, (status, reason) in quarantined.items():
-            self._audit_integrity(tool_name, _INTEGRITY_DECISION[status], reason)
+            self._audit_gate(tool_name, _INTEGRITY_DECISION[status], reason)
         return exposed
+
+    def _rbac_blocks(self, canonical: str) -> str | None:
+        """Reason a call must be refused by per-tool RBAC, or None if allowed.
+
+        A tool may pin ``constraints.allowed_clients`` to a set of client ids; only
+        agents belonging to one of them may call it (confused-deputy guard).
+        """
+        rule = self._policy.rule_for(canonical)
+        if rule is None:
+            return None
+        allowed = rule.constraints.get("allowed_clients")
+        if isinstance(allowed, list) and allowed:
+            client_id = self._approval_ctx.client_id if self._approval_ctx else None
+            if client_id not in allowed:
+                return "client_not_allowed"
+        return None
 
     async def _integrity_blocks(self, name: str) -> str | None:
         """Reason a call must be refused by the integrity guard, or None if clear."""
@@ -206,9 +233,10 @@ class PolicyBackend:
             return "unapproved"
         return None
 
-    def _audit_integrity(self, tool_name: str, decision: str, reason: str | None) -> None:
+    def _audit_gate(self, tool_name: str, decision: str, reason: str | None) -> None:
+        """Best-effort audit of a pre-policy gate decision (integrity / rbac)."""
         ctx = self._approval_ctx
-        if ctx is None:  # pragma: no cover - only called when integrity is on
+        if ctx is None:  # pragma: no cover - gate audits only fire with a context
             return
         try:
             with db.connection(ctx.database_url) as conn:
@@ -220,7 +248,7 @@ class PolicyBackend:
                     error=reason,
                 )
         except Exception:  # audit is best-effort; never break the call path
-            logger.warning("integrity_audit_failed", extra={"tool": tool_name})
+            logger.warning("gate_audit_failed", extra={"tool": tool_name})
 
     def _audit(
         self,
@@ -392,7 +420,7 @@ def build_server(backend: ToolBackend | None = None) -> Server:
 
 
 def _build_backend(
-    database_url: str, tenant_id: str
+    database_url: str, tenant_id: str, client_id: str | None = None
 ) -> PolicyBackend:  # pragma: no cover - I/O glue
     from core import policy_store, servers
     from core.config import get_settings
@@ -412,6 +440,7 @@ def _build_backend(
         tenant_id=tenant_id,
         timeout_seconds=policy.defaults.hitl_timeout_seconds,
         notifier=build_notifier(settings),
+        client_id=client_id,
     )
     return PolicyBackend(policy, DownstreamProxy(specs), ctx, build_judge(settings))
 
@@ -430,8 +459,10 @@ async def run_stdio() -> None:  # pragma: no cover - exercised via real MCP tran
         raise RuntimeError("DATABASE_URL is required to authenticate the gateway session")
     raw_token = os.environ.get(TENANT_TOKEN_ENV, "")
     tenant_id = authenticate_session(settings.database_url, raw_token)  # raises if invalid
+    with db.connection(settings.database_url) as conn:
+        client_id = tenant_tokens.resolve_client_id(conn, raw_token)
 
-    server = build_server(_build_backend(settings.database_url, tenant_id))
+    server = build_server(_build_backend(settings.database_url, tenant_id, client_id))
     async with stdio_server() as (read_stream, write_stream):
         await server.run(read_stream, write_stream, server.create_initialization_options())
 
