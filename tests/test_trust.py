@@ -35,3 +35,12 @@ def test_trust_is_scoped_per_tool(db: DBHandle) -> None:
     _log(db, "allow", tool="t.x")
     seen, streak = trust.observed(db.conn, tenant_id="t1", tool="t.other")
     assert seen is False and streak == 0
+
+
+def test_summary_lists_each_tool(db: DBHandle) -> None:
+    for _ in range(5):
+        _log(db, "allow", tool="t.hot")
+    _log(db, "allow", tool="t.cold")
+    rows = {r["tool"]: r for r in trust.summary(db.conn, "t1")}
+    assert rows["t.hot"]["trusted"] is True and rows["t.hot"]["clean_streak"] == 5
+    assert rows["t.cold"]["trusted"] is False and rows["t.cold"]["clean_streak"] == 1
