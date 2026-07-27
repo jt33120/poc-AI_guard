@@ -14,7 +14,11 @@ trust is conservative — it errs toward *more* review, never less.
 
 from __future__ import annotations
 
+from typing import Any
+
 import psycopg
+
+from core.risk import TRUST_THRESHOLD
 
 #: Decisions that count as a clean, trust-building outcome.
 _CLEAN = ("allow", "notify", "hitl_approved")
@@ -38,3 +42,24 @@ def observed(conn: psycopg.Connection, *, tenant_id: str, tool: str) -> tuple[bo
         else:
             break  # a refusal (deny / hitl_denied / expired / …) resets earned trust
     return seen_before, streak
+
+
+def summary(conn: psycopg.Connection, tenant_id: str) -> list[dict[str, Any]]:
+    """Per-tool earned-trust view for a tenant (for the read API)."""
+    tools = conn.execute(
+        "select distinct tool_name from audit_log "
+        "where tenant_id = %s and tool_name is not null order by tool_name",
+        (tenant_id,),
+    ).fetchall()
+    out: list[dict[str, Any]] = []
+    for (tool,) in tools:
+        seen, streak = observed(conn, tenant_id=tenant_id, tool=tool)
+        out.append(
+            {
+                "tool": tool,
+                "seen_before": seen,
+                "clean_streak": streak,
+                "trusted": streak >= TRUST_THRESHOLD,
+            }
+        )
+    return out

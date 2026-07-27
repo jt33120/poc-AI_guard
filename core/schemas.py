@@ -464,6 +464,15 @@ class ToolIntegrityRow(BaseModel):
     last_seen: str | None
 
 
+class ToolTrustRow(BaseModel):
+    """A tool's earned-trust level for a tenant (M11): clean approvals so far."""
+
+    tool: str
+    seen_before: bool
+    clean_streak: int
+    trusted: bool
+
+
 class ComplianceStatus(BaseModel):
     """EU AI Act readiness snapshot (M9): record-keeping + oversight + retention."""
 
