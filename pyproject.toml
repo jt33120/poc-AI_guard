@@ -104,7 +104,7 @@ ignore_errors = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "-q --cov=core --cov=api --cov=gateway --cov-report=term-missing --cov-fail-under=70"
+addopts = "-q --cov=core --cov=api --cov=gateway --cov=cli --cov-report=term-missing --cov-fail-under=70"
 
 [tool.coverage.run]
 branch = true

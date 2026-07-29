@@ -1,4 +1,6 @@
-# Control API image for container hosts (Railway / Render / Fly).
+# Control API image for container hosts (Railway / Render / Fly) and for the
+# one-shot migrate service of docker-compose.yml — the same image serves both, so
+# a deployment can never run an API build against a schema from another build.
 # NOTE: the MCP *gateway* runs over stdio beside an agent — it is NOT served here.
 # Only the hardened FastAPI control API (api.main:app) is exposed.
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
@@ -17,10 +19,13 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 
-# Application source (the control API and its libraries only).
-COPY core ./core
-COPY api ./api
-COPY gateway ./gateway
+# Application source. The whole build context lands here on purpose: the image
+# has to carry supabase/migrations + core/migrate.py so the migrate service can
+# migrate the database it is about to serve, and an explicit COPY list silently
+# drops every package added afterwards (that is exactly how `supabase` and
+# `scripts` went missing). What may ship is decided in one place — .dockerignore,
+# whose first section is the "never ship" deny-list.
+COPY . .
 
 ENV PATH="/opt/venv/bin:$PATH"
 

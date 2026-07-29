@@ -1,13 +1,13 @@
 # xSOM AI Guard
 
-An **MCP action-control gateway** for AI agents. The agent calls its tools
-*through* the gateway, which on every tool-call:
+An **action-control gateway** for AI agents. The agent reaches its tools *through*
+xSOM, which on every tool-call:
 
-- applies a deterministic **authorization policy** (auto / human-in-the-loop / deny),
-- keeps a **human in the loop** for irreversible actions (dry-run + approval),
-- writes an **immutable, hash-chained audit log** exportable for AI Act / GDPR.
+- applies a deterministic **authorization policy** (auto / notify / human-in-the-loop / deny),
+- keeps a **human in the loop** for irreversible actions (dry-run + approval + timeout),
+- writes an **immutable, hash-chained audit log** exportable for EU AI Act / GDPR.
 
-The differentiator: we control what the agent **does**, not just its prompts.
+The differentiator: we control what the agent **does**, not just what it is told.
 
 ```
  Agent ──MCP──▶  xSOM AI Guard  ──MCP──▶  downstream tool servers (mail, CRM, fs…)
@@ -15,74 +15,126 @@ The differentiator: we control what the agent **does**, not just its prompts.
                        │
         ┌──────────────┼─────────────────┐
         ▼              ▼                  ▼
-   Supabase       LLM judge          Control API (FastAPI)
-   (Postgres+RLS, (Mistral, thin)    ◀── Next.js frontend
-    append-only audit)               (inspector, approvals, audit, policy)
+   Postgres        LLM judge          Control API (FastAPI)
+   (RLS +          (Mistral, thin)    ◀── Next.js console
+    append-only audit)                (inspector, approvals, audit, policy)
 ```
+
+Three ways in, same verdict vocabulary: the **MCP gateway** (stdio, beside the
+agent — enforcement is mandatory), `POST /v1/authorize` (any language, one HTTP
+call before you execute a tool), and the **LLM provider proxy** (point an SDK's
+`base_url` at xSOM for zero-code monitoring).
+
+## What it does
+
+| Area | Shipped |
+|---|---|
+| **Policy** | YAML rules + auto-classification (read / write / external_send / irreversible / unknown), per-class approval levels, deny-by-default on unknown tools, natural-language policy drafting. |
+| **Human oversight** | Dry-run preview, approval queue, expiry = denial, email notification, per-tool RBAC scoped to a client. |
+| **Audit** | Append-only hash-chained entries, `verify_chain`, tenant-scoped exports, AI Act evidence packs (art. 12 / 14 / 26) and a retention floor. |
+| **Risk & trust** | Deterministic per-action risk score with bands, earned per-tool trust, graduated escalation instead of a binary gate. |
+| **Tool integrity** | MCP tool fingerprinting, drift/poison detection, quarantine at the proxy, operable approve / re-baseline. |
+| **Taint** | Indirect prompt-injection taint tracked across a session and enforced at the action boundary. |
+| **Egress DLP** | Outbound prompt scanning: block fixed-form secrets, flag structured PII — value never logged (kind + hash only). |
+| **AI observability** | Per-agent usage, cost and latency, OTLP `gen_ai` ingestion, cost-anomaly detection. |
+| **Tenancy** | Multi-tenant by Postgres RLS, self-serve signup, gateway tokens (hash-stored), client/project scoping. |
 
 ## Prerequisites
 
 - **Python 3.12** and [uv](https://docs.astral.sh/uv/)
-- **Node 20+** (frontend, M7)
-- **PostgreSQL 16** server binaries — used to spin an *ephemeral* cluster for the
-  hermetic RLS/HITL/audit tests and `make demo` (no live Supabase required).
+- **Node 20+** (console)
+- **PostgreSQL 16** server binaries — an *ephemeral* cluster is spun up for the
+  hermetic RLS/HITL/audit tests and `make demo` (no live database required).
   On Debian/Ubuntu: `apt-get install -y postgresql-16`.
 
-## Quickstart (local, < 10 min)
+## Quickstart (local)
 
 ```bash
-cp .env.example .env          # nothing is required to boot; fill in to enable features
-make install                  # backend (uv) + frontend (npm) + Playwright browser
+cp .env.example .env          # boots as-is; every key is optional, empty = feature off
+make install                  # backend (uv) + console (npm) + Playwright browser
 make verify                   # ruff + mypy + pytest + audit + eslint + tsc + Playwright
 make demo                     # the break-then-control story, end to end
-make dev                      # control API on :8000  (+ frontend on :3000)
+make dev                      # control API on :8000  (+ console on :3000)
 ```
 
-`make demo` runs entirely offline: it spins a throwaway Postgres, and shows an
+`make demo` runs entirely offline: it spins a throwaway Postgres and shows an
 agent that (1) is **held** when it tries an irreversible action, (2) is **denied**
-when it mails outside the allowlist, (3) is **allowed** to read — then verifies the
-audit chain is intact.
+when it mails outside the allowlist, (3) is **allowed** to read — then verifies
+the audit chain is intact.
+
+## Quickstart (self-hosted, Docker)
+
+```bash
+cp .env.example .env          # unedited
+make up                       # db + migrations + control API, all on 127.0.0.1
+curl localhost:8000/health/ready
+```
+
+`api` waits for the one-shot `migrate` service to *complete*, so the stack cannot
+report healthy on an unmigrated database. There is no identity provider in this
+stack and therefore no console login — gateway-token paths (MCP, `/v1/authorize`,
+audit) all work; point `SUPABASE_URL` at an issuer to unlock human login. The
+reasoning is written out at the top of `docker-compose.yml`.
+
+Operate it without ever opening a SQL console:
+
+```bash
+uv run python -m cli migrate --dry-run   # what would change
+uv run python -m cli bootstrap --org …   # tenant + admin + first gateway token
+uv run python -m cli doctor              # config, schema, capabilities — each gap with its fix
+```
+
+To point it at a real database and a real agent, see
+[`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ## Configuration
 
-All settings load from the environment / `.env` (gitignored). Everything is
-optional to boot; features light up as you configure them.
+All settings load from the environment / `.env` (gitignored). Nothing is required
+to boot; features light up as you configure them, and anything touching data or
+money fails **closed** when its key is missing.
+
+[`.env.example`](.env.example) documents every key the runtime reads — a test
+keeps it in sync with `core/config.py`, so it cannot go stale. The ones you will
+set first:
 
 | Variable | Purpose |
 |---|---|
 | `ENV` | `dev` / `staging` / `prod` (prod disables `/docs`). |
+| `DATABASE_URL` | Postgres DSN for the backend. |
 | `CORS_ALLOW_ORIGINS` | Explicit comma-separated allowlist (no `*`). |
-| `DATABASE_URL` | Postgres DSN for the backend (service-role connection). |
-| `SUPABASE_URL` / `SUPABASE_JWKS_URL` | JWT verification (JWKS). |
-| `SUPABASE_JWT_AUDIENCE` / `SUPABASE_JWT_ISSUER` | JWT claims. |
-| `SMTP_HOST` / `SMTP_FROM` / `APPROVAL_NOTIFY_TO` … | HITL email notifications. |
-| `MISTRAL_API_KEY` / `MISTRAL_MODEL` | LLM judge (ambiguous tools + narratives). |
-| `JUDGE_MAX_CALLS` / `EXPORT_RATE_LIMIT` | Cost cap + rate limiting. |
-| `SENTRY_DSN` | Optional error reporting. |
+| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | JWT verification (JWKS) and self-serve signup. Service role is **backend-only**. |
+| `MISTRAL_API_KEY` | LLM judge (ambiguous tools + compliance narratives). Absent ⇒ judge off, ambiguous escalates to a human. |
+| `XSOM_TENANT_TOKEN` | Read by the **agent's** process to authenticate its gateway session. |
 
-Frontend (`frontend/.env.local`): `NEXT_PUBLIC_SUPABASE_URL`,
-`NEXT_PUBLIC_SUPABASE_ANON_KEY`, `CONTROL_API_URL`.
+Console (`frontend/.env.local`): `NEXT_PUBLIC_SUPABASE_URL`,
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`, `CONTROL_API_URL`, `NEXT_PUBLIC_XSOM_API_URL`.
 
 ## Make targets
 
 | Target | What it does |
 |---|---|
-| `make install` | Install backend + frontend deps + Playwright browser. |
-| `make dev` | Run the control API (+ frontend); the gateway runs over stdio. |
+| `make install` | Install backend + console deps + Playwright browser. |
+| `make dev` | Run the control API (+ console); the gateway runs over stdio. |
 | `make test` | pytest + Playwright smoke. |
 | `make verify` | ruff + mypy + tests + security audit + eslint + tsc. |
 | `make demo` | End-to-end break-then-control demo. |
+| `make up` / `make down` | Bring the self-hosted compose stack up / down (the volume survives `down`). |
+| `make down-hard` | `down --volumes` — **destroys the database, and with it the audit chain**. |
+| `make logs` / `make ps` | Follow the stack's logs / list its services. |
 
 ## Layout
 
 ```
-gateway/   MCP gateway: server (to the agent) + client (downstream); policy→HITL→audit
-core/      config, db (RLS), policy, judge, approvals, audit, export, notify, schemas
-api/       hardened FastAPI control API (auth, servers, policy, approvals, audit)
-supabase/  SQL migrations (RLS, append-only audit)
-frontend/  Next.js 14 app (inspector, approvals, audit, admin)
+gateway/   MCP gateway: server (to the agent) + downstream client; policy→HITL→audit, integrity, taint
+core/      config, db (RLS), migrate, policy, judge, approvals, audit, risk, trust, dlp, compliance,
+           observability, usage/billing, credentials, export, notify, schemas
+api/       hardened FastAPI control API (auth, authorize, policy, approvals, audit, compliance,
+           integrity, trust, DLP, LLM proxy, usage, signup)
+supabase/  SQL migrations (RLS, append-only audit) + the schema_migrations ledger
+frontend/  Next.js 14 console (onboarding, inspector, approvals, audit, admin)
 scripts/   audit_security, verify_chain, demo
 tests/     pytest suite (ephemeral Postgres harness) + Playwright e2e
+docs/      SPEC, BUILD_PLAN, SECURITY, DEPLOY, product/ (PRD, architecture, epics)
 ```
 
 ## Security
@@ -94,4 +146,8 @@ audit, httpOnly auth cookies, no secrets in git (trufflehog in CI).
 
 ## Status
 
-MVP milestones **M0–M8 complete**. See `docs/BUILD_PLAN.md` and `docs/SPEC.md`.
+MVP milestones **M0–M8** plus **M9–M12** (AI Act compliance plane, tool integrity
+and RBAC, risk/trust-graduated escalation, taint) are complete, alongside egress
+DLP, AI observability and the LLM proxy. See `docs/BUILD_PLAN.md` for the MVP and
+`docs/product/` (PRD, `ARCHITECTURE-V2.md`, `EPICS.md`, `PLAN-REVIEW.md`) for what
+v2 adds next — starting with one-command deployment.

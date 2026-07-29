@@ -7,11 +7,12 @@ Fields are added milestone by milestone; M0 only declares what M0 uses.
 
 from __future__ import annotations
 
+import json
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 Env = Literal["dev", "staging", "prod"]
 
@@ -33,7 +34,11 @@ class Settings(BaseSettings):
 
     # --- Control API hardening -------------------------------------------
     # Explicit allowlist only; "*" is rejected (CLAUDE.md §4.8).
-    cors_allow_origins: list[str] = Field(default_factory=list)
+    # ``NoDecode`` is load-bearing: without it pydantic-settings JSON-decodes
+    # complex types straight out of the env/dotenv source, so the shipped
+    # ``CORS_ALLOW_ORIGINS=http://localhost:3000`` blew up with a SettingsError
+    # *before* the splitting validator below could ever run.
+    cors_allow_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
 
     # --- Supabase auth (JWT verification via JWKS) — M1 ------------------
     supabase_url: str | None = Field(default=None, max_length=300)
@@ -110,10 +115,20 @@ class Settings(BaseSettings):
     @field_validator("cors_allow_origins", mode="before")
     @classmethod
     def _split_origins(cls, value: object) -> object:
-        """Accept a comma-separated string from the environment."""
-        if isinstance(value, str):
-            return [item.strip() for item in value.split(",") if item.strip()]
-        return value
+        """Accept a comma-separated string, or a JSON list, from the environment.
+
+        Comma-separated is the documented form (``.env.example``). JSON is still
+        honoured so deployments that already set ``["https://a"]`` keep working.
+        """
+        if not isinstance(value, str):
+            return value
+        raw = value.strip()
+        if raw.startswith("["):
+            try:
+                return json.loads(raw)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"CORS_ALLOW_ORIGINS is not valid JSON: {exc}") from None
+        return [item.strip() for item in raw.split(",") if item.strip()]
 
     @field_validator("cors_allow_origins")
     @classmethod

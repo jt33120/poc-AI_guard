@@ -8,7 +8,16 @@ import { ProviderIcon } from "@/components/ProviderIcon";
 import { apiSend, apiSendVoid } from "@/lib/client";
 import { type StrKey, useT } from "@/lib/i18n";
 
-const XSOM_API = "https://xsom-ai-guard-production.up.railway.app";
+// Base URL of *this* deployment's control API. A generated artifact must never
+// point at a vendor-operated host: the customer's provider keys travel through
+// whatever URL we print here. Explicit build-time config wins; otherwise we fall
+// back to the origin the console is served from (correct for a single-origin
+// self-host). Read lazily — `window` does not exist while the page prerenders.
+function resolveApiBase(): string {
+  const configured = process.env.NEXT_PUBLIC_XSOM_API_URL;
+  if (configured) return configured.replace(/\/+$/, "");
+  return typeof window === "undefined" ? "" : window.location.origin;
+}
 
 type Tpl = "monitor" | "balanced" | "strict";
 type Stack = "openai" | "anthropic" | "openrouter" | "mistral" | "langchain" | "mcp" | "http";
@@ -32,17 +41,17 @@ const OPENAI_STYLE: Record<string, { sdkBase: string; keyEnv: string; keyHint: s
 
 // Token-in-URL base_url — works with ANY tool that lets you set a base URL
 // (no custom header needed). Null for non-proxy stacks.
-function proxyBase(stack: Stack, key: string): string | null {
+function proxyBase(stack: Stack, key: string, api: string): string | null {
   const oai = OPENAI_STYLE[stack];
-  if (oai) return `${XSOM_API}/proxy/${oai.sdkBase}/${key}/v1`;
-  if (stack === "anthropic") return `${XSOM_API}/proxy/anthropic/${key}`;
+  if (oai) return `${api}/proxy/${oai.sdkBase}/${key}/v1`;
+  if (stack === "anthropic") return `${api}/proxy/anthropic/${key}`;
   return null;
 }
 
 // A natural-language prompt for a self-modifying agent (openclaw, Claude Code…)
 // to reconfigure its own LLM endpoint. Null for non-proxy stacks.
-function integrationPrompt(stack: Stack, key: string): string | null {
-  const base = proxyBase(stack, key);
+function integrationPrompt(stack: Stack, key: string, api: string): string | null {
+  const base = proxyBase(stack, key, api);
   if (!base) return null;
   const hint = OPENAI_STYLE[stack]?.keyHint ?? "Anthropic";
   return `Reconfigure how you call the LLM so every model request goes through the xSOM proxy (for governance + cost tracking). Do NOT change your behavior, logic, prompts, or tools — only where the requests are sent.
@@ -83,13 +92,38 @@ defaults:
 `;
 }
 
-function snippet(stack: Stack, key: string): string {
-  if (stack === "mcp") {
-    return `# Point your agent's MCP client at the xSOM gateway and pass this token.
-# xSOM proxies your downstream MCP tool servers and gates every tool call.
-export XSOM_GATEWAY_TOKEN="${key}"
-# (configure the xSOM MCP server as your agent's tools endpoint)`;
-  }
+// The stdio gateway (`gateway/server.py`) reads exactly two variables at start-up:
+// XSOM_TENANT_TOKEN (the tenant session token) and DATABASE_URL (the control
+// plane it authenticates against). Emitting any other name ships a snippet that
+// cannot work, so this block mirrors the runtime literally.
+function mcpConfig(key: string): string {
+  return JSON.stringify(
+    {
+      mcpServers: {
+        "xsom-ai-guard": {
+          command: "uv",
+          args: [
+            "run",
+            "--directory",
+            "/path/to/xsom-ai-guard",
+            "python",
+            "-m",
+            "gateway.server",
+          ],
+          env: {
+            XSOM_TENANT_TOKEN: key,
+            DATABASE_URL: "postgresql://<user>:<password>@<host>:5432/<db>?sslmode=require",
+          },
+        },
+      },
+    },
+    null,
+    2,
+  );
+}
+
+function snippet(stack: Stack, key: string, api: string): string {
+  if (stack === "mcp") return mcpConfig(key);
   const oai = OPENAI_STYLE[stack];
   if (oai) {
     return `# Zero-code monitoring — point the OpenAI SDK at xSOM.
@@ -98,7 +132,7 @@ export XSOM_GATEWAY_TOKEN="${key}"
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="${proxyBase(stack, key)}",
+    base_url="${proxyBase(stack, key, api)}",
     api_key="<your ${oai.keyHint} key>",  # forwarded upstream, never stored by xSOM
 )
 # Use the client exactly as before — xSOM audits every tool-call it makes.`;
@@ -110,14 +144,14 @@ client = OpenAI(
 from anthropic import Anthropic
 
 client = Anthropic(
-    base_url="${proxyBase(stack, key)}",
+    base_url="${proxyBase(stack, key, api)}",
     api_key="<your Anthropic key>",
 )
 # Use the client exactly as before — xSOM audits every tool_use it makes.`;
   }
   return `import requests
 
-XSOM_API = "${XSOM_API}"
+XSOM_API = "${api}"
 XSOM_KEY = "${key}"
 
 def allowed(tool: str, arguments: dict) -> bool:
@@ -170,6 +204,11 @@ export default function OnboardingPage() {
   const { clients, reload } = useClientScope();
   const [projectId, setProjectId] = useState("");
   const [newProject, setNewProject] = useState("");
+  // Resolved after mount so the server-rendered markup and the hydrated markup
+  // agree (the fallback reads window.location).
+  const [apiBase, setApiBase] = useState("");
+
+  useEffect(() => setApiBase(resolveApiBase()), []);
 
   // First-time users have no project yet — default to creating one.
   useEffect(() => {
@@ -457,28 +496,28 @@ export default function OnboardingPage() {
             <p className="muted mt-2 text-xs">{t("onb.key.note")}</p>
           </div>
 
-          {proxyBase(stack, apiKey) ? (
+          {proxyBase(stack, apiKey, apiBase) ? (
             <div className="card p-5">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold">{t("onb.url.title")}</h3>
-                <CopyButton text={proxyBase(stack, apiKey) ?? ""} label={t("onb.copy")} />
+                <CopyButton text={proxyBase(stack, apiKey, apiBase) ?? ""} label={t("onb.copy")} />
               </div>
               <p className="muted mt-1 text-xs">{t("onb.url.note")}</p>
               <code className="mt-2 block break-all rounded-lg bg-navy-mid/70 px-3 py-2 font-mono text-xs text-brand-bright">
-                {proxyBase(stack, apiKey)}
+                {proxyBase(stack, apiKey, apiBase)}
               </code>
             </div>
           ) : null}
 
-          {integrationPrompt(stack, apiKey) ? (
+          {integrationPrompt(stack, apiKey, apiBase) ? (
             <div className="card p-5">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold">{t("onb.prompt.title")}</h3>
-                <CopyButton text={integrationPrompt(stack, apiKey) ?? ""} label={t("onb.copy")} />
+                <CopyButton text={integrationPrompt(stack, apiKey, apiBase) ?? ""} label={t("onb.copy")} />
               </div>
               <p className="muted mt-1 text-xs">{t("onb.prompt.note")}</p>
               <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded-xl bg-navy-mid/70 p-4 text-xs text-white/80">
-                {integrationPrompt(stack, apiKey)}
+                {integrationPrompt(stack, apiKey, apiBase)}
               </pre>
             </div>
           ) : null}
@@ -486,13 +525,13 @@ export default function OnboardingPage() {
           <div className="card p-5">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold">{t("onb.snippet.title")}</h3>
-              <CopyButton text={snippet(stack, apiKey)} label={t("onb.copy")} />
+              <CopyButton text={snippet(stack, apiKey, apiBase)} label={t("onb.copy")} />
             </div>
             <p className="muted mt-1 text-xs">
               {t(OPENAI_STYLE[stack] || stack === "anthropic" ? "onb.snippet.proxy" : "onb.snippet.note")}
             </p>
             <pre className="mt-2 overflow-x-auto rounded-xl bg-navy-mid/70 p-4 text-xs text-white/80">
-              {snippet(stack, apiKey)}
+              {snippet(stack, apiKey, apiBase)}
             </pre>
           </div>
 

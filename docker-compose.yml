@@ -1,0 +1,142 @@
+# xSOM AI Guard — self-hosted control plane.
+#
+#   docker compose up -d --wait      # database, migrations, control API
+#   make up / make logs / make down  # the same thing, plus the URLs to open
+#
+# WHAT THIS BRINGS UP
+#   db       PostgreSQL 16 with a named volume. deploy/auth_compat.sql is applied
+#            on first boot, so the Supabase-shaped RLS policies in
+#            supabase/migrations enforce unchanged on a plain cluster.
+#   migrate  One-shot. Runs every pending migration and exits 0. `api` waits for
+#            it to complete, so the stack cannot report healthy on an unmigrated
+#            database.
+#   api      The hardened control API. Enforces policy, HITL and the hash-chained
+#            audit log for every agent that reaches it.
+#
+# WHAT THIS DELIBERATELY DOES NOT BRING UP — read before you plan around it
+#   There is NO identity provider here, and therefore no console login. Bundling
+#   one (GoTrue) was reviewed and cut from this slice for three unresolved
+#   reasons, each of which fails at first boot rather than later: its signing
+#   keys have to exist *before* the container starts, but the CLI that generates
+#   them runs after; the `/auth/v1` prefix that core/config.py, core/signup.py and
+#   the console all assume is a Supabase-platform (Kong) artifact that bare GoTrue
+#   does not serve; and nothing mints the anon key both of them require. A login
+#   that 404s at minute one is worse than an honest gap.
+#
+#   So: everything that authenticates with a GATEWAY TOKEN works here — the MCP
+#   gateway, POST /v1/authorize, the audit chain, migrations, /health. Everything
+#   that authenticates a HUMAN with a JWT needs an external issuer: point
+#   SUPABASE_URL (or SUPABASE_JWKS_URL) at a Supabase project or any OIDC
+#   provider in your .env, and readiness will report `issuer: true`.
+#
+#   The console (frontend/) is not built here either; it deploys separately.
+#
+# PORTS — every published port is a variable, and every one binds to 127.0.0.1.
+#   XSOM_API_PORT (8000), XSOM_DB_PORT (5432). A port collision is the single
+#   most common first-run failure; override it in .env, not in this file:
+#   XSOM_API_PORT=18000 docker compose up -d --wait
+#
+# MANAGED POSTGRES instead of the bundled db: set DATABASE_URL in .env and apply
+#   deploy/auth_compat.sql to that database once, as its owner, before the first
+#   migration. `migrate` and `api` then use it; the bundled db container still
+#   starts (it is the ordering gate) and simply holds nothing.
+#
+# REQUIRES Docker Compose v2.24+ — `env_file: required: false` (so the stack boots
+#   before you have written a .env) and `up --wait` are both from v2.
+#
+# STATUS: the SQL in deploy/ and the /health endpoints are covered by tests that
+#   run against a real PostgreSQL 16 cluster. This compose file itself has not yet
+#   been executed in CI — see Story 1.24 for the smoke workflow that will.
+
+name: xsom
+
+# One definition, used by `migrate` and `api`. Anchors expand before compose
+# interpolates, so the override still works: set DATABASE_URL in .env to point
+# both services at a database of your own.
+x-database-url: &database_url ${DATABASE_URL:-postgresql://xsom:xsom_local_dev@db:5432/xsom}
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: xsom
+      # Fixed, and deliberately not a variable: this credential only ever reaches
+      # a database published on 127.0.0.1 by this file. Anything else — a shared
+      # host, a managed provider — means setting DATABASE_URL to your own
+      # database instead, with its credential in .env (gitignored, CLAUDE.md §4.7).
+      POSTGRES_PASSWORD: xsom_local_dev
+      POSTGRES_DB: xsom
+    ports:
+      - "127.0.0.1:${XSOM_DB_PORT:-5432}:5432"
+    volumes:
+      # Named, so `docker compose down` keeps the audit chain. Only `down -v`
+      # destroys it — that is why `make down-hard` is a separate target.
+      - xsom-db:/var/lib/postgresql/data
+      # Runs once, on an empty volume, before anything else can connect.
+      - ./deploy/auth_compat.sql:/docker-entrypoint-initdb.d/10-auth-compat.sql:ro
+    healthcheck:
+      # -h 127.0.0.1 forces TCP on purpose: while the entrypoint is running the
+      # initdb.d scripts, the temporary server listens on a unix socket only. A
+      # socket probe would go green before auth_compat.sql had been applied.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U xsom -d xsom"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  migrate:
+    build: .
+    image: xsom/control-api:local # same image as `api`: one build, one schema
+    restart: "no"
+    command: ["python", "-m", "cli", "migrate"]
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: *database_url
+
+  api:
+    build: .
+    image: xsom/control-api:local
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    env_file:
+      # Everything else (SUPABASE_URL, MISTRAL_API_KEY, DLP_*, ...) comes from
+      # .env when it exists; see .env.example. Values below win over the file.
+      - path: .env
+        required: false
+    environment:
+      ENV: ${ENV:-dev}
+      PORT: "8000"
+      # `db` is the in-network hostname; a DATABASE_URL in .env pointing at
+      # localhost would resolve to the container itself, not to your host.
+      DATABASE_URL: *database_url
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:3000}
+    ports:
+      - "127.0.0.1:${XSOM_API_PORT:-8000}:8000"
+    healthcheck:
+      # stdlib only — the runtime image ships no curl, and adding one to satisfy
+      # a healthcheck would widen the image for nothing. urlopen raises on 503,
+      # so a database that fell behind turns this container unhealthy.
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/health/ready', timeout=5)",
+        ]
+      interval: 10s
+      timeout: 8s
+      retries: 6
+      start_period: 20s
+
+volumes:
+  xsom-db:

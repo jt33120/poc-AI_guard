@@ -30,6 +30,7 @@ from api.credentials import router as credentials_router
 from api.dlp import router as dlp_router
 from api.errors import register_exception_handlers
 from api.gateway_tokens import router as gateway_tokens_router
+from api.health import router as health_router
 from api.integrity import router as integrity_router
 from api.llm_proxy import router as llm_proxy_router
 from api.policy import router as policy_router
@@ -101,7 +102,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/health", tags=["meta"])
     async def health() -> dict[str, str]:
-        """Liveness probe — the only unauthenticated route (SPEC §8)."""
+        """Liveness probe: this process is up. Unchanged, static, unauthenticated.
+
+        Readiness — can it actually serve? — is a different question and lives in
+        :mod:`api.health`, because a probe that touches the database must never be
+        what a load balancer restarts a healthy process over.
+        """
         return {"status": "ok"}
 
     @app.get("/v1/me", tags=["auth"])
@@ -113,6 +119,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "role": user.role.value if user.role else None,
         }
 
+    app.include_router(health_router)
     app.include_router(servers_router)
     app.include_router(policy_router)
     app.include_router(approvals_router)
