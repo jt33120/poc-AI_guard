@@ -1,124 +1,220 @@
 # Deployment — xSOM AI Guard
 
-How the MVP is deployed to a live environment. Three pieces go online:
+How to run xSOM AI Guard on your own infrastructure. Every value below is a
+placeholder: `<your-project-ref>`, `<your-backend-host>`, `<your-console-host>`.
+Nothing here points at a host operated by anyone but you — your database, your
+agents' tokens and your provider API keys must never transit a vendor's server.
 
-| Piece | Host | What it is |
+| Piece | What it is | Deploys to |
 |---|---|---|
-| **Supabase** | `ahndrprqongfqohkhwfu` (eu-west-1) | Postgres + Auth + RLS. Already provisioned (migrations applied). |
-| **Control API** | Railway (Docker) | Hardened FastAPI (`api.main:app`). |
-| **Frontend** | Vercel | Next.js 14 dashboard (root dir `frontend/`). |
+| **Database + identity** | Postgres 16 with RLS, plus a JWT issuer | Supabase, or your own Postgres + issuer |
+| **Control API** | Hardened FastAPI (`api.main:app`) — policy, approvals, audit, exports | Any container host (Railway, Render, Fly, Kubernetes) |
+| **Console** | Next.js 14 dashboard (root dir `frontend/`) | Vercel, or any Node host |
 
-> The **MCP gateway** (`gateway/server.py`) is **not** a hosted web service — it
-> runs over stdio next to an agent, pointed at the control plane. Nothing to deploy.
+> The **MCP gateway** (`gateway/server.py`) is not a hosted web service. It runs
+> over stdio next to the agent, reads `XSOM_TENANT_TOKEN` and `DATABASE_URL` from
+> that process's environment, and refuses to start without a valid token
+> (fail-closed, CLAUDE.md §4.4). There is nothing to deploy for it.
 
 All secrets live in each platform's environment variables — **never in git**
-(CLAUDE.md §4.7). The `service_role` key is backend-only and, in fact, unused by
-our code (we talk to Postgres via `DATABASE_URL` and verify JWTs via JWKS).
+(CLAUDE.md §4.7). `SUPABASE_SERVICE_ROLE_KEY` is backend-only: it bypasses RLS,
+so it never appears in the console's environment nor in any `NEXT_PUBLIC_*`
+variable (CLAUDE.md §4.6). Every key the runtime reads is documented in
+[`.env.example`](../.env.example), and a test keeps that file and
+`core/config.py` in sync — it is the authoritative list, this page is a subset.
 
 ---
 
-## 0. Supabase (done)
+## Path A — managed (Supabase + a container host + Vercel)
 
-The 5 migrations (tenancy → RLS → append-only hash-chained audit) are applied to
-project `ahndrprqongfqohkhwfu`. Auth uses an **ES256 asymmetric signing key**, so
-the public JWKS at `https://ahndrprqongfqohkhwfu.supabase.co/auth/v1/.well-known/jwks.json`
-is what the backend verifies against — no code change, fail-closed if unreachable.
+The path with the fewest moving parts.
 
-To re-apply migrations to a fresh project, run each file in `supabase/migrations/`
-in order (SQL editor, `psql`, or the Management API `database/query` endpoint).
+### 1. Database and identity
 
----
+Create a Supabase project; note its **project ref** (`<your-project-ref>`) and
+region. Auth signs tokens with an **ES256 asymmetric key**, so the backend
+verifies against the project's public JWKS —
+`https://<your-project-ref>.supabase.co/auth/v1/.well-known/jwks.json` — and
+fails closed if it is unreachable. No key material is copied anywhere.
 
-## 1. Backend → Railway (Docker)
+### 2. Apply the schema
 
-Railway builds the repo's `Dockerfile` (config in `railway.json`). Healthcheck:
-`GET /health`.
+Migrations are forward-only and recorded in a ledger,
+`schema_migrations(filename, checksum, applied_at)`. Do not count the files or
+paste them into a SQL editor: the runner records what ran, refuses to start on a
+checksum mismatch, serialises concurrent replicas with an advisory lock, and is
+safely re-runnable. Ask the ledger — not this document — what is applied.
 
-### Environment variables
+From a checkout, against the DSN from step 3:
+
+```bash
+DATABASE_URL="<your dsn>" uv run python -m cli migrate --dry-run   # plan only, writes nothing
+DATABASE_URL="<your dsn>" uv run python -m cli migrate
+```
+
+It prints the files it applied; re-running prints `schema already up to date`
+and changes nothing.
+
+> Filenames are a sequence, not a count, and the sequence has one hole: `0012`
+> was never used. It stays a hole because renumbering a released migration would
+> change its checksum and invalidate every ledger already written. A missing
+> `0012` is expected, not damage — `python -m cli doctor` is the authority on
+> whether a schema is at head.
+
+If the database predates the ledger (it already has `audit_log` but no
+`schema_migrations`), adopt its history **once** first:
+
+```bash
+DATABASE_URL="<your dsn>" uv run python -m cli migrate --adopt-baseline
+```
+
+It probes one sentinel object per historical file and records only the history it
+can prove ran, refusing to guess if it finds a gap. Adoption is deliberately
+never automatic — it cannot happen as a side effect of a container start.
+
+### 3. Control API
+
+Build the repository `Dockerfile` (`railway.json` configures Railway; any
+container host works). Healthcheck: `GET /health`.
 
 | Var | Value | Notes |
 |---|---|---|
 | `ENV` | `prod` | Disables `/docs`, `/redoc`, `/openapi.json` (CLAUDE.md §4.8). |
-| `DATABASE_URL` | `postgresql://postgres.ahndrprqongfqohkhwfu:<DB_PASSWORD>@aws-0-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require` | **Session pooler** (IPv4, port 5432). The direct `db.*` host is IPv6-only. |
-| `SUPABASE_URL` | `https://ahndrprqongfqohkhwfu.supabase.co` | JWKS URL is derived from this. |
-| `SUPABASE_JWT_AUDIENCE` | `authenticated` | Matches Supabase user-token `aud`. |
-| `SUPABASE_JWT_ISSUER` | `https://ahndrprqongfqohkhwfu.supabase.co/auth/v1` | Optional; must match token `iss` exactly. Leave empty to skip issuer check. |
-| `CORS_ALLOW_ORIGINS` | `https://<your-frontend>.vercel.app` | Explicit allowlist, comma-separated. No `*`. Set after the frontend URL is known. |
-| `MISTRAL_API_KEY` | _(optional)_ | Enables the LLM judge for ambiguous tools + compliance narratives. Absent ⇒ judge disabled (fail-closed). |
-| `MISTRAL_MODEL` | `mistral/mistral-small-latest` | Default; override only if needed. |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` / `APPROVAL_NOTIFY_TO` | _(optional)_ | HITL approval email notifications. |
+| `DATABASE_URL` | `postgresql://postgres.<your-project-ref>:<db-password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require` | Use the **session pooler** (IPv4, port 5432); the direct `db.*` host is IPv6-only. |
+| `SUPABASE_URL` | `https://<your-project-ref>.supabase.co` | The JWKS URL is derived from it. |
+| `SUPABASE_SERVICE_ROLE_KEY` | _(project API settings → `service_role`)_ | Backend only. Enables `POST /v1/signup`; absent ⇒ signup answers 503 forever. |
+| `SUPABASE_JWT_AUDIENCE` | `authenticated` | Matches the Supabase user token's `aud`. |
+| `SUPABASE_JWT_ISSUER` | `https://<your-project-ref>.supabase.co/auth/v1` | Optional; must match `iss` exactly. Empty skips the issuer check. |
+| `CORS_ALLOW_ORIGINS` | `https://<your-console-host>` | Explicit allowlist, comma-separated. `*` is refused at boot. Set once the console URL is known. |
+| `MISTRAL_API_KEY` | _(optional)_ | LLM judge + compliance narratives. Absent ⇒ judge off and ambiguous tools escalate to a human (fail-closed). |
+| `SMTP_*` / `APPROVAL_NOTIFY_TO` | _(optional)_ | HITL approval emails. Absent ⇒ reviewers watch the queue in the console. |
 | `SENTRY_DSN` | _(optional)_ | Error reporting. |
 
-`PORT` is injected by Railway — do not set it.
+Everything else has a working default; `.env.example` documents each one and what
+leaving it empty turns off.
 
-### Steps
-1. New Railway project → **Deploy from GitHub repo** → `jt33120/xsom-ai-guard`.
-2. Railway detects `Dockerfile` + `railway.json`. Set the variables above.
-3. Deploy. Note the public URL, e.g. `https://xsom-ai-guard-production.up.railway.app`.
-4. `curl https://<backend>/health` ⇒ `{"status":"ok"}`.
+`PORT` is injected by the platform — do not set it.
 
----
+Verify: `curl https://<your-backend-host>/health` ⇒ `{"status":"ok"}`.
 
-## 2. Frontend → Vercel
+### 4. Console
 
-Next.js, auto-detected. **Root Directory must be `frontend`.**
-
-### Environment variables
+Next.js, auto-detected. **Root directory must be `frontend`.**
 
 | Var | Value |
 |---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | `https://ahndrprqongfqohkhwfu.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://<your-project-ref>.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | _(the project's anon key)_ |
-| `CONTROL_API_URL` | `https://<backend>.up.railway.app` (server-side only; the browser never sees the bearer token) |
+| `CONTROL_API_URL` | `https://<your-backend-host>` — server-side only; the browser never sees the bearer token. |
+| `NEXT_PUBLIC_XSOM_API_URL` | `https://<your-backend-host>` — the base URL the onboarding wizard writes into generated snippets. Defaults to the console's own origin, which is only correct when API and console share one. |
 
-### Steps
-1. New Vercel project (team **xSOM Org**) → import `jt33120/xsom-ai-guard`.
-2. **Root Directory** = `frontend`. Framework preset = Next.js (auto). Build = `next build`.
-3. Set the variables above. Deploy. Note the URL, e.g. `https://xsom-ai-guard.vercel.app`.
-4. Go back to Railway and set `CORS_ALLOW_ORIGINS` to that exact origin; redeploy the backend.
+Then set `CORS_ALLOW_ORIGINS` on the backend to that exact origin and redeploy it.
+
+### 5. First tenant and admin — no SQL
+
+`POST /v1/signup` provisions in one call: the auth user, the tenant, the admin
+membership, and the user's `app_metadata` (`tenant_id` + `role`) that both the
+API and Postgres RLS read. It is unauthenticated, rate-limited
+(`SIGNUP_RATE_LIMIT`, default `10/hour`), and rolls the partial account back on
+failure.
+
+```bash
+curl -X POST https://<your-backend-host>/v1/signup \
+  -H 'content-type: application/json' \
+  -d '{"org":"Acme Ops","email":"admin@example.test","password":"<a strong password>"}'
+```
+
+`503` means `SUPABASE_SERVICE_ROLE_KEY` is not set on the backend; `409` means
+that email already has an account. On success, sign in to the console with those
+credentials — the first login mints a JWT carrying the new claims.
+
+> From a checkout you can do the same without the HTTP round trip:
+> `XSOM_ADMIN_PASSWORD=… uv run python -m cli bootstrap --org "Acme Ops" --email admin@example.test`
+> provisions the tenant, the admin and a first gateway token in one command. The
+> password is read from that variable (or prompted on the TTY) and never passed as
+> a flag, because argv is world-readable via `ps` and is kept in shell history.
+> Without `SUPABASE_SERVICE_ROLE_KEY` the command still creates the tenant and the
+> token, and tells you which half it could not create and why.
+
+### 6. Give an agent a token
+
+In the console: **Onboarding**, or **Settings → Gateway tokens**. Only the
+SHA-256 hash of the token is stored; the raw value is shown once. The onboarding
+wizard then prints an integration snippet for your stack, using this deployment's
+own base URL and the variable names the runtime actually reads — for the MCP
+gateway, `XSOM_TENANT_TOKEN`.
 
 ---
 
-## 3. Bootstrap a tenant + admin (required to use the app)
+## Path B — self-hosted, no cloud account
 
-RLS and RBAC read `tenant_id` and `role` from the user's `app_metadata` — the same
-claim the JWT carries. A brand-new sign-up has neither, so it can see nothing until
-you attach it to a tenant.
-
-```sql
--- 1) Create a tenant (note the returned id).
-insert into tenants (name) values ('Acme') returning id;
-
--- 2) After the user signs up (email/password in the app), link membership.
-insert into memberships (user_id, tenant_id, role)
-values ('<auth-user-uuid>', '<tenant-id>', 'admin');
+```bash
+cp .env.example .env      # works unedited; every key is a safe default or empty
+make up                   # docker compose up -d --build --wait
 ```
 
-Then stamp the user's `app_metadata` (admin privilege required — Management API SQL,
-or the Auth Admin API with the `service_role` key):
+`docker-compose.yml` brings up three services, every published port bound to
+`127.0.0.1`:
 
-```sql
-update auth.users
-set raw_app_meta_data =
-    coalesce(raw_app_meta_data, '{}'::jsonb)
-    || jsonb_build_object('tenant_id', '<tenant-id>', 'role', 'admin')
-where id = '<auth-user-uuid>';
-```
+| Service | What it does |
+|---|---|
+| `db` | PostgreSQL 16 on a named volume. `deploy/auth_compat.sql` is applied on first boot. |
+| `migrate` | One-shot `python -m cli migrate`, then exits 0. |
+| `api` | The control API. Waits on `migrate` *completing*, so the stack cannot report healthy on an unmigrated database. |
 
-The user must sign out/in to mint a fresh JWT carrying the new claims.
+Readiness is `GET /health/ready`, which answers four booleans and nothing else —
+`ok`, `database`, `schema_current`, `issuer`. It is unauthenticated, so it
+deliberately exposes no hostnames, DSNs or capability map: an anonymous
+capability list is a target-selection oracle.
 
-**Gateway token** (so an agent's MCP session authenticates to a tenant): insert a
-row in `gateway_tokens` storing only the SHA-256 hash of the raw token (the raw
-value is shown to the operator once and never stored).
+Set `XSOM_API_PORT` / `XSOM_DB_PORT` in `.env` if 8000 or 5432 are taken — a port
+collision is the most common first-run failure. To use a database of your own
+instead of the bundled one, set `DATABASE_URL` and apply `deploy/auth_compat.sql`
+to it once, as its owner, before the first migration.
+
+**There is no identity provider in this stack, so there is no console login.**
+Everything that authenticates with a *gateway token* works — the MCP gateway,
+`POST /v1/authorize`, the audit chain, migrations, health. Everything that
+authenticates a *human* with a JWT needs an external issuer: point `SUPABASE_URL`
+(or `SUPABASE_JWKS_URL`) at a Supabase project or any OIDC provider, and
+readiness reports `issuer: true`. The reasoning behind that gap is written out in
+full at the top of `docker-compose.yml`.
+
+Routine operation needs no database access:
+`python -m cli migrate | bootstrap | token | doctor`. `doctor` reports
+configuration *presence*, never values, and exits non-zero only on a real
+failure — an unconfigured optional capability is a warning, because "off" is not
+"broken" (the judge being off means ambiguous tools escalate to a human, which is
+fail-closed). The same gap in `ENV=prod` is a failure.
+
+**`deploy/auth_compat.sql`** is the supported production counterpart of
+`tests/fixtures/supabase_auth_shim.sql`: it creates the `auth` schema, the
+`auth.jwt()` / `auth.uid()` / `auth.role()` functions the RLS policies call, and
+the `anon` / `authenticated` / `service_role` roles. It is **not** an identity
+provider — it exposes claims an already-trusted backend set, and verifies
+nothing. That the RLS suite passes on a plain cluster with it applied is the
+evidence self-hosting is not a downgrade of the isolation boundary.
+
+> **Status.** The SQL, the migration runner, the CLI and the `/health` endpoints
+> are covered by tests that run against a real PostgreSQL 16 cluster, and the
+> compose boot order was reproduced against one outside a container. The compose
+> file *itself* has not yet been executed in CI — see Story 1.24.
 
 ---
 
-## 4. Security checklist (post-deploy)
+## Post-deploy security checklist
 
 - [ ] `ENV=prod` on the backend ⇒ `GET /docs` returns 404.
-- [ ] `CORS_ALLOW_ORIGINS` is the exact frontend origin, no `*`.
-- [ ] Secrets only in platform env vars; `git ls-files | grep -i env` shows no `.env`.
-- [ ] **Rotate** any secret pasted in plaintext during setup (Supabase `service_role`,
-      the Management API PAT) once provisioning is complete.
-- [ ] `service_role` is not set anywhere in the frontend project.
-- [ ] Auth cookies are `httpOnly` + `Secure` + `SameSite` (enforced in `lib/supabaseServer.ts`).
+- [ ] `CORS_ALLOW_ORIGINS` is the exact console origin, no `*`.
+- [ ] `SUPABASE_SERVICE_ROLE_KEY` is set on the backend **only** — absent from the
+      console project and from every `NEXT_PUBLIC_*` variable.
+- [ ] Secrets only in platform environment variables;
+      `git ls-files | grep -i env` shows no `.env`.
+- [ ] **Rotate** anything pasted in plaintext during setup, once provisioning is done.
+- [ ] Auth cookies are `httpOnly` + `Secure` + `SameSite` (enforced in
+      `frontend/lib/supabaseServer.ts`).
+- [ ] `DATABASE_URL=<your dsn> uv run python scripts/verify_chain.py` reports an
+      intact audit chain.
+- [ ] `ENV=prod DATABASE_URL=<your dsn> uv run python -m cli doctor` exits 0. It
+      re-checks most of the boxes above from the deployment's own environment,
+      and every non-OK line carries the fix.

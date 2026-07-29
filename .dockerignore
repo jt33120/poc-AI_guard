@@ -1,15 +1,39 @@
-# Keep the build context small and secret-free.
+# Build context = image content: the Dockerfile copies the whole context, so this
+# deny-list is the ONLY thing deciding what ships. Keep the "never ship" section
+# first and exhaustive; anything not listed here ends up in the image.
+#
+# `supabase` and `scripts` were excluded here until now, which meant the image
+# physically could not run its own migrations — the migrate service loads
+# supabase/migrations/*.sql through core/migrate.py. They must stay in.
+
+# --- Never ship: secrets and key material (CLAUDE.md §4.6/§4.7) --------------
+# `.env.*` also covers `.env.example`: nothing in the image reads it.
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+secrets/
+
+# --- Never ship: history, CI config, agent config ----------------------------
 .git
+.gitignore
 .github
 .claude
+
+# --- Not needed to serve the control API or to migrate -----------------------
+# The console is built and deployed separately. `tests` matters most here:
+# tests/fixtures/ holds the local auth shim and generated key material, none of
+# which belongs in a runtime image (Story 1.9 AC3). deploy/auth_compat.sql is
+# the production counterpart of that shim, and it DOES ship.
 frontend
 tests
 docs
-scripts
-supabase
-*.md
-.env
-.env.*
+**/*.md
+
+# --- Build/test artefacts (host-specific, never valid inside the image) ------
 .venv
 venv
 **/__pycache__

@@ -21,7 +21,16 @@ jobs:
     steps:
       - name: Ping control API health
         run: |
-          url="${KEEPWARM_URL:-https://xsom-ai-guard-production.up.railway.app/health}"
+          # No default host: this workflow ships in every fork and clone, and a
+          # baked-in URL would point every deployer's CI at someone else's
+          # instance. Set the repository variable KEEPWARM_URL to opt in.
+          url="${KEEPWARM_URL}"
+          if [ -z "$url" ]; then
+            echo "KEEPWARM_URL is not set — nothing to keep warm, skipping."
+            echo "Set it under Settings → Secrets and variables → Actions → Variables,"
+            echo "e.g. https://<your-backend-host>/health"
+            exit 0
+          fi
           for i in 1 2 3; do
             code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 75 "$url") || code=000
             echo "attempt $i -> $code"
