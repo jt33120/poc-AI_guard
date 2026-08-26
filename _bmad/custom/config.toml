@@ -1,7 +1,14 @@
-# Team / enterprise overrides for _bmad/config.toml.
-# Committed to the repo — applies to every developer on the project.
-# Tables deep-merge over base config; keyed entries merge by key.
-# Example: override an agent descriptor, or add a new agent.
+# Overrides d'équipe, jamais touchés par l'installeur BMAD.
 #
-# [agents.bmad-agent-pm]
-# description = "Prefers short, bulleted PRDs over narrative drafts."
+# Langue : décision produit — les artefacts destinés aux dirigeants et à
+# l'avant-vente (PRD, matrice de couverture, briefs) sont en français, cible
+# grands comptes FR et argument de souveraineté. Les artefacts techniques
+# (architecture, epics, stories) restent en anglais, cohérents avec le code et
+# avec docs/product/{PRD,ARCHITECTURE-V2,EPICS}.md déjà écrits.
+#
+# BMAD n'expose qu'un seul `document_output_language` : il porte le défaut
+# produit (français), et les artefacts techniques sont rédigés en anglais
+# explicitement au moment de leur création.
+
+[core]
+document_output_language = "French"
