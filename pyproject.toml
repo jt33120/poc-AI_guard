@@ -43,6 +43,9 @@ package = false
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# Vendored AI-agent tooling (Graft, BMAD-METHOD) — third-party scripts we don't
+# own or style-check; `.claude/skills/graft` and `graft/` ship no Python.
+extend-exclude = ["_bmad", ".claude/skills/bmad-*"]
 
 [tool.ruff.lint]
 select = [

@@ -36,3 +36,10 @@ frontend/playwright-report/
 .idea/
 .vscode/
 *.swp
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
+
+# BMAD-METHOD personal install answers (per-teammate name/language); the
+# shared team config is /_bmad/config.toml, which stays committed.
+/_bmad/config.user.toml

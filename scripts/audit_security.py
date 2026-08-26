@@ -36,6 +36,10 @@ _SKIP_DIRS = frozenset(
         "htmlcov",
         "dist",
         "build",
+        # Vendored AI-agent tooling (Graft, BMAD-METHOD): third-party scripts
+        # and regenerable cache, not project code.
+        "_bmad",
+        "graft",
     }
 )
 _CODE_SUFFIXES = frozenset({".py", ".ts", ".tsx", ".js", ".jsx", ".yaml", ".yml", ".json", ".toml"})
