@@ -20,7 +20,11 @@ def test_session_authenticates_with_valid_token(db: DBHandle) -> None:
         (tenant_id, hash_token(raw)),
     )
     db.conn.commit()
-    assert authenticate_session(db.url, raw) == str(tenant_id)
+    resolved_tenant, token_id = authenticate_session(db.url, raw)
+    assert resolved_tenant == str(tenant_id)
+    # The agent's identity travels with the tenant: the persisted taint is keyed
+    # on it, so it cannot be left to whatever the agent declares (FR-154).
+    assert token_id
 
 
 def test_session_refused_without_token(db: DBHandle) -> None:

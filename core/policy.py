@@ -149,6 +149,20 @@ class RiskBands(BaseModel):
 class PolicyDefaults(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_removed_keys(cls, data: Any) -> Any:
+        """Name what replaced a removed key, rather than let `extra="forbid"` say
+        only that it is unknown. `taint_window` counted calls; the persisted taint
+        is bounded in time, so the old key cannot be honoured (`FR-154`)."""
+        if isinstance(data, dict) and "taint_window" in data:
+            raise ValueError(
+                "'taint_window' (calls) was replaced by 'taint_window_seconds' "
+                "(seconds): the taint now survives a reconnect, and a per-connection "
+                "call count cannot express a window across one"
+            )
+        return data
+
     unknown_tool: Approval = Approval.deny
     hitl_timeout_seconds: int = Field(default=3600, ge=1, le=86400)
     on_approval_service_down: Approval = Approval.deny
@@ -168,7 +182,10 @@ class PolicyDefaults(BaseModel):
     # session is tainted, and a following irreversible/external action within the
     # window is escalated to a human or denied. Off by default (opt-in).
     taint_policy: Literal["off", "escalate", "deny"] = "off"
-    taint_window: int = Field(default=5, ge=1, le=100)
+    # Seconds, not calls (`FR-154`). A call counter restarts at zero on every
+    # connection, so it cannot express "recently" across the reconnect the
+    # persisted taint exists to survive. Default: 5 minutes.
+    taint_window_seconds: int = Field(default=300, ge=1, le=86_400)
     class_approvals: dict[ActionClass, Approval] = Field(
         default_factory=lambda: dict(_CLASS_DEFAULTS)
     )

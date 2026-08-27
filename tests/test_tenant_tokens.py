@@ -59,7 +59,7 @@ def test_resolve_revoked_token_returns_none(db: DBHandle) -> None:
 
 def test_authenticate_valid_token_marks_last_used(db: DBHandle) -> None:
     tenant_id, raw = _seed_token(db.conn)
-    assert authenticate_gateway_session(db.conn, raw) == tenant_id
+    assert authenticate_gateway_session(db.conn, raw)[0] == tenant_id
     row = db.conn.execute(
         "select last_used_at from gateway_tokens where token_hash = %s", (hash_token(raw),)
     ).fetchone()
