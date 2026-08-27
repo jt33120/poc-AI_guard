@@ -88,6 +88,14 @@ Elles viennent en premier pour cette seule raison. La démonstration vient ensui
 | **FR-157** | Les règles peuvent porter un **prédicat déterministe borné** sur la valeur des arguments (comparaison, appartenance, motif, plafond), non Turing-complet, échouant fermé sur champ absent ou mal typé. | `EXH-3` |
 | **FR-158** | Les outils exécuteurs génériques (`bash`, `execute_sql`, `kubectl`…) reçoivent une **classification déterministe** par motif d'argument, sans passer par le juge, échouant fermé au plafond déclaré de l'outil. | `EXH-4`, `G-06` |
 | **FR-159** | Une approbation par canal interactif n'est **pas rejouable** : l'identité provient de la signature vérifiée du fournisseur de canal et désigne le *cliqueur*, la séparation des devoirs est vérifiée contre lui, et la classe irréversible renvoie vers la console plutôt que de se décider dans le canal. | `INV-5`, `D-3`, `G-07` |
+| **FR-198** | Sans juge configuré, une règle `classify: ambiguous` est **plancherisée en irréversible**, jamais honorée à son `approval` déclaré. | `D-4` (revue d'architecture) |
+| **FR-199** | Les contraintes d'une règle sont évaluées sur **toutes** les branches, y compris `classify: ambiguous`. | `D-5` (revue d'architecture) |
+
+> **`FR-198` et `FR-199` sont deux défauts vivants découverts tardivement**, par la revue adversariale de l'architecture — absents des 34 correctifs comme des 21 écarts. Ils portent des numéros hauts parce qu'un identifiant est stable, jamais renuméroté ; leur rang de priorité est celui du groupe A, pas celui de leur numéro.
+>
+> **`D-4` est le plus grave de la strate.** `.env.example:117-119` affirme qu'une clé Mistral vide désactive le juge *« fail-closed : les outils ambigus sont traités comme irréversibles, donc soumis à approbation humaine au lieu d'être auto-autorisés »*. Le code fait l'inverse : `core/policy.py:295` renvoie l'`approval` déclaré avec `action_class=None`, et l'escalade est court-circuitée par `judge is not None` (`gateway/server.py:149`, `core/decision.py:94`). La garantie documentée n'existe pas, dans la configuration par défaut, dans le fichier que tout déployeur lit. On corrige le code pour qu'il tienne la promesse — pas la promesse pour qu'elle décrive le code.
+>
+> **`D-5`** : sur la branche `classify: ambiguous`, `evaluate` retourne **avant** `_constraints_ok`. Les contraintes d'une règle ambiguë ne sont jamais évaluées — et `docs/SPEC.md:197` livre un exemple portant `dry_run` et `business_hours_only`, deux contraintes sans effet. C'est le jumeau moteur de `FR-156`.
 
 > **Collision / Résolution.** `FR-156` impose de retirer `constraints: {dry_run: true}` de `scripts/demo.py` *ou* d'implémenter `dry_run`. Résolution : **implémenter**, parce que le dry-run est une promesse du discours HITL. À défaut, retirer — jamais laisser en place.
 
@@ -199,7 +207,7 @@ L'ordre découle de trois contraintes, dans cet ordre : ce que le produit affirm
 
 | Rang | Lot | Contenu | Pourquoi ici |
 |---|---|---|---|
-| **1** | **Cœur d'enforcement** | `FR-153` → `FR-159` | Des contrôles déjà livrés ne tiennent pas leurs garanties : la défense P2 porte deux contournements, une contrainte de la policy de démonstration est décorative, et l'approbation est rejouable. Rien d'autre ne compte tant que ce n'est pas vrai. |
+| **1** | **Cœur d'enforcement** | `FR-153` → `FR-159`, `FR-198`, `FR-199` | Des contrôles déjà livrés ne tiennent pas leurs garanties : la défense P2 porte deux contournements, une contrainte de la policy de démonstration est décorative, l'approbation est rejouable, et `.env.example` documente une garantie fail-closed que le code n'implémente pas. Rien d'autre ne compte tant que ce n'est pas vrai. |
 | **2** | **Intégrité de la preuve** | `FR-160`, `FR-161`, `FR-162`, `FR-164`, `FR-169` | Ce qu'une revue de sécurité trouve en premier sur un produit vendu sur la preuve. `FR-162` est le plus fort rayon de souffle du lot. |
 | **3** | **Le triage** | `FR-172` → `FR-175` | Pilier 1 de la vision. Sans lui, la démonstration retombe dans le catalogue. |
 | **4** | **Mode observation** | `FR-179`, `FR-180` | Une branche au point de décision, et l'artefact de conversion le plus fort du produit. Rang 4 et non 1 seulement parce qu'il ne bloque pas le tournage. |
