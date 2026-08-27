@@ -354,7 +354,15 @@ def test_doctor_fails_on_pending_migrations_after_adoption(
     _run(["migrate", "--adopt-baseline"], settings, capsys)
     code, out = _run(["doctor"], settings, capsys)
     assert code == 1
-    assert f"1 migration(s) pending: {migrate.LEDGER_MIGRATION}" in out
+    # Derived, not spelled out: the subject is that doctor fails and *names* what is
+    # missing, not that exactly one file happens to sit after the baseline today.
+    baseline = {sentinel.filename for sentinel in migrate._BASELINE}
+    pending = [
+        p.name for p in sorted(migrate.MIGRATIONS_DIR.glob("*.sql")) if p.name not in baseline
+    ]
+    assert f"{len(pending)} migration(s) pending" in out
+    for name in pending:
+        assert name in out
     assert "`python -m cli migrate`" in out
 
 
