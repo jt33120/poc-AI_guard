@@ -17,6 +17,8 @@ from typing import Any, Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
+from core import predicates
+
 _EMAIL = re.compile(r"[^\s@]+@[^\s@]+\.[^\s@]+")
 
 
@@ -96,14 +98,73 @@ class PolicyError(ValueError):
     """Raised when a policy document is invalid (API maps this to HTTP 422)."""
 
 
+class ArgumentRule(BaseModel):
+    """One bounded predicate over one field, and the class it selects (`FR-157`).
+
+    Exactly one operator per rule: no `and`, no `or`, no nesting. Ordered rules give
+    the expressiveness that matters without handing the policy author a language --
+    a policy that can compute is a policy nobody can review.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    field: str = Field(min_length=1, max_length=100)
+    action_class: ActionClass = Field(alias="class")
+    matches: str | None = None
+    equals: Any = None
+    one_of: list[Any] | None = None
+    gt: float | None = None
+    gte: float | None = None
+    lt: float | None = None
+    lte: float | None = None
+
+    @model_validator(mode="after")
+    def _exactly_one_predicate(self) -> ArgumentRule:
+        used = [op for op in predicates.OPERATORS if getattr(self, op, None) is not None]
+        if len(used) != 1:
+            raise ValueError(
+                f"argument rule on '{self.field}': exactly one predicate is required, got "
+                f"{len(used)} ({', '.join(sorted(used)) or 'none'}). "
+                f"Known: {', '.join(sorted(predicates.OPERATORS))}"
+            )
+        operator = used[0]
+        error = predicates.operator_shape_error(operator, getattr(self, operator))
+        if error is not None:
+            raise ValueError(f"argument rule on '{self.field}': {error}")
+        return self
+
+    @property
+    def predicate(self) -> tuple[str, Any]:
+        operator = next(op for op in predicates.OPERATORS if getattr(self, op, None) is not None)
+        return operator, getattr(self, operator)
+
+
+class ArgumentClass(BaseModel):
+    """Deterministic classification of an executor tool by its arguments (`FR-158`).
+
+    `bash ls` and `bash rm -rf /` are the same tool; only the arguments differ. Rules
+    are tried in order and the first match wins. **Anything unmatched -- including a
+    missing field, a wrong type, or an argument shape nobody anticipated -- takes
+    `otherwise`**, which is the tool's declared ceiling. That is the fail-closed
+    default `EXH-4` asks for, and it is required rather than defaulted so that an
+    author states the worst their tool can do instead of inheriting a guess.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    rules: list[ArgumentRule] = Field(min_length=1)
+    otherwise: ActionClass
+
+
 class ToolRule(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     name: str = Field(min_length=1, max_length=200)
     action_class: ActionClass | None = Field(default=None, alias="class")
-    classify: Literal["ambiguous"] | None = None
+    classify: Literal["ambiguous", "by_argument"] | None = None
     approval: Approval
     constraints: dict[str, Any] = Field(default_factory=dict)
+    argument_class: ArgumentClass | None = None
 
     @model_validator(mode="after")
     def _check_class_or_classify(self) -> ToolRule:
@@ -111,6 +172,15 @@ class ToolRule(BaseModel):
             raise ValueError(f"tool '{self.name}': one of 'class' or 'classify' is required")
         if self.classify is not None and self.action_class is not None:
             raise ValueError(f"tool '{self.name}': 'class' and 'classify' are mutually exclusive")
+        if self.classify == "by_argument" and self.argument_class is None:
+            raise ValueError(
+                f"tool '{self.name}': 'classify: by_argument' requires 'argument_class'"
+            )
+        if self.classify != "by_argument" and self.argument_class is not None:
+            raise ValueError(
+                f"tool '{self.name}': 'argument_class' only applies to "
+                "'classify: by_argument' -- it would be read by nothing here"
+            )
         return self
 
     @model_validator(mode="after")
@@ -246,11 +316,26 @@ def parse_policy(text: str) -> Policy:
         raise PolicyError(str(exc)) from exc
 
 
+def classify_by_argument(spec: ArgumentClass, arguments: dict[str, Any]) -> ActionClass:
+    """First matching rule wins; anything else takes the declared ceiling (`FR-158`).
+
+    No model is consulted: the most dangerous tool class in the product is exactly
+    where an opinion does not belong.
+    """
+    for rule in spec.rules:
+        operator, operand = rule.predicate
+        if rule.field in arguments and predicates.holds(operator, operand, arguments[rule.field]):
+            return rule.action_class
+    return spec.otherwise
+
+
 def classify(policy: Policy, tool_name: str, arguments: dict[str, Any]) -> ActionClass | None:
     """Return the deterministic action class, or None if unknown / needs the judge."""
     rule = policy.rule_for(tool_name)
     if rule is None:
         return classify_by_name(tool_name) if policy.defaults.auto_classify else None
+    if rule.classify == "by_argument" and rule.argument_class is not None:
+        return classify_by_argument(rule.argument_class, arguments)
     if rule.classify == "ambiguous":
         return None
     return rule.action_class
@@ -434,6 +519,17 @@ def evaluate(policy: Policy, tool_name: str, arguments: dict[str, Any]) -> Polic
     if not _constraints_ok(rule, arguments):
         return PolicyOutcome(rule.action_class, Approval.deny, rule.name, "constraint violated")
     approval = _constraint_floor(rule, rule.approval)
+    if rule.classify == "by_argument" and rule.argument_class is not None:
+        # Determined here, not by the judge (`FR-158`), and floored like any other
+        # class: an executor resolved to `irreversible` is held even when the rule
+        # says `auto`, exactly as if the class had been written out.
+        resolved = classify_by_argument(rule.argument_class, arguments)
+        return PolicyOutcome(
+            resolved,
+            escalate_for_class(approval, resolved),
+            rule.name,
+            "argument-classified",
+        )
     if rule.classify == "ambiguous":
         return PolicyOutcome(None, approval, rule.name, "ambiguous: needs judge", ambiguous=True)
     return PolicyOutcome(rule.action_class, approval, rule.name, "policy rule")

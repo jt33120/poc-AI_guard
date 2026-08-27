@@ -192,3 +192,65 @@ def test_a_secret_argument_never_reaches_the_audit_log_over_http(db: DBHandle) -
     assert written
     assert _SECRET not in written
     assert "sk-live-" not in written
+
+
+# --- M-06: an executor tool is classified by what it is asked to do ----------
+
+_EXECUTOR = parse_policy(
+    """
+tools:
+  - name: mock.echo
+    classify: by_argument
+    approval: auto
+    argument_class:
+      rules:
+        - {field: text, matches: "^(ls|cat|grep)\\\\b", class: read}
+        - {field: text, matches: "\\\\b(rm|dd|shutdown)\\\\b", class: irreversible}
+      otherwise: irreversible
+defaults: {unknown_tool: deny}
+"""
+)
+
+
+def _executor_backend(db: DBHandle, tenant_id: str) -> PolicyBackend:
+    proxy = DownstreamProxy(
+        [
+            ServerSpec(
+                name="mock",
+                transport="stdio",
+                config={"command": sys.executable, "args": [str(_MOCK)]},
+            )
+        ]
+    )
+    ctx = ApprovalContext(database_url=db.url, tenant_id=tenant_id, timeout_seconds=3600)
+    return PolicyBackend(_EXECUTOR, proxy, ctx)
+
+
+@pytest.mark.covers("M-06", "chaine", ingress="mcp", sens="bloque")
+async def test_a_destructive_executor_invocation_is_held(db: DBHandle) -> None:
+    # EXH-4 / G-06. `bash ls` and `bash rm -rf /` are the same tool: a class fixed on
+    # the tool is either uselessly strict or dangerously loose. The rule below says
+    # `approval: auto`, and the destructive invocation is held anyway.
+    backend = _executor_backend(db, _seed_tenant(db))
+
+    result = await backend.call_tool("echo", {"text": "rm -rf /var/data"})
+
+    assert result.isError is True
+    # The negative control: `mock.echo` returns its text on success, so a relayed
+    # call would be a *success* carrying it. This is a hold with an approval id.
+    assert "requires_approval" in _text(result) and "approval_id=" in _text(result)
+    # The command DOES appear here, in the dry-run -- that is the point of a dry-run.
+    # A human cannot approve what they are not shown.
+
+
+@pytest.mark.covers("M-06", "chaine", ingress="mcp", sens="laisse_passer")
+async def test_a_harmless_executor_invocation_still_runs(db: DBHandle) -> None:
+    # The half that makes it a control rather than an outage: the same tool, a benign
+    # argument, and it goes through. Without this, a gateway that denied every
+    # executor call would pass the test above.
+    backend = _executor_backend(db, _seed_tenant(db))
+
+    result = await backend.call_tool("echo", {"text": "ls -la"})
+
+    assert result.isError is False
+    assert "ls -la" in _text(result)

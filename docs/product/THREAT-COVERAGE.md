@@ -260,7 +260,7 @@ Chaque `G-nn` deviendra une ou plusieurs exigences fonctionnelles, numérotées 
 | `G-03` | ~~Taint persisté survivant à la reconnexion~~ — **fermé.** Table `session_taint` (migration `0018`), indexée sur le **jeton de passerelle** et non sur une session déclarée par l'agent, bornée en temps. Lecture impossible → teinté (`AD-10`). | M-02 | ✅ |
 | `G-04` | Déclaration de provenance des jeux de données / bases vectorielles au registre + section Evidence Pack | M-03 | Moyenne |
 | `G-05` | Détecteur d'extraction déterministe (volume / motif de requêtage) + alerte | M-04 | Moyenne |
-| `G-06` | Classification déterministe des outils exécuteurs (`bash`, `execute_sql`, `kubectl`…) — EXH-4 | M-06, M-15 | **Critique** |
+| `G-06` | ~~Classification déterministe des outils exécuteurs~~ — **fermé.** `classify: by_argument` + prédicat borné (`core/predicates.py`) : un exécuteur est classé par ce qu'on lui demande, sans juge, tout imprévu prenant le plafond déclaré. | M-06, M-15 | ✅ |
 | `G-07` | **Requalifié** : contrainte *sur du non-construit*, pas défaut vivant. Il n'existe aucun canal d'approbation interactif — `core/notify.py` envoie un e-mail portant un identifiant, jamais un porteur, et `POST /v1/approvals/{id}/decision` prend l'identité du décideur dans le JWT vérifié, jamais du payload. À tenir le jour où un canal est construit (`FR-159`) ; l'invariant est désormais asserté. | M-08 | ✅ (invariant verrouillé) |
 | `G-08` | Activation de `FR-64` (DLP en entrée des décisions post-taint) | M-10 | Haute |
 | `G-09` | Inventaire du Shadow AI : découverte des outils non supervisés (orchestré) | M-10 | Moyenne |
