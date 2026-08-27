@@ -75,7 +75,7 @@ def _seed_tenant(db: DBHandle) -> str:
 # --- M-07 emission: the agent as sender --------------------------------------
 
 
-@pytest.mark.covers("M-07", "emission", ingress="mcp")
+@pytest.mark.covers("M-07", "emission", ingress="mcp", sens="bloque")
 async def test_send_outside_the_allowlist_is_denied_and_never_relayed(db: DBHandle) -> None:
     backend = _backend(db, _seed_tenant(db))
 
@@ -90,7 +90,7 @@ async def test_send_outside_the_allowlist_is_denied_and_never_relayed(db: DBHand
     assert "sent" not in _text(result)
 
 
-@pytest.mark.covers("M-07", "emission", ingress="mcp")
+@pytest.mark.covers("M-07", "emission", ingress="mcp", sens="laisse_passer")
 async def test_send_inside_the_allowlist_still_goes_through(db: DBHandle) -> None:
     # The control's other half: a guard that blocks everything is not a control,
     # it is an outage. Without this, the test above passes on a broken gateway.
@@ -106,7 +106,8 @@ async def test_send_inside_the_allowlist_still_goes_through(db: DBHandle) -> Non
 # --- M-08 approval integrity: separation of duties ---------------------------
 
 
-@pytest.mark.covers("M-08", "approbation", ingress="mcp")
+@pytest.mark.covers("M-08", "approbation", ingress="mcp", sens="bloque")
+@pytest.mark.covers("M-08", "approbation", ingress="mcp", sens="laisse_passer")
 async def test_dual_approval_needs_two_distinct_humans_at_the_gateway(db: DBHandle) -> None:
     tenant_id = _seed_tenant(db)
     backend = _backend(db, tenant_id)
@@ -153,7 +154,8 @@ def _audit_text(db: DBHandle) -> str:
     return " ".join(str(v) for row in rows for v in row if v is not None)
 
 
-@pytest.mark.covers("M-14", "secrets", ingress="mcp")
+@pytest.mark.covers("M-14", "secrets", ingress="mcp", sens="bloque")
+@pytest.mark.covers("M-14", "secrets", ingress="mcp", sens="laisse_passer")
 async def test_a_secret_argument_never_reaches_the_audit_log_over_mcp(db: DBHandle) -> None:
     # CLAUDE.md 4.10: metadata and a hash, never argument values. The vault tests
     # prove the crypto; this proves the boundary -- that a secret handed to a tool
@@ -169,7 +171,8 @@ async def test_a_secret_argument_never_reaches_the_audit_log_over_mcp(db: DBHand
     assert "sk-live-" not in written
 
 
-@pytest.mark.covers("M-14", "secrets", ingress="http")
+@pytest.mark.covers("M-14", "secrets", ingress="http", sens="bloque")
+@pytest.mark.covers("M-14", "secrets", ingress="http", sens="laisse_passer")
 def test_a_secret_argument_never_reaches_the_audit_log_over_http(db: DBHandle) -> None:
     # Same claim on the cooperative path. A guarantee that holds on one ingress and
     # not the other is not a guarantee (AD-28).

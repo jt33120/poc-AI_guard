@@ -3,7 +3,8 @@
 `scripts/gen_coverage.py` is the thing that stops a `Bloqué` claim from being
 published without a scenario. If it silently passed everything, nothing downstream
 would notice -- the map would look identical. So its *refusal* is tested here, not
-only its success.
+only its success. Rule 3 -- both halves of a `Bloqué` claim -- is the one most
+likely to be argued away, so it has a test on each side of it.
 
 The *real* registry is deliberately not gated from inside this suite: the scenario
 report is written at session finish, so a test reading it mid-session would depend on
@@ -57,8 +58,20 @@ def _run(tmp_path: Path, scenarios: list[dict[str, object]]) -> subprocess.Compl
     )
 
 
-def _passing(row: str, facet: str, ingress: str) -> dict[str, object]:
-    return {"row": row, "facet": facet, "ingress": ingress, "test": "t", "outcome": "passed"}
+def _passing(row: str, facet: str, ingress: str, sens: str = "bloque") -> dict[str, object]:
+    return {
+        "row": row,
+        "facet": facet,
+        "ingress": ingress,
+        "sens": sens,
+        "test": f"t_{sens}",
+        "outcome": "passed",
+    }
+
+
+def _both(row: str, facet: str, ingress: str) -> list[dict[str, object]]:
+    """Both halves of a claim: it blocks, and a legitimate call still gets through."""
+    return [_passing(row, facet, ingress, "bloque"), _passing(row, facet, ingress, "laisse_passer")]
 
 
 def test_a_blocked_claim_without_a_scenario_fails_the_build(tmp_path: Path) -> None:
@@ -70,22 +83,37 @@ def test_a_blocked_claim_without_a_scenario_fails_the_build(tmp_path: Path) -> N
 
 def test_a_failing_scenario_proves_nothing(tmp_path: Path) -> None:
     # The distinction that matters: the marker existing is not the marker passing.
-    failed = _passing("M-99", "dur", "mcp") | {"outcome": "failed"}
-    result = _run(tmp_path, [failed])
+    scenarios = [s | {"outcome": "failed"} for s in _both("M-99", "dur", "mcp")]
+    result = _run(tmp_path, scenarios)
     assert result.returncode == 1
 
 
-def test_a_passing_scenario_satisfies_the_gate(tmp_path: Path) -> None:
-    result = _run(tmp_path, [_passing("M-99", "dur", "mcp")])
+def test_both_halves_satisfy_the_gate(tmp_path: Path) -> None:
+    result = _run(tmp_path, _both("M-99", "dur", "mcp"))
     assert result.returncode == 0, result.stderr
     assert "CM-7 = 0" in result.stdout
+
+
+def test_a_blocking_only_claim_fails(tmp_path: Path) -> None:
+    # A guard that refuses everything is not a control, it is an outage -- and the
+    # blocking scenario stays green on a gateway that blocks blindly. Proving the
+    # refusal without proving the discrimination proves the wrong thing.
+    result = _run(tmp_path, [_passing("M-99", "dur", "mcp", "bloque")])
+    assert result.returncode == 1
+    assert "une garde qui refuse tout est une panne" in result.stderr
+
+
+def test_a_pass_through_only_claim_fails(tmp_path: Path) -> None:
+    result = _run(tmp_path, [_passing("M-99", "dur", "mcp", "laisse_passer")])
+    assert result.returncode == 1
+    assert "ne prouve que l'action est refusée" in result.stderr
 
 
 def test_a_marker_naming_an_unknown_facet_fails(tmp_path: Path) -> None:
     # Same shape as the closed constraint vocabulary: an unknown key is rejected,
     # never silently ignored. A typo'd marker would otherwise prove nothing while
     # looking like proof.
-    result = _run(tmp_path, [_passing("M-99", "inexistante", "mcp")])
+    result = _run(tmp_path, _both("M-99", "inexistante", "mcp"))
     assert result.returncode == 1
     assert "marqueur inconnu" in result.stderr
 
@@ -94,7 +122,7 @@ def test_a_scenario_on_an_unclaimed_ingress_is_rejected(tmp_path: Path) -> None:
     # The registry claims `mcp` only. A test asserting the http path would be real
     # evidence, but not evidence for *this* claim -- accepting it would let the map
     # publish a path nobody claimed.
-    result = _run(tmp_path, [_passing("M-99", "dur", "http")])
+    result = _run(tmp_path, _both("M-99", "dur", "http"))
     assert result.returncode == 1
     assert "absent de la revendication" in result.stderr
 

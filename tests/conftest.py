@@ -159,7 +159,13 @@ def db(pg_cluster: pgcluster.EphemeralPostgres) -> Iterator[DBHandle]:
 # --- Coverage scenarios (AD-26, AD-30) ---------------------------------------
 # A gate test may declare the coverage facet it proves:
 #
-#     @pytest.mark.covers("M-06", "chaine", ingress="mcp")
+#     @pytest.mark.covers("M-06", "chaine", ingress="mcp", sens="bloque")
+#
+# `sens` says which half of the claim the test carries: `bloque` (the action was
+# refused) or `laisse_passer` (a legitimate action still went through). A `Bloqué`
+# facet needs both, because a guard that refuses everything is not a control, it is
+# an outage -- and the blocking test stays green on a gateway that blocks blindly.
+# A test asserting both halves carries both markers.
 #
 # The run records every marked test's outcome to `coverage/.scenarios.json`, and
 # `scripts/gen_coverage.py` folds that into the published map. A test that did not
@@ -172,7 +178,7 @@ _scenarios_key = pytest.StashKey[list[dict[str, Any]]]()
 def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers",
-        "covers(row, facet, ingress=...): coverage facet this test proves (AD-26)",
+        "covers(row, facet, ingress=..., sens=...): coverage facet this test proves (AD-26)",
     )
     config.stash[_scenarios_key] = []
 
@@ -187,12 +193,15 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]) ->
         if len(mark.args) != 2:
             raise ValueError(f"{item.nodeid}: @covers takes (row, facet)")
         row, facet = mark.args
-        ingress = mark.kwargs.get("ingress")
+        sens = mark.kwargs.get("sens")
+        if sens not in ("bloque", "laisse_passer"):
+            raise ValueError(f"{item.nodeid}: @covers needs sens='bloque'|'laisse_passer'")
         item.config.stash[_scenarios_key].append(
             {
                 "row": row,
                 "facet": facet,
-                "ingress": ingress,
+                "ingress": mark.kwargs.get("ingress"),
+                "sens": sens,
                 "test": item.nodeid,
                 "outcome": report.outcome,
             }

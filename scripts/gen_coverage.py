@@ -13,6 +13,11 @@ Two rules carry the whole thing:
 2. **A facet is published `Bloqué` only on the ingress paths actually proven.** A
    claim true on MCP reads as true everywhere unless the map says otherwise
    (`AD-28`). Unproven ingress paths render as `non asserté`, never as `Bloqué`.
+3. **A `Bloqué` facet needs both halves: a scenario that blocks, and one that lets a
+   legitimate call through.** A guard that refuses everything is not a control, it is
+   an outage -- and a blocking-only scenario stays green on a gateway that blocks
+   blindly. This is the mechanically checkable form of "every scenario carries its
+   negative control".
 
 Usage:
     uv run pytest                          # writes coverage/.scenarios.json
@@ -50,17 +55,25 @@ class Facet:
     gaps: list[str]
     #: ingress path -> node ids of the tests that passed for it
     prouve: dict[str, list[str]] = field(default_factory=dict)
+    #: which halves of the claim are proven: "bloque" and/or "laisse_passer"
+    sens_prouves: set[str] = field(default_factory=set)
 
     @property
     def exige_scenario(self) -> bool:
         return self.mode_revendique == "B"
 
     @property
+    def sens_manquants(self) -> list[str]:
+        if not self.exige_scenario:
+            return []
+        return [s for s in ("bloque", "laisse_passer") if s not in self.sens_prouves]
+
+    @property
     def mode_publie(self) -> str:
-        """The mode we may actually publish. `Bloqué` survives only if proven."""
+        """The mode we may actually publish. `Bloqué` survives only if fully proven."""
         if not self.exige_scenario:
             return self.mode_revendique
-        return "B" if self.prouve else "NA"
+        return "B" if self.prouve and not self.sens_manquants else "NA"
 
     @property
     def ingress_manquants(self) -> list[str]:
@@ -114,6 +127,8 @@ def _attach_scenarios(facets: list[Facet]) -> list[str]:
             )
             continue
         facet.prouve.setdefault(ingress, []).append(entry["test"])
+        if entry.get("sens"):
+            facet.sens_prouves.add(entry["sens"])
     return errors
 
 
@@ -130,6 +145,15 @@ def _commit() -> str:
     except (subprocess.CalledProcessError, FileNotFoundError):  # pragma: no cover
         return "inconnu"
 
+
+#: Why a missing half matters, said in the error rather than left to be inferred.
+_POURQUOI_SENS = {
+    "bloque": "aucun scénario ne prouve que l'action est refusée",
+    "laisse_passer": (
+        "aucun scénario ne prouve qu'un appel légitime passe encore — "
+        "une garde qui refuse tout est une panne, pas un contrôle"
+    ),
+}
 
 _MODE_LABEL = {
     "B": "Bloqué",
@@ -193,6 +217,13 @@ def main() -> int:
             f"{f.row_id}/{f.cle} revendique « Bloqué » et aucun scénario ne l'asserte ({f.libelle})"
         )
 
+    # Rule 3. Blocking-only proves the guard refuses, not that it discriminates.
+    for f in facets:
+        if not f.prouve:
+            continue
+        for manque in f.sens_manquants:
+            errors.append(f"{f.row_id}/{f.cle} : {_POURQUOI_SENS[manque]}")
+
     if errors:
         print("CM-7 — la carte ne peut pas être publiée :\n", file=sys.stderr)
         for e in errors:
@@ -232,6 +263,7 @@ def main() -> int:
                 "mode_publie": f.mode_publie,
                 "ingress_prouve": sorted(f.prouve),
                 "ingress_non_asserte": f.ingress_manquants,
+                "sens_prouves": sorted(f.sens_prouves),
                 "scenarios": sorted(t for v in f.prouve.values() for t in v),
                 "ecarts": f.gaps,
             }

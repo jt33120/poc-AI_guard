@@ -58,13 +58,14 @@ def _decisions(db: DBHandle) -> list[str]:
     return [r[0] for r in db.conn.execute("select decision from audit_log").fetchall()]
 
 
+@pytest.mark.covers("M-12", "rbac", ingress="mcp", sens="laisse_passer")
 async def test_allowed_client_may_call(db: DBHandle) -> None:
     proxy = FakeProxy()
     result = await _backend(db, proxy, client_id="c1").call_tool("secret", {})
     assert result.isError is False and proxy.calls == ["secret"]
 
 
-@pytest.mark.covers("M-12", "rbac", ingress="mcp")
+@pytest.mark.covers("M-12", "rbac", ingress="mcp", sens="bloque")
 async def test_foreign_client_is_denied_and_audited(db: DBHandle) -> None:
     proxy = FakeProxy()
     result = await _backend(db, proxy, client_id="c2").call_tool("secret", {})
@@ -73,7 +74,7 @@ async def test_foreign_client_is_denied_and_audited(db: DBHandle) -> None:
     assert "rbac_denied" in _decisions(db)
 
 
-@pytest.mark.covers("M-12", "rbac", ingress="mcp")
+@pytest.mark.covers("M-12", "rbac", ingress="mcp", sens="bloque")
 async def test_missing_client_is_denied(db: DBHandle) -> None:
     proxy = FakeProxy()
     result = await _backend(db, proxy, client_id=None).call_tool("secret", {})
