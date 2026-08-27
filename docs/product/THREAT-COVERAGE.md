@@ -269,6 +269,36 @@ Chaque `G-nn` deviendra une ou plusieurs exigences fonctionnelles, numérotées 
 | `G-20` | Déclarer l'angle mort de l'IA embarquée SaaS (P1b) et instruire la couverture `Détecté`/`Attesté` par ingestion des journaux d'audit de la suite | §2.4 | Haute — population très répandue |
 | `G-21` | Documenter et rendre démontrable l'architecture de référence souveraine (§6.2), y compris le choix des substituts UE pour chaque ligne `Orchestré` | Tous (pilier 3) | **Haute** — le pilier « Made in France » n'existe pas sans elle |
 
+### 8.2 Recoupement avec les 34 correctifs de PLAN-REVIEW
+
+La strate absorbe les 34 correctifs contraignants (`QO-1`). Additionnés aux 21 écarts, cela ferait 55 items — mais le recoupement est réel, et surtout **trois correctifs entrent en conflit frontal avec la direction v2.5**. Ce sont eux qui comptent : le reste est de l'arithmétique.
+
+**Recouvrements directs — cinq paires, un seul travail à faire :**
+
+| Écart | Correctif | Sujet commun |
+|---|---|---|
+| `G-03` | `INV-4` | Le taint indexé sur un `session_id` déclaré par l'agent |
+| `G-06` | `EXH-4` | Classification déterministe des outils exécuteurs |
+| `G-07` | `INV-5` | L'approbation par canal, rejouable par tout lecteur du message |
+| `G-11` | `EXH-2` | Fail-open sur clé de contrainte inconnue |
+| `G-18` | `FR-144` | Carte de couverture publiée, lignes non couvertes incluses |
+
+Périmètre net : **≈ 50 items distincts**, pas 55.
+
+**Trois conflits à arbitrer — la revue contredit la direction produit :**
+
+| Conflit | Ce que dit la revue | Ce que demande la strate v2.5 |
+|---|---|---|
+| **Référentiels** | `EXH-7` : ne livrer que le mapping EU AI Act, et différer ISO 42001 / NIST / SOC 2 / RGPD — « une correspondance qu'un auditeur rejette est pire que pas de correspondance », elle exige la revue d'un assesseur en exercice. | `G-16` ajoute **quatre familles** : OWASP LLM Top 10 + MITRE ATLAS, NIS2, DORA, ANSSI/SecNumCloud. |
+| **Proxy LLM** | `EXH-6` : le rétrograder de chemin d'ingestion à simple sonde de télémétrie non bloquante, et le sortir du périmètre d'unification de `FR-1`. | C'est **là que tourne la DLP d'egress**, donc la couverture `Bloqué` de **M-10** (exfiltration / Shadow AI) — l'une des huit lignes bloquées natives. |
+| **Découpage de release** | `PLAN-REVIEW.md:18-29` : v2.0-core = Epics 1-5 ; les Epics 6-13 partent en v2.1/v2.2. | **M-06** dépend de l'Epic 6 (arrêt d'urgence) et **G-03** de l'Epic 7 (plan agent, taint persisté). Deux lignes de couverture revendiquées reposent sur des epics repoussés. |
+
+**Lecture.** Le conflit sur les référentiels est le plus simple à trancher : `EXH-7` vise les référentiels de *management* (ISO 42001, SOC 2), dont la correspondance engage un jugement d'auditeur. OWASP LLM Top 10 et MITRE ATLAS sont des taxonomies *techniques* — s'y aligner est descriptif, pas assertif, et ne présente pas le même risque. NIS2, DORA et ANSSI retombent en revanche dans la catégorie que la revue met en garde.
+
+Le conflit sur le proxy LLM est le plus coûteux : suivre `EXH-6` sans compensation dégrade M-10 de `Bloqué` à `Détecté`, ce qui retire une ligne au compte de la démo. Une sortie possible est de séparer les deux fonctions — garder l'application DLP sur l'egress (enforcement) tout en abandonnant la comptabilité de coûts et la reconstitution des appels d'outils en flux (télémétrie) — mais elle reste à valider.
+
+Ces trois arbitrages conditionnent le périmètre des `FR-153+` et doivent être tranchés avant l'écriture de la PRD.
+
 ---
 
 ## 9. Questions ouvertes
