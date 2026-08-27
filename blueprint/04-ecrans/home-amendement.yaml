@@ -1,0 +1,47 @@
+id: home_amendement
+nom: Accueil — amendement bandeau de déploiement
+route: /home
+roles: [viewer, operator, admin]
+roles_refuses: []
+objectif: "Dire sur quel déploiement tourne l'instance et quelle est la nature de son historique, pour qu'un visiteur ne prenne jamais des données fabriquées pour du réel."
+parcours: [P4]
+
+# AMENDEMENT — l'écran existe (frontend/app/(app)/home/page.tsx) et n'est pas
+# re-spécifié. Cette spec ne couvre QUE le bandeau ajouté en tête.
+
+layout:
+  - zone: bandeau_deploiement
+    composants:
+      - { type: Encadre, variante: neutre, position: "au-dessus du contenu existant", visible_si: "deployment != null" }
+      - { type: Badge, cle: deployment, valeurs: "hosted|local", libelle_hosted: "Instance de démonstration hébergée", libelle_local: "Instance locale" }
+      - { type: Paragraphe, classe: muted, cle: nature_historique, texte: "<selon le déploiement — voir états>" }
+
+donnees:
+  - endpoint: get_readiness
+    quand: "au montage — le champ `deployment` arrive dans la réponse existante, aucun appel supplémentaire"
+
+etats:
+  loading: "Aucun bandeau tant que la valeur n'est pas connue. Un bandeau qui s'afficherait puis changerait de libellé serait pire que son absence."
+  empty: "Champ `deployment` absent de la réponse — instance de production d'un client : aucun bandeau. C'est le cas nominal en clientèle, pas une dégradation."
+  error: "Sonde injoignable : aucun bandeau, et le reste de l'écran conserve son comportement existant. Le bandeau ne crée pas de mode d'échec propre."
+  partial: "Déploiement hébergé mais historique plus court que la fenêtre annoncée : le texte dit la durée réelle disponible, jamais la durée visée."
+  success: "Bandeau visible. En hébergé : « Instance de démonstration hébergée — trafic d'agents de démonstration uniquement, historique accumulé depuis le <date>. » En local : « Instance locale — historique fabriqué à partir d'une graine committée, aucune donnée réelle. »"
+
+interactions:
+  - declencheur: "Clic sur le badge de déploiement"
+    effet: "Déplie une explication : ce que contient l'historique, ce qu'il ne contient pas, et le fait qu'aucun trafic client réel n'y transite."
+    feedback: "L'encadré s'étend en place ; l'état déplié se conserve pour la session."
+
+responsive:
+  base: "Bandeau pleine largeur au-dessus du contenu, texte sur deux lignes."
+  md: "Badge et texte sur une ligne."
+  lg: "Inchangé."
+
+a11y:
+  - "Le bandeau est une région de complément annoncée avant le contenu principal — c'est une réserve sur ce qui suit, elle doit précéder sa lecture."
+  - "Le déploiement est porté par un libellé textuel, jamais par la seule couleur du badge."
+
+edge_cases:
+  - "Instance client réelle : aucun bandeau, jamais de mention « production » — nommer le déploiement d'un client sur son propre écran n'apporte rien et expose une information de posture qu'INV-11 tient hors des surfaces non authentifiées."
+  - "Instance locale connectée au réseau : le bandeau reste « locale ». Le déploiement décrit l'origine des données, pas l'état du réseau."
+  - "Historique hébergé vide au premier démarrage : le texte dit « historique en cours de constitution » plutôt qu'une date de début qui serait celle du jour."

@@ -1,0 +1,87 @@
+id: admin_amendement
+nom: Administration — amendement fenêtres d'observation
+route: /admin
+roles: [admin]
+roles_refuses: [viewer, operator]
+objectif: "Ouvrir, prolonger et arrêter une fenêtre d'observation par agent, bornée dans le temps, en disant ce que le mode ne couvre pas."
+parcours: [P5]
+
+# AMENDEMENT — l'écran existe (frontend/app/(app)/admin/page.tsx) et n'est pas
+# re-spécifié. Cette spec ne couvre QUE la section ajoutée.
+
+layout:
+  - zone: section_observation
+    composants:
+      - { type: Heading, niveau: h2, texte: "Mode observation" }
+      - { type: Paragraphe, classe: muted, texte: "Le pipeline s'exécute entièrement et journalise la décision qu'il aurait prise, sans bloquer l'appel." }
+      - { type: Encadre, variante: neutre, texte: "Les actions irréversibles et les envois externes restent bloqués en observation. Ce mode ne les couvre jamais." }
+      - { type: DataTable, colonnes: [agent_nom, etat, expires_at, enabled_by], tri_defaut: "expires_at asc", pagination: 25 }
+  - zone: ouverture
+    composants:
+      - { type: Select, id: agent, label: "Agent", options: "<agents du tenant>" }
+      - { type: Input, id: duree_heures, variante: number, label: "Durée (heures)", aide: "Plafond : <plafond configuré> h" }
+      - { type: Button, variante: primary, label: "Ouvrir une fenêtre", position: droite, action: "open_monitor_window" }
+
+donnees:
+  - endpoint: list_monitor_windows
+    quand: "au montage, et après chaque ouverture ou fermeture"
+  - endpoint: open_monitor_window
+    quand: "au clic sur « Ouvrir une fenêtre »"
+  - endpoint: close_monitor_window
+    quand: "au clic sur « Arrêter » d'une ligne active"
+
+etats:
+  loading: "Squelette de tableau. Le formulaire d'ouverture est rendu mais désactivé — il ne doit pas être actionnable avant de savoir si une fenêtre court déjà."
+  empty: "Aucune fenêtre jamais ouverte : le tableau est remplacé par « Aucune période d'observation. L'enforcement est actif sur tous les agents. » Le formulaire reste disponible."
+  error: "Bandeau badge-red « Impossible de charger les fenêtres d'observation » et bouton « Réessayer ». Le formulaire d'ouverture est désactivé tant que l'état est inconnu — ouvrir à l'aveugle pourrait prolonger une fenêtre sans le savoir."
+  partial: "Fenêtres présentes mais toutes expirées : le tableau les affiche en historique grisé, avec la mention « l'enforcement est actif »."
+  success: "Le tableau liste les fenêtres avec leur état, leur échéance et qui les a ouvertes. Une fenêtre active porte un bouton « Arrêter »."
+
+interactions:
+  - declencheur: "Clic sur « Ouvrir une fenêtre »"
+    effet: "Ouvre une fenêtre pour l'agent choisi, ou prolonge celle qui court déjà. Écrit un événement de plan de contrôle."
+    feedback: "Bandeau badge-green nommant l'échéance : « Observation active sur <agent> jusqu'au <date>. » Si une fenêtre courait déjà, le message dit « prolongée jusqu'au <date> » et non « ouverte »."
+  - declencheur: "Clic sur « Arrêter » d'une ligne active"
+    effet: "Ferme la fenêtre immédiatement ; l'enforcement reprend au prochain appel."
+    feedback: "Confirmation préalable nommant l'agent, puis bandeau badge-green « Enforcement rétabli sur <agent> ». La ligne passe en historique, elle ne disparaît pas."
+  - declencheur: "Saisie d'une durée au-delà du plafond"
+    effet: "La soumission est bloquée avant tout appel."
+    feedback: "Message sous le champ nommant le plafond configuré, et non un refus générique."
+  - declencheur: "Clic sur « Voir le rapport » d'une ligne"
+    effet: "Navigue vers /promotion filtré sur cet agent."
+    feedback: "Transition avec le filtre agent pré-appliqué et visible."
+
+validations:
+  - champ: duree_heures
+    regles: ["entier strictement positif", "inférieur ou égal au plafond configuré"]
+    quand: "à la saisie et à la soumission, côté serveur également"
+    message_invalide: "La durée doit être un nombre d'heures positif."
+    message_plafond: "Le plafond configuré est de <plafond> heures. Une fenêtre sans échéance courte n'est pas une observation, c'est un contournement."
+  - champ: agent
+    regles: ["appartient aux agents du tenant"]
+    quand: "à la soumission"
+    message_invalide: "Agent inconnu. Rechargez la page."
+
+soumission:
+  bloquee_si: "aucun agent choisi, ou durée absente, invalide ou au-delà du plafond"
+  pendant: "Le bouton est désactivé et porte un Spinner. Le tableau reste lisible."
+  succes: "Le tableau se recharge, la nouvelle fenêtre apparaît en tête, et le bandeau nomme l'échéance."
+  echec_403: "Bandeau badge-red « L'ouverture d'une fenêtre d'observation demande le rôle admin. »"
+  echec_422: "Le message du serveur est affiché tel quel sous le champ concerné — il nomme le plafond, ce qu'un message générique ne ferait pas."
+  echec_reseau: "Bandeau badge-amber « Ouverture impossible. » Aucune fenêtre n'est ouverte : en cas de doute, l'enforcement reste actif."
+
+responsive:
+  base: "Tableau en cartes, formulaire empilé sous la section."
+  md: "Tableau en colonnes, formulaire sur une ligne."
+  lg: "Inchangé."
+
+a11y:
+  - "L'encadré de bornes précède le tableau dans l'ordre du document : c'est une réserve sur ce que le mode couvre, elle doit être lue avant d'agir."
+  - "La confirmation d'arrêt est un dialogue modal étiqueté, avec le focus placé sur l'action la moins destructrice."
+  - "Le champ durée annonce son plafond par une description associée, pas seulement par un texte d'aide visuel."
+
+edge_cases:
+  - "Ouverture sur un agent déjà en observation : prolonge, jamais une seconde ligne. Le message dit « prolongée » pour que l'administrateur sache ce qu'il vient de faire."
+  - "Fenêtre expirant pendant que l'écran est ouvert : la ligne passe en historique sans rechargement, et un bandeau annonce le rétablissement de l'enforcement."
+  - "Agent supprimé avec une fenêtre active : la fenêtre est close par la suppression ; la ligne subsiste en historique sous le nom historique de l'agent."
+  - "Plafond de configuration abaissé alors qu'une fenêtre plus longue court : la fenêtre en cours va à son terme, les nouvelles sont bornées au nouveau plafond. On ne raccourcit pas rétroactivement une décision tracée."

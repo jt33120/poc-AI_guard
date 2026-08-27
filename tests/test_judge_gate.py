@@ -74,3 +74,44 @@ async def test_ambiguous_safe_stays_auto(db: DBHandle) -> None:
     assert result.isError is False
     assert "hi" in result.content[0].text  # type: ignore[union-attr]
     assert _decisions(db, tenant_id) == [("allow", True)]
+
+
+async def test_ambiguous_without_a_judge_is_held_not_auto_allowed(db: DBHandle) -> None:
+    # No MISTRAL_API_KEY -> build_judge returns None. The rule below says `auto`;
+    # the guarantee is that it is NOT honoured. Before this, the escalation was
+    # skipped entirely when no judge existed and a destructive call ran unattended.
+    tenant_id = _seed_tenant(db)
+    policy = parse_policy(
+        "tools:\n"
+        "  - {name: mock.delete_contact, classify: ambiguous, approval: auto}\n"
+        "defaults: {unknown_tool: deny}\n"
+    )
+    ctx = ApprovalContext(database_url=db.url, tenant_id=tenant_id, timeout_seconds=3600)
+    backend = PolicyBackend(policy, _proxy(), ctx, judge=None)
+
+    result = await backend.call_tool("delete_contact", {"contact_id": "c1"})
+
+    assert result.isError is True
+    assert "requires_approval" in result.content[0].text  # type: ignore[union-attr]
+    assert "deleted" not in result.content[0].text  # type: ignore[union-attr]
+    # Held, and not credited to a judge that does not exist (AD-21.4).
+    assert _decisions(db, tenant_id) == [("hitl_pending", False)]
+
+
+async def test_ambiguous_without_a_judge_holds_even_a_harmless_tool(db: DBHandle) -> None:
+    # Fail-closed means the *whole* ambiguous branch is floored, not just the tools
+    # a human would guess are dangerous: with no classifier there is nothing to
+    # distinguish them by.
+    tenant_id = _seed_tenant(db)
+    policy = parse_policy(
+        "tools:\n"
+        "  - {name: mock.echo, classify: ambiguous, approval: auto}\n"
+        "defaults: {unknown_tool: deny}\n"
+    )
+    ctx = ApprovalContext(database_url=db.url, tenant_id=tenant_id, timeout_seconds=3600)
+    backend = PolicyBackend(policy, _proxy(), ctx, judge=None)
+
+    result = await backend.call_tool("echo", {"text": "hi"})
+
+    assert result.isError is True
+    assert _decisions(db, tenant_id) == [("hitl_pending", False)]

@@ -1,0 +1,80 @@
+id: couverture
+nom: Carte de couverture
+route: /couverture
+roles: [public, viewer, operator, admin]
+roles_refuses: []
+objectif: "Montrer, pour un profil donné, quelles menaces le concernent et lesquelles sont réellement bloquées — avec la preuve et le chemin d'ingestion de chaque revendication."
+parcours: [P1]
+
+layout:
+  - zone: header
+    composants:
+      - { type: Heading, niveau: h1, texte: "Votre carte de couverture" }
+      - { type: ProfileTierChip, source: tiers_effectifs, etat: lecture, action: "naviguer:/diagnostic" }
+      - { type: Paragraphe, classe: muted, source: provenance, texte: "Générée le <date> depuis le commit <sha>." }
+  - zone: compte
+    composants:
+      - { type: Statistique, cle: applicables, libelle: "menaces vous concernent", taille: xl }
+      - { type: Statistique, cle: bloquees, libelle: "bloquées nativement", taille: xl, variante: "coverage.blocked" }
+      - { type: Paragraphe, classe: muted, texte: "Sur les 16 vecteurs que le marché présente." }
+  - zone: applicables
+    composants:
+      - { type: Heading, niveau: h2, texte: "Ce qui vous concerne" }
+      - { type: DataTable, colonnes: [libelle, mode, chemin, preuve], tri_defaut: "mode asc", pagination: 0 }
+      - { type: CoverageBadge, colonne: mode, avec_chemin: true }
+  - zone: non_applicables
+    composants:
+      - { type: Heading, niveau: h2, texte: "Ce qui ne vous concerne pas, et pourquoi" }
+      - { type: DataTable, colonnes: [libelle, raison], tri_defaut: "libelle asc", pagination: 0 }
+
+donnees:
+  - endpoint: get_coverage_map
+    quand: "au montage, avec le profil de l'URL s'il est présent, sinon celui du tenant si une session existe"
+  - endpoint: get_tenant_profile
+    quand: "au montage si une session existe et qu'aucun profil n'est passé en URL"
+
+etats:
+  loading: "Squelette de deux tableaux et deux statistiques en attente. Aucun chiffre affiché avant d'être vrai — un zéro transitoire se lirait comme un résultat."
+  empty: "Profil vide, aucun usage d'IA déclaré : les tableaux sont remplacés par un message « Aucun usage d'IA déclaré. Reprenez le diagnostic pour voir votre exposition. » et un bouton vers /diagnostic. Jamais les seize menaces par défaut."
+  error: "Résultats de scénarios indisponibles (503) : la carte REFUSE de s'afficher. Bandeau badge-red « Carte indisponible : les preuves de couverture n'ont pas pu être chargées. » et bouton « Réessayer ». Aucune revendication n'est affichée sans sa preuve (AD-30)."
+  partial: "Profil incomplet : les deux tableaux s'affichent, et une troisième section « Indéterminé — n menaces » liste ce que le diagnostic n'a pas tranché, avec un lien pour compléter."
+  success: "Deux tableaux peuplés, le compte « N vous concernent, M bloquées » en tête, chaque ligne portant son mode, son chemin d'ingestion et sa preuve."
+
+interactions:
+  - declencheur: "Clic sur une ligne applicable"
+    effet: "Déplie le détail : description de la menace, contrôle qui s'applique, référentiels correspondants, et lien vers la preuve."
+    feedback: "La ligne s'étend en place, la pastille de mode reste visible ; l'état déplié se conserve au tri."
+  - declencheur: "Clic sur la preuve d'une ligne bloquée"
+    effet: "Ouvre le scénario qui l'atteste — son identifiant, sa dernière exécution et son résultat."
+    feedback: "Panneau latéral, avec la date d'exécution et le commit. Si le scénario n'a pas tourné sur le commit courant, la ligne ne serait pas là."
+  - declencheur: "Clic sur le ProfileTierChip"
+    effet: "Retourne au diagnostic, questionnaire pré-rempli."
+    feedback: "Transition immédiate, aucune confirmation — rien n'est perdu."
+  - declencheur: "Survol d'un CoverageBadge"
+    effet: "Affiche la définition du mode et la portée du chemin d'ingestion."
+    feedback: "Infobulle : « Bloqué sur MCP — l'action est refusée. Sur le chemin coopératif, la décision est enregistrée mais l'exécution dépend de l'agent. »"
+
+# Aucune section `validations` : cet écran est en lecture seule et ne soumet rien.
+# La vérification du paramètre d'URL `profile` est un cas limite au sens strict —
+# elle s'applique avant tout appel, pas à la soumission d'un formulaire. Elle est
+# donc spécifiée sous `edge_cases`, où son comportement est défini.
+
+responsive:
+  base: "Tableaux en cartes empilées, une menace par carte, mode et chemin en tête de carte."
+  md: "Tableaux en colonnes. Le compte reste en tête, sur une ligne."
+  lg: "Deux tableaux l'un sous l'autre, largeur bornée et interlignes augmentés — la carte doit rester lisible projetée dans une salle, pas seulement sur un portable."
+
+a11y:
+  - "Le mode de couverture est porté par un libellé textuel en plus de la couleur ; la pastille n'est jamais le seul signal."
+  - "Les tableaux portent des en-têtes de colonne associés, et le dépliement d'une ligne est annoncé."
+  - "Le compte en tête est une région live polie, annoncée une seule fois après chargement."
+  - "Contraste conforme AA sur les cinq variantes de mode, y compris projetées."
+
+edge_cases:
+  - "Visiteur anonyme avec profil en URL : carte complète, aucune donnée du tenant, mention « profil déclaré, non enregistré »."
+  - "Paramètre `profile` malformé — palier inconnu ou séparateur inattendu : aucun appel n'est émis, bandeau badge-red « Profil non reconnu dans le lien » et bouton vers /diagnostic. Le paramètre est vérifié avant tout appel, jamais assaini en silence : un lien tronqué ne doit pas produire une carte plausible mais fausse."
+  - "Session sans profil enregistré : redirige vers /diagnostic, sauf profil explicite en URL."
+  - "Une menace applicable sans scénario : elle s'affiche avec son mode réel — jamais promue en Bloqué faute de preuve."
+  - "Une ligne Attesté ou Hors périmètre : la colonne chemin affiche « n/a », valeur prévue et non une absence (AD-28)."
+  - "Catalogue plus récent que le profil : bandeau badge-amber proposant un re-diagnostic, la carte restant affichée sur l'ancien profil."
+  - "Impression ou export PDF : les deux tableaux tiennent sans troncature, le compte et la provenance figurant sur chaque page."

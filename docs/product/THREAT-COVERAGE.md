@@ -15,11 +15,14 @@ autorité: "CLAUDE.md §4 (invariants non négociables) prime sur ce document. d
 
 Ce document est le **socle de cadrage** de la strate v2.5 : transformer xSOM AI Guard en démonstrateur de notre capacité de protection cyber souveraine pour l'IA, à destination des grands comptes.
 
-Il ne définit **aucune** exigence fonctionnelle. Il établit, pour chacune des 15 menaces de la matrice source, trois faits vérifiables :
+Il ne définit **aucune** exigence fonctionnelle. Il établit, pour chacune des 15 menaces de la matrice source, quatre faits vérifiables :
 
-1. **ce que le produit fait déjà**, prouvé par `fichier:ligne` dans le code livré ;
-2. **le mode de couverture revendicable** — et donc ce que le commercial a le droit de dire ;
-3. **l'écart résiduel** (`G-nn`), qui deviendra une exigence dans la PRD de strate.
+1. **à qui la menace appartient** (§2) — un éditeur de modèle et un grand compte utilisateur d'IA n'affrontent pas les mêmes attaques ;
+2. **ce que le produit fait déjà**, prouvé par `fichier:ligne` dans le code livré ;
+3. **le mode de couverture revendicable** — et donc ce que le commercial a le droit de dire ;
+4. **l'écart résiduel** (`G-nn`), qui deviendra une exigence dans la PRD de strate.
+
+Les deux premiers points forment deux **axes indépendants** : l'applicabilité (§2) dit *si ça le concerne*, la couverture (§1, §3) dit *ce que nous savons en faire*. Les croiser produit l'énoncé de la démo (§2.5) ; les confondre produit un catalogue.
 
 **Il est le préalable au BMAD.** Sans lui, la PRD re-spécifierait des contrôles déjà livrés (le pipeline actuel enchaîne déjà 8 gardes) et en promettrait d'inatteignables (aucun POC ne construit un EDR, une passerelle mail et un détecteur de deepfake).
 
@@ -45,7 +48,64 @@ Le piège commercial est de promettre « nous bloquons les 15 menaces ». C'est 
 
 ---
 
-## 2. La matrice
+## 2. L'axe d'applicabilité — qui est vraiment visé
+
+La couverture (§1) dit *ce que nous savons faire*. Elle ne dit pas *si la menace concerne ce client*. C'est le second axe, et c'est celui qui porte le premier pilier de la vision : **faire comprendre les vrais enjeux derrière les mots-clés**.
+
+### 2.1 Le tri fondateur : fournisseur de modèle ≠ utilisateur d'IA
+
+Les attaques qui visent **un éditeur de modèle** ne sont pas celles qui visent **un grand compte qui utilise l'IA**. La matrice source — comme OWASP LLM Top 10, comme l'essentiel du discours du marché — mélange les deux populations sans jamais le dire, parce que tout le monde a intérêt à vendre les quinze lignes.
+
+| Famille | Menaces | À qui le problème appartient |
+|---|---|---|
+| **Menaces du fournisseur** | Empoisonnement du jeu d'entraînement · Attaques adverses / évasion · Vol de modèle | L'éditeur qui entraîne et expose le modèle. **Sauf bascule de profil** — voir §2.3. |
+| **Cyber classique dopé à l'IA** | Phishing hyper-personnalisé · Deepfake · Malwares polymorphes | Réel pour le client, mais c'est son SOC, sa passerelle mail, son EDR. Nous n'en gardons que la facette IA : l'agent comme *émetteur* (M-07) et l'intégrité de l'*approbation* (M-08). |
+| **Sécurité de l'usage de l'IA** | Injection directe et indirecte · Piratage d'agent · Exfiltration & Shadow AI · Supply chain d'outils · Privilèges excessifs · Sorties non assainies · Fuite de system prompt · Validation aveugle de code · Hallucinations | **Le client, et notre terrain.** |
+
+Dire à voix haute que **6 des 16 lignes ne sont pas son sujet** est le moment où le RSSI comprend qu'on ne lui vend pas un catalogue. C'est un argument de crédibilité, pas une concession.
+
+### 2.2 Les profils d'usage
+
+Le sous-ensemble applicable se déduit de la position du client dans la chaîne de valeur. Chaque profil **ajoute** aux précédents.
+
+| Profil | Ce que fait le client | Réalité du marché français | Ce qui s'active en plus |
+|---|---|---|---|
+| **P1a — API hyperscaler** | Consomme Azure OpenAI et assimilés | **Très répandu** | Socle : exfiltration, Shadow AI, fuite de prompt, hallucinations. Tension de souveraineté : hébergement UE ≠ droit UE. |
+| **P1b — IA embarquée SaaS** | Microsoft Copilot et assimilés | **Très répandu** | Même socle, **mais aucune interposition possible** — voir §2.4. |
+| **P2 — RAG interne** | Base vectorielle nourrie de ses propres documents | **À maîtriser absolument** — socle non négociable | **+ injection indirecte**, **+ empoisonnement de la base vectorielle** |
+| **P3 — Agents outillés** | L'IA *agit* : envoie, écrit, paie, déploie | **En croissance** — la trajectoire | **+ piratage d'agent, privilèges excessifs, sorties non assainies, supply chain d'outils** ← cœur du produit |
+| **P4 — Poids ouverts hébergés** | Héberge lui-même les poids d'un modèle | **Nombreux** — c'est le modèle de distribution de Mistral auprès des grands comptes français | + supply chain de modèles (artefacts sérialisés), + extraction si le modèle est exposé, + **souveraineté réelle atteignable** (§6.2) |
+| **P5 — Entraînement / fine-tuning** | Entraîne ou affine un modèle | Rare | + empoisonnement du jeu d'entraînement, + attaques adverses |
+
+**P4 n'est pas un profil de niche en France.** C'est l'erreur d'analyse la plus coûteuse qu'on puisse faire ici : le modèle de distribution de Mistral place une part significative des grands comptes français en position d'hébergeur de poids. Cela change deux choses — des menaces réputées « côté fournisseur » redeviennent les leurs, et la souveraineté cesse d'être un argument pour devenir une architecture.
+
+### 2.3 Les bascules — la nuance qui prouve qu'on connaît le métier
+
+Trois menaces changent de camp selon le profil. Ce sont elles qu'il faut savoir expliquer en réunion.
+
+| Menace | Côté fournisseur tant que… | Devient le problème du client dès… |
+|---|---|---|
+| **Empoisonnement de données** (M-03) | le client ne détient aucun corpus | **P2** — sa base vectorielle est empoisonnable même s'il n'entraîne rien |
+| **Vol de modèle / extraction** (M-04) | le client ne fait que consommer une API | **P4** — il héberge et expose un modèle, fût-ce en interne |
+| **Attaques adverses** (M-05) | le client ne touche pas aux poids | **P5** seulement — et la conséquence reste bloquée au plan action (§3, M-05) |
+
+### 2.4 L'angle mort déclaré : l'IA embarquée SaaS (P1b)
+
+**Nous ne pouvons pas nous interposer devant Microsoft Copilot.** Il n'y a pas de frontière d'outils à instrumenter : l'assistant est encastré dans la suite, ses actions s'exécutent dans le tenant, et aucun gateway MCP ne s'intercale. Au mieux, une couverture **Détecté / Attesté** par ingestion des journaux d'audit de la suite — jamais **Bloqué**.
+
+C'est une ligne `X` sur l'enforcement, et elle doit être annoncée **avant** que le prospect ne la découvre, d'autant qu'il est probablement déjà équipé. Le dire sert le pilier « vrais enjeux » : un fournisseur qui prétend superviser Copilot par un proxy ment ou n'a pas compris le produit.
+
+### 2.5 Ce que la démo revendique
+
+La combinaison des deux axes donne l'énoncé de vente, à calculer devant le client plutôt qu'à asséner :
+
+> « Sur les 15 menaces que le marché vous présente, **N vous concernent réellement** compte tenu de votre usage. Sur ces N, nous en **bloquons M nativement, chez vous, aujourd'hui** — et voici les preuves. Les autres, nous vous disons qui les porte. »
+
+Un RSSI accorde davantage de crédit à ce compte-là qu'à quinze cases cochées, parce qu'il sait qu'aucun produit ne les coche.
+
+---
+
+## 3. La matrice de couverture
 
 Les 15 lignes de la matrice source produisent **16 lignes de couverture** : la menace « Injection de prompts (Directe / Indirecte) » regroupe deux vecteurs dont les plans techniques et les modes de couverture diffèrent radicalement, et doit être scindée.
 
@@ -83,6 +143,8 @@ Légende écart : ✅ couvert · ⚠️ partiel / durci à faire · ❌ absent
 | **M-10** | Exfiltration de données / PI via LLM | **B** (chemin supervisé) / **O** (découverte) | ✅ `core/dlp.py:59-75` (secret bloqué / PII signalé / entropie), `api/llm_proxy.py`, coffre `core/secrets.py`. ⚠️ `FR-64` (DLP post-taint) **différé**. ❌ Découverte du Shadow AI non supervisé = territoire CASB. | `G-08` `G-09` |
 | **M-11** | Supply chain (modèles / bibliothèques) | **B** (outils MCP) / **A** (libs) / **O** (modèles ML) | ✅ Outils MCP : empreinte + quarantaine, `gateway/server.py:130-134`, `FR-53/54/68` — différenciateur revendiqué (PRD.md:1087). ✅ Libs : SBOM `FR-141`, `pip-audit` + `trufflehog` en CI. ❌ Modèles ML (picklescan/modelscan) : absent. | `G-10` |
 
+**M-10 — Chemin d'ingestion (`AD-28`).** Le `Bloqué` porte sur l'**egress du proxy LLM**, et il y est inconditionnel : le blocage DLP précède l'appel amont et la branche streaming, donc ni l'en-tête `x-xsom-mode` ni le mode flux ne l'atteignent (§8.3). Il ne porte **pas** sur la garde d'appels d'outils du même proxy, qui relève de `M-06`/`M-12` et tombe sous `G-25`/`G-26`.
+
 **M-10 — Collision / Résolution.** PRD `§5.4` : « xSOM n'est pas un produit DLP ; la DLP est une *entrée* des décisions de risque et d'egress, pas un plan de contrôle vendu ». **Résolution :** la ligne reste `B` sur le chemin supervisé — le blocage d'un secret sortant est réel et prouvable — mais le support commercial ne vend jamais « une DLP ». Il vend « aucun secret ne franchit la frontière d'action sans décision tracée ». Le non-objectif tient.
 
 ### Domaine 4 — Architecture & Configuration
@@ -108,7 +170,7 @@ Légende écart : ✅ couvert · ⚠️ partiel / durci à faire · ❌ absent
 
 ---
 
-## 3. Synthèse de couverture
+## 4. Synthèse de couverture
 
 | Mode | Lignes | Part |
 |---|---|---|
@@ -122,7 +184,7 @@ Légende écart : ✅ couvert · ⚠️ partiel / durci à faire · ❌ absent
 
 ---
 
-## 4. Défauts confirmés dans le code livré — bloquants pour toute démo
+## 5. Défauts confirmés dans le code livré — bloquants pour toute démo
 
 Ces trois points ne sont pas des écarts de périmètre : ce sont des **défauts du cœur d'enforcement existant**, confirmés en lisant le code, sur des chemins que la démonstration expose directement.
 
@@ -136,9 +198,11 @@ Ces trois points ne sont pas des écarts de périmètre : ce sont des **défauts
 
 ---
 
-## 5. Axe souveraineté
+## 6. Axe souveraineté
 
 C'est le mot du brief, et c'est aujourd'hui le point le plus faible du plan v2.
+
+### 6.1 L'écart entre la promesse et le plan
 
 **Constat.** `« sovereign hosting bundles »` est **explicitement hors périmètre** de la v2.0 (PRD.md:961). **Mistral n'apparaît pas une seule fois** dans les 6 800 lignes des quatre documents produit — alors que `CLAUDE.md §3` impose `LiteLLM → Mistral` pour le juge. **OVH : zéro occurrence.** Keycloak apparaît deux fois, et `PLAN-REVIEW.md:174-178` (DEP-6) qualifie l'affirmation « Keycloak/Entra/Okta fonctionnent par configuration seule » de **fausse**.
 
@@ -146,9 +210,27 @@ C'est le mot du brief, et c'est aujourd'hui le point le plus faible du plan v2.
 
 **Principe à porter dans la PRD :** *aucun contrôle du chemin de décision ne dépend d'un service hors UE, et le produit doit fonctionner intégralement hors ligne.* Le socle technique existe déjà — `OP-10` (opération hors ligne), l'ancre `file` « seule option fonctionnant en air-gap » (ARCHITECTURE-V2.md:395), le vérificateur autonome sans dépendance. La souveraineté est donc à **assembler et à nommer**, pas à inventer.
 
+### 6.2 L'architecture de référence souveraine — ce que P4 rend possible
+
+Le profil **P4** (§2.2) transforme la souveraineté d'argument en architecture démontrable. Un grand compte qui héberge déjà les poids d'un modèle français peut faire tourner une chaîne complète sans dépendance hors UE **sur le chemin de décision** :
+
+| Couche | Composant souverain | État |
+|---|---|---|
+| Modèle | Poids Mistral auto-hébergés (ou plateforme FR) | Chez le client (P4) |
+| Contrôle d'action | Gateway xSOM | Existant |
+| Juge (cas ambigus) | Mistral via LiteLLM | **Imposé par `CLAUDE.md §3`, à rendre visible dans le plan** |
+| Données & audit | Postgres auto-hébergé | Existant |
+| Identité | Keycloak / GoTrue auto-hébergé | Existant, mais voir `DEP-6` |
+| Hébergement | OVH, Scaleway, Outscale, ou on-premise | À nommer |
+| Ancrage de preuve | Ancre `file`, fonctionne en air-gap | Existant (ARCHITECTURE-V2.md:395) |
+
+**C'est le seul argument de souveraineté qui résiste à un RSSI.** Il ne repose pas sur une localisation de datacentre — un hébergement UE opéré sous droit américain n'est pas une réponse — mais sur l'absence de dépendance opérationnelle : aucun appel sortant nécessaire pour qu'une décision d'autorisation soit prise, journalisée et vérifiable.
+
+**Corollaire contraignant pour les lignes `Orchestré` (§1).** Chaque contrôle tiers que nous orchestrons doit avoir un substitut européen identifié, faute de quoi il perce la chaîne. Les outils recommandés par la matrice source (NeMo Guardrails, Llama Guard, Snyk, SonarQube, CASB du marché) ne sont pas utilisables tels quels dans cette architecture : `G-01`, `G-10` et `G-14` ne sont pas spécifiables tant que leurs substituts ne sont pas choisis.
+
 ---
 
-## 6. Référentiels à mapper
+## 7. Référentiels à mapper
 
 Décision : les quatre familles sont retenues. `FR-131` mappe déjà EU AI Act, RGPD, ISO 42001, NIST AI RMF et SOC 2 via une **table de correspondance déclarative** (`core/frameworks.py`, ARCHITECTURE-V2.md). Les nouveaux référentiels s'y ajoutent comme des lignes de données, pas comme du code : **le coût d'intégration est faible et l'effort réel est le travail de correspondance lui-même.**
 
@@ -161,7 +243,7 @@ Décision : les quatre familles sont retenues. `FR-131` mappe déjà EU AI Act, 
 
 ---
 
-## 7. Écarts à instruire dans la PRD de strate
+## 8. Écarts à instruire dans la PRD de strate
 
 Chaque `G-nn` deviendra une ou plusieurs exigences fonctionnelles, numérotées à partir de **FR-153** pour ne pas entrer en collision avec les 152 existantes.
 
@@ -185,12 +267,75 @@ Chaque `G-nn` deviendra une ou plusieurs exigences fonctionnelles, numérotées 
 | `G-16` | Mapping OWASP LLM Top 10 + MITRE ATLAS + NIS2 + DORA + ANSSI dans `core/frameworks.py` | Tous | Haute |
 | `G-17` | Doctrine de souveraineté : substituts UE pour tout contrôle orchestré, fonctionnement hors ligne prouvé | Tous | Haute |
 | `G-18` | Carte de couverture publiée (`FR-144`) portant cette matrice, lignes non couvertes incluses | Tous | Haute |
+| `G-19` | **Diagnostic de profil d'usage** : positionner le client sur P1a/P1b/P2→P5 et en déduire son sous-ensemble de menaces applicables, avec le compte « N vous concernent, M sont bloquées » | Tous (axe §2) | **Haute** — c'est le pilier 1 de la vision |
+| `G-20` | Déclarer l'angle mort de l'IA embarquée SaaS (P1b) et instruire la couverture `Détecté`/`Attesté` par ingestion des journaux d'audit de la suite | §2.4 | Haute — population très répandue |
+| `G-21` | Documenter et rendre démontrable l'architecture de référence souveraine (§6.2), y compris le choix des substituts UE pour chaque ligne `Orchestré` | Tous (pilier 3) | **Haute** — le pilier « Made in France » n'existe pas sans elle |
+| `G-22` | Rédaction de contenu avant l'envoi au juge : `core/approvals.py:45-57` masque par *nom de clé*, pas par contenu. Une PII dans la valeur d'une clé anodine (`body`, `text`) atteint le modèle. Le chemin `core/dlp.py` existe mais n'est pas branché sur le juge. | M-10, §4.10 | **Haute** — c'est un transit de données vers un modèle |
+| `G-23` | `business_hours_only` : borne temporelle d'exécution, retirée de l'exemple `SPEC.md` faute d'implémentation. Demande un fuseau par tenant et une horloge testable. | M-12 | Basse |
+| `G-24` | `allowed_clients` n'est appliqué que par le gateway MCP (`_rbac_blocks`) : sur `/v1/authorize` la même policy n'est pas également bornée. Le vocabulaire le nomme désormais, il ne le corrige pas. | M-12, divergence d'ingress | **Haute** |
+| `G-25` | Le mode d'enforcement du proxy LLM est lu dans un en-tête de requête (`x-xsom-mode`) : l'agent contrôlé décide s'il est contrôlé. À remplacer par un réglage de plan de contrôle, enforcement par défaut + fenêtre d'observation bornée. | M-06, M-12, divergence d'ingress | **Critique** |
+| `G-26` | La branche streaming du proxy LLM contourne entièrement la garde d'appels d'outils et n'écrit aucune ligne d'audit. La DLP d'egress reste appliquée. Aucun test ne couvre le streaming. | M-06, M-12 | **Critique** |
+
+### 8.2 Recoupement avec les 34 correctifs de PLAN-REVIEW
+
+La strate absorbe les 34 correctifs contraignants (`QO-1`). Additionnés aux 21 écarts, cela ferait 55 items — mais le recoupement est réel, et surtout **trois correctifs entrent en conflit frontal avec la direction v2.5**. Ce sont eux qui comptent : le reste est de l'arithmétique.
+
+**Recouvrements directs — cinq paires, un seul travail à faire :**
+
+| Écart | Correctif | Sujet commun |
+|---|---|---|
+| `G-03` | `INV-4` | Le taint indexé sur un `session_id` déclaré par l'agent |
+| `G-06` | `EXH-4` | Classification déterministe des outils exécuteurs |
+| `G-07` | `INV-5` | L'approbation par canal, rejouable par tout lecteur du message |
+| `G-11` | `EXH-2` | Fail-open sur clé de contrainte inconnue |
+| `G-18` | `FR-144` | Carte de couverture publiée, lignes non couvertes incluses |
+
+Périmètre net : **≈ 50 items distincts**, pas 55.
+
+**Trois conflits à arbitrer — la revue contredit la direction produit :**
+
+| Conflit | Ce que dit la revue | Ce que demande la strate v2.5 |
+|---|---|---|
+| **Référentiels** | `EXH-7` : ne livrer que le mapping EU AI Act, et différer ISO 42001 / NIST / SOC 2 / RGPD — « une correspondance qu'un auditeur rejette est pire que pas de correspondance », elle exige la revue d'un assesseur en exercice. | `G-16` ajoute **quatre familles** : OWASP LLM Top 10 + MITRE ATLAS, NIS2, DORA, ANSSI/SecNumCloud. |
+| **Proxy LLM** | `EXH-6` : le rétrograder de chemin d'ingestion à simple sonde de télémétrie non bloquante, et le sortir du périmètre d'unification de `FR-1`. | C'est **là que tourne la DLP d'egress**, donc la couverture `Bloqué` de **M-10** (exfiltration / Shadow AI) — l'une des huit lignes bloquées natives. |
+| **Découpage de release** | `PLAN-REVIEW.md:18-29` : v2.0-core = Epics 1-5 ; les Epics 6-13 partent en v2.1/v2.2. | **M-06** dépend de l'Epic 6 (arrêt d'urgence) et **G-03** de l'Epic 7 (plan agent, taint persisté). Deux lignes de couverture revendiquées reposent sur des epics repoussés. |
+
+**Lecture.** Le conflit sur les référentiels est le plus simple à trancher : `EXH-7` vise les référentiels de *management* (ISO 42001, SOC 2), dont la correspondance engage un jugement d'auditeur. OWASP LLM Top 10 et MITRE ATLAS sont des taxonomies *techniques* — s'y aligner est descriptif, pas assertif, et ne présente pas le même risque. NIS2, DORA et ANSSI retombent en revanche dans la catégorie que la revue met en garde.
+
+Le conflit sur le proxy LLM est le plus coûteux : suivre `EXH-6` sans compensation dégrade M-10 de `Bloqué` à `Détecté`, ce qui retire une ligne au compte de la démo. La sortie envisagée — séparer l'application DLP (enforcement) de la comptabilité de coûts (télémétrie) — **est validée par la lecture du code** ; voir §8.3.
+
+### 8.3 `AR-2` / `QO-8` — tranché : le proxy est séparable, et l'inspection révèle deux défauts
+
+**La séparation est acquise, parce que le couplage n'a jamais existé.** Dans `api/llm_proxy.py` `_forward`, la DLP d'egress est un filtre de la *requête* : elle s'exécute avant l'appel amont, sa sortie est un `403` ou un corps réécrit, et elle ne lit rien de ce que produit la télémétrie. La télémétrie (`_inspect` → `usage`, `billing`, `pricing`) s'exécute après coup, sur les seules réponses non-streamées en 200. Les deux ne partagent que la route, le `GatewayPrincipal` et l'URL de base. Abandonner la comptabilité de coûts ne touche à aucune ligne du chemin bloquant.
+
+**Conséquence pour la carte : `M-10` conserve son `Bloqué` sur le chemin d'egress supervisé. La démo ne perd pas de ligne.** `QO-8` est close.
+
+**Mais l'inspection trouve une troisième fonction, que `AR-2` ne nommait pas.** `_inspect` appelle `_process`, qui ré-exécute `evaluate()` sur les appels d'outils *demandés par le modèle* et retire de la réponse ceux qui ne sont pas autorisés. Ce n'est ni de la DLP ni de la télémétrie : c'est du contrôle d'action, le cœur du produit, sur un **troisième chemin d'ingestion** à côté de MCP et de `/v1/authorize`. Et il porte deux défauts, tous deux sans test :
+
+| | Défaut | Effet |
+|---|---|---|
+| `G-25` | `enforce = request.headers.get("x-xsom-mode") == "enforce"` — **l'agent contrôlé décide s'il est contrôlé.** Sans l'en-tête, les verdicts sont calculés et journalisés, mais `kept` n'est jamais réassigné : tous les appels proposés repartent intacts. | Un en-tête omis — par compromission ou par simple erreur de configuration — dissout la garde. Même famille que `INV-4` (taint indexé sur un `session_id` déclaré par l'agent) : une décision de plan de contrôle prise dans le plan de données. |
+| `G-26` | La branche `if streaming:` renvoie les octets amont bruts et retourne **avant** `_inspect`. | Avec `stream: true` — le défaut de la plupart des frameworks d'agents — la garde d'appels d'outils n'existe pas, et aucune ligne d'audit n'est écrite pour ces appels. La DLP d'egress, elle, s'applique : elle est en amont de la branche. |
+
+**Lecture de couverture, et c'est le point qui compte.** `M-10` tient parce que le blocage DLP est inconditionnel (`if scan.blocked: raise HTTPException`) et en amont du streaming : ni l'en-tête ni le mode flux ne l'atteignent. En revanche **le chemin proxy LLM ne doit être compté dans aucune revendication de contrôle d'appels d'outils** (`M-06`, `M-12`) tant que `G-25` et `G-26` tiennent : sur cette ingestion, la garde est optionnelle au choix de l'agent et absente en streaming. Une revendication `Bloqué` vraie sur MCP se lirait comme vraie ici — c'est exactement ce que `AD-28` impose d'afficher, et pourquoi la carte porte le chemin d'ingestion et pas seulement le mode.
+
+**Le correctif de `G-25` n'est pas d'inverser le défaut.** L'enforcement par défaut casserait tout agent dont la policy n'est pas encore écrite (outil inconnu → `deny` → tous les appels retirés), et c'est précisément l'écueil que l'en-tête contournait. La forme juste est celle que le blueprint spécifie déjà pour l'admin : enforcement par défaut, et **fenêtre d'observation bornée dans le temps, ouverte par le plan de contrôle**, jamais par l'appelant. `G-25` est donc un préalable au même travail que le mode observation, pas un patch isolé.
+
+Ces trois arbitrages conditionnent le périmètre des `FR-153+` et doivent être tranchés avant l'écriture de la PRD.
 
 ---
 
-## 8. Questions ouvertes
+## 9. Questions ouvertes
 
-- **QO-1** — Les correctifs contraignants de `PLAN-REVIEW.md` (34, dont 5 « avant tout merge ») sont-ils absorbés par cette strate, ou traités comme un chantier antérieur distinct ? `D-1`, `D-2` et `D-3` en font partie et bloquent la démonstration.
-- **QO-2** — Le démonstrateur cible-t-il un appel d'offres identifié ? Si oui, le mapping NIS2/DORA/ANSSI doit être priorisé sur les écarts techniques ; sinon l'inverse.
-- **QO-3** — Pour les lignes `O`, quel est le substitut souverain retenu par contrôle ? Sans réponse, `G-01`, `G-10` et `G-14` ne sont pas spécifiables.
-- **QO-4** — La strate v2.5 se démontre-t-elle sur les Epics 1-5 (v2.0-core) uniquement, ou suppose-t-elle des epics post-core (6-13) que `PLAN-REVIEW.md:18-29` a repoussés en v2.1/v2.2 ? M-08 dépend de l'Epic 4 et M-06 de l'Epic 6.
+### Tranchées
+
+- **QO-1 — Résolue.** La strate **absorbe les 34 correctifs contraignants** de `PLAN-REVIEW.md`, pas seulement `D-1`/`D-2`/`D-3`. La base v2 est assainie avant que la couverture ne s'y ajoute. Périmètre brut : 34 + 21 écarts, avant dédoublonnage — et le recoupement est réel : plusieurs correctifs (`INV-2`, `INV-3`, `INV-7`, `INV-12`) *sont* la crédibilité du démonstrateur, pas de l'hygiène séparée.
+- **QO-2 — Résolue.** Asset générique grands comptes, réutilisable ensuite pour un dossier. Priorité aux écarts techniques ; correspondance réglementaire structurée mais non exhaustive.
+- **QO-5 — Résolue.** *Produit ou mission ?* **Les deux, à dominante mission.** Certains déploiements sont autonomes, mais la majorité des clients exige une infrastructure et une compétence — donc une prestation. Le déploiement en autonomie devient la **preuve de substance** (« ce n'est pas une maquette »), pas le mouvement commercial principal.
+
+### Ouvertes
+
+- **QO-3** — Pour chaque ligne `Orchestré`, quel substitut européen est retenu ? Sans réponse, `G-01`, `G-10` et `G-14` ne sont pas spécifiables, et §6.2 reste incomplète.
+- **QO-4** — La strate se démontre-t-elle sur les Epics 1-5 (v2.0-core) uniquement, ou suppose-t-elle des epics post-core (6-13) que `PLAN-REVIEW.md:18-29` a repoussés ? M-08 dépend de l'Epic 4 et M-06 de l'Epic 6.
+- **QO-6** — *Conséquence de QO-5, à arbitrer.* La PRD v2 est bâtie autour de sa phrase de test de périmètre : « un inconnu s'auto-héberge en dix minutes ». Si la majorité des clients passe par une prestation, `SM-1` (médiane ≤ 10 min pour un inconnu) est une métrique de crédibilité, pas le métier. Cela ne condamne pas l'Epic 1 (26 stories) — le déploiement doit fonctionner, pour nous chez le client comme pour un évaluateur — mais cela change ce que « terminé » y signifie, et donc combien de ces 26 stories la strate doit porter.
+- **QO-7** — Le diagnostic de profil (`G-19`) est-il un livrable de mission (grille tenue par le consultant) ou une fonction du produit (questionnaire dans la console qui calcule la couverture applicable) ? La réponse à QO-5 penche vers le premier, mais le second est un puissant générateur de leads en autonomie.

@@ -1,0 +1,57 @@
+id: audit_amendement
+nom: Explorateur d'audit — amendement chemin et mode
+route: /audit
+roles: [viewer, operator, admin]
+roles_refuses: []
+objectif: "Rendre visible à l'écran le chemin d'ingestion et le mode d'enforcement de chaque décision, sans quoi une entrée d'observation se lit comme un blocage réel."
+parcours: [P2, P3, P4]
+
+# AMENDEMENT — l'écran existe (frontend/app/(app)/audit/page.tsx) et n'est pas
+# re-spécifié. Cette spec ne couvre QUE la zone amendée : deux colonnes ajoutées
+# au tableau existant, leur rendu et leurs états. Le reste de l'écran est ratifié.
+
+layout:
+  - zone: tableau_colonnes_ajoutees
+    composants:
+      - { type: CoverageBadge, colonne: chemin, valeurs: "mcp|cooperatif", avec_chemin: true, libelle_mcp: "MCP — obligatoire", libelle_coop: "Coopératif — l'agent doit obéir" }
+      - { type: Badge, colonne: enforcement_mode, valeurs: "mandatory|cooperative|monitor", variante_monitor: "badge-amber", libelle_monitor: "Observation" }
+  - zone: filtres_ajoutes
+    composants:
+      - { type: Select, id: filtre_chemin, label: "Chemin", options: "tous|mcp|cooperatif" }
+      - { type: Select, id: filtre_mode, label: "Mode", options: "tous|mandatory|cooperative|monitor" }
+
+donnees:
+  - endpoint: list_audit_entries
+    quand: "au montage et à chaque changement de filtre — les deux champs arrivent dans la réponse existante, aucun appel supplémentaire"
+
+etats:
+  loading: "Les deux colonnes affichent un squelette de pastille, jamais une valeur par défaut."
+  empty: "Aucune entrée : le tableau vide existant est conservé, les colonnes ajoutées n'y changent rien."
+  error: "Erreur de chargement : comportement existant conservé. Les colonnes ajoutées ne créent pas de mode d'échec propre."
+  partial: "Une entrée antérieure à l'amendement, sans les champs : la cellule affiche « non enregistré » et non une valeur devinée. Une décision ancienne ne doit pas être rétro-attribuée à un chemin."
+  success: "Chaque ligne porte son chemin et son mode. Une entrée en mode observation est visuellement distincte d'un blocage réel, à la seule lecture de la ligne."
+
+interactions:
+  - declencheur: "Changement du filtre Chemin ou Mode"
+    effet: "Filtre la liste côté serveur et met à jour le compteur d'entrées."
+    feedback: "Le tableau passe en squelette pendant le rechargement ; le filtre actif reste visible et effaçable."
+  - declencheur: "Survol de la pastille de chemin"
+    effet: "Affiche la portée réelle du chemin."
+    feedback: "Infobulle : « MCP — l'action a été refusée par le gateway. Coopératif — la décision a été enregistrée, l'exécution dépendait de l'agent. »"
+  - declencheur: "Survol de la pastille Observation"
+    effet: "Affiche la réserve attachée au mode."
+    feedback: "Infobulle : « Mode observation : la décision a été calculée et enregistrée, l'appel a été relayé. Cette entrée ne compte pas comme preuve de supervision. »"
+
+responsive:
+  base: "Les deux valeurs passent en tête de carte, sous l'outil, avant la décision."
+  md: "Deux colonnes distinctes à droite de la décision."
+  lg: "Inchangé."
+
+a11y:
+  - "Chemin et mode portent un libellé textuel en plus de la pastille ; la couleur n'est jamais le seul signal."
+  - "Les infobulles sont accessibles au clavier et lisibles par lecteur d'écran."
+
+edge_cases:
+  - "Entrée en mode observation : jamais comptée dans les indicateurs de supervision de l'écran executive, et la ligne le dit."
+  - "Entrée antérieure à l'amendement : « non enregistré », jamais une valeur par défaut — la valeur par défaut la plus plausible serait « mandatory », c'est-à-dire la plus flatteuse et la moins vérifiable."
+  - "Filtre Mode = monitor sans aucune fenêtre jamais ouverte : liste vide avec un lien vers /promotion pour expliquer le mode."

@@ -1,0 +1,142 @@
+id: presentation_publique
+nom: Page de présentation publique — xSOM AI Guard
+route: /ia-guard.html          # FR ; EN : /en/ai-guard.html (page dupliquée, jamais un dictionnaire JS)
+depot: xsom-consulting/infra-xsom_website
+roles: [public]
+roles_refuses: []
+objectif: "Dire ce que le produit fait, ce qu'il garantit et ce qu'il ne couvre pas encore, de façon qu'un évaluateur puisse vérifier chaque affirmation — et rediriger vers les deux surfaces publiques de la console (diagnostic, couverture)."
+parcours: [P0]
+
+# PASS 2 — page publique, hors du dépôt produit.
+# Le site est un statique sans étape de build, bilingue FR/EN à pages dupliquées.
+# Conventions RATIFIÉES, jamais réinventées : tokens dans assets/css/tokens.css
+# (aucune couleur littérale ailleurs), classes de assets/css/components.css,
+# animations par attributs `data-*`, polices auto-hébergées (aucun CDN).
+# Ajouter la page = copier une page FR existante, adapter title/description/
+# canonical/hreflang, inscrire dans PAGES de tools/sync-partials.js, ajouter à
+# sitemap.xml. Idem pour la page EN. Voir README.md du site.
+
+regle_cardinale: >
+  Une affirmation de cette page renvoie à une ligne de la carte de couverture, et
+  une ligne de couverture à un scénario qui passe. La page ne peut rien dire que la
+  suite n'asserte pas. C'est CM-7 rendu public : sans cette règle, la page est du
+  marketing ; avec elle, elle est une pièce.
+
+layout:
+  - zone: hero
+    composants:
+      - { type: PageHead, classe: "page-head page-head--visual", contenu: "titre + sous-titre + deux actions" }
+      - { type: Eyebrow, texte: "Contrôle d'action pour agents IA" }
+      - { type: Titre, niveau: h1, attribut: data-split, texte: "On ne filtre pas ce que l'agent dit. On contrôle ce qu'il fait." }
+      - { type: Lead, texte: "Une injection de prompt réussie ne suffit pas : l'appel qui causerait le dommage passe quand même par la policy, la classe d'action, le plancher d'irréversibilité et, s'il le faut, un humain." }
+      - { type: Button, variante: "btn btn--primary", label: "Voir ce qui vous concerne", cible: "<console>/diagnostic" }
+      - { type: Button, variante: "btn btn--ghost", label: "Voir la carte de couverture", cible: "#couverture" }
+  - zone: schema
+    composants:
+      - { type: Diagram, attribut: data-diagram, classe: "diagram-wrap reveal", contenu: "agent → chaîne de filtres → relais / retenue / refus. Reprend le vocabulaire visuel des schémas dg-* de ia-souverainete.html." }
+  - zone: doctrine
+    composants:
+      - { type: SecHead, texte: "Cinq modes, et un seul autorise le verbe « bloquer »" }
+      - { type: Grid, classe: "grid grid-3", contenu: "cinq cartes : Bloqué · Détecté · Orchestré · Attesté · Hors périmètre, chacune avec sa définition en une phrase" }
+      - { type: Encadre, classe: quote, texte: "Publier ce que nous ne couvrons pas est le contrôle qualité de ce que nous couvrons." }
+  - zone: couverture
+    composants:
+      - { type: SecHead, texte: "Ce que nous bloquons, détectons, orchestrons — et ce que nous ne faisons pas" }
+      - { type: TableCouverture, source: "fragment généré, committé", colonnes: [menace, mode, chemin_ingestion, preuve] }
+      - { type: Provenance, texte: "Carte générée depuis les scénarios qui passent au commit <sha>, le <date>." }
+      - { type: Button, variante: "btn btn--ghost btn--sm", label: "Explorer la carte complète", cible: "<console>/couverture" }
+  - zone: garanties
+    composants:
+      - { type: SecHead, texte: "Les garanties, et comment chacune se vérifie" }
+      - { type: Checklist, classe: checklist, contenu: "une ligne par garantie, chacune nommant son moyen de preuve (scénario, test, chaîne d'audit)" }
+  - zone: souverainete
+    composants:
+      - { type: SecHead, texte: "Souverain veut dire : rien n'est requis hors du périmètre pour décider" }
+      - { type: Paragraphe, texte: "Le critère est la dépendance opérationnelle, pas la nationalité de l'éditeur." }
+      - { type: Numbered, classe: numbered, contenu: "les sorties possibles, et ce qu'il se passe si chacune est coupée" }
+      - { type: Button, variante: "btn btn--ghost btn--sm", label: "Le détail de l'architecture souveraine", cible: "/ia-souverainete.html" }
+  - zone: a_venir
+    composants:
+      - { type: SecHead, texte: "Ce qui arrive" }
+      - { type: Paragraphe, classe: lead, texte: "Ce sont des écarts, pas une feuille de route commerciale. Ils sont ici parce qu'un évaluateur les trouverait de toute façon." }
+      - { type: Grid, classe: "grid grid-3", contenu: "les écarts de sévérité haute et critique, sans date promise" }
+  - zone: cta
+    composants:
+      - { type: Section, classe: "section cta-band", contenu: "accès au compte de démonstration + lien vers /contact.html" }
+
+# Pas de section `donnees:` — la page n'appelle aucun endpoint, et une section
+# vide vaudrait mieux supprimée qu'écrite « N/A ». D'où vient alors le tableau :
+
+generation:
+  source: "fragment HTML généré dans le dépôt produit, committé dans le dépôt du site"
+  quand: "à la génération de la carte (AD-30), puis reporté par une PR sur le site"
+  pourquoi: >
+    Le site est un statique sans étape de build ni backend. Un appel réseau depuis la
+    page publique vers la console créerait précisément la dépendance que la page
+    déclare inexistante — et l'adresse IP d'un visiteur du site vitrine n'a rien à
+    faire dans les journaux du produit. Le fragment traverse donc une revue humaine,
+    ce qui est cohérent : publier une revendication de couverture est une décision.
+
+etats:
+  loading: "Aucun. La page est complète au premier rendu : pas de squelette, pas de saut de mise en page. C'est une contrainte, pas une absence de spécification — un tableau de couverture qui arrive après coup décalerait la page sous le lecteur."
+  empty: "Aucun scénario ne passe (régression totale) : le tableau est remplacé par « La carte n'a pas pu être régénérée au dernier build. Elle n'est pas affichée plutôt qu'affichée périmée. » Aucune ligne n'est montrée. On ne publie pas une couverture qu'on ne peut plus prouver."
+  error: "Le fragment généré est absent à la publication : le build du site échoue avant de publier. La page ne part pas en ligne sans sa carte — une page de garanties sans les garanties est pire qu'une page absente."
+  partial: "Certaines lignes n'ont pas de scénario associé : elles s'affichent avec la mention explicite « non assertée » et ne portent jamais le mode Bloqué, quel que soit ce que la source dit. C'est CM-7 appliqué au rendu."
+  success: "La carte affiche chaque ligne avec son mode, son chemin d'ingestion et son moyen de preuve, suivie du commit et de la date dont elle est issue."
+
+interactions:
+  - declencheur: "Clic sur « Voir ce qui vous concerne »"
+    effet: "Ouvre le diagnostic de profil de la console, accessible sans compte."
+    feedback: "Navigation vers la console. Le lien est externe au site : il porte la mention du domaine pour que le visiteur sache qu'il change de surface."
+  - declencheur: "Clic sur « Voir la carte de couverture »"
+    effet: "Défile jusqu'à la section couverture de la même page — pas vers la console."
+    feedback: "Défilement doux, respectant `prefers-reduced-motion`, et le titre de section prend le focus pour un lecteur d'écran."
+  - declencheur: "Clic sur « Explorer la carte complète »"
+    effet: "Ouvre la carte de couverture de la console, où le filtrage par profil est disponible."
+    feedback: "Navigation externe, mention du domaine, comme ci-dessus."
+  - declencheur: "Survol d'une ligne de couverture"
+    effet: "Aucun changement de sens. Le chemin d'ingestion est déjà affiché en permanence, jamais révélé au survol."
+    feedback: "Surlignage de ligne uniquement. Une revendication n'est pas une information à découvrir."
+  - declencheur: "Consultation sans JavaScript"
+    effet: "Toute l'information reste lisible : la carte est du HTML statique, les révélations au défilement sont des enrichissements."
+    feedback: "Aucune dégradation de contenu, seulement d'animation. Le site entier tient déjà cette règle."
+
+validations:
+  - champ: table_couverture
+    regles:
+      - "chaque ligne porte un mode parmi les cinq"
+      - "chaque ligne porte un chemin d'ingestion — MCP, HTTP coopératif, proxy LLM, ou « tous »"
+      - "une ligne en mode Bloqué porte obligatoirement une référence de scénario"
+    quand: "à la génération, dans le dépôt produit — jamais à l'affichage"
+    message_invalide: "La génération échoue et le fragment n'est pas produit. Une ligne Bloqué sans scénario ne franchit pas le build."
+  - champ: provenance
+    regles: ["commit non vide", "horodatage non vide"]
+    quand: "à la génération"
+    message_invalide: "Un tableau sans provenance ne se distingue pas d'un tableau rédigé à la main. La génération échoue."
+
+soumission:
+  bloquee_si: "sans objet — la page ne porte aucun formulaire"
+  pendant: "sans objet"
+  succes: "sans objet"
+  echec_403: "sans objet"
+  echec_422: "sans objet"
+  echec_reseau: "sans objet — aucun appel réseau n'est émis depuis la page. Le formulaire de contact reste sur /contact.html, qui a déjà le sien."
+
+responsive:
+  base: "Une colonne. Le tableau de couverture passe en cartes empilées, une par menace, mode et chemin d'ingestion en tête de carte."
+  md: "Le tableau reprend ses colonnes. Les grilles de cartes passent à deux."
+  lg: "Grilles à trois, conformément à `grid-3`. Le tableau privilégie la densité verticale : une salle de réunion regarde un 16:9 de loin."
+
+a11y:
+  - "Le tableau de couverture est un vrai `<table>` avec `<caption>` et en-têtes associées — c'est une donnée, pas une mise en page."
+  - "Le mode de couverture n'est jamais porté par la seule couleur : chaque pastille porte son libellé en texte. Les cinq modes doivent rester distinguables en projection et en niveaux de gris."
+  - "La mention de provenance est dans le `<caption>` du tableau, pas dans un texte flottant : elle doit être lue avec le tableau, pas après."
+  - "Les liens vers la console sont annoncés comme externes, avec le domaine dans le nom accessible."
+  - "Toutes les animations sont déjà neutralisées sous `prefers-reduced-motion: reduce` par le site ; la page n'introduit aucun mouvement hors de ce cadre."
+
+edge_cases:
+  - "Une ligne passe de Bloqué à Détecté entre deux publications : la carte change sans annonce spéciale. Elle porte sa date ; c'est la date qui dit qu'elle a bougé. Un journal des changements de couverture est un écart séparé, pas un correctif de cette page."
+  - "Le fragment généré est plus récent que le texte des garanties qui l'entoure : c'est le cas dangereux. La section « garanties » ne contient donc aucun compte chiffré en dur — les chiffres ne vivent que dans le fragment généré."
+  - "Version EN désynchronisée de la FR : le site impose déjà que toute modification de contenu soit reportée dans les deux langues. Le fragment de couverture est produit une fois avec des libellés dans les deux langues, pour qu'une carte ne puisse pas diverger entre versions linguistiques."
+  - "Visiteur arrivant par un lien profond `#couverture` : la section est atteinte directement et la mention de provenance est visible sans défilement supplémentaire. Un tableau atteint hors contexte doit porter sa date."
+  - "Aucun compte de démonstration disponible : le bloc d'appel à l'action affiche le lien de contact seul, jamais un bouton qui mène à une page d'erreur."
