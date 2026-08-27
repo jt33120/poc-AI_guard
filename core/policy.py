@@ -298,10 +298,16 @@ def evaluate(policy: Policy, tool_name: str, arguments: dict[str, Any]) -> Polic
                     "auto-classified by name",
                 )
         return PolicyOutcome(None, policy.defaults.unknown_tool, None, "unknown tool")
+    # Constraints are checked before the ambiguous branch, not after it: a rule can
+    # carry both, and a constraint is a hard bound that does not depend on knowing
+    # the action class. Checking it after meant `classify: ambiguous` returned early
+    # and the constraint was never evaluated at all -- the rule read as bounded and
+    # was not (FR-199). `action_class` is None here because we denied before
+    # classifying, which is the honest record.
+    if not _constraints_ok(rule, arguments):
+        return PolicyOutcome(rule.action_class, Approval.deny, rule.name, "constraint violated")
     if rule.classify == "ambiguous":
         return PolicyOutcome(
             None, rule.approval, rule.name, "ambiguous: needs judge", ambiguous=True
         )
-    if not _constraints_ok(rule, arguments):
-        return PolicyOutcome(rule.action_class, Approval.deny, rule.name, "constraint violated")
     return PolicyOutcome(rule.action_class, rule.approval, rule.name, "policy rule")

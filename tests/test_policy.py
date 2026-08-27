@@ -132,6 +132,35 @@ def test_allowed_domains_constraint_denies_foreign_domain() -> None:
     assert outcome.reason == "constraint violated"
 
 
+_AMBIGUOUS_CONSTRAINED = """
+tools:
+  - name: agent.relay
+    classify: ambiguous
+    approval: human_in_the_loop
+    constraints: { allowed_domains: ["@client.fr"] }
+defaults:
+  unknown_tool: deny
+"""
+
+
+def test_constraints_are_enforced_on_an_ambiguous_rule() -> None:
+    # FR-199: the ambiguous branch used to return before the constraint check, so a
+    # rule carrying both read as bounded and was not. The bound must hold whether or
+    # not the action class is known -- it does not depend on knowing it.
+    policy = parse_policy(_AMBIGUOUS_CONSTRAINED)
+    outcome = evaluate(policy, "agent.relay", {"to": "attacker@evil.com"})
+    assert outcome.decision is Approval.deny
+    assert outcome.reason == "constraint violated"
+    assert outcome.ambiguous is False  # denied before classifying; no judge is owed
+
+
+def test_a_satisfied_constraint_still_reaches_the_judge() -> None:
+    policy = parse_policy(_AMBIGUOUS_CONSTRAINED)
+    outcome = evaluate(policy, "agent.relay", {"to": "alice@client.fr"})
+    assert outcome.ambiguous is True
+    assert outcome.action_class is None
+
+
 # --- auto-classification (zero-config onboarding) ----------------------------
 
 _AUTO_YAML = """
