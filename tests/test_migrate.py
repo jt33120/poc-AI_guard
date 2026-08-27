@@ -20,6 +20,10 @@ _REPO = Path(__file__).resolve().parent.parent
 _SHIM_SQL = _REPO / "tests" / "fixtures" / "supabase_auth_shim.sql"
 _ALL_FILES = [p.name for p in sorted(migrate.MIGRATIONS_DIR.glob("*.sql"))]
 _BASELINE_FILES = [s.filename for s in migrate._BASELINE]
+#: Everything the pre-ledger baseline does not cover — the ledger migration and
+#: whatever shipped after it. Derived, so a new migration does not falsify a test
+#: about adoption, which is a statement about the baseline and nothing else.
+_POST_BASELINE = [f for f in _ALL_FILES if f not in _BASELINE_FILES]
 
 
 @pytest.fixture
@@ -136,8 +140,9 @@ def test_adopt_baseline_on_a_fully_migrated_database(db: DBHandle) -> None:
     conn = db.conn
     assert migrate.adopt_baseline(conn) == _BASELINE_FILES
     assert migrate.applied(conn) == _BASELINE_FILES
-    # Only the ledger migration itself remains, and adopting again changes nothing.
-    assert [p.name for p in migrate.pending(conn)] == [migrate.LEDGER_MIGRATION]
+    # Everything the baseline does not cover stays pending -- derived rather than
+    # spelled out, so adding a migration does not falsify this test.
+    assert [p.name for p in migrate.pending(conn)] == _POST_BASELINE
     assert migrate.adopt_baseline(conn) == []
 
 
@@ -148,7 +153,7 @@ def test_adopt_baseline_stops_at_the_first_gap(bare_db: DBHandle) -> None:
 
     assert migrate.adopt_baseline(conn) == prefix
     # The rest was never executed, so it stays pending and is applied for real.
-    remaining = [*_BASELINE_FILES[9:], migrate.LEDGER_MIGRATION]
+    remaining = [*_BASELINE_FILES[9:], *_POST_BASELINE]
     assert [p.name for p in migrate.pending(conn)] == remaining
     assert migrate.apply_all(conn) == remaining
     assert conn.execute("select to_regclass('public.dlp_config')").fetchone() == ("dlp_config",)

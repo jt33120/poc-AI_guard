@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class Role(StrEnum):
@@ -136,6 +137,26 @@ class ApprovalOut(BaseModel):
     expires_at: str | None
     decided_at: str | None
     decided_by: str | None
+
+
+class MonitorWindowRequest(BaseModel):
+    """Open (or extend) an observation window on one agent (G-25, FR-179)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    gateway_token_id: str = Field(min_length=1, max_length=64)
+    hours: int = Field(ge=1, le=720)
+
+
+class MonitorWindowOut(BaseModel):
+    id: int
+    gateway_token_id: str
+    opened_at: datetime
+    expires_at: datetime
+    closed_at: datetime | None
+    opened_by: str | None
+    closed_by: str | None
+    active: bool
 
 
 class DecisionRequest(BaseModel):

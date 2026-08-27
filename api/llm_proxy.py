@@ -1,4 +1,4 @@
-"""LLM provider proxy — zero-code monitoring (and optional enforcement).
+"""LLM provider proxy — zero-code monitoring, with enforcement on by default.
 
 The agent points its provider ``base_url`` at this proxy and presents its tenant
 gateway token (``X-Gateway-Token``). xSOM forwards to the provider using the
@@ -10,12 +10,18 @@ estimated cost per completion for the usage dashboard.
 Providers: OpenAI / Mistral / OpenRouter (OpenAI-compatible Chat Completions)
 and Anthropic Messages.
 
-Modes (``X-XSOM-Mode`` header):
-  * ``monitor`` (default) — the provider response is returned unchanged.
-  * ``enforce`` — tool-calls that aren't auto-allowed (``hold``/``deny``) are
-    stripped from the response so the agent can't run them. True
-    human-in-the-loop *approval* still belongs on the cooperative
-    ``/v1/authorize`` path (the proxy can't pause a single completion).
+**Enforcement is the default, and it is not the caller's to choose** (`G-25`).
+Tool-calls that aren't auto-allowed (``hold``/``deny``) are stripped from the
+response so the agent can't run them. True human-in-the-loop *approval* still
+belongs on the cooperative ``/v1/authorize`` path (the proxy can't pause a single
+completion).
+
+An admin may open a bounded **observation window** on one agent through the
+control plane (``core/monitor.py``): during it, refused calls are relayed and
+recorded as ``monitor_*`` so a prospect can see what enforcement *would* do
+without breaking their fleet. Irreversible actions and external sends are never
+covered by a window (`AD-27.2`). This used to be an ``X-XSOM-Mode`` request
+header — which handed the decision to the agent being controlled.
 
 Only metadata + ``args_hash`` and token *counts* are ever logged, never content
 or keys (§4.10). Streaming is passed through transparently (not inspected).
@@ -37,10 +43,10 @@ from starlette.concurrency import run_in_threadpool
 from api.deps import database_url
 from api.ratelimit import limiter, llm_proxy_rate_limit
 from api.security import GatewayPrincipal, get_gateway_principal, resolve_gateway_principal
-from core import approvals, audit, billing, db, dlp, dlp_config, policy_store, pricing
+from core import approvals, audit, billing, db, dlp, dlp_config, monitor, policy_store, pricing
 from core import usage as usage_store
 from core.config import Settings
-from core.policy import Approval, Policy, evaluate
+from core.policy import ActionClass, Approval, Policy, evaluate
 
 logger = logging.getLogger("xsom.llm_proxy")
 
@@ -162,15 +168,29 @@ def _verdict(policy: Policy, name: str, args: dict[str, Any]) -> tuple[str | Non
 
 
 def _process(
-    style: str, data: dict[str, Any], policy: Policy, enforce: bool
+    style: str, data: dict[str, Any], policy: Policy, observing: bool
 ) -> list[tuple[str, str | None, str, str]]:
-    """Audit rows [(tool, class, decision, args_hash)]; strip non-allowed calls if enforce."""
+    """Audit rows [(tool, class, decision, args_hash)]; drop the calls that must not stand.
+
+    ``observing`` comes from the control plane, never from the request (`G-25`). Under
+    an open window a refused call is let through and recorded as ``monitor_*`` -- but
+    **only** for classes observation may cover: irreversible actions and external
+    sends are dropped in every mode (`AD-27.2`).
+    """
     audited: list[tuple[str, str | None, str, str]] = []
 
-    def judge(name: str, args: dict[str, Any]) -> str:
-        action_class, decision = _verdict(policy, name, args)
-        audited.append((name, action_class, decision, approvals.args_hash(args)))
-        return decision
+    def drop(name: str, args: dict[str, Any]) -> bool:
+        """Whether this tool call must be removed from the relayed response."""
+        raw_class, decision = _verdict(policy, name, args)
+        action_class = ActionClass(raw_class) if raw_class else None
+        blocked = decision != "allow"
+        relaxed = blocked and observing and monitor.observes(action_class)
+        # AD-27.3: the distinction lives in `decision`, which is inside the hashed
+        # payload -- otherwise "we blocked it" and "we would have blocked it" hash
+        # identically and the standalone verifier cannot tell them apart.
+        recorded = f"monitor_{decision}" if relaxed else decision
+        audited.append((name, raw_class, recorded, approvals.args_hash(args)))
+        return blocked and not relaxed
 
     if style == "openai":
         for choice in data.get("choices") or []:
@@ -182,13 +202,12 @@ def _process(
             for call in calls:
                 fn = (call or {}).get("function") or {}
                 name = fn.get("name")
-                if name and judge(name, _parse_args(fn.get("arguments"))) != "allow" and enforce:
+                if name and drop(name, _parse_args(fn.get("arguments"))):
                     continue
                 kept.append(call)
-            if enforce:
-                message["tool_calls"] = kept
-                if not kept and not message.get("content"):
-                    message["content"] = _BLOCKED_NOTE
+            message["tool_calls"] = kept
+            if not kept and not message.get("content"):
+                message["content"] = _BLOCKED_NOTE
     elif style == "anthropic":
         content = data.get("content")
         if isinstance(content, list):
@@ -196,11 +215,10 @@ def _process(
             for block in content:
                 if (block or {}).get("type") == "tool_use" and block.get("name"):
                     args = block.get("input") if isinstance(block.get("input"), dict) else {}
-                    if judge(block["name"], args) != "allow" and enforce:
+                    if drop(block["name"], args):
                         continue
                 kept.append(block)
-            if enforce:
-                data["content"] = kept
+            data["content"] = kept
     return audited
 
 
@@ -211,12 +229,12 @@ def _inspect(
     provider: str,
     style: str,
     data: dict[str, Any],
-    enforce: bool,
+    observing: bool,
     latency_ms: float | None = None,
 ) -> None:
     with db.connection(url) as conn:
         policy = policy_store.load_policy(conn, tenant_id)
-    audited = _process(style, data, policy, enforce)
+    audited = _process(style, data, policy, observing)
     usage = _extract_usage(style, data)
     billed = _extract_billed(provider, data)
     if not audited and usage is None and billed is None:
@@ -265,6 +283,21 @@ def _inspect(
                 external_id=request_id,
             )
         conn.commit()
+
+
+def _observing(url: str, principal: GatewayPrincipal) -> bool:
+    """Whether an admin has an observation window open on this agent (G-25).
+
+    A control plane we cannot read is not permission to stop enforcing: any failure
+    answers "no window", which means enforce.
+    """
+    try:
+        with db.connection(url) as conn:
+            window = monitor.active_window(conn, principal.tenant_id, principal.token_id)
+    except Exception:
+        logger.warning("monitor_lookup_failed", extra={"tenant_id": principal.tenant_id})
+        return False
+    return window is not None
 
 
 def _load_dlp_state(url: str, tenant_id: str, settings: Settings) -> dlp_config.DlpState:
@@ -332,7 +365,10 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
             if scan.redacted_body is not None:
                 body = scan.redacted_body
 
-    enforce = request.headers.get("x-xsom-mode", "").lower() == "enforce"
+    # The agent being controlled does not get to say whether it is controlled
+    # (G-25). Enforcement is the default; only an open control-plane window, opened
+    # by an admin and bounded in time, relaxes it -- and never for the irreversible.
+    observing = await run_in_threadpool(_observing, url, principal)
     style = "anthropic" if provider == "anthropic" else "openai"
     base = _base_url(settings, provider).rstrip("/")
 
@@ -387,11 +423,13 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
                 provider,
                 style,
                 data,
-                enforce,
+                observing,
                 latency_ms,
             )
-            if enforce:
-                return Response(content=json.dumps(data).encode(), media_type="application/json")
+            # The response is rewritten in every mode: under observation `_process`
+            # keeps what a window may cover, so the payload only differs where the
+            # window does not reach.
+            return Response(content=json.dumps(data).encode(), media_type="application/json")
     return Response(
         content=upstream_resp.content,
         status_code=upstream_resp.status_code,

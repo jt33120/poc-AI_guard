@@ -7,12 +7,14 @@ from collections.abc import Callable
 from typing import Any
 from uuid import uuid4
 
+import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
 from api import llm_proxy
 from api.main import create_app
 from api.security import TokenVerifier
+from core import monitor
 from core.config import Settings
 from tests.conftest import DBHandle
 
@@ -26,6 +28,40 @@ defaults:
     external_send: human_in_the_loop
     irreversible: human_in_the_loop
 """
+
+# A policy that HOLDS a write -- so an observation window has something it may
+# legitimately relax. Under AUTO_POLICY a write is auto-allowed, which would prove
+# nothing about the window.
+WRITE_POLICY = """tools: []
+defaults:
+  unknown_tool: deny
+  auto_classify: true
+  class_approvals:
+    read: auto
+    write: human_in_the_loop
+    external_send: human_in_the_loop
+    irreversible: human_in_the_loop
+"""
+
+WRITE_BODY = {
+    "id": "chatcmpl-write",
+    "object": "chat.completion",
+    "choices": [
+        {
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "id": "call_w",
+                        "type": "function",
+                        "function": {"name": "crm.update_contact", "arguments": '{"id": 9}'},
+                    }
+                ],
+            },
+        }
+    ],
+}
 
 # A canned OpenAI chat-completion the model "returned", asking for two tools.
 UPSTREAM_BODY = {
@@ -75,7 +111,10 @@ class _FakeResp:
         self._payload = payload
 
     def json(self) -> dict[str, Any]:
-        return self._payload
+        # A real response parses fresh JSON each time; this fake must too. Handing
+        # back the shared module-level dict let `_process` -- which rewrites
+        # `tool_calls` in place -- amputate the fixture for every later test.
+        return json.loads(self.content)
 
 
 class _FakeClient:
@@ -130,9 +169,15 @@ def test_proxy_forwards_and_audits_tool_calls(
         headers={"X-Gateway-Token": raw, "Authorization": "Bearer sk-agentkey"},
         json={"model": "gpt-4o", "messages": [{"role": "user", "content": "remove 42"}]},
     )
-    # Response is passed through unchanged (monitoring mode).
+    # Enforcement is the DEFAULT now (G-25): no header, no window, so the
+    # irreversible call is stripped and the read survives. This assertion is the
+    # point of the test -- it previously checked only the response id, and so would
+    # not have noticed the mode flipping either way.
     assert resp.status_code == 200
-    assert resp.json()["id"] == "chatcmpl-test"
+    body = resp.json()
+    assert body["id"] == "chatcmpl-test"
+    kept = [c["function"]["name"] for c in body["choices"][0]["message"]["tool_calls"]]
+    assert kept == ["crm.get_contact"]
     # The agent's own provider key was forwarded upstream, not xSOM's.
     assert fake.captured["headers"]["Authorization"] == "Bearer sk-agentkey"
 
@@ -435,31 +480,114 @@ def test_token_in_url_unknown_provider_404(
     assert resp.status_code == 404
 
 
-def test_enforce_mode_strips_non_allowed_tool_calls(
+def _agent(client: Any, admin: str) -> tuple[str, str]:
+    """A gateway token (raw) and its id -- the id is how a window names the agent."""
+    body = client.post(
+        "/v1/gateway-tokens", headers={"Authorization": f"Bearer {admin}"}, json={"name": "bot"}
+    ).json()
+    return body["token"], body["id"]
+
+
+def _relay(client: Any, raw: str) -> Any:
+    return client.post(
+        "/proxy/openai/v1/chat/completions",
+        headers={"X-Gateway-Token": raw, "Authorization": "Bearer sk"},
+        json={"model": "gpt-4o", "messages": [{"role": "user", "content": "remove 42"}]},
+    )
+
+
+def test_a_request_header_can_no_longer_relax_enforcement(
     db: DBHandle,
     test_verifier: TokenVerifier,
     make_token: Callable[..., str],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # G-25. `X-XSOM-Mode: monitor` used to turn the guard off. The agent being
+    # controlled does not get to say whether it is controlled -- so the header is
+    # now inert, and the irreversible call is stripped anyway.
     tid = _tenant(db)
     client = _client(db.url, test_verifier)
     admin = make_token(tenant_id=tid, role="admin")
     client.put(
         "/v1/policy", headers={"Authorization": f"Bearer {admin}"}, json={"yaml": AUTO_POLICY}
     )
-    raw = client.post(
-        "/v1/gateway-tokens", headers={"Authorization": f"Bearer {admin}"}, json={"name": "bot"}
-    ).json()["token"]
+    raw, _ = _agent(client, admin)
 
     monkeypatch.setattr(llm_proxy, "_http", lambda: _FakeClient(_FakeResp(UPSTREAM_BODY)))
     resp = client.post(
         "/proxy/openai/v1/chat/completions",
-        headers={"X-Gateway-Token": raw, "Authorization": "Bearer sk", "X-XSOM-Mode": "enforce"},
+        headers={"X-Gateway-Token": raw, "Authorization": "Bearer sk", "X-XSOM-Mode": "monitor"},
         json={"model": "gpt-4o", "messages": [{"role": "user", "content": "remove 42"}]},
     )
-    # The irreversible delete (hold) is stripped; the read (allow) remains.
+
     kept = [c["function"]["name"] for c in resp.json()["choices"][0]["message"]["tool_calls"]]
     assert kept == ["crm.get_contact"]
+
+
+def test_an_open_window_relays_what_it_may_cover_and_records_it_as_monitor(
+    db: DBHandle,
+    test_verifier: TokenVerifier,
+    make_token: Callable[..., str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The legitimate use the header was working around: an admin wants to see what
+    # enforcement would do before turning it loose on a fleet.
+    tid = _tenant(db)
+    client = _client(db.url, test_verifier)
+    admin = make_token(tenant_id=tid, role="admin")
+    client.put(
+        "/v1/policy", headers={"Authorization": f"Bearer {admin}"}, json={"yaml": WRITE_POLICY}
+    )
+    raw, token_id = _agent(client, admin)
+    monitor.open_window(db.conn, tenant_id=tid, gateway_token_id=token_id, hours=2, max_hours=24)
+    db.conn.commit()
+
+    monkeypatch.setattr(llm_proxy, "_http", lambda: _FakeClient(_FakeResp(WRITE_BODY)))
+    resp = _relay(client, raw)
+
+    kept = [c["function"]["name"] for c in resp.json()["choices"][0]["message"]["tool_calls"]]
+    assert kept == ["crm.update_contact"]  # relayed, though the policy holds it
+
+    with psycopg.connect(db.url) as check:
+        rows = check.execute(
+            "select tool_name, decision from audit_log where tenant_id = %s", (tid,)
+        ).fetchall()
+    # AD-27.3: the distinction is inside the hashed payload, so "we blocked it" and
+    # "we would have blocked it" cannot hash identically.
+    assert dict(rows)["crm.update_contact"] == "monitor_hold"
+
+
+def test_an_open_window_never_covers_the_irreversible(
+    db: DBHandle,
+    test_verifier: TokenVerifier,
+    make_token: Callable[..., str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # AD-27.2, and the guarantee that must not bend: a window may relax a write, it
+    # may never relax a destructive action. Otherwise observation is a documented
+    # bypass of CLAUDE.md 4.1, which admits no exception.
+    tid = _tenant(db)
+    client = _client(db.url, test_verifier)
+    admin = make_token(tenant_id=tid, role="admin")
+    client.put(
+        "/v1/policy", headers={"Authorization": f"Bearer {admin}"}, json={"yaml": AUTO_POLICY}
+    )
+    raw, token_id = _agent(client, admin)
+    monitor.open_window(db.conn, tenant_id=tid, gateway_token_id=token_id, hours=2, max_hours=24)
+    db.conn.commit()
+
+    monkeypatch.setattr(llm_proxy, "_http", lambda: _FakeClient(_FakeResp(UPSTREAM_BODY)))
+    resp = _relay(client, raw)
+
+    kept = [c["function"]["name"] for c in resp.json()["choices"][0]["message"]["tool_calls"]]
+    assert kept == ["crm.get_contact"]  # the delete is still gone, window or not
+
+    with psycopg.connect(db.url) as check:
+        rows = check.execute(
+            "select tool_name, decision from audit_log where tenant_id = %s", (tid,)
+        ).fetchall()
+    # Recorded as a real block, not as "we would have".
+    assert dict(rows)["crm.delete_contact"] == "hold"
 
 
 # --- Egress DLP guard --------------------------------------------------------

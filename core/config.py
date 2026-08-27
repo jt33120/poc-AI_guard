@@ -80,6 +80,10 @@ class Settings(BaseSettings):
     # blocked, structured PII is flagged (observe, don't break the agent), and
     # the high-entropy scan is opt-in. Never logs the value — kind + hash only.
     dlp_enabled: bool = False
+    # Ceiling on an observation window (G-25). A window without a short deadline is
+    # not an observation, it is a bypass -- so the ceiling is configuration, not a
+    # per-request argument. Default: 24 h.
+    monitor_max_hours: int = Field(default=24, ge=1, le=720)
     dlp_secret_action: Literal["block", "redact", "flag", "off"] = "block"  # noqa: S105
     dlp_pii_action: Literal["block", "redact", "flag", "off"] = "flag"
     dlp_entropy_action: Literal["flag", "off"] = "off"

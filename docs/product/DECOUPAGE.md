@@ -119,7 +119,7 @@ plutôt qu'en le supposant. Aucun ne crée de rang nouveau — chacun se rattach
 | `G-22` | La rédaction avant envoi au juge masque par *nom de clé*, pas par contenu : une PII dans la valeur d'une clé anodine atteint le modèle | Rang 7 (couverture P2, avec la DLP) | Haute |
 | `G-23` | `business_hours_only` retiré de `SPEC.md` faute d'implémentation ; demande un fuseau par tenant | Rang 8 | Basse |
 | `G-24` | `allowed_clients` n'est appliqué que par le gateway MCP : la même policy n'est pas également bornée sur `/v1/authorize` | Rang 1 (divergence d'ingress) | Haute |
-| `G-25` | Le mode d'enforcement du proxy LLM est lu dans un en-tête de requête : **l'agent contrôlé décide s'il est contrôlé** | **Rang 4** — se corrige avec la fenêtre d'observation, pas en inversant le défaut | Critique |
+| `G-25` | ~~Le mode d'enforcement lu dans un en-tête de requête~~ — **fermé.** Fenêtre d'observation de plan de contrôle, bornée, réservée à l'`admin` | Rang 4 — livré | ✅ |
 | `G-26` | La branche streaming du proxy LLM contourne entièrement la garde d'appels d'outils, sans ligne d'audit | Rang 7 | Critique |
 
 **`G-25` est la raison de remonter le rang 4.** La PRD le plaçait en quatre « seulement
