@@ -1,0 +1,94 @@
+id: diagnostic
+nom: Diagnostic de profil
+route: /diagnostic
+roles: [public, viewer, operator, admin]
+roles_refuses: []
+objectif: "Positionner le visiteur sur son profil d'usage de l'IA, pour n'afficher ensuite que les menaces qui le concernent réellement."
+parcours: [P1]
+
+layout:
+  - zone: header
+    composants:
+      - { type: Heading, niveau: h1, texte: "Quelles menaces IA vous concernent vraiment ?" }
+      - { type: Paragraphe, classe: muted, texte: "Six questions sur votre usage. Aucune donnée de votre système d'information n'est demandée." }
+  - zone: progression
+    composants:
+      - { type: ProfileTierChip, source: tiers_declares, etat: live, aide: "Se remplit à mesure des réponses" }
+  - zone: questionnaire
+    composants:
+      - { type: QuestionCard, id: q_api, texte: "Vos équipes appellent-elles un modèle via une API (Azure OpenAI, Mistral, autre) ?", reponses: "oui|non|je ne sais pas", palier: P1a }
+      - { type: QuestionCard, id: q_saas, texte: "Utilisez-vous un assistant IA intégré à votre suite bureautique (type Copilot) ?", reponses: "oui|non|je ne sais pas", palier: P1b }
+      - { type: QuestionCard, id: q_rag, texte: "Une base documentaire interne est-elle consultée par vos outils IA ?", reponses: "oui|non|je ne sais pas", palier: P2 }
+      - { type: QuestionCard, id: q_agents, texte: "Vos outils IA effectuent-ils des actions — envoyer, écrire, payer, déployer ?", reponses: "oui|non|je ne sais pas", palier: P3 }
+      - { type: QuestionCard, id: q_poids, texte: "Hébergez-vous vous-même les poids d'un modèle ?", reponses: "oui|non|je ne sais pas", palier: P4 }
+      - { type: QuestionCard, id: q_entrainement, texte: "Entraînez-vous ou affinez-vous un modèle ?", reponses: "oui|non|je ne sais pas", palier: P5 }
+  - zone: pied
+    composants:
+      - { type: Button, variante: primary, label: "Voir ma carte de couverture", position: droite, action: "naviguer:/couverture" }
+      - { type: Button, variante: ghost, label: "Enregistrer pour mon organisation", position: droite, action: "put_tenant_profile", visible_si: "role=admin" }
+
+donnees:
+  - endpoint: get_threat_catalogue
+    quand: "au montage, pour connaître les paliers et les menaces qu'ils activent"
+  - endpoint: get_tenant_profile
+    quand: "au montage si une session existe — pré-remplit le questionnaire avec le profil courant"
+  - endpoint: submit_diagnostic
+    quand: "à chaque réponse, en différé de 400 ms, pour recalculer les paliers sans persister"
+  - endpoint: put_tenant_profile
+    quand: "au clic sur « Enregistrer pour mon organisation », rôle admin uniquement"
+
+etats:
+  loading: "Six QuestionCard en squelette. La zone progression affiche un ProfileTierChip vide et non un zéro, qui se lirait comme un résultat."
+  empty: "Aucune réponse donnée : les six questions sont posées, le bouton primaire est actif et mène à une carte au profil vide, qui explique pourquoi elle est vide plutôt que de rester blanche."
+  error: "Catalogue indisponible : bandeau badge-red « Impossible de charger le catalogue de menaces » et bouton « Réessayer ». Le questionnaire reste affiché mais les paliers ne se calculent pas — jamais de calcul depuis un catalogue partiel."
+  partial: "Questionnaire entamé et incomplet : la zone progression montre les paliers déjà déterminés, et une mention « n question(s) sans réponse » qui ne bloque pas l'accès à la carte."
+  success: "Six réponses données : la zone progression affiche les paliers déclarés et les paliers dérivés par cumul, visuellement distingués, et le bouton primaire prend le libellé « Voir mes N menaces »."
+
+interactions:
+  - declencheur: "Réponse à une QuestionCard"
+    effet: "Recalcule les paliers et met à jour la zone progression sans rechargement."
+    feedback: "La QuestionCard passe en état répondu ; le ProfileTierChip du palier concerné apparaît ou disparaît avec une transition brève."
+  - declencheur: "Réponse « je ne sais pas »"
+    effet: "Le palier est marqué indéterminé, jamais absent — une menace indéterminée reste affichée comme telle sur la carte."
+    feedback: "Le ProfileTierChip du palier s'affiche en variante indéterminée, avec une infobulle expliquant l'effet sur la carte."
+  - declencheur: "Clic sur « Voir ma carte de couverture »"
+    effet: "Navigue vers /couverture en passant les paliers en paramètre d'URL."
+    feedback: "Le bouton passe en état chargement le temps de la navigation."
+  - declencheur: "Clic sur « Enregistrer pour mon organisation »"
+    effet: "Persiste le profil du tenant et écrit un événement de plan de contrôle."
+    feedback: "Bandeau badge-green « Profil enregistré », et la mention « modifié le <date> par <membre> » apparaît sous le titre."
+
+validations:
+  - champ: reponses
+    regles: ["chaque réponse appartient à {oui, non, je ne sais pas}"]
+    quand: "à la soumission différée, côté serveur également"
+    message_invalide: "Réponse non reconnue. Rechargez la page."
+  - champ: tiers
+    regles: ["sous-ensemble de {P1a,P1b,P2,P3,P4,P5}", "non vide à l'enregistrement"]
+    quand: "au clic sur Enregistrer"
+    message_vide: "Répondez à au moins une question avant d'enregistrer pour votre organisation."
+
+soumission:
+  bloquee_si: "aucune réponse donnée, pour l'enregistrement uniquement — la consultation de la carte n'est jamais bloquée"
+  pendant: "Le bouton d'enregistrement est désactivé et porte un Spinner. Le questionnaire reste modifiable."
+  succes: "Bandeau badge-green, et le profil enregistré devient la source de la carte à la prochaine visite."
+  echec_403: "Bandeau badge-red nommant le rôle requis : « L'enregistrement pour l'organisation demande le rôle admin. Votre carte reste consultable. »"
+  echec_reseau: "Bandeau badge-amber « Enregistrement impossible, vos réponses sont conservées dans cette page. » Aucune réponse perdue."
+
+responsive:
+  base: "Une QuestionCard par ligne, pleine largeur. Zone progression collée en haut au défilement."
+  md: "Deux QuestionCard par ligne. Zone progression en colonne latérale."
+  lg: "Deux QuestionCard par ligne, largeur de contenu bornée pour rester lisible en projection."
+
+a11y:
+  - "Chaque QuestionCard est un groupe de boutons radio étiqueté par le texte de la question."
+  - "La zone progression est une région live polie : elle annonce le changement de palier sans voler le focus."
+  - "Parcours complet au clavier, ordre de tabulation suivant l'ordre visuel."
+  - "Le mode de couverture n'est jamais porté par la seule couleur — libellé textuel systématique."
+
+edge_cases:
+  - "Visiteur anonyme : le diagnostic fonctionne intégralement et n'écrit rien en base."
+  - "Session existante avec profil : le questionnaire est pré-rempli et le bouton d'enregistrement porte « Mettre à jour » plutôt que « Enregistrer »."
+  - "Rôle viewer ou operator connecté : le bouton d'enregistrement n'est pas rendu, la carte reste accessible."
+  - "Réponses toutes négatives : profil vide et valide. La carte l'explique — « aucun usage d'IA déclaré » — au lieu d'afficher les seize menaces par défaut."
+  - "Catalogue plus récent que le profil enregistré : la carte le signale et propose un re-diagnostic, sans invalider le profil de force."
