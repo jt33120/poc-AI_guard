@@ -280,7 +280,7 @@ Chaque `G-nn` deviendra une ou plusieurs exigences fonctionnelles, numérotées 
 | `G-23` | `business_hours_only` : borne temporelle d'exécution, retirée de l'exemple `SPEC.md` faute d'implémentation. Demande un fuseau par tenant et une horloge testable. | M-12 | Basse |
 | `G-24` | `allowed_clients` n'est appliqué que par le gateway MCP (`_rbac_blocks`) : sur `/v1/authorize` la même policy n'est pas également bornée. Le vocabulaire le nomme désormais, il ne le corrige pas. | M-12, divergence d'ingress | **Haute** |
 | `G-25` | ~~Le mode d'enforcement du proxy LLM est lu dans un en-tête de requête~~ — **fermé.** L'enforcement est le défaut ; seule une fenêtre d'observation bornée, ouverte par un `admin` via `/v1/monitor-windows`, le relâche — et jamais sur l'irréversible ni l'envoi externe (`AD-27.2`). `core/monitor.py`, migration `0017`. | M-06, M-12 | ✅ |
-| `G-26` | La branche streaming du proxy LLM contourne entièrement la garde d'appels d'outils et n'écrit aucune ligne d'audit. La DLP d'egress reste appliquée. Aucun test ne couvre le streaming. | M-06, M-12 | **Critique** |
+| `G-26` | La branche streaming du proxy LLM n'examine aucun appel d'outil et n'écrit aucune ligne d'audit. **Requalifié** : ce n'est pas une revendication fausse — le registre ne revendique `llm_proxy` que pour `M-10 / egress`, qui couvre bien le streaming. Ce qui reste est l'invisibilité de l'angle mort. Options instruites dans `DECISION-G26-STREAMING.md`. | M-06, M-12 | **Moyenne** — à trancher |
 
 ### 8.2 Recoupement avec les 34 correctifs de PLAN-REVIEW
 
