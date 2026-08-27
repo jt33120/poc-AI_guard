@@ -5,6 +5,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 from core.policy import parse_policy
 from gateway.downstream import DownstreamProxy, ServerSpec
 from gateway.server import PolicyBackend
@@ -49,6 +51,7 @@ async def test_auto_tool_is_relayed() -> None:
     assert "hi" in _text(result)
 
 
+@pytest.mark.covers("M-06", "chaine", ingress="mcp")
 async def test_irreversible_tool_is_held_not_relayed() -> None:
     result = await _backend().call_tool("delete_contact", {"contact_id": "c1"})
     assert result.isError is True
@@ -56,6 +59,7 @@ async def test_irreversible_tool_is_held_not_relayed() -> None:
     assert "deleted" not in _text(result)  # downstream tool was never called
 
 
+@pytest.mark.covers("M-06", "chaine", ingress="mcp")
 async def test_unknown_tool_is_denied() -> None:
     result = await _backend().call_tool("ghost", {})
     assert result.isError is True

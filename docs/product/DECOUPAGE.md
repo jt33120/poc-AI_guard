@@ -95,7 +95,7 @@ affirmations du produit qui ne sont pas vraies.
 |---|---|---|---|---|
 | **1** | Cœur d'enforcement | `FR-153`→`159`, `198`, `199` — *4 / 9 livrés* | — | Tout. Rien d'autre ne compte tant que les garanties revendiquées ne sont pas vraies |
 | **2** | Intégrité de la preuve | `FR-160`, `161`, `162`, `164`, `169` | Rang 1 | La crédibilité devant une revue. `FR-162` a le plus fort rayon de souffle du lot |
-| **3** | Le triage · **pilier 1** | `FR-172`→`175` | — | Le démonstrateur. Sans lui, la démonstration retombe dans le catalogue de fonctionnalités |
+| **3** | Le triage · **pilier 1** | `FR-172`→`175` — *`G-18` fermé* | — | Le démonstrateur. Sans lui, la démonstration retombe dans le catalogue. **La carte est désormais générée** (`coverage/`), donc `CM-7` est mesuré en continu au lieu d'être une intention |
 | **4** | Mode observation | `FR-179`, `180` | Rang 1 | Le démonstrateur, **et** `G-25` : la bonne forme du correctif du proxy LLM est une fenêtre d'observation du plan de contrôle |
 | **5** | Le démonstrateur | `FR-181`→`183` | Rangs 3 et 4 | La preuve publique |
 | **6** | Souveraineté · **pilier 3** | `FR-176`→`178` | `QO-3` ✅ tranchée | `G-17`, `G-21` |

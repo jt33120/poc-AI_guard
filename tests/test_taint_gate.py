@@ -6,6 +6,7 @@ from typing import Any
 from uuid import uuid4
 
 import mcp.types as types
+import pytest
 
 from core.policy import parse_policy
 from gateway.server import ApprovalContext, PolicyBackend
@@ -65,6 +66,7 @@ def _text(result: types.CallToolResult) -> str:
     return result.content[0].text  # type: ignore[union-attr]
 
 
+@pytest.mark.covers("M-02", "taint", ingress="mcp")
 async def test_tainted_result_then_risky_action_is_denied(db: DBHandle) -> None:
     proxy = FakeProxy({"fetch": _INJECTED})
     backend = _backend(db, proxy, "deny")
@@ -87,6 +89,7 @@ async def test_clean_result_does_not_gate(db: DBHandle) -> None:
     assert r2.isError is False and proxy.calls == ["fetch", "send"]  # no taint → relayed
 
 
+@pytest.mark.covers("M-02", "taint", ingress="mcp")
 async def test_escalate_holds_the_risky_action(db: DBHandle) -> None:
     proxy = FakeProxy({"fetch": _INJECTED})
     backend = _backend(db, proxy, "escalate")

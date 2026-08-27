@@ -43,3 +43,8 @@ frontend/playwright-report/
 # BMAD-METHOD personal install answers (per-teammate name/language); the
 # shared team config is /_bmad/config.toml, which stays committed.
 /_bmad/config.user.toml
+
+# Generated coverage artefacts (AD-30: the map is derived, never authored).
+/coverage/.scenarios.json
+/coverage/map.json
+/coverage/COVERAGE-MAP.md

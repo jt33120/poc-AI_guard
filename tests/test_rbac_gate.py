@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import mcp.types as types
+import pytest
 
 from core.policy import parse_policy
 from gateway.server import ApprovalContext, PolicyBackend
@@ -63,6 +64,7 @@ async def test_allowed_client_may_call(db: DBHandle) -> None:
     assert result.isError is False and proxy.calls == ["secret"]
 
 
+@pytest.mark.covers("M-12", "rbac", ingress="mcp")
 async def test_foreign_client_is_denied_and_audited(db: DBHandle) -> None:
     proxy = FakeProxy()
     result = await _backend(db, proxy, client_id="c2").call_tool("secret", {})
@@ -71,6 +73,7 @@ async def test_foreign_client_is_denied_and_audited(db: DBHandle) -> None:
     assert "rbac_denied" in _decisions(db)
 
 
+@pytest.mark.covers("M-12", "rbac", ingress="mcp")
 async def test_missing_client_is_denied(db: DBHandle) -> None:
     proxy = FakeProxy()
     result = await _backend(db, proxy, client_id=None).call_tool("secret", {})

@@ -481,6 +481,7 @@ def _mint(client: TestClient, admin: str) -> str:
     return client.post("/v1/gateway-tokens", headers=auth, json={"name": "bot"}).json()["token"]
 
 
+@pytest.mark.covers("M-10", "egress", ingress="llm_proxy")
 def test_dlp_blocks_secret_before_forwarding(
     db: DBHandle,
     test_verifier: TokenVerifier,
