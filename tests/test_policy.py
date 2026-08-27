@@ -7,7 +7,10 @@ import pytest
 from core.policy import (
     ActionClass,
     Approval,
+    Policy,
+    PolicyDefaults,
     PolicyError,
+    ToolRule,
     authorize,
     classify,
     evaluate,
@@ -228,3 +231,92 @@ def test_classify_by_name_safety_ordering() -> None:
     assert classify_by_name("candidate.search") is ActionClass.read
     assert classify_by_name("candidate.update") is ActionClass.write
     assert classify_by_name("xyzzy") is None
+
+
+# --- closed constraint vocabulary (EXH-2 / G-11) -----------------------------
+
+
+def _with_constraint(body: str) -> str:
+    return f"tools:\n  - name: t\n    class: write\n    approval: auto\n    constraints: {body}\n"
+
+
+def test_unknown_constraint_key_is_rejected_at_parse_time() -> None:
+    # `business_hours_only` used to parse, display as a bound, and do nothing.
+    with pytest.raises(PolicyError) as exc:
+        parse_policy(_with_constraint("{ business_hours_only: true }"))
+    assert "business_hours_only" in str(exc.value)
+    assert "known constraints" in str(exc.value)  # the error names the vocabulary
+
+
+def test_malformed_known_constraint_is_rejected_at_parse_time() -> None:
+    with pytest.raises(PolicyError):
+        parse_policy(_with_constraint('{ allowed_domains: "@client.fr" }'))  # string, not list
+    with pytest.raises(PolicyError):
+        parse_policy(_with_constraint("{ allowed_domains: [] }"))  # empty allows nothing, silently
+    with pytest.raises(PolicyError):
+        parse_policy(_with_constraint("{ dry_run: yes-please }"))  # not a boolean
+
+
+def test_every_vocabulary_member_is_accepted() -> None:
+    from core.policy import _KNOWN_CONSTRAINTS
+
+    samples: dict[str, str] = {
+        "allowed_domains": '["@client.fr"]',
+        "allowed_clients": '["c1"]',
+        "dry_run": "true",
+    }
+    # A key in the vocabulary with no sample here means the vocabulary grew without
+    # this test growing with it -- which is how the silent-ignore defect got in.
+    assert set(samples) == set(_KNOWN_CONSTRAINTS)
+    for key, value in samples.items():
+        parse_policy(_with_constraint(f"{{ {key}: {value} }}"))
+
+
+def test_unenforceable_constraint_denies_at_evaluation() -> None:
+    # Parse-time rejection is the ergonomics; this is the guarantee. A rule built
+    # around the parser (a stored document, a hand-built ToolRule) still fails closed.
+    rule = ToolRule.model_construct(
+        name="t",
+        action_class=ActionClass.write,
+        classify=None,
+        approval=Approval.auto,
+        constraints={"business_hours_only": True},
+    )
+    policy = Policy.model_construct(tools=[rule], defaults=PolicyDefaults())
+    outcome = evaluate(policy, "t", {})
+    assert outcome.decision is Approval.deny
+    assert outcome.reason == "constraint violated"
+
+
+def test_dry_run_raises_the_approval_floor() -> None:
+    # A dry run nobody is shown is not a dry run: declaring it forces a human.
+    policy = parse_policy(
+        "tools:\n"
+        "  - name: crm.purge\n"
+        "    class: irreversible\n"
+        "    approval: auto\n"
+        "    constraints: { dry_run: true }\n"
+    )
+    assert evaluate(policy, "crm.purge", {}).decision is Approval.human_in_the_loop
+
+
+def test_dry_run_floor_never_lowers_a_stricter_approval() -> None:
+    policy = parse_policy(
+        "tools:\n"
+        "  - name: crm.purge\n"
+        "    class: irreversible\n"
+        "    approval: human_dual\n"
+        "    constraints: { dry_run: true }\n"
+    )
+    assert evaluate(policy, "crm.purge", {}).decision is Approval.human_dual
+
+
+def test_dry_run_false_forces_nothing() -> None:
+    policy = parse_policy(
+        "tools:\n"
+        "  - name: crm.note\n"
+        "    class: write\n"
+        "    approval: auto\n"
+        "    constraints: { dry_run: false }\n"
+    )
+    assert evaluate(policy, "crm.note", {}).decision is Approval.auto

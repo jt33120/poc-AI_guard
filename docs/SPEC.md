@@ -186,7 +186,6 @@ tools:
   - name: crm.update_contact
     class: write
     approval: auto
-    constraints: { reversible: true }
   - name: mail.send
     class: external_send
     approval: human_in_the_loop
@@ -194,7 +193,7 @@ tools:
   - name: crm.delete_contact
     class: irreversible
     approval: human_dual
-    constraints: { dry_run: true, business_hours_only: true }
+    constraints: { dry_run: true }
   - name: shell.exec
     classify: ambiguous       # → LLM juge détermine action_class selon arguments
     approval: human_in_the_loop
@@ -203,6 +202,23 @@ defaults:
   hitl_timeout_seconds: 3600
   on_approval_service_down: deny
 ```
+
+**Le vocabulaire des contraintes est clos** (`core/policy.py`, `_KNOWN_CONSTRAINTS`).
+Une clé inconnue ou malformée fait échouer le document au parse (422) et refuse à
+l'évaluation. Une policy qui ne peut pas être intégralement appliquée n'est jamais
+acceptée : une règle qui *paraît* bornée sans l'être achète une confiance qu'elle
+n'a pas méritée. Clés reconnues aujourd'hui :
+
+| Clé | Effet | Où |
+|---|---|---|
+| `allowed_domains` | Refuse si un e-mail des arguments sort des domaines listés | `evaluate` |
+| `dry_run` | Relève le plancher d'approbation à `human_in_the_loop` — un dry-run que personne ne voit n'en est pas un | `evaluate` |
+| `allowed_clients` | Restreint l'appel aux clients listés (garde du député confus) | **gateway MCP seul** — pas sur `/v1/authorize` |
+
+Cet exemple portait auparavant `reversible: true` et `business_hours_only: true`.
+Aucune des deux n'était appliquée nulle part. `business_hours_only` demande un
+fuseau par tenant et reste à spécifier (`G-23`) ; `reversible` était une assertion,
+pas une borne, et disparaît.
 Validation au `PUT` : `name` unique, `class`/`approval` dans l'énum, cohérence `classify: ambiguous`.
 
 ---

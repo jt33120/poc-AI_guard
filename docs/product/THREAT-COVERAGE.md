@@ -269,6 +269,8 @@ Chaque `G-nn` deviendra une ou plusieurs exigences fonctionnelles, numérotées 
 | `G-20` | Déclarer l'angle mort de l'IA embarquée SaaS (P1b) et instruire la couverture `Détecté`/`Attesté` par ingestion des journaux d'audit de la suite | §2.4 | Haute — population très répandue |
 | `G-21` | Documenter et rendre démontrable l'architecture de référence souveraine (§6.2), y compris le choix des substituts UE pour chaque ligne `Orchestré` | Tous (pilier 3) | **Haute** — le pilier « Made in France » n'existe pas sans elle |
 | `G-22` | Rédaction de contenu avant l'envoi au juge : `core/approvals.py:45-57` masque par *nom de clé*, pas par contenu. Une PII dans la valeur d'une clé anodine (`body`, `text`) atteint le modèle. Le chemin `core/dlp.py` existe mais n'est pas branché sur le juge. | M-10, §4.10 | **Haute** — c'est un transit de données vers un modèle |
+| `G-23` | `business_hours_only` : borne temporelle d'exécution, retirée de l'exemple `SPEC.md` faute d'implémentation. Demande un fuseau par tenant et une horloge testable. | M-12 | Basse |
+| `G-24` | `allowed_clients` n'est appliqué que par le gateway MCP (`_rbac_blocks`) : sur `/v1/authorize` la même policy n'est pas également bornée. Le vocabulaire le nomme désormais, il ne le corrige pas. | M-12, divergence d'ingress | **Haute** |
 
 ### 8.2 Recoupement avec les 34 correctifs de PLAN-REVIEW
 

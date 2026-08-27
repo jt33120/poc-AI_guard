@@ -9,6 +9,7 @@ authorizes on its own.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Literal
@@ -110,6 +111,21 @@ class ToolRule(BaseModel):
             raise ValueError(f"tool '{self.name}': one of 'class' or 'classify' is required")
         if self.classify is not None and self.action_class is not None:
             raise ValueError(f"tool '{self.name}': 'class' and 'classify' are mutually exclusive")
+        return self
+
+    @model_validator(mode="after")
+    def _check_constraints(self) -> ToolRule:
+        """Reject a document the engine cannot fully enforce (EXH-2 / G-11).
+
+        A policy is a claim about what is bounded. Accepting a key we ignore lets
+        that claim be false, so the document is refused here -- while the operator
+        is writing it -- rather than at the first call it fails to stop.
+        """
+        for key, value in self.constraints.items():
+            error = _constraint_shape_error(key, value)
+            if error is not None:
+                known = ", ".join(sorted(_KNOWN_CONSTRAINTS))
+                raise ValueError(f"tool '{self.name}': {error} (known constraints: {known})")
         return self
 
 
@@ -245,19 +261,14 @@ def _iter_strings(arguments: dict[str, Any]) -> list[str]:
     return out
 
 
-def _allowed_domains_ok(allowed: list[str], arguments: dict[str, Any]) -> bool:
+def _allowed_domains_ok(value: Any, arguments: dict[str, Any]) -> bool:
+    if not isinstance(value, list):  # shape already rejected at parse time
+        return False
     for text in _iter_strings(arguments):
         for email in _EMAIL.findall(text):
             domain = "@" + email.split("@")[-1]
-            if not any(domain == d or domain.endswith(d) for d in allowed):
+            if not any(domain == d or domain.endswith(d) for d in value):
                 return False
-    return True
-
-
-def _constraints_ok(rule: ToolRule, arguments: dict[str, Any]) -> bool:
-    allowed = rule.constraints.get("allowed_domains")
-    if isinstance(allowed, list):
-        return _allowed_domains_ok(allowed, arguments)
     return True
 
 
@@ -268,6 +279,86 @@ _APPROVAL_ORDER = {
     Approval.human_dual: 3,
     Approval.deny: 4,
 }
+
+# --- the closed constraint vocabulary (EXH-2 / G-11) -------------------------
+# `_constraints_ok` used to read exactly one key and return True for every other,
+# so `constraints: {business_hours_only: true}` parsed, displayed as a bound, and
+# did nothing. A rule that *looks* constrained and is not is worse than an
+# unconstrained one: it buys confidence it has not earned.
+#
+# The vocabulary below is closed. An unknown or malformed key is rejected at parse
+# time (the operator learns while authoring) and denies at evaluation (anything
+# that bypassed the parser still fails closed). The three tables are separate
+# because the effects differ, and the vocabulary is their *computed* union -- a key
+# cannot be declared known without landing in one of them, which is the property
+# that keeps this from drifting back.
+
+#: Keys that bound the call's *arguments*. The checker returns False to deny.
+_ARGUMENT_CONSTRAINTS: dict[str, Callable[[Any, dict[str, Any]], bool]] = {
+    "allowed_domains": _allowed_domains_ok,
+}
+
+#: Keys that raise the *approval floor* when declared true. `dry_run` is here and
+#: not among the argument bounds because it is not a condition on the call: it says
+#: the effect must be shown to a human before it happens, and a dry run nobody is
+#: shown is not a dry run. The floor is a minimum -- it never lowers `human_dual`.
+_FLOOR_CONSTRAINTS: dict[str, Approval] = {
+    "dry_run": Approval.human_in_the_loop,
+}
+
+#: Keys enforced by an ingress adapter rather than by `evaluate`. Listing them keeps
+#: them in the vocabulary; it does not make them portable. `allowed_clients` is
+#: enforced by the MCP gateway alone (``gateway/server.py`` ``_rbac_blocks``), so a
+#: policy leaning on it is *not* equally bounded over ``/v1/authorize``. The
+#: divergence is named here rather than left to be discovered.
+_ADAPTER_CONSTRAINTS: dict[str, str] = {
+    "allowed_clients": "enforced by the MCP gateway (per-tool RBAC), not by /v1/authorize",
+}
+
+#: Computed, never hand-maintained.
+_KNOWN_CONSTRAINTS = (
+    frozenset(_ARGUMENT_CONSTRAINTS)
+    | frozenset(_FLOOR_CONSTRAINTS)
+    | frozenset(_ADAPTER_CONSTRAINTS)
+)
+
+
+def _constraint_shape_error(key: str, value: Any) -> str | None:
+    """Why ``value`` is not an acceptable declaration for ``key``, or None if it is.
+
+    Single authority on shape, used by both the parser and the evaluator so the two
+    can never disagree about what a well-formed constraint is.
+    """
+    if key not in _KNOWN_CONSTRAINTS:
+        return f"unknown constraint key '{key}'"
+    if key in _FLOOR_CONSTRAINTS:
+        if not isinstance(value, bool):
+            return f"'{key}' must be a boolean"
+        return None
+    if not isinstance(value, list) or not value or not all(isinstance(d, str) and d for d in value):
+        return f"'{key}' must be a non-empty list of non-empty strings"
+    return None
+
+
+def _constraints_ok(rule: ToolRule, arguments: dict[str, Any]) -> bool:
+    """Whether every declared constraint holds. Unenforceable ones deny."""
+    for key, value in rule.constraints.items():
+        if _constraint_shape_error(key, value) is not None:
+            return False  # cannot be evaluated -> is not satisfied
+        check = _ARGUMENT_CONSTRAINTS.get(key)
+        if check is not None and not check(value, arguments):
+            return False
+    return True
+
+
+def _constraint_floor(rule: ToolRule, base: Approval) -> Approval:
+    """Raise ``base`` to the highest floor the rule's constraints demand."""
+    floor = base
+    for key, value in rule.constraints.items():
+        forced = _FLOOR_CONSTRAINTS.get(key)
+        if forced is not None and value and _APPROVAL_ORDER[forced] > _APPROVAL_ORDER[floor]:
+            floor = forced
+    return floor
 
 
 def escalate_for_class(base: Approval, action_class: ActionClass) -> Approval:
@@ -306,8 +397,7 @@ def evaluate(policy: Policy, tool_name: str, arguments: dict[str, Any]) -> Polic
     # classifying, which is the honest record.
     if not _constraints_ok(rule, arguments):
         return PolicyOutcome(rule.action_class, Approval.deny, rule.name, "constraint violated")
+    approval = _constraint_floor(rule, rule.approval)
     if rule.classify == "ambiguous":
-        return PolicyOutcome(
-            None, rule.approval, rule.name, "ambiguous: needs judge", ambiguous=True
-        )
-    return PolicyOutcome(rule.action_class, rule.approval, rule.name, "policy rule")
+        return PolicyOutcome(None, approval, rule.name, "ambiguous: needs judge", ambiguous=True)
+    return PolicyOutcome(rule.action_class, approval, rule.name, "policy rule")
