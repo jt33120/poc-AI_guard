@@ -76,6 +76,13 @@ select = [
 "core/billing.py" = ["S608"]
 "core/clients.py" = ["S608"]
 "core/monitor.py" = ["S608"]
+# RUF001/2/3 flag characters that look like Latin ones. The homoglyph table is
+# made of exactly those characters, on purpose: folding them is how a Cyrillic
+# "о" in an injected instruction stops evading the pattern (FR-153).
+"gateway/taint.py" = ["RUF001", "RUF002", "RUF003"]
+# Same reason, one level up: these tests assert that a Cyrillic "о" and a
+# full-width "Ｉ" no longer evade the guard, so they must contain them.
+"tests/test_taint.py" = ["RUF001", "RUF002", "RUF003"]
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI dependency-injection idiom: Depends/Security in argument defaults.

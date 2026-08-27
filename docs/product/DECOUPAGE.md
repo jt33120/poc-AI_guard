@@ -71,7 +71,7 @@ Le lot qui rendait vrai ce que le produit affirmait déjà.
 | `FR-155` | Vocabulaire des contraintes clos et versionné ; une clé inconnue fait échouer le document (`EXH-2`, `D-2`, `G-11`) | ✅ **Livré** — refus au parse **et** à l'évaluation |
 | `FR-156` | Toute contrainte publiée dans un exemple ou une démo est effectivement appliquée, ou retirée | ✅ **Livré** — `dry_run` implémenté en plancher d'approbation ; `reversible` et `business_hours_only` retirés de `SPEC.md` |
 | — | Service d'approbation injoignable : refus sur MCP, HTTP 500 sur `/v1/authorize` | ✅ **Livré** — `service_down_verdict` partagée |
-| `FR-153` | Détection de contenu injecté en FR/ES/DE + normalisation unicode, encodages, homoglyphes (`D-1` : regex anglaise uniquement) | ⬜ À faire |
+| `FR-153` | Détection de contenu injecté en FR/ES/DE + normalisation unicode, encodages, homoglyphes | ✅ **Livré** — scénario de garde en français ; 27 tests dont 9 de non-régression sur de la prose métier bénigne |
 | `FR-154` | Taint lié au **jeton de passerelle**, pas au `session_id` déclaré par l'agent : un identifiant neuf ne remet pas la session à blanc (`INV-4`, `G-03`) | ⬜ À faire |
 | `FR-157` | Prédicat déterministe borné sur la valeur des arguments — non Turing-complet, échouant fermé sur champ absent ou mal typé (`EXH-3`) | ⬜ À faire |
 | `FR-158` | Classification déterministe des outils exécuteurs (`bash`, `execute_sql`, `kubectl`) sans passer par le juge (`EXH-4`, `G-06`) | ⬜ À faire |
