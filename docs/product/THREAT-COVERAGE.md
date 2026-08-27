@@ -143,6 +143,8 @@ Légende écart : ✅ couvert · ⚠️ partiel / durci à faire · ❌ absent
 | **M-10** | Exfiltration de données / PI via LLM | **B** (chemin supervisé) / **O** (découverte) | ✅ `core/dlp.py:59-75` (secret bloqué / PII signalé / entropie), `api/llm_proxy.py`, coffre `core/secrets.py`. ⚠️ `FR-64` (DLP post-taint) **différé**. ❌ Découverte du Shadow AI non supervisé = territoire CASB. | `G-08` `G-09` |
 | **M-11** | Supply chain (modèles / bibliothèques) | **B** (outils MCP) / **A** (libs) / **O** (modèles ML) | ✅ Outils MCP : empreinte + quarantaine, `gateway/server.py:130-134`, `FR-53/54/68` — différenciateur revendiqué (PRD.md:1087). ✅ Libs : SBOM `FR-141`, `pip-audit` + `trufflehog` en CI. ❌ Modèles ML (picklescan/modelscan) : absent. | `G-10` |
 
+**M-10 — Chemin d'ingestion (`AD-28`).** Le `Bloqué` porte sur l'**egress du proxy LLM**, et il y est inconditionnel : le blocage DLP précède l'appel amont et la branche streaming, donc ni l'en-tête `x-xsom-mode` ni le mode flux ne l'atteignent (§8.3). Il ne porte **pas** sur la garde d'appels d'outils du même proxy, qui relève de `M-06`/`M-12` et tombe sous `G-25`/`G-26`.
+
 **M-10 — Collision / Résolution.** PRD `§5.4` : « xSOM n'est pas un produit DLP ; la DLP est une *entrée* des décisions de risque et d'egress, pas un plan de contrôle vendu ». **Résolution :** la ligne reste `B` sur le chemin supervisé — le blocage d'un secret sortant est réel et prouvable — mais le support commercial ne vend jamais « une DLP ». Il vend « aucun secret ne franchit la frontière d'action sans décision tracée ». Le non-objectif tient.
 
 ### Domaine 4 — Architecture & Configuration
@@ -271,6 +273,8 @@ Chaque `G-nn` deviendra une ou plusieurs exigences fonctionnelles, numérotées 
 | `G-22` | Rédaction de contenu avant l'envoi au juge : `core/approvals.py:45-57` masque par *nom de clé*, pas par contenu. Une PII dans la valeur d'une clé anodine (`body`, `text`) atteint le modèle. Le chemin `core/dlp.py` existe mais n'est pas branché sur le juge. | M-10, §4.10 | **Haute** — c'est un transit de données vers un modèle |
 | `G-23` | `business_hours_only` : borne temporelle d'exécution, retirée de l'exemple `SPEC.md` faute d'implémentation. Demande un fuseau par tenant et une horloge testable. | M-12 | Basse |
 | `G-24` | `allowed_clients` n'est appliqué que par le gateway MCP (`_rbac_blocks`) : sur `/v1/authorize` la même policy n'est pas également bornée. Le vocabulaire le nomme désormais, il ne le corrige pas. | M-12, divergence d'ingress | **Haute** |
+| `G-25` | Le mode d'enforcement du proxy LLM est lu dans un en-tête de requête (`x-xsom-mode`) : l'agent contrôlé décide s'il est contrôlé. À remplacer par un réglage de plan de contrôle, enforcement par défaut + fenêtre d'observation bornée. | M-06, M-12, divergence d'ingress | **Critique** |
+| `G-26` | La branche streaming du proxy LLM contourne entièrement la garde d'appels d'outils et n'écrit aucune ligne d'audit. La DLP d'egress reste appliquée. Aucun test ne couvre le streaming. | M-06, M-12 | **Critique** |
 
 ### 8.2 Recoupement avec les 34 correctifs de PLAN-REVIEW
 
@@ -298,7 +302,24 @@ Périmètre net : **≈ 50 items distincts**, pas 55.
 
 **Lecture.** Le conflit sur les référentiels est le plus simple à trancher : `EXH-7` vise les référentiels de *management* (ISO 42001, SOC 2), dont la correspondance engage un jugement d'auditeur. OWASP LLM Top 10 et MITRE ATLAS sont des taxonomies *techniques* — s'y aligner est descriptif, pas assertif, et ne présente pas le même risque. NIS2, DORA et ANSSI retombent en revanche dans la catégorie que la revue met en garde.
 
-Le conflit sur le proxy LLM est le plus coûteux : suivre `EXH-6` sans compensation dégrade M-10 de `Bloqué` à `Détecté`, ce qui retire une ligne au compte de la démo. Une sortie possible est de séparer les deux fonctions — garder l'application DLP sur l'egress (enforcement) tout en abandonnant la comptabilité de coûts et la reconstitution des appels d'outils en flux (télémétrie) — mais elle reste à valider.
+Le conflit sur le proxy LLM est le plus coûteux : suivre `EXH-6` sans compensation dégrade M-10 de `Bloqué` à `Détecté`, ce qui retire une ligne au compte de la démo. La sortie envisagée — séparer l'application DLP (enforcement) de la comptabilité de coûts (télémétrie) — **est validée par la lecture du code** ; voir §8.3.
+
+### 8.3 `AR-2` / `QO-8` — tranché : le proxy est séparable, et l'inspection révèle deux défauts
+
+**La séparation est acquise, parce que le couplage n'a jamais existé.** Dans `api/llm_proxy.py` `_forward`, la DLP d'egress est un filtre de la *requête* : elle s'exécute avant l'appel amont, sa sortie est un `403` ou un corps réécrit, et elle ne lit rien de ce que produit la télémétrie. La télémétrie (`_inspect` → `usage`, `billing`, `pricing`) s'exécute après coup, sur les seules réponses non-streamées en 200. Les deux ne partagent que la route, le `GatewayPrincipal` et l'URL de base. Abandonner la comptabilité de coûts ne touche à aucune ligne du chemin bloquant.
+
+**Conséquence pour la carte : `M-10` conserve son `Bloqué` sur le chemin d'egress supervisé. La démo ne perd pas de ligne.** `QO-8` est close.
+
+**Mais l'inspection trouve une troisième fonction, que `AR-2` ne nommait pas.** `_inspect` appelle `_process`, qui ré-exécute `evaluate()` sur les appels d'outils *demandés par le modèle* et retire de la réponse ceux qui ne sont pas autorisés. Ce n'est ni de la DLP ni de la télémétrie : c'est du contrôle d'action, le cœur du produit, sur un **troisième chemin d'ingestion** à côté de MCP et de `/v1/authorize`. Et il porte deux défauts, tous deux sans test :
+
+| | Défaut | Effet |
+|---|---|---|
+| `G-25` | `enforce = request.headers.get("x-xsom-mode") == "enforce"` — **l'agent contrôlé décide s'il est contrôlé.** Sans l'en-tête, les verdicts sont calculés et journalisés, mais `kept` n'est jamais réassigné : tous les appels proposés repartent intacts. | Un en-tête omis — par compromission ou par simple erreur de configuration — dissout la garde. Même famille que `INV-4` (taint indexé sur un `session_id` déclaré par l'agent) : une décision de plan de contrôle prise dans le plan de données. |
+| `G-26` | La branche `if streaming:` renvoie les octets amont bruts et retourne **avant** `_inspect`. | Avec `stream: true` — le défaut de la plupart des frameworks d'agents — la garde d'appels d'outils n'existe pas, et aucune ligne d'audit n'est écrite pour ces appels. La DLP d'egress, elle, s'applique : elle est en amont de la branche. |
+
+**Lecture de couverture, et c'est le point qui compte.** `M-10` tient parce que le blocage DLP est inconditionnel (`if scan.blocked: raise HTTPException`) et en amont du streaming : ni l'en-tête ni le mode flux ne l'atteignent. En revanche **le chemin proxy LLM ne doit être compté dans aucune revendication de contrôle d'appels d'outils** (`M-06`, `M-12`) tant que `G-25` et `G-26` tiennent : sur cette ingestion, la garde est optionnelle au choix de l'agent et absente en streaming. Une revendication `Bloqué` vraie sur MCP se lirait comme vraie ici — c'est exactement ce que `AD-28` impose d'afficher, et pourquoi la carte porte le chemin d'ingestion et pas seulement le mode.
+
+**Le correctif de `G-25` n'est pas d'inverser le défaut.** L'enforcement par défaut casserait tout agent dont la policy n'est pas encore écrite (outil inconnu → `deny` → tous les appels retirés), et c'est précisément l'écueil que l'en-tête contournait. La forme juste est celle que le blueprint spécifie déjà pour l'admin : enforcement par défaut, et **fenêtre d'observation bornée dans le temps, ouverte par le plan de contrôle**, jamais par l'appelant. `G-25` est donc un préalable au même travail que le mode observation, pas un patch isolé.
 
 Ces trois arbitrages conditionnent le périmètre des `FR-153+` et doivent être tranchés avant l'écriture de la PRD.
 
