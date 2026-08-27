@@ -60,6 +60,21 @@ Fermé. **Un composant n'entre pas dans l'inventaire sans au moins deux usages r
 
 Les composants métier (`ApiKeys`, `ClientsManager`, `DlpSettings`, `ExecutiveSummary`, `ProviderCredentials`, `ReadTokens`, `ClientScope`) restent propres à leurs écrans : ils ne sont pas des primitives et n'ont pas à le devenir.
 
+### Primitives de mise en page — existantes, nommées ici pour être citables
+
+Les specs d'écran les nomment ; elles se rendent avec les classes ci-dessus. Elles figurent dans l'inventaire parce qu'un composant cité dans une spec doit exister dans l'inventaire.
+
+| Type | Usages | Rend avec |
+|---|---|---|
+| `Heading` | `diagnostic`, `couverture`, `promotion` | balise de titre + typographie du thème |
+| `Paragraphe` | `diagnostic`, `couverture`, `promotion`, `home` | `muted` quand secondaire |
+| `Button` | `diagnostic`, `promotion` | `btn` + variante |
+| `Input` · `Select` | `diagnostic`, `promotion`, `audit` | `input` |
+| `DataTable` | `couverture`, `promotion`, `audit` | `data-table` |
+| `Badge` | `audit`, `home` | `badge` + variante |
+| `Statistique` | `couverture`, `promotion` | `card` + typographie de chiffre |
+| `Encadre` | `promotion`, `home` | `card` en variante discrète |
+
 ### Ce que la strate ajoute — deux composants, pas un de plus
 
 | Composant | Usages réels | Rôle |
@@ -67,7 +82,17 @@ Les composants métier (`ApiKeys`, `ClientsManager`, `DlpSettings`, `ExecutiveSu
 | `CoverageBadge` | `couverture`, `audit`, `diagnostic` | Rend un des cinq modes de couverture avec son token de rôle et **son chemin d'ingestion** (`AD-28`). Le chemin n'est pas décoratif : sans lui, une revendication `Bloqué` vraie sur MCP se lit comme vraie partout. |
 | `ProfileTierChip` | `diagnostic`, `couverture` | Rend un palier `P1a`→`P5`, en distinguant **déclaré** et **dérivé par cumul** — la nuance qui rend le triage compréhensible plutôt que magique. |
 
-**Ce qui a été refusé faute de deux usages :** un composant de questionnaire (un seul écran — c'est du layout, pas une primitive), un composant de rapport de promotion (idem), et un composant de graphe pour la carte (elle est un tableau dense, pas une visualisation ; un graphe rendrait le compte moins lisible en projection).
+### Compositions locales à un écran
+
+Une spec d'écran peut nommer une composition qui n'existe qu'elle — elle est alors **locale, jamais partagée**, et n'entre pas dans l'inventaire des primitives.
+
+| Composition | Écran | Faite de |
+|---|---|---|
+| `QuestionCard` | `diagnostic` seul | `card` + `Paragraphe` + groupe de boutons radio |
+
+C'est la lecture correcte de la règle des deux usages : elle interdit de **promouvoir en primitive partagée** ce qui ne sert qu'une fois, pas de composer localement. Promouvoir `QuestionCard` obligerait le prochain écran à s'y conformer sans raison.
+
+**Ce qui reste refusé :** un composant de rapport de promotion (c'est du layout d'un seul écran), et un composant de graphe pour la carte de couverture — elle est un tableau dense, pas une visualisation, et un graphe rendrait le compte moins lisible en projection.
 
 ---
 

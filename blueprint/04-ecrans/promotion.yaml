@@ -1,0 +1,70 @@
+id: promotion
+nom: Rapport de promotion
+route: /promotion
+roles: [operator, admin]
+roles_refuses: [viewer]
+objectif: "Montrer ce que l'enforcement aurait fait pendant la période d'observation, pour décider de l'activer en connaissance de cause."
+parcours: [P5]
+
+layout:
+  - zone: header
+    composants:
+      - { type: Heading, niveau: h1, texte: "Si vous aviez activé l'enforcement" }
+      - { type: Paragraphe, classe: muted, source: periode, texte: "Du <debut> au <fin>, sur <fenetres_couvertes> fenêtre(s) d'observation." }
+      - { type: Select, id: filtre_agent, label: "Agent", options: "tous|<liste des agents observés>", position: droite }
+  - zone: compte
+    composants:
+      - { type: Statistique, cle: auraient_ete_tenus, libelle: "appels auraient été tenus", taille: xl, variante: "coverage.blocked" }
+      - { type: Statistique, cle: auraient_ete_refuses, libelle: "auraient été refusés", taille: xl, variante: "coverage.blocked" }
+      - { type: Statistique, cle: observations, libelle: "appels observés au total", taille: md, classe: muted }
+  - zone: detail
+    composants:
+      - { type: Heading, niveau: h2, texte: "Par outil" }
+      - { type: DataTable, colonnes: [tool, tenus, refuses, classe_dominante], tri_defaut: "tenus desc", pagination: 25 }
+  - zone: bornes
+    composants:
+      - { type: Encadre, variante: neutre, texte: "L'observation ne couvre jamais les actions irréversibles ni les envois externes : celles-ci ont été bloquées pendant toute la période. Les chiffres ci-dessus portent sur les classes réversibles." }
+  - zone: pied
+    composants:
+      - { type: Button, variante: ghost, label: "Gérer les fenêtres d'observation", position: droite, action: "naviguer:/admin", visible_si: "role=admin" }
+
+donnees:
+  - endpoint: get_promotion_report
+    quand: "au montage, et à chaque changement du filtre agent"
+  - endpoint: list_monitor_windows
+    quand: "au montage, pour peupler le filtre agent et dater la période"
+
+etats:
+  loading: "Squelette de trois statistiques et d'un tableau. Aucun chiffre avant d'être vrai."
+  empty: "Aucune fenêtre d'observation n'a jamais été ouverte : message « Aucune période d'observation enregistrée » et bouton vers /admin pour en ouvrir une. Aucun tableau, aucun zéro."
+  error: "Bandeau badge-red « Impossible de charger le rapport » et bouton « Réessayer ». Aucun chiffre partiel n'est affiché — un compte incomplet se lirait comme un compte."
+  partial: "Fenêtre ouverte mais aucun appel observé : les statistiques affichent « aucune donnée » en toutes lettres, jamais zéro. Un zéro se lirait comme « rien n'aurait été tenu », c'est-à-dire l'inverse du message."
+  success: "Les trois statistiques sont peuplées, le tableau par outil est trié par volume tenu décroissant, et l'encadré de bornes est visible."
+
+interactions:
+  - declencheur: "Changement du filtre agent"
+    effet: "Recharge le rapport pour l'agent choisi, ou pour tous."
+    feedback: "Les statistiques passent en squelette pendant le rechargement ; la période affichée se met à jour."
+  - declencheur: "Clic sur une ligne du tableau par outil"
+    effet: "Navigue vers l'explorateur d'audit filtré sur cet outil et sur la période d'observation."
+    feedback: "La ligne se surligne, puis transition vers /audit avec les filtres pré-appliqués et visibles."
+  - declencheur: "Survol d'une statistique"
+    effet: "Affiche la définition du chiffre."
+    feedback: "Infobulle : « Appels que le pipeline aurait tenus pour approbation humaine si l'enforcement avait été actif. »"
+
+responsive:
+  base: "Statistiques empilées, tableau en cartes. L'encadré de bornes reste au-dessus du pied."
+  md: "Trois statistiques sur une ligne, tableau en colonnes."
+  lg: "Mise en page inchangée, largeur bornée pour rester lisible en projection."
+
+a11y:
+  - "Chaque statistique associe son chiffre à son libellé par un lien accessible, jamais par la seule proximité visuelle."
+  - "L'encadré de bornes est lu avant le tableau dans l'ordre du document — c'est une réserve sur les chiffres, elle doit précéder leur lecture."
+  - "Le tableau porte des en-têtes associés et son tri est annoncé."
+
+edge_cases:
+  - "Rôle viewer : l'écran n'est pas servi, message nommant le rôle requis (operator ou admin)."
+  - "Fenêtre encore active : la période affiche « en cours depuis <date> » et le rapport se lit comme provisoire, pas comme un bilan."
+  - "Agent supprimé pendant la période : ses observations restent comptées, l'agent apparaît sous son nom historique avec la mention « supprimé »."
+  - "Toutes les fenêtres expirées et l'enforcement déjà repris : bandeau badge-green « L'enforcement est actif » au-dessus du rapport, qui devient un bilan."
+  - "Chiffres tous à zéro avec des observations non nulles : cas réel et lisible — la flotte n'a rien tenté qui aurait été tenu. Le message le dit plutôt que de laisser interpréter."
