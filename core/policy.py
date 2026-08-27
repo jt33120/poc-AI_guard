@@ -375,6 +375,25 @@ def escalate_for_class(base: Approval, action_class: ActionClass) -> Approval:
     return base if _APPROVAL_ORDER[base] >= _APPROVAL_ORDER[floor] else floor
 
 
+def service_down_verdict(policy: Policy, action_class: ActionClass | None) -> Approval:
+    """Verdict when the approval service cannot be reached at all.
+
+    ``CLAUDE.md`` §4.4 pins the irreversible case: an action that can be neither held
+    nor approved is refused. For lighter classes the tenant's declared
+    ``on_approval_service_down`` stands -- an operator may reasonably prefer
+    availability on a ``write``. **An unknown class counts as the worst case**, since
+    not knowing what an action does is not a reason to be lenient about it.
+
+    Shared by both ingress paths (`AD-37`). Before this, the MCP gateway denied by a
+    hardcoded branch and the cooperative path raised, so `/v1/authorize` answered a
+    500 -- an error, not a verdict, on a contract whose whole premise is that the
+    agent honours the verdict.
+    """
+    if action_class in (None, ActionClass.irreversible, ActionClass.external_send):
+        return Approval.deny
+    return policy.defaults.on_approval_service_down
+
+
 def evaluate(policy: Policy, tool_name: str, arguments: dict[str, Any]) -> PolicyOutcome:
     """Full decision for a tool call: action class + authorization (fail-closed)."""
     rule = policy.rule_for(tool_name)

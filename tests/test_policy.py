@@ -320,3 +320,15 @@ def test_dry_run_false_forces_nothing() -> None:
         "    constraints: { dry_run: false }\n"
     )
     assert evaluate(policy, "crm.note", {}).decision is Approval.auto
+
+
+def test_service_down_verdict_treats_an_unknown_class_as_the_worst_case() -> None:
+    from core.policy import service_down_verdict
+
+    policy = parse_policy("defaults: {unknown_tool: deny, on_approval_service_down: auto}\n")
+    # Not knowing what an action does is not a reason to be lenient about it.
+    assert service_down_verdict(policy, None) is Approval.deny
+    assert service_down_verdict(policy, ActionClass.irreversible) is Approval.deny
+    assert service_down_verdict(policy, ActionClass.external_send) is Approval.deny
+    assert service_down_verdict(policy, ActionClass.write) is Approval.auto
+    assert service_down_verdict(_policy(), ActionClass.write) is Approval.deny  # default

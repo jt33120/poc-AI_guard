@@ -25,7 +25,14 @@ from mcp.server.lowlevel import Server
 from core import approvals, audit, db, integrity, risk, tenant_tokens, trust
 from core.judge import Judge, resolve_ambiguous
 from core.notify import Notifier
-from core.policy import ActionClass, Approval, Policy, PolicyOutcome, evaluate
+from core.policy import (
+    ActionClass,
+    Approval,
+    Policy,
+    PolicyOutcome,
+    evaluate,
+    service_down_verdict,
+)
 from core.tenant_tokens import authenticate_gateway_session
 from gateway.downstream import DownstreamProxy, ServerSpec
 from gateway.taint import TaintState, taints_result
@@ -356,9 +363,15 @@ class PolicyBackend:
         try:
             return await self._run_approval_flow(ctx, name, arguments, canonical, outcome, required)
         except Exception:
-            # Approval service unavailable -> fail-closed (CLAUDE.md §4.4).
+            # Approval service unavailable. Same shared verdict as the cooperative
+            # path (AD-37): deny on irreversible / external_send / unknown class,
+            # otherwise the tenant's declared `on_approval_service_down`, which until
+            # now nothing read (CLAUDE.md §4.4).
             logger.exception("approval_service_error", extra={"tool": canonical})
-            return _denied_result(f"'{canonical}' held: approval service unavailable")
+            verdict = service_down_verdict(self._policy, outcome.action_class)
+            if verdict is Approval.deny:
+                return _denied_result(f"'{canonical}' held: approval service unavailable")
+            return await self._proxy.call_tool(name, arguments)
 
     async def _run_approval_flow(
         self,

@@ -165,3 +165,57 @@ def test_ambiguous_with_a_judge_follows_its_class_on_the_http_path(db: DBHandle)
     assert res["decision"] == "allow"
     assert res["action_class"] == "read"
     assert _judge_used(db, tid) == [True]
+
+
+def test_service_down_answers_deny_not_an_error(db: DBHandle) -> None:
+    # The cooperative contract is that the agent honours the verdict, so it must get
+    # one. A raised exception surfaced as an HTTP 500 -- an error, not a decision --
+    # and left the agent to guess. The MCP gateway already denied here.
+    tid = _tenant(db)
+    res = decision.authorize(
+        database_url="postgresql://nobody@127.0.0.1:1/nothing",
+        policy=POLICY,
+        tenant_id=tid,
+        tool="mock.delete",  # irreversible, human_dual
+        arguments={"id": "1"},
+    )
+    assert res["decision"] == "deny"
+    assert res["reason"] == "approval_service_unavailable"
+
+
+def test_service_down_honours_the_tenant_setting_on_a_light_class(db: DBHandle) -> None:
+    # CLAUDE.md 4.4 pins the *irreversible* case. On a `write` an operator may
+    # reasonably prefer availability, and `on_approval_service_down` finally means
+    # something -- until now nothing in the codebase read it.
+    tid = _tenant(db)
+    policy = parse_policy(
+        "tools:\n"
+        "  - {name: mock.edit, class: write, approval: human_in_the_loop}\n"
+        "defaults: {unknown_tool: deny, on_approval_service_down: auto}\n"
+    )
+    res = decision.authorize(
+        database_url="postgresql://nobody@127.0.0.1:1/nothing",
+        policy=policy,
+        tenant_id=tid,
+        tool="mock.edit",
+        arguments={"id": "1"},
+    )
+    assert res["decision"] == "allow"
+    assert res["reason"] == "approval_service_unavailable"
+
+
+def test_service_down_still_denies_the_irreversible_whatever_the_setting(db: DBHandle) -> None:
+    tid = _tenant(db)
+    policy = parse_policy(
+        "tools:\n"
+        "  - {name: mock.wipe, class: irreversible, approval: human_dual}\n"
+        "defaults: {unknown_tool: deny, on_approval_service_down: auto}\n"
+    )
+    res = decision.authorize(
+        database_url="postgresql://nobody@127.0.0.1:1/nothing",
+        policy=policy,
+        tenant_id=tid,
+        tool="mock.wipe",
+        arguments={"id": "1"},
+    )
+    assert res["decision"] == "deny"
