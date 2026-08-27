@@ -137,7 +137,7 @@ Légende écart : ✅ couvert · ⚠️ partiel / durci à faire · ❌ absent
 | # | Menace | Mode | État réel du code | Écart |
 |---|---|---|---|---|
 | **M-07** | Phishing hyper-personnalisé | **B** (émission) / **X** (réception) | ✅ Côté émission : un agent qui envoie du mail passe par la policy — `mail.send` hors allowlist est le scénario `make demo` (CLAUDE.md §7). ❌ Détection entrante : hors produit. | — |
-| **M-08** | Usurpation par deepfake | **B** (approbation) / **X** (média) | ⚠️ SoD `FR-19`, canal signé `FR-21`. **Mais** `PLAN-REVIEW.md:77` (INV-5) : le callback d'approbation Slack *est* un porteur — quiconque lit le message peut l'exercer, et la SoD tombe par le même biais. | `G-07` |
+| **M-08** | Usurpation par deepfake | **B** (approbation) / **X** (média) | ✅ SoD réelle : le décideur est le principal authentifié (`api/approvals.py`), la quorum compte des identités signées distinctes, et aucun canal interactif n'existe — donc aucun porteur rejouable. `INV-5` vise un canal à construire, pas le code actuel. | `G-07` |
 | **M-09** | Malwares polymorphes | **X** | ❌ Rien. Plan endpoint (EDR/XDR). | — |
 
 **M-07 / M-08 — l'inversion qui vend.** Ces deux lignes semblaient hors sujet ; elles sont en réalité nos meilleurs arguments, à condition d'inverser la question. Nous ne détectons pas le mail de phishing entrant : **nous empêchons votre agent d'en devenir l'émetteur**. Nous ne détectons pas la voix clonée du dirigeant : **le faux dirigeant ne peut pas approuver le virement**, parce qu'une approbation exige une décision signée, attribuée, en séparation des devoirs, et inscrite dans la chaîne. C'est le discours « arnaque au président » que tout grand compte comprend immédiatement — et il est aujourd'hui **affaibli par INV-5**, qui doit être corrigé avant toute démo.
@@ -261,7 +261,7 @@ Chaque `G-nn` deviendra une ou plusieurs exigences fonctionnelles, numérotées 
 | `G-04` | Déclaration de provenance des jeux de données / bases vectorielles au registre + section Evidence Pack | M-03 | Moyenne |
 | `G-05` | Détecteur d'extraction déterministe (volume / motif de requêtage) + alerte | M-04 | Moyenne |
 | `G-06` | Classification déterministe des outils exécuteurs (`bash`, `execute_sql`, `kubectl`…) — EXH-4 | M-06, M-15 | **Critique** |
-| `G-07` | Approbation non rejouable : liaison au décideur, usage unique, expiration — INV-5 | M-08 | **Critique (D-3)** |
+| `G-07` | **Requalifié** : contrainte *sur du non-construit*, pas défaut vivant. Il n'existe aucun canal d'approbation interactif — `core/notify.py` envoie un e-mail portant un identifiant, jamais un porteur, et `POST /v1/approvals/{id}/decision` prend l'identité du décideur dans le JWT vérifié, jamais du payload. À tenir le jour où un canal est construit (`FR-159`) ; l'invariant est désormais asserté. | M-08 | ✅ (invariant verrouillé) |
 | `G-08` | Activation de `FR-64` (DLP en entrée des décisions post-taint) | M-10 | Haute |
 | `G-09` | Inventaire du Shadow AI : découverte des outils non supervisés (orchestré) | M-10 | Moyenne |
 | `G-10` | Analyse d'artefacts de modèles ML (orchestré) + entrée au registre | M-11 | Basse |

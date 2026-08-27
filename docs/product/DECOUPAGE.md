@@ -75,14 +75,14 @@ Le lot qui rendait vrai ce que le produit affirmait déjà.
 | `FR-154` | Taint lié au **jeton de passerelle**, persisté et borné en temps : ni une reconnexion ni un identifiant neuf ne remettent l'agent à blanc | ✅ **Livré** — scénario de reconnexion, plus le voisin non contaminé et deux chemins fail-closed |
 | `FR-157` | Prédicat déterministe borné sur la valeur des arguments — non Turing-complet, échouant fermé sur champ absent ou mal typé (`EXH-3`) | ⬜ À faire |
 | `FR-158` | Classification déterministe des outils exécuteurs (`bash`, `execute_sql`, `kubectl`) sans passer par le juge (`EXH-4`, `G-06`) | ⬜ À faire |
-| `FR-159` | Approbation par canal non rejouable : identité issue de la signature du fournisseur, désignant le *cliqueur*, SoD vérifiée contre lui (`INV-5`, `D-3`, `G-07`) | ⬜ À faire |
+| `FR-159` | Approbation par canal non rejouable | ⚪ **Sans objet aujourd'hui** — aucun canal interactif n'existe. L'invariant qu'il devra respecter (le décideur est le principal authentifié, jamais une donnée de requête) est asserté par deux tests. À rouvrir avec le canal |
 
 **Quatre des neuf sont livrés — et c'est la moitié du vocabulaire de contraintes qui
 part avec.** `FR-155` et `FR-156` allaient ensemble : fermer le vocabulaire sans
 implémenter `dry_run` aurait fait échouer la policy de démonstration, et implémenter
 `dry_run` sans fermer le vocabulaire aurait laissé les autres clés décoratives.
 
-**Ce qui reste est le taint et l'approbation rejouable**, plus les deux prédicats.
+**Ce qui reste est les deux prédicats** (`FR-157`, `FR-158`).
 Le taint et l'approbation portent chacun un `Bloqué` revendiqué aujourd'hui : `M-02`
 que `D-1` fragilise, `M-08` que `INV-5` traverse. Ce sont les deux dernières
 affirmations du produit qui ne sont pas vraies.
