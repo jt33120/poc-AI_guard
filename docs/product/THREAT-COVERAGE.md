@@ -122,7 +122,7 @@ Légende écart : ✅ couvert · ⚠️ partiel / durci à faire · ❌ absent
 | # | Menace | Mode | État réel du code | Écart |
 |---|---|---|---|---|
 | **M-01** | Injection de prompts **directe** | **O** + A | ❌ Rien. Non-objectif assumé (PRD.md:917). | `G-01` |
-| **M-02** | Injection de prompts **indirecte** | **B** | ✅ `gateway/taint.py` — garde de taint sur les *résultats* d'outils, **FR/ES/DE + normalisation** (`FR-153`). État en mémoire, non persisté. | `G-02` `G-03` |
+| **M-02** | Injection de prompts **indirecte** | **B** | ✅ `gateway/taint.py` — garde de taint sur les *résultats* d'outils, **FR/ES/DE + normalisation** (`FR-153`). État persisté par agent (`FR-154`). | `G-02` `G-03` |
 | **M-03** | Empoisonnement de données | **A** | ❌ Rien. « data poisoning » absent des 4 docs produit. `poison` ne désigne que le *Tool Poisoning* (PRD.md:291). | `G-04` |
 | **M-04** | Vol de modèle / extraction | **D** | ⚠️ `api/ratelimit.py`, `core/usage.py` — la télémétrie existe, mais cadrée « équité multi-tenant », jamais anti-extraction. | `G-05` |
 | **M-05** | Attaques par évasion (adversarial) | **X** | ❌ Rien — et c'est le bon choix : la robustesse du modèle est un problème d'entraînement. | — |
@@ -257,7 +257,7 @@ Chaque `G-nn` deviendra une ou plusieurs exigences fonctionnelles, numérotées 
 |---|---|---|---|
 | `G-01` | Connecteur de garde-prompt tiers souverain + attestation de présence, verdicts chaînés | M-01 | Moyenne |
 | `G-02` | ~~Détection de taint multilingue + normalisation~~ — **fermé.** FR/ES/DE, plus normalisation NFKC, entités HTML, pourcent-encodage, homoglyphes cyrilliques et grecs, diacritiques. `gateway/taint.py`, scénario de garde en français. | M-02 | ✅ |
-| `G-03` | Taint persisté survivant à la reconnexion (`FR-62`, non implémenté) | M-02 | Haute |
+| `G-03` | ~~Taint persisté survivant à la reconnexion~~ — **fermé.** Table `session_taint` (migration `0018`), indexée sur le **jeton de passerelle** et non sur une session déclarée par l'agent, bornée en temps. Lecture impossible → teinté (`AD-10`). | M-02 | ✅ |
 | `G-04` | Déclaration de provenance des jeux de données / bases vectorielles au registre + section Evidence Pack | M-03 | Moyenne |
 | `G-05` | Détecteur d'extraction déterministe (volume / motif de requêtage) + alerte | M-04 | Moyenne |
 | `G-06` | Classification déterministe des outils exécuteurs (`bash`, `execute_sql`, `kubectl`…) — EXH-4 | M-06, M-15 | **Critique** |

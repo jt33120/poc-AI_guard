@@ -22,7 +22,7 @@ from uuid import uuid4
 import mcp.types as types
 from mcp.server.lowlevel import Server
 
-from core import approvals, audit, db, integrity, risk, tenant_tokens, trust
+from core import approvals, audit, db, integrity, risk, taint_store, tenant_tokens, trust
 from core.judge import Judge, resolve_ambiguous
 from core.notify import Notifier
 from core.policy import (
@@ -35,7 +35,7 @@ from core.policy import (
 )
 from core.tenant_tokens import authenticate_gateway_session
 from gateway.downstream import DownstreamProxy, ServerSpec
-from gateway.taint import TaintState, taints_result
+from gateway.taint import taints_result
 
 logger = logging.getLogger("xsom.gateway")
 
@@ -94,6 +94,9 @@ class ApprovalContext:
     requested_by: str | None = None
     #: The calling agent's client id, for per-tool RBAC (None = no client scope).
     client_id: str | None = None
+    #: The calling agent itself, as the control plane names it. The persisted taint
+    #: (`FR-154`) is keyed on this rather than on anything the agent declares.
+    gateway_token_id: str | None = None
 
 
 class PolicyBackend:
@@ -117,9 +120,11 @@ class PolicyBackend:
         self._judge = judge
         # Tools quarantined by the integrity guard during the last list_tools.
         self._quarantined: set[str] = set()
-        # Indirect-injection taint state for this session (M12).
-        self._call_seq = 0
-        self._taint = TaintState()
+        #: Reason from the last taint read, for the audit line that follows it.
+        self._taint_reason: str | None = None
+        # Indirect-injection taint is persisted, keyed on the agent (FR-154). It is
+        # deliberately NOT held here: an object on this instance dies with the
+        # connection, and a guard a reconnect defeats is not a guard.
 
     @property
     def _integrity_on(self) -> bool:
@@ -132,7 +137,6 @@ class PolicyBackend:
         return await self._screen_tools(tools)
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> types.CallToolResult:
-        self._call_seq += 1
         if self._integrity_on:
             blocked = await self._integrity_blocks(name)
             if blocked is not None:
@@ -162,7 +166,7 @@ class PolicyBackend:
         # Indirect-injection guard (M12): a risky action in a tainted session is
         # escalated to a human or denied, before anything runs.
         if self._taint_blocks(outcome):
-            self._audit_gate(canonical, "tainted_action", self._taint.reason)
+            self._audit_gate(canonical, "tainted_action", self._taint_reason)
             if self._policy.defaults.taint_policy == "deny":
                 logger.info("tainted_action_denied", extra={"tool": canonical})
                 return _denied_result(
@@ -284,22 +288,60 @@ class PolicyBackend:
         return replace(outcome, decision=tier, reason="risk")
 
     def _taint_blocks(self, outcome: PolicyOutcome) -> bool:
-        """Whether a risky action is gated because the session is tainted (M12)."""
+        """Whether a risky action is gated because this agent is tainted (M12).
+
+        `AD-10`: a taint that cannot be read is not a clean one. Every failure path
+        answers *tainted*, so an unreachable store gates the irreversible instead of
+        waving it through.
+        """
         defaults = self._policy.defaults
         if defaults.taint_policy == "off":
             return False
         if outcome.action_class not in (ActionClass.irreversible, ActionClass.external_send):
             return False
-        return self._taint.active(call_seq=self._call_seq, window=defaults.taint_window)
+        ctx = self._approval_ctx
+        if ctx is None or ctx.gateway_token_id is None:
+            logger.warning("taint_unresolvable", extra={"reason": "no_agent_identity"})
+            self._taint_reason = "taint_unresolvable"
+            return True
+        try:
+            with db.connection(ctx.database_url) as conn:
+                taint = taint_store.active(conn, ctx.tenant_id, ctx.gateway_token_id)
+        except Exception:
+            logger.warning("taint_store_unreadable", extra={"tenant_id": ctx.tenant_id})
+            self._taint_reason = "taint_store_unreadable"
+            return True
+        self._taint_reason = taint.reason if taint else None
+        return taint is not None
 
     def _mark_taint(self, canonical: str, result: types.CallToolResult) -> None:
-        """Taint the session if a relayed tool result looks like an injection (M12)."""
+        """Taint this agent if a relayed tool result looks like an injection (M12)."""
         if self._policy.defaults.taint_policy == "off":
             return
         reason = taints_result(_result_text(result))
-        if reason is not None:
-            self._taint.mark(call_seq=self._call_seq, source_tool=canonical, reason=reason)
-            self._audit_gate(canonical, "taint_marked", reason)
+        if reason is None:
+            return
+        ctx = self._approval_ctx
+        if ctx is None or ctx.gateway_token_id is None:  # pragma: no cover - guarded above
+            logger.warning("taint_not_recorded", extra={"tool": canonical})
+            return
+        try:
+            with db.connection(ctx.database_url) as conn:
+                taint_store.mark(
+                    conn,
+                    tenant_id=ctx.tenant_id,
+                    gateway_token_id=ctx.gateway_token_id,
+                    window_seconds=self._policy.defaults.taint_window_seconds,
+                    source_tool=canonical,
+                    reason=reason,
+                )
+                conn.commit()
+        except Exception:
+            # The write failed, so the next call reads no taint. Say so loudly: this
+            # is the one path where a store failure loses a guard rather than
+            # tightening one.
+            logger.warning("taint_write_failed", extra={"tool": canonical, "reason": reason})
+        self._audit_gate(canonical, "taint_marked", reason)
 
     def _audit_gate(self, tool_name: str, decision: str, reason: str | None) -> None:
         """Best-effort audit of a pre-policy gate decision (integrity / rbac)."""
@@ -463,15 +505,17 @@ def _notify(notifier: Notifier | None, approval_id: str, summary: str, expires_a
         logger.warning("approval_notify_failed", extra={"approval_id": approval_id})
 
 
-def authenticate_session(database_url: str, raw_token: str) -> str:
-    """Resolve the tenant for an MCP session, or raise PermissionError.
+def authenticate_session(database_url: str, raw_token: str) -> tuple[str, str]:
+    """Resolve ``(tenant_id, token_id)`` for an MCP session, or raise PermissionError.
 
-    Fail-closed (CLAUDE.md §4.4): a missing/unknown/revoked token is refused.
+    Fail-closed (CLAUDE.md §4.4): a missing/unknown/revoked token is refused. The
+    token id travels with the tenant because it is the agent's identity, and the
+    persisted taint is keyed on it (`FR-154`).
     """
     with db.connection(database_url) as conn:
-        tenant_id = authenticate_gateway_session(conn, raw_token)
+        tenant_id, token_id = authenticate_gateway_session(conn, raw_token)
         conn.commit()
-    return tenant_id
+    return tenant_id, token_id
 
 
 def build_server(backend: ToolBackend | None = None) -> Server:
@@ -494,7 +538,10 @@ def build_server(backend: ToolBackend | None = None) -> Server:
 
 
 def _build_backend(
-    database_url: str, tenant_id: str, client_id: str | None = None
+    database_url: str,
+    tenant_id: str,
+    client_id: str | None = None,
+    gateway_token_id: str | None = None,
 ) -> PolicyBackend:  # pragma: no cover - I/O glue
     from core import policy_store, servers
     from core.config import get_settings
@@ -515,6 +562,7 @@ def _build_backend(
         timeout_seconds=policy.defaults.hitl_timeout_seconds,
         notifier=build_notifier(settings),
         client_id=client_id,
+        gateway_token_id=gateway_token_id,
     )
     return PolicyBackend(policy, DownstreamProxy(specs), ctx, build_judge(settings))
 
@@ -532,11 +580,11 @@ async def run_stdio() -> None:  # pragma: no cover - exercised via real MCP tran
     if not settings.database_url:
         raise RuntimeError("DATABASE_URL is required to authenticate the gateway session")
     raw_token = os.environ.get(TENANT_TOKEN_ENV, "")
-    tenant_id = authenticate_session(settings.database_url, raw_token)  # raises if invalid
+    tenant_id, token_id = authenticate_session(settings.database_url, raw_token)  # raises
     with db.connection(settings.database_url) as conn:
         client_id = tenant_tokens.resolve_client_id(conn, raw_token)
 
-    server = build_server(_build_backend(settings.database_url, tenant_id, client_id))
+    server = build_server(_build_backend(settings.database_url, tenant_id, client_id, token_id))
     async with stdio_server() as (read_stream, write_stream):
         await server.run(read_stream, write_stream, server.create_initialization_options())
 

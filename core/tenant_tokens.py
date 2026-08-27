@@ -133,17 +133,22 @@ def authenticate_gateway_principal(conn: psycopg.Connection, raw_token: str) -> 
     return principal
 
 
-def authenticate_gateway_session(conn: psycopg.Connection, raw_token: str) -> str:
-    """Resolve the tenant for an MCP session or raise — fail-closed.
+def authenticate_gateway_session(conn: psycopg.Connection, raw_token: str) -> tuple[str, str]:
+    """Resolve ``(tenant_id, token_id)`` for an MCP session or raise — fail-closed.
+
+    The token id is the agent's identity: the persisted taint (`FR-154`) and the
+    observation windows (`G-25`) are both keyed on it, so an agent cannot mint
+    itself a clean one by reconnecting or by declaring a new session.
 
     Raises:
         PermissionError: if the token is missing, unknown, or revoked.
     """
-    tenant_id = resolve_tenant(conn, raw_token)
-    if tenant_id is None:
+    principal = resolve_principal(conn, raw_token)
+    if principal is None:
         raise PermissionError("invalid or missing tenant token")
+    token_id, tenant_id = principal
     conn.execute(
         "update gateway_tokens set last_used_at = now() where token_hash = %s",
         (hash_token(raw_token),),
     )
-    return tenant_id
+    return tenant_id, token_id
