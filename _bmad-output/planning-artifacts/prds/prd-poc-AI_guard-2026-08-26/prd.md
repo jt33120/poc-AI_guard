@@ -71,9 +71,13 @@ Le sous-ensemble de menaces applicables se déduit de la position du client dans
 
 ## 3. Exigences
 
-### 3.1 Groupe A — Réparer le cœur d'enforcement · **prérequis de tournage**
+### 3.1 Groupe A — Réparer le cœur d'enforcement
 
-Ces sept exigences bloquent la production du démonstrateur. Une vidéo est permanente et s'étudie image par image : filmer une défense contournable produit une preuve durable contre nous.
+Ces sept exigences ne sont pas des améliorations : ce sont des **défauts de contrôles déjà livrés et déjà revendiqués**. Tant qu'ils tiennent, le produit affirme des garanties qu'il ne tient pas — que l'on démontre ou non, que l'on vende ou non.
+
+Elles viennent en premier pour cette seule raison. La démonstration vient ensuite, quand le produit est vrai : on ne filme pas ce qui n'existe pas.
+
+*La démonstration a néanmoins servi de révélateur* : c'est en examinant ce qu'on montrerait qu'on a lu `scripts/demo.py` et trouvé une contrainte décorative dans la policy de démonstration elle-même (`FR-156`). Utile comme détecteur, jamais comme moteur.
 
 | FR | Exigence | Source |
 |---|---|---|
@@ -87,7 +91,7 @@ Ces sept exigences bloquent la production du démonstrateur. Une vidéo est perm
 
 > **Collision / Résolution.** `FR-156` impose de retirer `constraints: {dry_run: true}` de `scripts/demo.py` *ou* d'implémenter `dry_run`. Résolution : **implémenter**, parce que le dry-run est une promesse du discours HITL. À défaut, retirer — jamais laisser en place.
 
-> **Pourquoi `FR-159` est ici et non au groupe B.** L'intégrité de l'approbation porte tout le récit anti-deepfake (`M-08`) : « le faux dirigeant ne peut pas approuver le virement ». Filmer cette scène alors que le lien d'approbation est un porteur rejouable revient à filmer l'inverse de ce qu'on affirme.
+> **Pourquoi `FR-159` est ici et non au groupe B.** L'intégrité de l'approbation porte toute la garantie anti-usurpation (`M-08`) : « le faux dirigeant ne peut pas approuver le virement ». Tant que le lien d'approbation est un porteur rejouable par quiconque lit le message, cette phrase est fausse — et c'est une des rares que le produit énonce sans réserve.
 
 ### 3.2 Groupe B — Intégrité de la preuve
 
@@ -124,6 +128,21 @@ Ce qu'une revue de sécurité de grand compte trouve en premier. Sur un produit 
 | **FR-176** | Aucun contrôle du **chemin de décision** ne dépend d'un service hors UE ; le produit fonctionne intégralement hors ligne. | `G-17` |
 | **FR-177** | L'**architecture de référence souveraine** est documentée et démontrable de bout en bout. | `G-21` |
 | **FR-178** | Chaque contrôle tiers orchestré a un **substitut européen nommé** ; sans substitut, la ligne reste `Hors périmètre` plutôt que `Orchestré`. | `QO-3`, `G-01`/`G-10`/`G-14` |
+
+#### Le critère : dépendance opérationnelle, pas nationalité de l'éditeur
+
+La souveraineté porte sur ce dont on **dépend pour décider**, pas sur le passeport de l'auteur du code. Un outil open-source exécuté localement, sans rappel réseau, ne perce pas la chaîne quelle que soit son origine — c'est exactement la raison pour laquelle `ruff`, `mypy` et `pip-audit` sont déjà dans la CI sans que quiconque y voie une dépendance américaine. Ce qui perce la chaîne, c'est un **service appelé en ligne**, qui voit les données, et dont dépend la décision.
+
+Appliqué aux quatre contrôles orchestrés, ce critère les tranche :
+
+| Contrôle | Substitut retenu | Raison |
+|---|---|---|
+| **Garde-prompt** (`FR-193`) | **Mistral** — modération via la plateforme, ou poids auto-hébergés en P4 | C'est un service en ligne qui voit le prompt : ici la nationalité compte vraiment. Mistral est déjà imposé par `CLAUDE.md §3` pour le juge — zéro fournisseur supplémentaire. En P4 le client héberge déjà les poids : dépendance nulle. |
+| **Artefacts de modèles** (`FR-188`) | **Scanners d'artefacts open-source exécutés localement** | Binaires locaux, aucun rappel réseau, verdict auditable. Aucune dépendance opérationnelle créée. |
+| **Analyse statique** (`FR-191`) | **Ce qui est déjà là** — règles bandit de `ruff`, `pip-audit`, `trufflehog` — complété au besoin par un analyseur auto-hébergé | Idem : local, sans rappel. Inutile d'introduire un service pour produire un verdict qu'on sait déjà calculer. |
+| **Découverte du Shadow AI** (`FR-189`) | **Aucun CASB.** L'inventaire se dérive des journaux d'egress du client. | Le marché CASB est intégralement non-UE et ce sont des services qui voient tout le trafic. Pas de substitut crédible : la règle de `FR-178` s'applique et la ligne descend de `Orchestré` à `Attesté`. La dérivation depuis les journaux existants est de toute façon plus souveraine, moins chère, et n'ajoute aucun fournisseur. |
+
+**Un seul contrôle exige donc un choix de fournisseur** — le garde-prompt — et il tombe sur Mistral, que la stack impose déjà. Les trois autres se résolvent en exécutant localement ce qui existe. La ligne `Découverte du Shadow AI` perd son statut `Orchestré` : c'est la doctrine qui fonctionne comme prévu, pas un échec.
 
 ### 3.5 Groupe E — Le démonstrateur
 
@@ -176,11 +195,11 @@ Ce qu'une revue de sécurité de grand compte trouve en premier. Sur un produit 
 
 ## 5. Priorité et séquencement
 
-L'ordre découle de trois contraintes, dans cet ordre : ce qui bloque la production du démonstrateur, ce que le terrain exige (P2 avant P3), ce qu'une revue de sécurité trouve en premier.
+L'ordre découle de trois contraintes, dans cet ordre : ce que le produit affirme sans le tenir, ce que le terrain exige (P2 avant P3), ce qu'une revue de sécurité trouve en premier.
 
 | Rang | Lot | Contenu | Pourquoi ici |
 |---|---|---|---|
-| **1** | **Prérequis de tournage** | `FR-153` → `FR-159` | Rien ne peut être filmé avant. La démo phare est du P2 et sa défense porte deux contournements ; la démo existante contient un contrôle décoratif ; le récit anti-deepfake repose sur une approbation rejouable. |
+| **1** | **Cœur d'enforcement** | `FR-153` → `FR-159` | Des contrôles déjà livrés ne tiennent pas leurs garanties : la défense P2 porte deux contournements, une contrainte de la policy de démonstration est décorative, et l'approbation est rejouable. Rien d'autre ne compte tant que ce n'est pas vrai. |
 | **2** | **Intégrité de la preuve** | `FR-160`, `FR-161`, `FR-162`, `FR-164`, `FR-169` | Ce qu'une revue de sécurité trouve en premier sur un produit vendu sur la preuve. `FR-162` est le plus fort rayon de souffle du lot. |
 | **3** | **Le triage** | `FR-172` → `FR-175` | Pilier 1 de la vision. Sans lui, la démonstration retombe dans le catalogue. |
 | **4** | **Mode observation** | `FR-179`, `FR-180` | Une branche au point de décision, et l'artefact de conversion le plus fort du produit. Rang 4 et non 1 seulement parce qu'il ne bloque pas le tournage. |
@@ -225,7 +244,7 @@ Absorber les 34 correctifs n'est pas purement additif : trois contredisent la di
 
 ## 8. Questions ouvertes
 
-- **QO-3** — Quel substitut européen pour chaque contrôle orchestré ? Bloque `FR-178`, `FR-188`, `FR-191`, `FR-193`.
+- **QO-3 — Résolue** (§3.4). Le critère retenu est la **dépendance opérationnelle**, pas la nationalité de l'éditeur. Un seul contrôle exige un choix de fournisseur — le garde-prompt, résolu sur Mistral que la stack impose déjà ; les trois autres s'exécutent localement sans rappel réseau. La découverte du Shadow AI perd son statut `Orchestré` faute de substitut, conformément à `FR-178`. `FR-178`, `FR-188`, `FR-191` et `FR-193` sont débloquées.
 - **QO-7** — Le diagnostic de profil (`FR-172`) est-il un livrable de mission ou une fonction de la console ? §2.1 penche pour le premier ; le second génère des leads en autonomie.
 - **QO-8** — `AR-2` est-il techniquement séparable ? Conditionne une ligne du compte de la démonstration.
 - **QO-9** — Quel domaine pour le tenant synthétique (`FR-182`) ? La forme d'UTI (matching consultants/appels d'offres) est la plus proche du métier, donc la plus crédible à raconter.
