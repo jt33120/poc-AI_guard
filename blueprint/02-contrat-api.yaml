@@ -1,0 +1,257 @@
+# Contrat d'API — console du démonstrateur
+#
+# PORTÉE : uniquement les endpoints que les écrans neufs ou amendés consomment.
+# Les endpoints déjà livrés et inchangés (audit, approbations, coûts, agents,
+# conformité…) ne figurent pas ici : ils existent, ils ne sont pas re-contractés.
+#
+# RAPPORT À L'OpenAPI : ce fichier est un SOUS-ENSEMBLE DÉRIVÉ de la spécification
+# OpenAPI publiée que FR-139 exige (publiée, drift-gated). Il n'est pas un second
+# contrat concurrent. En cas de divergence, l'OpenAPI fait foi et ce fichier est
+# régénéré — jamais l'inverse.
+#
+# Chaque `ressource` reprend MOT POUR MOT une ligne de la matrice de permissions
+# de 05-decisions.md.
+
+# ─────────────────────────────────────────────────────────────────────────
+# P1 — Le triage
+# ─────────────────────────────────────────────────────────────────────────
+
+- id: get_threat_catalogue
+  method: GET
+  path: /v1/coverage/catalogue
+  auth: public
+  scope: none
+  ressource: "Catalogue de menaces"
+  consomme_par: [screen:diagnostic, screen:couverture]
+  reponse_200:
+    generated_at: datetime
+    commit: string                    # commit sur lequel les scénarios ont tourné
+    threats:
+      - id: string                    # "M-02"
+        libelle: string
+        domaine: string
+        mode: "bloque|detecte|orchestre|atteste|hors_perimetre"
+        chemin: "mcp|cooperatif|n/a"  # AD-28 : jamais absent
+        profils: [string]             # ["P2","P3"] — profils qui l'activent
+        preuve: string|null           # id du scénario, ou id de section d'Evidence Pack
+        referentiels: [string]         # ["OWASP LLM01","ATLAS AML.T0051"]
+  erreurs:
+    503: "résultats de scénarios indisponibles — la carte refuse de s'afficher (AD-30)"
+
+- id: submit_diagnostic
+  method: POST
+  path: /v1/coverage/diagnostic
+  auth: public
+  scope: none
+  ressource: "Diagnostic de profil"
+  consomme_par: [screen:diagnostic]
+  note: "Anonyme et SANS PERSISTANCE. Calcule et renvoie, n'écrit rien."
+  corps:
+    answers: { type: object, required: true }   # réponses de posture, jamais d'inventaire
+  reponse_200:
+    tiers: [string]                   # ["P1a","P2"] — déclarés, implication non dénormalisée
+    tiers_effectifs: [string]         # ["P1a","P2"] cumul dérivé à la lecture
+    applicables: [string]             # ids de menaces retenues
+    non_applicables:
+      - id: string
+        raison: string                # "menace du fournisseur de modèle"
+    complet: bool
+  erreurs:
+    422: "réponse hors vocabulaire"
+
+- id: get_tenant_profile
+  method: GET
+  path: /v1/coverage/profile
+  auth: required
+  scope: own
+  ressource: "Profil du tenant"
+  consomme_par: [screen:diagnostic, screen:couverture]
+  reponse_200:
+    tiers: [string]
+    tiers_effectifs: [string]
+    completed_at: datetime|null       # null = diagnostic entamé, état valide
+    updated_at: datetime
+  erreurs:
+    401: non authentifié
+    404: "aucun profil — l'écran redirige vers le diagnostic"
+
+- id: put_tenant_profile
+  method: PUT
+  path: /v1/coverage/profile
+  auth: "role:admin"
+  scope: own
+  ressource: "Profil du tenant"
+  consomme_par: [screen:diagnostic]
+  note: "Écrit un événement de plan de contrôle : un re-diagnostic change la couverture revendiquée."
+  corps:
+    answers: { type: object, required: true }
+    tiers:   { type: array, required: true }
+  reponse_200:
+    tiers: [string]
+    tiers_effectifs: [string]
+    completed_at: datetime
+  erreurs:
+    401: non authentifié
+    403: "rôle insuffisant — nomme le rôle requis (FR-93)"
+    422: "réponse hors vocabulaire"
+
+- id: get_coverage_map
+  method: GET
+  path: /v1/coverage/map
+  auth: public
+  scope: own
+  ressource: "Carte de couverture"
+  consomme_par: [screen:couverture]
+  note: >
+    Sans session, retourne la carte du profil passé en query (visiteur anonyme).
+    Avec session et sans query, retourne celle du profil du tenant.
+  query:
+    profile: { type: string, required: false }   # "P2,P3" — profil déclaré par un anonyme
+  reponse_200:
+    profil_source: "anonyme|tenant"
+    tiers_effectifs: [string]
+    compte:
+      applicables: int
+      bloquees: int                   # le « N vous concernent, M sont bloquées »
+    lignes:
+      - id: string
+        libelle: string
+        applicable: bool
+        raison_non_applicable: string|null
+        mode: "bloque|detecte|orchestre|atteste|hors_perimetre"
+        chemin: "mcp|cooperatif|n/a"
+        preuve: string|null
+    generated_at: datetime
+    commit: string
+  erreurs:
+    422: "profil invalide"
+    503: "résultats de scénarios indisponibles (AD-30)"
+
+# ─────────────────────────────────────────────────────────────────────────
+# P5 — Observation puis promotion
+# ─────────────────────────────────────────────────────────────────────────
+
+- id: list_monitor_windows
+  method: GET
+  path: /v1/monitor/windows
+  auth: "role:operator"
+  scope: own
+  ressource: "Fenêtre d'observation"
+  consomme_par: [screen:admin, screen:promotion]
+  reponse_200:
+    windows:
+      - id: uuid
+        gateway_token_id: uuid
+        agent_nom: string
+        starts_at: datetime
+        expires_at: datetime
+        ended_at: datetime|null
+        etat: "active|expiree|arretee"
+        enabled_by: string            # nom du membre, jamais son identifiant brut
+  erreurs:
+    401: non authentifié
+    403: "rôle insuffisant — nomme le rôle requis"
+
+- id: open_monitor_window
+  method: POST
+  path: /v1/monitor/windows
+  auth: "role:admin"
+  scope: own
+  ressource: "Fenêtre d'observation"
+  consomme_par: [screen:admin]
+  note: >
+    Activer alors qu'une fenêtre court PROLONGE l'existante — jamais une seconde ligne.
+    Écrit un événement de plan de contrôle. L'observation ne couvre jamais
+    irreversible ni external_send : le refus vit dans le pipeline, pas ici (AD-27).
+  corps:
+    gateway_token_id: { type: uuid, required: true }
+    duree_heures:     { type: int,  required: true }   # borné par un plafond de configuration
+  reponse_201:
+    id: uuid
+    starts_at: datetime
+    expires_at: datetime
+    prolongee: bool                   # true si une fenêtre courait déjà
+  erreurs:
+    401: non authentifié
+    403: "rôle insuffisant"
+    422: "durée au-delà du plafond configuré — le message nomme le plafond"
+
+- id: close_monitor_window
+  method: DELETE
+  path: /v1/monitor/windows/{id}
+  auth: "role:admin"
+  scope: own
+  ressource: "Fenêtre d'observation"
+  consomme_par: [screen:admin]
+  note: "Arrêt anticipé. La ligne survit : le rapport de promotion lit l'historique."
+  reponse_200:
+    id: uuid
+    ended_at: datetime
+  erreurs:
+    401: non authentifié
+    403: "rôle insuffisant"
+    404: "fenêtre inconnue ou déjà close"
+
+- id: get_promotion_report
+  method: GET
+  path: /v1/monitor/promotion
+  auth: "role:operator"
+  scope: own
+  ressource: "Rapport de promotion"
+  consomme_par: [screen:promotion]
+  note: >
+    Calculé à la lecture depuis audit_log filtré sur enforcement_mode=monitor,
+    croisé avec les fenêtres. Rien n'est stocké : une table de synthèse serait une
+    seconde source de vérité sur le seul sujet où le produit vend la source unique.
+  query:
+    gateway_token_id: { type: uuid, required: false }
+    depuis:           { type: datetime, required: false }
+  reponse_200:
+    periode: { debut: datetime, fin: datetime }
+    observations: int                 # 0 et "aucune donnée" sont deux états distincts
+    auraient_ete_tenus: int
+    auraient_ete_refuses: int
+    par_outil:
+      - tool: string
+        tenus: int
+        refuses: int
+        classe_dominante: string
+    fenetres_couvertes: int
+  erreurs:
+    401: non authentifié
+    403: "rôle insuffisant"
+
+# ─────────────────────────────────────────────────────────────────────────
+# Amendements à des endpoints existants — forme de réponse, pas de route neuve
+# ─────────────────────────────────────────────────────────────────────────
+
+- id: list_audit_entries
+  method: GET
+  path: /v1/audit
+  auth: required
+  scope: own
+  ressource: "Audit"
+  consomme_par: [screen:audit]
+  statut: amende
+  amendement: >
+    La réponse gagne `chemin` ("mcp" | "cooperatif") et `enforcement_mode`
+    ("mandatory" | "cooperative" | "monitor"). Sans le premier, AD-28 est invisible
+    à l'écran ; sans le second, une entrée d'observation se lit comme un blocage réel.
+  champs_ajoutes:
+    chemin: "mcp|cooperatif"
+    enforcement_mode: "mandatory|cooperative|monitor"
+
+- id: get_readiness
+  method: GET
+  path: /health/ready
+  auth: public
+  scope: none
+  ressource: "Catalogue de menaces"
+  consomme_par: [screen:home]
+  statut: amende
+  amendement: >
+    Le bandeau de `home` a besoin de savoir sur quel déploiement il tourne.
+    INV-11 interdit d'exposer la posture de sécurité sans authentification : le
+    champ ajouté nomme le DÉPLOIEMENT, jamais une capacité de sécurité.
+  champs_ajoutes:
+    deployment: "hosted|local"

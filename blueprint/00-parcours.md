@@ -50,18 +50,20 @@ Amont : `_bmad-output/planning-artifacts/prds/prd-poc-AI_guard-2026-08-26/prd.md
 
 ## Inventaire des écrans
 
+Vocabulaire de rôles : `admin` · `operator` · `viewer` (`core/schemas.py:11-16`, miroir de la contrainte sur `memberships.role`). Il n'existe pas de rôle « approbateur » : décider d'une approbation exige `admin` ou `operator` (`api/approvals.py:18`).
+
 | id | Nom | Route | Rôles autorisés | Parcours | Priorité | État |
 |---|---|---|---|---|---|---|
-| `diagnostic` | Diagnostic de profil | `/diagnostic` | public, viewer, admin | P1 | 1 | **neuf** |
-| `couverture` | Carte de couverture | `/couverture` | public, viewer, admin | P1 | 1 | **neuf** |
-| `promotion` | Rapport de promotion | `/promotion` | admin | P5 | 2 | **neuf** |
-| `inspector` | Inspecteur / playground | `/inspector` | viewer, admin | P2, P3 | 2 | existant — ratifié |
-| `approvals` | File d'approbation | `/approvals` | approver, admin | P2 | 2 | existant — ratifié |
-| `audit` | Explorateur d'audit | `/audit` | viewer, admin | P2, P3, P4 | 2 | existant — **à amender** |
-| `home` | Accueil | `/home` | viewer, admin | P4 | 3 | existant — **à amender** |
+| `diagnostic` | Diagnostic de profil | `/diagnostic` | public, viewer, operator, admin | P1 | 1 | **neuf** |
+| `couverture` | Carte de couverture | `/couverture` | public, viewer, operator, admin | P1 | 1 | **neuf** |
+| `promotion` | Rapport de promotion | `/promotion` | operator, admin | P5 | 2 | **neuf** |
+| `inspector` | Inspecteur / playground | `/inspector` | viewer, operator, admin | P2, P3 | 2 | existant — ratifié |
+| `approvals` | File d'approbation | `/approvals` | lecture : viewer, operator, admin · **décision : operator, admin** | P2 | 2 | existant — ratifié |
+| `audit` | Explorateur d'audit | `/audit` | viewer, operator, admin | P2, P3, P4 | 2 | existant — **à amender** |
+| `home` | Accueil | `/home` | viewer, operator, admin | P4 | 3 | existant — **à amender** |
 | `admin` | Administration | `/admin` | admin | P5 | 3 | existant — **à amender** |
-| `costs` | Coûts et usage | `/costs` | viewer, admin | P4 | 3 | existant — ratifié |
-| `executive` | Synthèse dirigeants | `/executive` | viewer, admin | — | 4 | existant — ratifié |
+| `costs` | Coûts et usage | `/costs` | viewer, operator, admin | P4 | 3 | existant — ratifié |
+| `executive` | Synthèse dirigeants | `/executive` | viewer, operator, admin | — | 4 | existant — ratifié |
 | `onboarding` | Connexion d'un agent | `/onboarding` | admin | — | 4 | existant — ratifié |
 | `login` · `signup` | Authentification | `/login` · `/signup` | public | — | 4 | existant — ratifié |
 
