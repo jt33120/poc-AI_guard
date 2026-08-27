@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
@@ -153,3 +154,63 @@ def db(pg_cluster: pgcluster.EphemeralPostgres) -> Iterator[DBHandle]:
         conn.close()
         admin.execute(sql.SQL("drop database {} with (force)").format(sql.Identifier(dbname)))
         admin.close()
+
+
+# --- Coverage scenarios (AD-26, AD-30) ---------------------------------------
+# A gate test may declare the coverage facet it proves:
+#
+#     @pytest.mark.covers("M-06", "chaine", ingress="mcp", sens="bloque")
+#
+# `sens` says which half of the claim the test carries: `bloque` (the action was
+# refused) or `laisse_passer` (a legitimate action still went through). A `Bloqué`
+# facet needs both, because a guard that refuses everything is not a control, it is
+# an outage -- and the blocking test stays green on a gateway that blocks blindly.
+# A test asserting both halves carries both markers.
+#
+# The run records every marked test's outcome to `coverage/.scenarios.json`, and
+# `scripts/gen_coverage.py` folds that into the published map. A test that did not
+# run, or did not pass, proves nothing -- there is no third state.
+
+_SCENARIOS_OUT = _REPO / "coverage" / ".scenarios.json"
+_scenarios_key = pytest.StashKey[list[dict[str, Any]]]()
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    config.addinivalue_line(
+        "markers",
+        "covers(row, facet, ingress=..., sens=...): coverage facet this test proves (AD-26)",
+    )
+    config.stash[_scenarios_key] = []
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]) -> Any:
+    outcome = yield
+    report = outcome.get_result()
+    if report.when != "call":
+        return
+    for mark in item.iter_markers(name="covers"):
+        if len(mark.args) != 2:
+            raise ValueError(f"{item.nodeid}: @covers takes (row, facet)")
+        row, facet = mark.args
+        sens = mark.kwargs.get("sens")
+        if sens not in ("bloque", "laisse_passer"):
+            raise ValueError(f"{item.nodeid}: @covers needs sens='bloque'|'laisse_passer'")
+        item.config.stash[_scenarios_key].append(
+            {
+                "row": row,
+                "facet": facet,
+                "ingress": mark.kwargs.get("ingress"),
+                "sens": sens,
+                "test": item.nodeid,
+                "outcome": report.outcome,
+            }
+        )
+
+
+def pytest_sessionfinish(session: pytest.Session) -> None:
+    scenarios = session.config.stash.get(_scenarios_key, None)
+    if not scenarios:
+        return
+    _SCENARIOS_OUT.parent.mkdir(parents=True, exist_ok=True)
+    _SCENARIOS_OUT.write_text(json.dumps(scenarios, indent=2, sort_keys=True), encoding="utf-8")

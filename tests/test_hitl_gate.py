@@ -7,6 +7,8 @@ import sys
 from pathlib import Path
 from uuid import uuid4
 
+import pytest
+
 from core import approvals
 from core.policy import parse_policy
 from gateway.downstream import DownstreamProxy, ServerSpec
@@ -60,6 +62,7 @@ def _seed_tenant(db: DBHandle) -> str:
     return str(tenant_id)
 
 
+@pytest.mark.covers("M-06", "chaine", ingress="mcp", sens="bloque")
 async def test_irreversible_held_then_approved_relays_once(db: DBHandle) -> None:
     tenant_id = _seed_tenant(db)
     backend = _backend(db, tenant_id)
@@ -84,6 +87,7 @@ async def test_irreversible_held_then_approved_relays_once(db: DBHandle) -> None
     assert "requires_approval" in _text(again)
 
 
+@pytest.mark.covers("M-06", "chaine", ingress="mcp", sens="bloque")
 async def test_denied_is_never_relayed(db: DBHandle) -> None:
     tenant_id = _seed_tenant(db)
     backend = _backend(db, tenant_id)
@@ -95,6 +99,7 @@ async def test_denied_is_never_relayed(db: DBHandle) -> None:
     assert "deleted" not in _text(result)
 
 
+@pytest.mark.covers("M-06", "chaine", ingress="mcp", sens="bloque")
 async def test_expired_is_never_relayed(db: DBHandle) -> None:
     tenant_id = _seed_tenant(db)
     backend = _backend(db, tenant_id, seconds=-10)  # created already past its deadline
@@ -105,6 +110,7 @@ async def test_expired_is_never_relayed(db: DBHandle) -> None:
     assert "deleted" not in _text(result)
 
 
+@pytest.mark.covers("M-06", "chaine", ingress="mcp", sens="bloque")
 async def test_approval_service_down_fails_closed(db: DBHandle) -> None:
     tenant_id = _seed_tenant(db)
     # Point the approval store at an unreachable database.
@@ -115,6 +121,7 @@ async def test_approval_service_down_fails_closed(db: DBHandle) -> None:
     assert "deleted" not in _text(result)
 
 
+@pytest.mark.covers("M-06", "chaine", ingress="mcp", sens="laisse_passer")
 async def test_auto_tool_still_relays(db: DBHandle) -> None:
     tenant_id = _seed_tenant(db)
     result = await _backend(db, tenant_id).call_tool("echo", {"text": "hi"})

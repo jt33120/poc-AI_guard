@@ -481,6 +481,7 @@ def _mint(client: TestClient, admin: str) -> str:
     return client.post("/v1/gateway-tokens", headers=auth, json={"name": "bot"}).json()["token"]
 
 
+@pytest.mark.covers("M-10", "egress", ingress="llm_proxy", sens="bloque")
 def test_dlp_blocks_secret_before_forwarding(
     db: DBHandle,
     test_verifier: TokenVerifier,
@@ -518,6 +519,7 @@ def test_dlp_blocks_secret_before_forwarding(
     assert "aws_access_key_id" in row[2] and AWS_KEY not in row[2]
 
 
+@pytest.mark.covers("M-10", "egress", ingress="llm_proxy", sens="laisse_passer")
 def test_dlp_flags_pii_but_forwards_unchanged(
     db: DBHandle,
     test_verifier: TokenVerifier,

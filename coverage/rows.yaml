@@ -1,0 +1,190 @@
+# Registre des lignes de couverture — la seule partie RÉDIGÉE de la carte.
+#
+# AD-30 : la carte est générée depuis les scénarios qui passent, jamais rédigée.
+# Ce fichier ne dit donc pas ce qui est couvert : il dit ce qui est *revendiqué*,
+# et le générateur confronte la revendication aux scénarios. L'écart entre les deux
+# est CM-7, dont la cible est zéro.
+#
+# Règle dure : une facette en mode `B` sans scénario qui passe **fait échouer le
+# build**. Une revendication « Bloqué » qu'aucun test n'asserte n'est pas une nuance
+# de rédaction, c'est une affirmation fausse.
+#
+# Les autres modes n'exigent pas de scénario — mais s'il en existe un, il est
+# enregistré, parce qu'une preuve de plus ne se jette pas.
+
+version: 1
+
+modes:
+  B: {libelle: "Bloqué", exige_scenario: true}
+  D: {libelle: "Détecté", exige_scenario: false}
+  O: {libelle: "Orchestré", exige_scenario: false}
+  A: {libelle: "Attesté", exige_scenario: false}
+  X: {libelle: "Hors périmètre", exige_scenario: false}
+
+# Chemins d'ingestion (AD-28). Une revendication porte toujours le sien : une ligne
+# vraie sur MCP se lirait comme vraie partout si on ne le disait pas.
+ingress:
+  mcp: "Gateway MCP — contraignant, xSOM exécute ou n'exécute pas"
+  http: "/v1/authorize — coopératif, l'agent honore le verdict"
+  llm_proxy: "Proxy LLM — egress DLP contraignant ; garde d'outils sous G-25/G-26"
+
+rows:
+  - id: M-01
+    titre: "Injection de prompts directe"
+    facettes:
+      - cle: garde_prompt
+        libelle: "garde-prompt"
+        mode: O
+        gaps: [G-01]
+      - cle: attestation
+        libelle: "attestation de présence du garde"
+        mode: A
+        gaps: [G-01]
+
+  - id: M-02
+    titre: "Injection de prompts indirecte"
+    facettes:
+      - cle: taint
+        libelle: "garde de taint sur les résultats d'outils"
+        mode: B
+        ingress: [mcp]
+        gaps: [G-02, G-03]
+
+  - id: M-03
+    titre: "Empoisonnement de données"
+    facettes:
+      - cle: provenance
+        libelle: "déclaration de provenance des jeux de données"
+        mode: A
+        gaps: [G-04]
+
+  - id: M-04
+    titre: "Vol de modèle / extraction"
+    facettes:
+      - cle: telemetrie
+        libelle: "télémétrie de volume et de motif"
+        mode: D
+        gaps: [G-05]
+
+  - id: M-05
+    titre: "Attaques par évasion (adversarial)"
+    facettes:
+      - cle: robustesse
+        libelle: "robustesse du modèle"
+        mode: X
+
+  - id: M-06
+    titre: "Piratage d'agents autonomes"
+    facettes:
+      - cle: chaine
+        libelle: "chaîne de contrôle complète, plancher irréversible"
+        mode: B
+        ingress: [mcp]
+        gaps: [G-06]
+
+  - id: M-07
+    titre: "Phishing hyper-personnalisé"
+    facettes:
+      - cle: emission
+        libelle: "l'agent comme émetteur — envoi hors allowlist"
+        mode: B
+        ingress: [mcp]
+      - cle: reception
+        libelle: "réception — passerelle mail"
+        mode: X
+
+  - id: M-08
+    titre: "Usurpation par deepfake"
+    facettes:
+      - cle: approbation
+        libelle: "intégrité de l'approbation — séparation des devoirs"
+        mode: B
+        ingress: [mcp]
+        gaps: [G-07]
+      - cle: media
+        libelle: "détection du média truqué"
+        mode: X
+
+  - id: M-09
+    titre: "Malwares polymorphes"
+    facettes:
+      - cle: endpoint
+        libelle: "plan endpoint (EDR/XDR)"
+        mode: X
+
+  - id: M-10
+    titre: "Exfiltration de données / PI via LLM"
+    facettes:
+      - cle: egress
+        libelle: "DLP d'egress sur le chemin supervisé"
+        mode: B
+        ingress: [llm_proxy]
+        gaps: [G-08, G-22]
+      - cle: decouverte
+        libelle: "découverte du Shadow AI non supervisé"
+        mode: O
+        gaps: [G-09]
+
+  - id: M-11
+    titre: "Supply chain (modèles / bibliothèques)"
+    facettes:
+      - cle: outils_mcp
+        libelle: "empreinte et quarantaine des outils MCP"
+        mode: B
+        ingress: [mcp]
+      - cle: bibliotheques
+        libelle: "SBOM et audit de dépendances en CI"
+        mode: A
+      - cle: modeles_ml
+        libelle: "analyse d'artefacts de modèles"
+        mode: O
+        gaps: [G-10]
+
+  - id: M-12
+    titre: "Privilèges excessifs (excessive agency)"
+    facettes:
+      - cle: rbac
+        libelle: "RBAC par outil, garde du député confus"
+        mode: B
+        ingress: [mcp]
+        gaps: [G-11, G-24]
+
+  - id: M-13
+    titre: "Traitement non sécurisé des sorties"
+    facettes:
+      - cle: charge_executable
+        libelle: "détection de charge exécutable dans les résultats"
+        mode: D
+        gaps: [G-12]
+
+  - id: M-14
+    titre: "Fuite du system prompt & secrets"
+    facettes:
+      - cle: secrets
+        libelle: "coffre ; aucun secret inline, aucun secret journalisé"
+        mode: B
+        ingress: [mcp, http]
+        gaps: [G-13]
+      - cle: prompt
+        libelle: "détection de fuite du prompt sur l'egress"
+        mode: O
+        gaps: [G-13]
+
+  - id: M-15
+    titre: "Validation aveugle de code (Copilot)"
+    facettes:
+      - cle: sast
+        libelle: "ingestion de verdicts SAST/DAST"
+        mode: O
+        gaps: [G-14]
+      - cle: ci
+        libelle: "audit de dépendances et de secrets en CI"
+        mode: A
+
+  - id: M-16
+    titre: "Décision fondée sur une hallucination"
+    facettes:
+      - cle: revue_humaine
+        libelle: "attestation « décision critique sous revue humaine »"
+        mode: A
+        gaps: [G-15]

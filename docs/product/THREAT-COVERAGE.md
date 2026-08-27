@@ -113,6 +113,12 @@ Légende écart : ✅ couvert · ⚠️ partiel / durci à faire · ❌ absent
 
 ### Domaine 1 — Attaque ciblée IA
 
+> **Cette table est rédigée ; elle ne fait plus foi.** Depuis `G-18`, la carte est
+> **générée** depuis les scénarios qui passent (`coverage/`, `AD-30`), et une facette
+> revendiquée `Bloqué` sans scénario fait échouer le build (`CM-7`). En cas d'écart
+> entre cette prose et `coverage/COVERAGE-MAP.md`, c'est la carte générée qui a raison
+> — et l'écart est lui-même le défaut à corriger.
+
 | # | Menace | Mode | État réel du code | Écart |
 |---|---|---|---|---|
 | **M-01** | Injection de prompts **directe** | **O** + A | ❌ Rien. Non-objectif assumé (PRD.md:917). | `G-01` |
@@ -266,7 +272,7 @@ Chaque `G-nn` deviendra une ou plusieurs exigences fonctionnelles, numérotées 
 | `G-15` | Attestation « décision critique sous revue humaine » adossée au HITL existant | M-16 | Faible coût, fort rendement |
 | `G-16` | Mapping OWASP LLM Top 10 + MITRE ATLAS + NIS2 + DORA + ANSSI dans `core/frameworks.py` | Tous | Haute |
 | `G-17` | Doctrine de souveraineté : substituts UE pour tout contrôle orchestré, fonctionnement hors ligne prouvé | Tous | Haute |
-| `G-18` | Carte de couverture publiée (`FR-144`) portant cette matrice, lignes non couvertes incluses | Tous | Haute |
+| `G-18` | ~~Carte de couverture publiée portant cette matrice~~ — **fermé.** `coverage/rows.yaml` + `scripts/gen_coverage.py` : la carte est générée depuis les scénarios, et `CM-7` est une garde de CI. Reste ouvert : la publication du fragment sur le site, encore manuelle. | Tous | ✅ |
 | `G-19` | **Diagnostic de profil d'usage** : positionner le client sur P1a/P1b/P2→P5 et en déduire son sous-ensemble de menaces applicables, avec le compte « N vous concernent, M sont bloquées » | Tous (axe §2) | **Haute** — c'est le pilier 1 de la vision |
 | `G-20` | Déclarer l'angle mort de l'IA embarquée SaaS (P1b) et instruire la couverture `Détecté`/`Attesté` par ingestion des journaux d'audit de la suite | §2.4 | Haute — population très répandue |
 | `G-21` | Documenter et rendre démontrable l'architecture de référence souveraine (§6.2), y compris le choix des substituts UE pour chaque ligne `Orchestré` | Tous (pilier 3) | **Haute** — le pilier « Made in France » n'existe pas sans elle |
