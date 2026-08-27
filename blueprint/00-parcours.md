@@ -1,6 +1,6 @@
 # Parcours et écrans
 
-Périmètre : **console du démonstrateur** (passe 1). La page de présentation publique fait l'objet de la passe 2.
+Périmètre : **console du démonstrateur** (passe 1, `04-ecrans/`) et **page de présentation publique** (passe 2, `06-page-publique/`, dans le dépôt du site vitrine).
 
 Projet **brownfield** : la console existe (`frontend/app/`). Les écrans déjà livrés sont *ratifiés*, pas re-spécifiés — seuls les écrans neufs et ceux que les neufs forcent à changer sont détaillés dans `04-ecrans/`.
 
@@ -9,6 +9,16 @@ Amont : `_bmad-output/planning-artifacts/prds/prd-poc-AI_guard-2026-08-26/prd.md
 ---
 
 ## Parcours critiques
+
+### P0 — L'évaluateur qui vérifie avant de croire
+**Déclencheur** : un architecte ou un RSSI arrive sur le site, envoyé par un lien ou une recherche. Il n'a pas de compte et n'en veut pas encore.
+**Étapes** : `presentation_publique` → `diagnostic` → `couverture`
+**Fin réussie** : il sait ce que nous bloquons, ce que nous ne bloquons pas, et sur quel chemin d'ingestion — **et il a pu remonter chaque affirmation jusqu'à un scénario**. Il n'a pas eu à nous croire sur parole.
+**Sorties d'échec** :
+- fragment de couverture non régénéré au dernier build → la page ne l'affiche pas plutôt que de l'afficher périmé. Une carte sans date ne se distingue pas d'une carte rédigée à la main.
+- le visiteur repart avant le diagnostic → il a quand même vu la doctrine des cinq modes et les écarts. La page se lit seule ; le diagnostic est un approfondissement, pas la condition de la compréhension.
+
+**Ce que P0 impose au reste** : `diagnostic` et `couverture` sont **accessibles sans compte** — c'est ce parcours qui l'exige, et c'est pourquoi l'inventaire les marque `public`.
 
 ### P1 — Le triage
 **Déclencheur** : ouverture de la démonstration, ou visite autonome depuis la page de présentation.
@@ -54,8 +64,9 @@ Vocabulaire de rôles : `admin` · `operator` · `viewer` (`core/schemas.py:11-1
 
 | id | Nom | Route | Rôles autorisés | Parcours | Priorité | État |
 |---|---|---|---|---|---|---|
-| `diagnostic` | Diagnostic de profil | `/diagnostic` | public, viewer, operator, admin | P1 | 1 | **neuf** |
-| `couverture` | Carte de couverture | `/couverture` | public, viewer, operator, admin | P1 | 1 | **neuf** |
+| `presentation_publique` | Page de présentation | `/ia-guard.html` · `/en/ai-guard.html` | public | P0 | 1 | **neuf** — *dépôt `infra-xsom_website`* |
+| `diagnostic` | Diagnostic de profil | `/diagnostic` | public, viewer, operator, admin | P0, P1 | 1 | **neuf** |
+| `couverture` | Carte de couverture | `/couverture` | public, viewer, operator, admin | P0, P1 | 1 | **neuf** |
 | `promotion` | Rapport de promotion | `/promotion` | operator, admin | P5 | 2 | **neuf** |
 | `inspector` | Inspecteur / playground | `/inspector` | viewer, operator, admin | P2, P3 | 2 | existant — ratifié |
 | `approvals` | File d'approbation | `/approvals` | lecture : viewer, operator, admin · **décision : operator, admin** | P2 | 2 | existant — ratifié |
@@ -77,7 +88,8 @@ Vocabulaire de rôles : `admin` · `operator` · `viewer` (`core/schemas.py:11-1
 ## Navigation
 
 - Barre permanente : `home` · `couverture` · `inspector` · `approvals` · `audit` · `costs` · `admin`. `promotion` n'y figure pas : on y entre depuis `admin` ou depuis une alerte de fin de fenêtre.
-- `diagnostic` et `couverture` sont **accessibles sans compte** — ce sont les deux surfaces que la page de présentation profonde-lie, et le triage est la porte d'entrée commerciale.
+- `diagnostic` et `couverture` sont **accessibles sans compte** — ce sont les deux surfaces que la page de présentation profonde-lie (`P0`), et le triage est la porte d'entrée commerciale.
+- `presentation_publique` ne figure dans aucune barre de navigation de la console : elle vit sur un autre domaine et n'est pas un écran d'application. Les liens vont dans l'autre sens — du site vers la console — et sont annoncés comme externes.
 - Non connecté sur une route protégée → `/login`. Connecté sur `/login` → `/home`.
 - `couverture` atteint sans profil → redirige vers `diagnostic`, sauf paramètre de profil explicite dans l'URL (le consultant arrive avec le profil déjà choisi).
 - Rôle insuffisant → écran d'accès refusé nommant le rôle requis, jamais une redirection muette (`FR-93` : l'erreur nomme le réglage qui débloquerait).
