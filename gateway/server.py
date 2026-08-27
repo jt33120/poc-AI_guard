@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 from uuid import uuid4
@@ -23,9 +23,9 @@ import mcp.types as types
 from mcp.server.lowlevel import Server
 
 from core import approvals, audit, db, integrity, risk, tenant_tokens, trust
-from core.judge import Judge
+from core.judge import Judge, resolve_ambiguous
 from core.notify import Notifier
-from core.policy import ActionClass, Approval, Policy, PolicyOutcome, escalate_for_class, evaluate
+from core.policy import ActionClass, Approval, Policy, PolicyOutcome, evaluate
 from core.tenant_tokens import authenticate_gateway_session
 from gateway.downstream import DownstreamProxy, ServerSpec
 from gateway.taint import TaintState, taints_result
@@ -144,17 +144,10 @@ class PolicyBackend:
 
         outcome = evaluate(self._policy, canonical, arguments)
 
-        # Ambiguous tools: ask the judge for an action class, then escalate the
-        # decision to a safe floor. The judge classifies only — never authorizes.
-        if outcome.ambiguous and self._judge is not None:
-            judged = self._judge.classify(canonical, approvals.redact(arguments))
-            outcome = PolicyOutcome(
-                action_class=judged,
-                decision=escalate_for_class(outcome.decision, judged),
-                rule_name=outcome.rule_name,
-                reason="judge",
-                ambiguous=True,
-            )
+        # Ambiguous tools: classify, then floor for that class. The judge only
+        # classifies — never authorizes — and an absent judge floors to
+        # irreversible rather than letting the rule's approval stand (AD-34).
+        outcome = resolve_ambiguous(outcome, self._judge, canonical, arguments)
 
         # Graduated autonomy (M11): risk-score an `auto` outcome and tighten it.
         outcome = self._apply_risk(canonical, outcome, arguments)
@@ -168,13 +161,7 @@ class PolicyBackend:
                 return _denied_result(
                     f"'{canonical}' denied: session tainted by a prior tool result"
                 )
-            outcome = PolicyOutcome(
-                outcome.action_class,
-                Approval.human_in_the_loop,
-                outcome.rule_name,
-                "taint",
-                outcome.ambiguous,
-            )
+            outcome = replace(outcome, decision=Approval.human_in_the_loop, reason="taint")
 
         if outcome.decision in (Approval.auto, Approval.notify):
             # notify-and-proceed (M11) relays like auto but is recorded distinctly.
@@ -287,9 +274,7 @@ class PolicyBackend:
         )
         if tier is outcome.decision:
             return outcome
-        return PolicyOutcome(
-            outcome.action_class, tier, outcome.rule_name, "risk", outcome.ambiguous
-        )
+        return replace(outcome, decision=tier, reason="risk")
 
     def _taint_blocks(self, outcome: PolicyOutcome) -> bool:
         """Whether a risky action is gated because the session is tainted (M12)."""
@@ -351,7 +336,7 @@ class PolicyBackend:
                     tool_name=canonical,
                     action_class=outcome.action_class.value if outcome.action_class else None,
                     policy_rule_id=outcome.rule_name,
-                    judge_used=outcome.ambiguous,
+                    judge_used=outcome.judge_used,
                     args_hash=approvals.args_hash(arguments),
                     latency_ms=latency_ms,
                     error=error,

@@ -189,7 +189,12 @@ class PolicyOutcome:
     decision: Approval
     rule_name: str | None
     reason: str
+    #: The rule needed a classifier (``classify: ambiguous``).
     ambiguous: bool = False
+    #: A model call was actually made. Distinct from ``ambiguous``, which only says
+    #: one was *needed*: an absent or over-budget judge classifies fail-closed with
+    #: no model call, and the audit log must not credit that to the judge (AD-21.4).
+    judge_used: bool = False
 
 
 def parse_policy(text: str) -> Policy:

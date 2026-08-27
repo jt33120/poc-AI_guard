@@ -268,6 +268,7 @@ Chaque `G-nn` deviendra une ou plusieurs exigences fonctionnelles, numérotées 
 | `G-19` | **Diagnostic de profil d'usage** : positionner le client sur P1a/P1b/P2→P5 et en déduire son sous-ensemble de menaces applicables, avec le compte « N vous concernent, M sont bloquées » | Tous (axe §2) | **Haute** — c'est le pilier 1 de la vision |
 | `G-20` | Déclarer l'angle mort de l'IA embarquée SaaS (P1b) et instruire la couverture `Détecté`/`Attesté` par ingestion des journaux d'audit de la suite | §2.4 | Haute — population très répandue |
 | `G-21` | Documenter et rendre démontrable l'architecture de référence souveraine (§6.2), y compris le choix des substituts UE pour chaque ligne `Orchestré` | Tous (pilier 3) | **Haute** — le pilier « Made in France » n'existe pas sans elle |
+| `G-22` | Rédaction de contenu avant l'envoi au juge : `core/approvals.py:45-57` masque par *nom de clé*, pas par contenu. Une PII dans la valeur d'une clé anodine (`body`, `text`) atteint le modèle. Le chemin `core/dlp.py` existe mais n'est pas branché sur le juge. | M-10, §4.10 | **Haute** — c'est un transit de données vers un modèle |
 
 ### 8.2 Recoupement avec les 34 correctifs de PLAN-REVIEW
 

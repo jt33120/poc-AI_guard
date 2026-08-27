@@ -12,6 +12,7 @@ gateway, xSOM does not execute the action here — enforcement is **cooperative*
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4
@@ -19,9 +20,9 @@ from uuid import uuid4
 import psycopg
 
 from core import approvals, audit, db, risk, trust
-from core.judge import Judge
+from core.judge import Judge, resolve_ambiguous
 from core.notify import Notifier
-from core.policy import Approval, Policy, PolicyOutcome, escalate_for_class, evaluate
+from core.policy import Approval, Policy, PolicyOutcome, evaluate
 
 logger = logging.getLogger("xsom.decision")
 
@@ -90,12 +91,10 @@ def authorize(
     """Decide whether the agent may perform ``tool`` with ``arguments``."""
     outcome = evaluate(policy, tool, arguments)
 
-    # Ambiguous tools: the judge classifies (never authorizes); escalate to a floor.
-    if outcome.ambiguous and judge is not None:
-        judged = judge.classify(tool, approvals.redact(arguments))
-        outcome = PolicyOutcome(
-            judged, escalate_for_class(outcome.decision, judged), outcome.rule_name, "judge", True
-        )
+    # Ambiguous tools: classify, then floor for that class. Same shared step as the
+    # MCP path — an absent judge floors to irreversible rather than letting the
+    # rule's declared approval stand (AD-34).
+    outcome = resolve_ambiguous(outcome, judge, tool, arguments)
 
     # Graduated autonomy (M11): risk-score an `auto` outcome and tighten it (opt-in).
     if policy.defaults.risk_bands is not None and outcome.decision is Approval.auto:
@@ -110,9 +109,7 @@ def authorize(
             clean_streak=streak,
         )
         if tier is not outcome.decision:
-            outcome = PolicyOutcome(
-                outcome.action_class, tier, outcome.rule_name, "risk", outcome.ambiguous
-            )
+            outcome = replace(outcome, decision=tier, reason="risk")
 
     ah = approvals.args_hash(arguments)
 
@@ -126,7 +123,7 @@ def authorize(
             request_id=request_id,
             action_class=_class(outcome),
             policy_rule_id=outcome.rule_name,
-            judge_used=outcome.ambiguous,
+            judge_used=outcome.judge_used,
             args_hash=ah,
             gateway_token_id=gateway_token_id,
         )
@@ -144,7 +141,7 @@ def authorize(
             request_id=request_id,
             action_class=_class(outcome),
             policy_rule_id=outcome.rule_name,
-            judge_used=outcome.ambiguous,
+            judge_used=outcome.judge_used,
             args_hash=ah,
             gateway_token_id=gateway_token_id,
         )
@@ -165,7 +162,7 @@ def authorize(
             request_id=request_id,
             action_class=_class(outcome),
             policy_rule_id=outcome.rule_name,
-            judge_used=outcome.ambiguous,
+            judge_used=outcome.judge_used,
             args_hash=ah,
             gateway_token_id=gateway_token_id,
         )
@@ -206,7 +203,7 @@ def authorize(
                 request_id=record.id,
                 action_class=action_class,
                 policy_rule_id=outcome.rule_name,
-                judge_used=outcome.ambiguous,
+                judge_used=outcome.judge_used,
                 args_hash=ah,
                 gateway_token_id=gateway_token_id,
             )

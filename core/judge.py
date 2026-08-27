@@ -14,7 +14,8 @@ import json
 from collections.abc import Callable
 from typing import Any
 
-from core.policy import ActionClass
+from core.approvals import redact
+from core.policy import ActionClass, PolicyOutcome, escalate_for_class
 
 #: (system_prompt, user_prompt) -> raw model text (expected JSON).
 Completer = Callable[[str, str], str]
@@ -105,3 +106,46 @@ def build_judge(settings: Any) -> Judge | None:
         return None
     completer = litellm_completer(settings.mistral_model, settings.mistral_api_key)
     return Judge(completer, max_calls=settings.judge_max_calls)
+
+
+def resolve_ambiguous(
+    outcome: PolicyOutcome,
+    judge: Judge | None,
+    tool_name: str,
+    arguments: dict[str, Any],
+) -> PolicyOutcome:
+    """Classify a ``classify: ambiguous`` outcome, then floor it for that class.
+
+    Shared by every ingress path, so the classification step cannot drift between
+    them (ARCHITECTURE-V2.5 AD-4/AD-21).
+
+    **An unconfigured judge is not an inert one** (AD-34). With no model key the
+    step still runs and contributes its *failure* class — ``irreversible`` — so an
+    ambiguous rule can never be honoured at its declared ``approval``. That is the
+    guarantee ``.env.example`` documents ("ambiguous tools are treated as
+    irreversible, so they go to human approval instead of being auto-allowed");
+    before this, the escalation was skipped entirely when no judge existed and the
+    rule's own approval stood, which could be ``auto``.
+
+    The returned ``judge_used`` says whether a model call was actually made, so the
+    audit log never credits a fail-closed default to the judge (AD-21.4).
+    """
+    if not outcome.ambiguous:
+        return outcome
+    if judge is None:
+        judged, reason, used = ActionClass.irreversible, "judge_unavailable", False
+    else:
+        before = judge.calls
+        judged = judge.classify(tool_name, redact(arguments))
+        # Over budget, `classify` fails closed without calling the model. Compare the
+        # counter rather than assuming a judge object means a model call (AD-21.4).
+        used = judge.calls > before
+        reason = "judge" if used else "judge_over_budget"
+    return PolicyOutcome(
+        action_class=judged,
+        decision=escalate_for_class(outcome.decision, judged),
+        rule_name=outcome.rule_name,
+        reason=reason,
+        ambiguous=True,
+        judge_used=used,
+    )

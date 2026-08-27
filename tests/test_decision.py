@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import uuid4
 
 from core import approvals, decision
+from core.judge import Judge
 from core.policy import parse_policy
 from tests.conftest import DBHandle
 
@@ -116,3 +117,51 @@ def test_human_dual_requires_two_approvers(db: DBHandle) -> None:
 def test_poll_unknown_returns_none(db: DBHandle) -> None:
     tid = _tenant(db)
     assert decision.poll(database_url=db.url, tenant_id=tid, approval_id=str(uuid4())) is None
+
+
+AMBIGUOUS = parse_policy(
+    "tools:\n"
+    "  - {name: mock.exec, classify: ambiguous, approval: auto}\n"
+    "defaults: {unknown_tool: deny}\n"
+)
+
+
+def _judge_used(db: DBHandle, tenant_id: str) -> list[bool]:
+    rows = db.conn.execute(
+        "select judge_used from audit_log where tenant_id = %s order by id", (tenant_id,)
+    ).fetchall()
+    return [r[0] for r in rows]
+
+
+def test_ambiguous_without_a_judge_holds_on_the_http_path_too(db: DBHandle) -> None:
+    # The cooperative HTTP path must give the same answer as the MCP gateway; a
+    # guarantee that holds on one ingress and not the other is not a guarantee.
+    tid = _tenant(db)
+    res = decision.authorize(
+        database_url=db.url,
+        policy=AMBIGUOUS,
+        tenant_id=tid,
+        tool="mock.exec",
+        arguments={"cmd": "rm -rf /"},
+        judge=None,
+    )
+    assert res["decision"] == "hold"
+    assert res["action_class"] == "irreversible"
+    assert _decisions(db, tid) == ["hitl_pending"]
+    assert _judge_used(db, tid) == [False]  # AD-21.4: no model call was made
+
+
+def test_ambiguous_with_a_judge_follows_its_class_on_the_http_path(db: DBHandle) -> None:
+    tid = _tenant(db)
+    judge = Judge(lambda _s, _u: '{"action_class": "read"}')
+    res = decision.authorize(
+        database_url=db.url,
+        policy=AMBIGUOUS,
+        tenant_id=tid,
+        tool="mock.exec",
+        arguments={"cmd": "ls"},
+        judge=judge,
+    )
+    assert res["decision"] == "allow"
+    assert res["action_class"] == "read"
+    assert _judge_used(db, tid) == [True]
