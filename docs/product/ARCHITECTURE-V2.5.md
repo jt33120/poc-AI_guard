@@ -199,6 +199,18 @@ Adapters depend on the core; the core never depends on an adapter. Filters **do*
 - **Prevents:** two teams adding the same key with different units or semantics — both typed, both parsing, both versioned, and off by a factor of a hundred
 - **Rule:** the vocabulary is one committed registry file: `id · type · unit · evaluating filter · failure direction · introduced-in version`. CI fails on a duplicate id, a missing unit, or a key referenced in code but absent from the registry. Adding a key is a diff to that file plus a `constraints_version` bump. A policy that fails to parse makes the tenant's effective policy **deny-all** and raises a control-plane event — never last-known-good.
 
+### AD-37 — Extraction is incremental, and every step is already chain-shaped
+
+- **Binds:** `AD-4`, `AD-21`, `AD-33`, `AD-35`, every shared behaviour added to `core/`
+- **Prevents:** the two failure modes of the same choice. A big-bang `core/pipeline.py` rewrite competes with feature work and stalls half-done, leaving both adapters live and divergent — the very state `AD-4` exists to end. A drift of ad-hoc shared helpers converges on nothing and reproduces the duplication one function lower.
+- **Rule:**
+  1. Extraction proceeds **one shared step at a time**, and a step is extracted when a *concrete* second caller exists — never speculatively.
+  2. Each step is written to the chain's obligations **while it still has one caller**: it takes only what a `CallContext` would give it, returns a minimum tier or a classification enrichment (never a final verdict), and declares its failure direction per `AD-34`.
+  3. Any new behaviour shared by both adapters lands **in a step, never in a second copy**. A duplicated block across `gateway/` and `api/` is a review failure from here on.
+  4. The extraction is **done** when `core/pipeline.py` holds the declared order of `AD-33` and both adapters call only it. Until then the fold is implicit in the adapters, which is why `AD-35` (every path runs the full chain) is asserted by scenarios rather than by shape.
+- **Reference shape:** `resolve_ambiguous` (`core/judge.py`) is step one. It was extracted because both adapters held the same eleven lines of judge handling; it declares its failure class (`irreversible`) rather than inheriting an absent dependency's silence, which is `AD-34` made concrete.
+- **Ratifies** the *minimal-designed-for-full* amplitude the spine had left open.
+
 ---
 
 ## Consistency Conventions
@@ -279,7 +291,7 @@ scenarios/             # one per coverage row, each with its negative control �
 | `FR-179`..`FR-183` — demonstrator | `core/pipeline.py`, `scenarios/` | `AD-26`, `AD-27`, `AD-29`, `AD-30`, `AD-31` |
 | `FR-184`..`FR-194` — remaining coverage | filters, registry | `AD-21`, `AD-23`, `AD-35`, `AD-36` |
 | `FR-195`..`FR-197` — deployment, identity, positioning | deployment envelope, docs | `AD-29`, `AD-32` |
-| `FR-198`, `FR-199` — defects the review surfaced | policy engine | `AD-34`, `AD-23` |
+| `FR-198`, `FR-199` — defects the review surfaced | policy engine (**shipped**) | `AD-34`, `AD-23`, `AD-37` |
 
 ---
 
@@ -287,9 +299,7 @@ scenarios/             # one per coverage row, each with its negative control �
 
 | Deferred | Why it can wait |
 | --- | --- |
-| **Extraction amplitude** — minimal fold versus the full `core/pipeline.py` + `core/provenance.py` of ARCHITECTURE-V2 §2.C.1 | Both satisfy `AD-21`. The lean is minimal-designed-for-full, so the choice changes sequencing, not shape. Awaiting ratification. |
 | **Where the usage-profile model lives** (`FR-172`) — tenant attribute versus consulting artefact | Depends on `QO-7`, which is a commercial question. The two answers produce different architectures; deciding it here would be guessing. |
 | **NIS2 / DORA / ANSSI mapping** | `AR-1` defers them pending review by a practising assessor. The declarative mapping table already makes adding them cheap. |
-| **LLM proxy separability** (`AR-2`, `QO-8`) | Whether DLP enforcement survives demoting the proxy is an implementation question. It changes one coverage row, not the spine. |
 | **Demo tenant domain** (`QO-9`) | `AD-31` fixes the form — committed, deterministic, PII-checked. The subject matter is a narrative choice. |
 | **Story-level detail** | This spine is initiative altitude. It fixes what epics must share and deliberately stops there. |
