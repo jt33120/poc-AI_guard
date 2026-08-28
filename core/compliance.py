@@ -26,6 +26,8 @@ import psycopg
 
 from core import audit, export
 from core import usage as usage_store
+from core.audit import EnforcementMode
+from core.monitor import NEVER_OBSERVED
 
 #: EU AI Act art. 12 mandates high-risk logs be retained at least 6 months.
 MIN_RETENTION_DAYS = 183
@@ -177,6 +179,62 @@ def fria_scaffold(decision_summary: dict[str, int]) -> dict[str, Any]:
     }
 
 
+def observation_disclosure(conn: psycopg.Connection, tenant_id: str | None) -> dict[str, Any]:
+    """Periods during which enforcement was relaxed, disclosed with the proof (`FR-179`).
+
+    An observation window stands the gateway down on one agent for a bounded time.
+    That is a legitimate, attributed, opt-in operation — and it is exactly the kind
+    of fact a supervision proof must carry rather than average away. A pack that
+    reported human-oversight coverage across a period containing an unenforced
+    window would be answering a narrower question than the one being asked.
+
+    `AD-27.2` bounds the exposure and the pack says so: no window ever relaxed an
+    irreversible action or an external send. The disclosure exists so that limit is
+    read together with the numbers, not discovered afterwards.
+    """
+    row = conn.execute(
+        "select count(*), count(distinct gateway_token_id), min(opened_at), "
+        " max(coalesce(closed_at, expires_at)), "
+        " count(*) filter (where closed_at is null and expires_at > now()) "
+        "from monitor_windows"
+    ).fetchone()
+    windows, agents, first, last, running = row if row else (0, 0, None, None, 0)
+
+    seen = conn.execute(
+        "select count(*), count(*) filter (where decision like 'monitor\\_%%') "
+        "from audit_log where enforcement_mode = %s",
+        (EnforcementMode.observing.value,),
+    ).fetchone()
+    observed_calls, relaxed_calls = (seen[0], seen[1]) if seen else (0, 0)
+
+    if not windows:
+        statement = (
+            "Enforcement was active throughout: no observation window was ever opened "
+            "for this tenant."
+        )
+    else:
+        statement = (
+            f"{windows} observation window(s) over {agents} agent(s) relaxed enforcement "
+            f"for a bounded period. {observed_calls} call(s) were decided under one, of "
+            f"which {relaxed_calls} were let through and recorded rather than enforced. "
+            f"No window ever covered "
+            f"{', '.join(sorted(c.value for c in NEVER_OBSERVED))}: those actions were "
+            "blocked throughout. Decisions taken under a window are not evidence of "
+            "enforcement and are excluded from the oversight figures above."
+        )
+    return {
+        "windows": int(windows),
+        "agents_observed": int(agents),
+        "still_running": int(running),
+        "from": first.isoformat() if first else None,
+        "to": last.isoformat() if last else None,
+        "calls_decided_under_observation": int(observed_calls),
+        "calls_let_through": int(relaxed_calls),
+        "never_relaxed": sorted(c.value for c in NEVER_OBSERVED),
+        "statement": statement,
+    }
+
+
 _ENFORCED_INGRESS = "mcp_gateway"
 
 
@@ -244,6 +302,9 @@ def build_evidence_pack(
             # stated from the data -- and stated in a structured field, because a
             # narrator hook can rewrite prose and cannot rewrite this.
             "scope": _oversight_scope(base["ingress_mix"]),
+            # FR-179: an unenforced period does not get to sit silently inside a
+            # supervision proof. It is disclosed with the figures it affects.
+            "observation": observation_disclosure(conn, tenant_id),
         },
         "article_26_deployer": {
             "decision_summary": base["summary"],

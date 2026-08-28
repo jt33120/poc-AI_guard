@@ -35,6 +35,7 @@ from api.integrity import router as integrity_router
 from api.llm_proxy import router as llm_proxy_router
 from api.monitor import router as monitor_router
 from api.policy import router as policy_router
+from api.promotion import router as promotion_router
 from api.ratelimit import limiter
 from api.read_tokens import router as read_tokens_router
 from api.security import build_verifier, get_current_user
@@ -138,6 +139,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(compliance_router)
     app.include_router(integrity_router)
     app.include_router(monitor_router)
+    app.include_router(promotion_router)
     app.include_router(trust_router)
     app.include_router(signup_router)
 

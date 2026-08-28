@@ -16,8 +16,10 @@ observation window — were counted in the total and reported nowhere.
 from __future__ import annotations
 
 from typing import Any
+from uuid import uuid4
 
-from core import compliance, export
+from core import audit, compliance, export, monitor, tenant_tokens
+from tests.conftest import DBHandle
 
 # Every decision string the codebase writes, with where it comes from. A summary
 # that silently drops one of these is the defect this file exists to prevent.
@@ -100,3 +102,45 @@ def test_the_oversight_guarantee_is_scoped_to_the_door_it_holds_at() -> None:
     assert scope["cooperative_or_unrecorded"] == 4
     assert "cannot bypass" in scope["statement"]
     assert "depends on the agent" in scope["statement"]
+
+
+def test_an_unenforced_period_is_disclosed_with_the_supervision_figures(db: DBHandle) -> None:
+    """FR-179 — an observation window is not allowed to sit silently inside a proof.
+
+    A window stands the gateway down on one agent for a bounded time. That is a
+    legitimate, attributed, opt-in operation; averaging it into a human-oversight
+    figure answers a narrower question than the regulator is asking.
+    """
+    quiet = compliance.observation_disclosure(db.conn, None)
+    assert quiet["windows"] == 0
+    assert "no observation window was ever opened" in quiet["statement"]
+
+    tenant = str(uuid4())
+    db.conn.execute("insert into tenants (id, name) values (%s, 'A')", (tenant,))
+    _, token = tenant_tokens.mint(db.conn, tenant_id=tenant, name="bot")
+    monitor.open_window(
+        db.conn,
+        tenant_id=tenant,
+        gateway_token_id=str(token["id"]),
+        hours=1,
+        max_hours=8,
+        opened_by="op-1",
+    )
+    audit.log_event(
+        db.conn,
+        tenant_id=tenant,
+        decision="monitor_hold",
+        tool_name="crm.update",
+        action_class="write",
+        gateway_token_id=str(token["id"]),
+        origin=audit.Origin.llm_proxy(observing=True),
+    )
+    db.conn.commit()
+
+    disclosed = compliance.observation_disclosure(db.conn, None)
+    assert disclosed["windows"] == 1 and disclosed["still_running"] == 1
+    assert disclosed["calls_decided_under_observation"] == 1
+    assert disclosed["calls_let_through"] == 1
+    # The bound travels with the disclosure: the exposure was never unlimited.
+    assert disclosed["never_relaxed"] == ["external_send", "irreversible"]
+    assert "excluded from the oversight figures" in disclosed["statement"]
