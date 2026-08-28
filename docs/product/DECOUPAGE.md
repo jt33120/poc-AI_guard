@@ -120,7 +120,7 @@ plutôt qu'en le supposant. Aucun ne crée de rang nouveau — chacun se rattach
 | `G-23` | `business_hours_only` retiré de `SPEC.md` faute d'implémentation ; demande un fuseau par tenant | Rang 8 | Basse |
 | `G-24` | `allowed_clients` n'est appliqué que par le gateway MCP : la même policy n'est pas également bornée sur `/v1/authorize` | Rang 1 (divergence d'ingress) | Haute |
 | `G-25` | ~~Le mode d'enforcement lu dans un en-tête de requête~~ — **fermé.** Fenêtre d'observation de plan de contrôle, bornée, réservée à l'`admin` | Rang 4 — livré | ✅ |
-| `G-26` | La branche streaming du proxy LLM contourne entièrement la garde d'appels d'outils, sans ligne d'audit | Rang 7 | Critique |
+| `G-26` | ~~La branche streaming contourne la garde d'appels d'outils, sans ligne d'audit~~ — **option `B` livrée** : l'absence est inscrite (`streamed_uninspected`). La couverture réelle (`C`) attend son déclencheur : un client `P3` routant ses agents par le proxy | Rang 7 — livré (`B`) | ✅ |
 
 **`G-25` est la raison de remonter le rang 4.** La PRD le plaçait en quatre « seulement
 parce qu'il ne bloque pas le tournage ». Il s'avère maintenant être le véhicule du

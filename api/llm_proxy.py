@@ -359,6 +359,43 @@ def _base_url(settings: Settings, provider: str) -> str:
     }[provider]
 
 
+def _audit_streamed(
+    url: str | None, tenant_id: str, gateway_token_id: str, provider: str, *, observing: bool
+) -> None:
+    """`G-26` option B — inscrire qu'une complétion a été streamée, donc non inspectée.
+
+    Avec `stream: true`, la réponse est relayée telle quelle : aucun appel d'outil
+    n'est examiné. Ce n'est pas une revendication fausse — `coverage/rows.yaml` ne
+    revendique `llm_proxy` que pour `M-10 / egress`, que la DLP couvre bien puisqu'elle
+    s'applique en amont de cette branche (`AD-35` : une capacité absente est un manque
+    déclaré).
+
+    Ce qui manquait est plus étroit : **l'absence de trace ne se voyait nulle part.**
+    Le silence était indiscernable d'une absence de trafic, et un évaluateur qui le
+    trouvait seul le lisait comme une omission plutôt que comme un choix. Une ligne par
+    complétion streamée rend l'angle mort *auditable* : la console peut dire « N % du
+    trafic de cet agent n'a pas été observé ».
+
+    Métadonnées seules — aucun nom d'outil, aucun argument : nous ne les avons pas
+    regardés, et en inventer serait pire que de n'en pas écrire.
+    """
+    if not url:
+        return
+    try:
+        with db.connection(url) as conn:
+            audit.log_event(
+                conn,
+                tenant_id=tenant_id,
+                decision="streamed_uninspected",
+                gateway_token_id=gateway_token_id,
+                error=f"provider={provider}",
+                origin=audit.Origin.llm_proxy(observing=observing),
+            )
+            conn.commit()
+    except Exception:  # l'audit est best-effort ; il ne casse jamais le relais
+        logger.warning("streamed_audit_failed", extra={"tenant_id": tenant_id})
+
+
 async def _forward(request: Request, principal: GatewayPrincipal, provider: str) -> Response:
     settings: Settings = request.app.state.settings
     url = database_url(request)
@@ -416,6 +453,21 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
 
     client = _http()
     if streaming:
+        # Écrit **avant** le relais, pas dans le `BackgroundTask` de fermeture. La note
+        # de décision disait « hors chemin de réponse » ; en construisant, l'ordre s'est
+        # avéré porter la question : une ligne écrite après la fin du flux manque
+        # exactement pour les sessions qui ont échoué en cours de route — celles qu'un
+        # auditeur regarde en premier. Le fait « cette requête est streamée, donc non
+        # inspectée » est connu ici, avant qu'aucun octet ne circule, et le coût est un
+        # `insert` devant un appel de modèle qui dure des centaines de millisecondes.
+        await run_in_threadpool(
+            _audit_streamed,
+            url,
+            principal.tenant_id,
+            principal.token_id,
+            provider,
+            observing=observing,
+        )
         upstream_req = client.build_request("POST", upstream, content=body, headers=fwd_headers)
         upstream_resp = await client.send(upstream_req, stream=True)
         return StreamingResponse(

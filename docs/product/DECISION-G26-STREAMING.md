@@ -1,6 +1,7 @@
 # `G-26` — le streaming du proxy LLM : note de décision
 
-> **Statut : à trancher.** Ce document instruit le dossier ; il ne décide pas.
+> **Statut : tranché — `B` retenue et livrée, `C` reportée à son déclencheur.**
+> Ce document a instruit le dossier ; la décision est prise et consignée en §6.
 > **Audience** : le propriétaire produit.
 > Sources vérifiées : `api/llm_proxy.py` `_forward`, `coverage/rows.yaml`, `AD-35`.
 
@@ -94,3 +95,31 @@ faux. C'est un choix de calendrier, pas un compromis sur l'honnêteté.
 2. **C, à quel déclencheur ?** Ma proposition : quand un client de profil `P3`
    (agents outillés) route son trafic par le proxy plutôt que par le gateway MCP.
    Avant ça, l'effort sert une revendication que personne ne demande.
+
+---
+
+## 6. La décision, et un écart d'implémentation assumé
+
+**`B` est retenue et livrée** : une ligne `streamed_uninspected` par complétion
+streamée, métadonnées seules. **`C` est reportée** au déclencheur proposé en §5 — un
+client de profil `P3` qui route son trafic d'agents par le proxy plutôt que par le
+gateway MCP.
+
+**Un écart avec §3, à voir en revue.** Le tableau annonçait « une écriture par requête,
+**hors chemin de réponse** — latence ~0 », c'est-à-dire dans la tâche de fermeture du
+flux. En construisant, l'ordre s'est avéré porter la question : une ligne écrite après
+la fin du flux **manque exactement pour les sessions interrompues en cours de route**,
+qui sont celles qu'un auditeur regarde en premier. Une métrique « N % du trafic non
+observé » qui perd ses cas d'échec est fausse dans le sens qui arrange.
+
+La ligne est donc écrite **avant** le relais. Le fait « cette requête est streamée, donc
+non inspectée » est connu à ce moment, avant qu'aucun octet ne circule, et le coût est
+un `insert` devant un appel de modèle qui dure des centaines de millisecondes. Le
+« latence ~0 » de §3 devient « latence négligeable » — l'écart est petit, mais il a été
+choisi plutôt que subi.
+
+**Ce que `B` ne fait pas**, et il faut le redire ici : aucun contrôle supplémentaire.
+Un appel d'outil demandé en flux n'est toujours pas examiné. `CM-7` interdit de le
+revendiquer, et le registre continue de ne revendiquer `llm_proxy` que pour
+`M-10 / egress` — dont la borne est désormais assertée par un test plutôt que déduite
+de la lecture du code.
