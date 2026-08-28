@@ -33,6 +33,7 @@ import json
 import logging
 import time
 from typing import Any
+from uuid import uuid4
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -240,7 +241,15 @@ def _inspect(
     if not audited and usage is None and billed is None:
         return
     raw_id = data.get("id")
-    request_id = raw_id if isinstance(raw_id, str) else None
+    upstream_id = raw_id if isinstance(raw_id, str) else None
+    # FR-161: the provider's completion id is a *declared* value -- whoever is at the
+    # other end of this connection chose it. It used to be written straight into
+    # `audit_log.request_id`, which is inside the hashed payload, so an upstream (or
+    # anything able to answer as one) picked part of what the chain attests, and could
+    # collide it with a real gateway request id. The audit row now carries a
+    # server-minted id, one per inspected response so the tool calls of a single
+    # completion still group, and keeps the provider's own id beside it, labelled.
+    request_id = uuid4().hex
     raw_model = data.get("model")
     model_name = raw_model if isinstance(raw_model, str) else None
     # Fresh connection: each log_event is then a top-level, committed transaction.
@@ -254,7 +263,11 @@ def _inspect(
                 action_class=action_class,
                 args_hash=args_hash,
                 request_id=request_id,
+                upstream_request_id=upstream_id,
                 gateway_token_id=gateway_token_id,
+                # `observing` was read from the control plane in `_observing`, never
+                # from this request -- which is the whole of FR-160 on this path.
+                origin=audit.Origin.llm_proxy(observing=observing),
             )
         if usage is not None:
             model, prompt_tokens, completion_tokens = usage
@@ -267,7 +280,9 @@ def _inspect(
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
                 cost_usd=pricing.cost_usd(provider, model, prompt_tokens, completion_tokens),
-                request_id=request_id,
+                # Not the audit id: reconciliation is against the provider's records,
+                # so it is the provider's identifier that belongs here.
+                request_id=upstream_id,
                 latency_ms=latency_ms,
             )
         if billed is not None:
@@ -280,7 +295,7 @@ def _inspect(
                 source="openrouter_inline",
                 model=model_name,
                 amount_usd=billed,
-                external_id=request_id,
+                external_id=upstream_id,
             )
         conn.commit()
 
@@ -325,6 +340,10 @@ def _audit_egress(
                 args_hash=scan.digest(),
                 error="dlp:" + ",".join(scan.kinds),
                 gateway_token_id=gateway_token_id,
+                # `enforcing`, and not because nobody passed anything: an observation
+                # window relaxes *tool calls* it may cover (`monitor.observes`), never
+                # egress DLP, which is about what leaves rather than what is done.
+                origin=audit.Origin.llm_proxy(observing=False),
             )
             conn.commit()
     except Exception:  # audit is best-effort; a blocked call stays blocked regardless

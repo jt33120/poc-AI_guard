@@ -65,6 +65,43 @@ def chain_integrity(conn: psycopg.Connection, tenant_id: str | None = None) -> d
     return {"ok": result.ok, "entries": result.count, "first_broken_id": result.broken_id}
 
 
+def verification_independence() -> dict[str, Any]:
+    """What the Article 12 check actually proves — and what it does not (FR-169 / INV-12).
+
+    `chain_integrity` recomputes the chain **from the same rows, over the same
+    connection, inside the same process that wrote them**. That detects a row
+    edited in place; it cannot detect an operator who rewrote the whole chain
+    forward, because nothing outside this system ever witnessed a prior state.
+
+    A regulator's question is not "is the chain self-consistent" — it is "how do I
+    know the operator did not rewrite it". Answering the first and presenting it as
+    the second is the failure this requirement was written to prevent, so the pack
+    now carries the answer in a machine-readable field instead of leaving
+    `tamper_evident: true` to be read as more than it is.
+
+    Independence would need a witness this deployment does not have: a signed
+    checkpoint whose key lives outside the database host, or an external anchor.
+    Neither exists yet, so this is computed rather than written — the day a signer
+    ships, it is this function that has to learn about it, and until it does the
+    pack keeps saying `independent: false`. An unconfigured witness contributes its
+    *absence*, exactly as an unconfigured dependency contributes its failure tier
+    (`AD-34`).
+    """
+    return {
+        "method": "recomputed_in_place",
+        "independent": False,
+        "witness": None,
+        "checkpoint_signature": None,
+        "signing_key_location": None,
+        "statement": (
+            "The audit chain was recomputed by the system that wrote it, from its own "
+            "database. This proves internal consistency and detects an edited row. It "
+            "is not independent verification: no external witness, signed checkpoint "
+            "or third-party anchor is configured for this deployment."
+        ),
+    }
+
+
 def oversight_coverage(conn: psycopg.Connection) -> dict[str, Any]:
     """Article 14 metric: were all irreversible/external actions gated by a human?"""
     row = conn.execute(
@@ -140,6 +177,26 @@ def fria_scaffold(decision_summary: dict[str, int]) -> dict[str, Any]:
     }
 
 
+_ENFORCED_INGRESS = "mcp_gateway"
+
+
+def _oversight_scope(ingress_mix: dict[str, int]) -> dict[str, Any]:
+    """Which of the recorded decisions the oversight guarantee actually covers."""
+    enforced = ingress_mix.get(_ENFORCED_INGRESS, 0)
+    cooperative = sum(n for door, n in ingress_mix.items() if door != _ENFORCED_INGRESS)
+    return {
+        "enforced_at_gateway": enforced,
+        "cooperative_or_unrecorded": cooperative,
+        "statement": (
+            f"{enforced} decision(s) passed through the MCP gateway, which an agent "
+            f"cannot bypass: for these, an irreversible action was not executed without "
+            f"recorded human supervision. {cooperative} decision(s) came through a "
+            f"cooperative or unrecorded path, where the guarantee depends on the agent "
+            f"honouring the verdict it was given."
+        ),
+    }
+
+
 def build_evidence_pack(
     conn: psycopg.Connection,
     *,
@@ -174,8 +231,20 @@ def build_evidence_pack(
             "first_broken_id": integrity["first_broken_id"],
             "retention_floor_days": retention_floor_days,
             "log_model": "append-only, hash-chained",
+            "verification": verification_independence(),
         },
-        "article_14_human_oversight": coverage,
+        "article_14_human_oversight": {
+            **coverage,
+            # The product used to assert, unconditionally and in prose, that
+            # "irreversible actions are never executed without recorded human
+            # supervision". That holds at the MCP gateway, which an agent cannot
+            # route around. It does not hold by itself on the cooperative paths,
+            # where the agent must choose to honour the verdict. Since FR-160 the
+            # log says which door each decision came through, so the scope is now
+            # stated from the data -- and stated in a structured field, because a
+            # narrator hook can rewrite prose and cannot rewrite this.
+            "scope": _oversight_scope(base["ingress_mix"]),
+        },
         "article_26_deployer": {
             "decision_summary": base["summary"],
             "fria": fria_scaffold(base["summary"]),

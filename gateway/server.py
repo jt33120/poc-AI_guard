@@ -356,6 +356,7 @@ class PolicyBackend:
                     decision=decision,
                     tool_name=tool_name,
                     error=reason,
+                    origin=audit.Origin.mcp_gateway(),
                 )
         except Exception:  # audit is best-effort; never break the call path
             logger.warning("gate_audit_failed", extra={"tool": tool_name})
@@ -389,6 +390,8 @@ class PolicyBackend:
                     args_hash=approvals.args_hash(arguments),
                     latency_ms=latency_ms,
                     error=error,
+                    # The mandatory door: an agent speaking MCP cannot route around it.
+                    origin=audit.Origin.mcp_gateway(),
                 )
         except Exception:  # audit is best-effort; never break the call path
             logger.warning("audit_write_failed", extra={"tool": canonical, "decision": decision})

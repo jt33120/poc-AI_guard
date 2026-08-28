@@ -5,9 +5,14 @@ from __future__ import annotations
 from core import audit, trust
 from tests.conftest import DBHandle
 
+# `log_event` requires the ingestion adapter to name its door (FR-160). These
+# tests exercise the audit store itself, not a door, so they all state the same
+# one; the tests that care which door it was assert on it explicitly.
+_ORIGIN = audit.Origin.mcp_gateway()
+
 
 def _log(db: DBHandle, decision: str, *, tool: str = "t.x") -> None:
-    audit.log_event(db.conn, tenant_id="t1", decision=decision, tool_name=tool)
+    audit.log_event(db.conn, tenant_id="t1", decision=decision, tool_name=tool, origin=_ORIGIN)
 
 
 def test_no_history_means_unseen_and_zero_streak(db: DBHandle) -> None:

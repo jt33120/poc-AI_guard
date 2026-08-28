@@ -11,6 +11,11 @@ from core.policy import parse_policy
 from gateway.server import ApprovalContext, PolicyBackend
 from tests.conftest import DBHandle
 
+# `log_event` requires the ingestion adapter to name its door (FR-160). These
+# tests exercise the audit store itself, not a door, so they all state the same
+# one; the tests that care which door it was assert on it explicitly.
+_ORIGIN = audit.Origin.mcp_gateway()
+
 _AWS_KEY = "AKIAIOSFODNN7EXAMPLE"
 
 _POLICY = parse_policy(
@@ -78,7 +83,9 @@ async def test_medium_risk_is_tightened_to_notify(db: DBHandle) -> None:
 async def test_earned_trust_relaxes_back_to_auto(db: DBHandle) -> None:
     # Five clean approvals earn trust for (tenant, mock.set).
     for _ in range(5):
-        audit.log_event(db.conn, tenant_id="t-risk", decision="allow", tool_name="mock.set")
+        audit.log_event(
+            db.conn, tenant_id="t-risk", decision="allow", tool_name="mock.set", origin=_ORIGIN
+        )
     proxy = FakeProxy()
     # write + secret = 50 (would be notify), minus the 30-pt trust discount → 20 → auto.
     result = await _backend(db, proxy).call_tool("set", {"key": _AWS_KEY})

@@ -13,6 +13,11 @@ from core import audit, billing, usage
 from core.config import Settings
 from tests.conftest import DBHandle
 
+# `log_event` requires the ingestion adapter to name its door (FR-160). These
+# tests exercise the audit store itself, not a door, so they all state the same
+# one; the tests that care which door it was assert on it explicitly.
+_ORIGIN = audit.Origin.mcp_gateway()
+
 
 def _client(db_url: str, verifier: TokenVerifier) -> TestClient:
     app = create_app(Settings(_env_file=None, env="dev", database_url=db_url))
@@ -60,9 +65,12 @@ def _seed(db: DBHandle) -> tuple[str, str]:
         decision="allow",
         tool_name="crm.read",
         gateway_token_id=str(gid),
+        origin=_ORIGIN,
     )
     # An unattributed (console) decision — no agent.
-    audit.log_event(db.conn, tenant_id=str(tid), decision="deny", tool_name="crm.delete")
+    audit.log_event(
+        db.conn, tenant_id=str(tid), decision="deny", tool_name="crm.delete", origin=_ORIGIN
+    )
     db.conn.commit()
     return str(tid), str(gid)
 

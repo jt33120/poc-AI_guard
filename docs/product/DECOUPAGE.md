@@ -73,8 +73,8 @@ Le lot qui rendait vrai ce que le produit affirmait déjà.
 | — | Service d'approbation injoignable : refus sur MCP, HTTP 500 sur `/v1/authorize` | ✅ **Livré** — `service_down_verdict` partagée |
 | `FR-153` | Détection de contenu injecté en FR/ES/DE + normalisation unicode, encodages, homoglyphes | ✅ **Livré** — scénario de garde en français ; 27 tests dont 9 de non-régression sur de la prose métier bénigne |
 | `FR-154` | Taint lié au **jeton de passerelle**, persisté et borné en temps : ni une reconnexion ni un identifiant neuf ne remettent l'agent à blanc | ✅ **Livré** — scénario de reconnexion, plus le voisin non contaminé et deux chemins fail-closed |
-| `FR-157` | Prédicat déterministe borné sur la valeur des arguments — non Turing-complet, échouant fermé sur champ absent ou mal typé (`EXH-3`) | ⬜ À faire |
-| `FR-158` | Classification déterministe des outils exécuteurs (`bash`, `execute_sql`, `kubectl`) sans passer par le juge (`EXH-4`, `G-06`) | ⬜ À faire |
+| `FR-157` | Prédicat déterministe borné sur la valeur des arguments | ✅ **Livré** — `core/predicates.py`, vocabulaire clos de sept opérateurs, un seul par règle |
+| `FR-158` | Classification déterministe des outils exécuteurs sans passer par le juge | ✅ **Livré** — `classify: by_argument`, plafond obligatoire, scénario de garde des deux côtés |
 | `FR-159` | Approbation par canal non rejouable | ⚪ **Sans objet aujourd'hui** — aucun canal interactif n'existe. L'invariant qu'il devra respecter (le décideur est le principal authentifié, jamais une donnée de requête) est asserté par deux tests. À rouvrir avec le canal |
 
 **Quatre des neuf sont livrés — et c'est la moitié du vocabulaire de contraintes qui
@@ -82,7 +82,7 @@ part avec.** `FR-155` et `FR-156` allaient ensemble : fermer le vocabulaire sans
 implémenter `dry_run` aurait fait échouer la policy de démonstration, et implémenter
 `dry_run` sans fermer le vocabulaire aurait laissé les autres clés décoratives.
 
-**Ce qui reste est les deux prédicats** (`FR-157`, `FR-158`).
+**Le rang 1 est clos.** Les neuf exigences du groupe A sont livrées ou requalifiées.
 Le taint et l'approbation portent chacun un `Bloqué` revendiqué aujourd'hui : `M-02`
 que `D-1` fragilise, `M-08` que `INV-5` traverse. Ce sont les deux dernières
 affirmations du produit qui ne sont pas vraies.
@@ -93,7 +93,7 @@ affirmations du produit qui ne sont pas vraies.
 
 | Rang | Lot | Contenu | Dépend de | Débloque |
 |---|---|---|---|---|
-| **1** | Cœur d'enforcement | `FR-153`→`159`, `198`, `199` — *4 / 9 livrés* | — | Tout. Rien d'autre ne compte tant que les garanties revendiquées ne sont pas vraies |
+| **1** | Cœur d'enforcement | `FR-153`→`159`, `198`, `199` — **clos** | — | Tout. Rien d'autre ne compte tant que les garanties revendiquées ne sont pas vraies |
 | **2** | Intégrité de la preuve | `FR-160`, `161`, `162`, `164`, `169` | Rang 1 | La crédibilité devant une revue. `FR-162` a le plus fort rayon de souffle du lot |
 | **3** | Le triage · **pilier 1** | `FR-172`→`175` — *`G-18` fermé* | — | Le démonstrateur. Sans lui, la démonstration retombe dans le catalogue. **La carte est désormais générée** (`coverage/`), donc `CM-7` est mesuré en continu au lieu d'être une intention |
 | **4** | Mode observation | `FR-179`, `180` | Rang 1 | Le démonstrateur, **et** `G-25` : la bonne forme du correctif du proxy LLM est une fenêtre d'observation du plan de contrôle |

@@ -50,6 +50,7 @@ def _audit(
     judge_used: bool = False,
     args_hash: str | None = None,
     gateway_token_id: str | None = None,
+    client_request_id: str | None = None,
 ) -> None:
     with db.connection(database_url) as conn:
         audit.log_event(
@@ -63,6 +64,10 @@ def _audit(
             judge_used=judge_used,
             args_hash=args_hash,
             gateway_token_id=gateway_token_id,
+            client_request_id=client_request_id,
+            # The cooperative door. Fixed here, not passed in: an adapter states
+            # what it is, it does not accept being told (FR-160).
+            origin=audit.Origin.authorize_api(),
         )
 
 
@@ -87,8 +92,15 @@ def authorize(
     timeout_seconds: int = 3600,
     notifier: Notifier | None = None,
     gateway_token_id: str | None = None,
+    client_request_id: str | None = None,
 ) -> dict[str, Any]:
-    """Decide whether the agent may perform ``tool`` with ``arguments``."""
+    """Decide whether the agent may perform ``tool`` with ``arguments``.
+
+    ``client_request_id`` is whatever the agent called this request. It is stored
+    beside the decision so the agent can line its own trace up with ours, and it
+    is stored as a *declared* value: nothing verifies it, so it never becomes the
+    audit entry's identity (FR-161).
+    """
     outcome = evaluate(policy, tool, arguments)
 
     # Ambiguous tools: classify, then floor for that class. Same shared step as the
@@ -126,6 +138,7 @@ def authorize(
             judge_used=outcome.judge_used,
             args_hash=ah,
             gateway_token_id=gateway_token_id,
+            client_request_id=client_request_id,
         )
         return {"decision": "allow", "action_class": _class(outcome), "reason": outcome.reason}
 
@@ -144,6 +157,7 @@ def authorize(
             judge_used=outcome.judge_used,
             args_hash=ah,
             gateway_token_id=gateway_token_id,
+            client_request_id=client_request_id,
         )
         return {
             "decision": "allow",
@@ -165,6 +179,7 @@ def authorize(
             judge_used=outcome.judge_used,
             args_hash=ah,
             gateway_token_id=gateway_token_id,
+            client_request_id=client_request_id,
         )
         return {"decision": "deny", "action_class": _class(outcome), "reason": outcome.reason}
 
@@ -183,6 +198,7 @@ def authorize(
             timeout_seconds=timeout_seconds,
             notifier=notifier,
             gateway_token_id=gateway_token_id,
+            client_request_id=client_request_id,
         )
     except Exception:
         # Approval service unavailable. The cooperative contract is that the agent
@@ -204,6 +220,7 @@ def authorize(
                 judge_used=outcome.judge_used,
                 args_hash=ah,
                 gateway_token_id=gateway_token_id,
+                client_request_id=client_request_id,
             )
         except Exception:  # the audit store may be the thing that is down
             logger.warning("audit_write_failed", extra={"tool": tool})
@@ -225,6 +242,7 @@ def _hold_for_humans(
     timeout_seconds: int,
     notifier: Notifier | None,
     gateway_token_id: str | None,
+    client_request_id: str | None = None,
 ) -> dict[str, Any]:
     """Create or resume the approval for a held action. Raises if the store is down."""
     with db.connection(database_url) as conn:
@@ -263,6 +281,7 @@ def _hold_for_humans(
                 judge_used=outcome.judge_used,
                 args_hash=ah,
                 gateway_token_id=gateway_token_id,
+                client_request_id=client_request_id,
             )
             _notify(notifier, record.id, summary, record.expires_at.isoformat())
             return _hold(record.id, record.action_class, summary)
@@ -311,6 +330,10 @@ def _resolve_terminal(
     gateway_token_id: str | None = None,
 ) -> dict[str, Any]:
     audit_decision, verdict = _TERMINAL[record.status]
+    # No `client_request_id` here, deliberately: this row is written when a *poll*
+    # resolves a held approval, and the poller's declared id is not the requester's.
+    # Carrying the original one would mean storing it on the approval record; leaving
+    # the poller's would be a small lie in the column whose whole point is provenance.
     # Record the terminal decision once (the first consumer), then it is spent.
     if approvals.consume(conn, record.id):
         conn.commit()
