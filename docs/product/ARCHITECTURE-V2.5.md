@@ -211,6 +211,18 @@ Adapters depend on the core; the core never depends on an adapter. Filters **do*
 - **Reference shape:** `resolve_ambiguous` (`core/judge.py`) is step one. It was extracted because both adapters held the same eleven lines of judge handling; it declares its failure class (`irreversible`) rather than inheriting an absent dependency's silence, which is `AD-34` made concrete.
 - **Ratifies** the *minimal-designed-for-full* amplitude the spine had left open.
 
+### AD-38 — Un artefact de conformité énonce la portée de ce qu'il prouve
+
+- **Binds:** `core/compliance.py`, `core/export.py`, l'Evidence Pack JSON et PDF, `FR-169`, `FR-175`, hérite d'`AD-28`
+- **Prevents:** la forme la plus coûteuse du contrôle décoratif — celle qui sort du produit. Un pack remis à un régulateur avec `tamper_evident: true` répond à « la chaîne est-elle cohérente » pendant que le lecteur pose « l'exploitant l'a-t-il réécrite ». Et un récit dont les quatre nombres ne totalisent pas l'effectif annoncé fait disparaître, silencieusement, la catégorie la plus intéressante pour un auditeur : les actions laissées passer sous fenêtre d'observation.
+- **Rule:**
+  1. Un résumé de décisions est une **partition** : tout ce qui est compté dans le total est compté dans un seau. Une décision inconnue tombe dans `unclassified`, est publiée et est **nommée dans le récit** — jamais omise.
+  2. `monitor_*` n'est pas « autorisé ». Une action laissée passer sous fenêtre d'observation a son propre seau, dans le pack comme dans la prose.
+  3. Une vérification déclare **par qui** elle a été faite. Tant qu'aucun témoin externe n'est configuré, le pack porte `independent: false` — calculé, pas rédigé, pour que la construction d'un signataire oblige à modifier la fonction plutôt qu'à se souvenir d'une phrase.
+  4. Une garantie qui ne vaut pas également sur les trois chemins d'entrée est **portée en champ structuré**, pas seulement en prose : un narrateur LLM peut réécrire une phrase, il ne réécrit pas `article_14.scope`.
+  5. Le PDF porte les mêmes réserves que le JSON. C'est l'exemplaire qui est remis.
+- **Reference shape:** `export.summarise` et `compliance.verification_independence`. Le premier a une propriété testable — la somme des seaux égale la somme des décisions — vérifiée contre le vocabulaire complet que le code écrit ; le second n'a rien à valider parce qu'il n'y a rien à saisir.
+
 ---
 
 ## Consistency Conventions
@@ -285,7 +297,8 @@ scenarios/             # one per coverage row, each with its negative control �
 | Requirement group | Lives in | Governed by |
 | --- | --- | --- |
 | `FR-153`..`FR-159` — enforcement core | `core/pipeline.py`, `core/constraints.py`, taint | `AD-21`, `AD-23`, `AD-33`, `AD-34`, `AD-36`, amended `AD-10` |
-| `FR-160`..`FR-171` — evidence integrity | adapters, `core/provenance.py`, migrations | `AD-22`, `AD-24`, `AD-32`, `AD-35`, inherited `AD-1` |
+| `FR-160`..`FR-171` — evidence integrity | adapters, `core/egress.py`, migrations `0019`/`0020` | `AD-22`, `AD-24`, `AD-32`, `AD-35`, `AD-38`, inherited `AD-1` |
+| ↳ `FR-160`, `161`, `162`, `164`, `169` (partiel) | **livrées** — `audit.Origin`, colonnes `declared`, garde RLS, `core/egress.py`, bloc `verification` | `AD-38`, `AD-1`, `AD-24`, `AD-28` |
 | `FR-172`..`FR-175` — triage | generated map, published artefacts | `AD-28`, `AD-30` |
 | `FR-176`..`FR-178` — sovereignty | decision path, CI | `AD-25`, `AD-34` |
 | `FR-179`..`FR-183` — demonstrator | `core/pipeline.py`, `scenarios/` | `AD-26`, `AD-27`, `AD-29`, `AD-30`, `AD-31` |
