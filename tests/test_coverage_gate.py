@@ -5,8 +5,12 @@ to the coverage row it proves. `M-07` rested on `scripts/demo.py` -- a script CI
 never runs -- and `M-08` on a unit test of `approvals.decide`, which says nothing
 about whether the gateway actually withholds the action.
 
-Each test carries its negative control: the claim is not that a refusal is
-reported, it is that the downstream tool was never reached.
+Each claim carries three parts (`AD-30.3`): the dangerous action is refused, a
+legitimate one still goes through, and — with that guard *disabled* — the same
+dangerous action reaches the downstream. The third is the one that is easy to
+argue away and hardest to do without: a passing refusal proves only that nothing
+happened, and a crash, an unreachable downstream or a misspelt tool name all
+satisfy "the defence held".
 """
 
 from __future__ import annotations
@@ -49,6 +53,29 @@ def _approval_id(result: object) -> str:
     match = re.search(r"approval_id=([0-9a-f-]+)", _text(result))
     assert match is not None
     return match.group(1)
+
+
+def _proxy() -> DownstreamProxy:
+    return DownstreamProxy(
+        [
+            ServerSpec(
+                name="mock",
+                transport="stdio",
+                config={"command": sys.executable, "args": [str(_MOCK)]},
+            )
+        ]
+    )
+
+
+def _unguarded(db: DBHandle, tenant_id: str, policy_yaml: str) -> PolicyBackend:
+    """The same gateway with one guard removed from the policy — nothing else.
+
+    A negative control is only worth what it isolates: the downstream, the tool
+    name, the arguments and the transport are identical to the blocking scenario,
+    so the single difference is the guard under test.
+    """
+    ctx = ApprovalContext(database_url=db.url, tenant_id=tenant_id, timeout_seconds=3600)
+    return PolicyBackend(parse_policy(policy_yaml), _proxy(), ctx)
 
 
 def _backend(db: DBHandle, tenant_id: str) -> PolicyBackend:
@@ -101,6 +128,30 @@ async def test_send_inside_the_allowlist_still_goes_through(db: DBHandle) -> Non
     )
 
     assert result.isError is False
+
+
+@pytest.mark.covers("M-07", "emission", ingress="mcp", sens="controle_negatif")
+async def test_without_the_allowlist_the_same_mail_leaves(db: DBHandle) -> None:
+    """`AD-30.3` — the mail was going to leave; the allowlist is what stopped it.
+
+    Same tool, same recipient, same subject as the blocking scenario. The only
+    change is a policy with no `allowed_domains`. If this did not send, the refusal
+    above would be proving that `mail_send` is broken, not that we guard it.
+    """
+    backend = _unguarded(
+        db,
+        _seed_tenant(db),
+        "tools:\n"
+        "  - {name: mock.mail_send, class: external_send, approval: auto}\n"
+        "defaults: {unknown_tool: deny}\n",
+    )
+
+    result = await backend.call_tool(
+        "mail_send", {"to": "target@evil.test", "subject": "urgent wire transfer"}
+    )
+
+    assert result.isError is False
+    assert "sent to target@evil.test" in _text(result)
 
 
 # --- M-08 approval integrity: separation of duties ---------------------------
@@ -254,3 +305,89 @@ async def test_a_harmless_executor_invocation_still_runs(db: DBHandle) -> None:
 
     assert result.isError is False
     assert "ls -la" in _text(result)
+
+
+@pytest.mark.covers("M-08", "approbation", ingress="mcp", sens="controle_negatif")
+async def test_without_the_approval_gate_the_same_delete_executes(db: DBHandle) -> None:
+    """`AD-30.3` — the delete was reachable; two humans are what withheld it.
+
+    Same tool, same contact id. The only change is `approval: auto`. A blocking
+    scenario whose action could never have run is a scenario about nothing.
+    """
+    backend = _unguarded(
+        db,
+        _seed_tenant(db),
+        "tools:\n"
+        "  - {name: mock.delete_contact, class: irreversible, approval: auto}\n"
+        "defaults: {unknown_tool: deny}\n",
+    )
+
+    result = await backend.call_tool("delete_contact", {"contact_id": "c1"})
+
+    assert result.isError is False
+    assert "deleted c1" in _text(result)
+
+
+@pytest.mark.covers("M-06", "chaine", ingress="mcp", sens="controle_negatif")
+async def test_without_argument_classification_the_destructive_invocation_runs(
+    db: DBHandle,
+) -> None:
+    """`AD-30.3` — and here it earns its keep more than anywhere else.
+
+    `mock.echo` is exactly the shape `EXH-4` warns about: the operator's only escape
+    used to be `class: read, approval: auto`, after which `rm -rf /` went through.
+    This asserts that outcome, so the hold above is proven to be the classifier's
+    doing and not an accident of the argument being unroutable.
+    """
+    backend = _unguarded(
+        db,
+        _seed_tenant(db),
+        "tools:\n"
+        "  - {name: mock.echo, class: read, approval: auto}\n"
+        "defaults: {unknown_tool: deny}\n",
+    )
+
+    result = await backend.call_tool("echo", {"text": "rm -rf /var/data"})
+
+    assert result.isError is False
+    assert "rm -rf /var/data" in _text(result)
+
+
+@pytest.mark.covers("M-14", "secrets", ingress="mcp", sens="controle_negatif")
+async def test_the_secret_really_travelled_and_is_absent_only_from_the_log(
+    db: DBHandle,
+) -> None:
+    """`AD-30.3`, in the one shape that fits a redaction claim.
+
+    "The secret is not in the audit log" is satisfied by a secret that never left
+    the test. `mock.mail_send` echoes its subject, so this asserts the value
+    *reached the downstream* — it existed, it travelled the whole call path — and
+    is absent from the log specifically, which is the actual claim.
+    """
+    backend = _backend(db, _seed_tenant(db))
+
+    result = await backend.call_tool("mail_send", {"to": "alice@client.fr", "subject": _SECRET})
+
+    assert result.isError is False
+    assert _SECRET in _text(result)  # it really went through the call
+    assert _SECRET not in _audit_text(db)  # and stopped at the log
+
+
+@pytest.mark.covers("M-14", "secrets", ingress="http", sens="controle_negatif")
+def test_the_secret_reaches_the_verdict_path_and_is_absent_only_from_the_log(
+    db: DBHandle,
+) -> None:
+    """Same on the cooperative path: the argument was carried, then excluded."""
+    from core import decision
+
+    tenant_id = _seed_tenant(db)
+    result = decision.authorize(
+        database_url=db.url,
+        policy=_POLICY,
+        tenant_id=tenant_id,
+        tool="mock.mail_send",
+        arguments={"to": "alice@client.fr", "subject": _SECRET},
+    )
+
+    assert result["decision"] == "allow"  # the call carrying the secret was decided
+    assert _SECRET not in _audit_text(db)

@@ -86,3 +86,27 @@ async def test_tool_without_allowlist_is_unaffected(db: DBHandle) -> None:
     # 'mock.open' has no allowed_clients -> RBAC does not apply, even with no client.
     result = await _backend(db, proxy, client_id=None).call_tool("open", {})
     assert result.isError is False and proxy.calls == ["open"]
+
+
+@pytest.mark.covers("M-12", "rbac", ingress="mcp", sens="controle_negatif")
+async def test_without_the_client_allowlist_the_same_tool_is_relayed(db: DBHandle) -> None:
+    """`AD-30.3` — the same tool, the same absent client, and the call lands.
+
+    Deliberately not `test_tool_without_allowlist_is_unaffected`: that one calls a
+    *different* tool (`open`), so it proves RBAC does not over-apply — a second
+    `laisse_passer`, not a counterfactual. If `secret` were misspelt or unknown to
+    the proxy, both refusal tests above would pass while proving nothing, and only
+    this test would notice.
+    """
+    proxy = FakeProxy()
+    unguarded = parse_policy(
+        "tools:\n  - {name: mock.secret, class: read, approval: auto}\ndefaults:\n"
+        "  unknown_tool: deny\n"
+    )
+    ctx = ApprovalContext(database_url=db.url, tenant_id="t-rbac", client_id=None)
+    backend = PolicyBackend(unguarded, proxy, ctx)  # type: ignore[arg-type]
+
+    result = await backend.call_tool("secret", {})
+
+    assert result.isError is False
+    assert proxy.calls == ["secret"]

@@ -27,18 +27,31 @@ prouvés** (`AD-28`). Un chemin revendiqué mais non asserté est rendu `non ass
 jamais `Bloqué`. Une garantie vraie sur MCP se lirait comme vraie partout si la carte
 ne le disait pas.
 
-## La troisième règle : une revendication `Bloqué` doit prouver les deux moitiés
+## La troisième règle : une revendication `Bloqué` se prouve en trois parties
 
-> Une facette `Bloqué` a besoin d'un scénario qui **bloque** *et* d'un scénario qui
-> **laisse passer** un appel légitime.
+> Une facette `Bloqué` a besoin d'un scénario qui **bloque**, d'un scénario qui
+> **laisse passer** un appel légitime, et d'un **contrôle négatif** : la même garde
+> désactivée, la même action dangereuse atteint l'aval.
 
-Une garde qui refuse tout n'est pas un contrôle, c'est une panne — et le scénario
-bloquant reste vert sur un gateway qui bloque aveuglément. Prouver le refus sans
-prouver la discrimination prouve la mauvaise chose.
+Chacune répond à une question que les deux autres laissent ouverte.
 
-C'est la forme mécaniquement vérifiable de « chaque scénario porte son contrôle
-négatif ». On ne peut pas outiller « l'assertion est-elle sérieuse » ; on peut
-outiller « les deux sens sont-ils prouvés ».
+`bloque` seul : une garde qui refuse tout n'est pas un contrôle, c'est une panne, et
+le scénario bloquant reste vert sur un gateway qui bloque aveuglément.
+
+`bloque` + `laisse_passer` : prouve que la garde discrimine — mais pas que l'action
+dangereuse serait arrivée. Un plantage, un aval injoignable, un nom d'outil mal
+orthographié satisfont tous « la défense a tenu et l'aval n'a pas été invoqué ».
+`laisse_passer` ne le rattrape pas : il exerce une *autre* invocation.
+
+`controle_negatif` ferme cela en assertant la contrefactuelle — même outil, mêmes
+arguments, garde retirée, et l'aval est atteint. C'est `AD-30.3`, et c'est la partie
+qu'on argumente le plus facilement à la baisse.
+
+Les trois sont outillées. En les rendant obligatoires, les huit facettes `Bloqué`
+publiées se sont retrouvées sans contrôle négatif d'un coup : trois existaient déjà
+sans être déclarées, deux étaient des *quasi*-contrôles portant sur un **autre outil**
+(`M-11`, `M-12`) et un ne vérifiait que la présence d'une requête, pas la fuite
+(`M-10`). Trois manquaient entièrement.
 
 ## Écrire un scénario
 
@@ -51,7 +64,15 @@ async def test_send_outside_the_allowlist_is_denied_and_never_relayed(db): ...
 
 @pytest.mark.covers("M-07", "emission", ingress="mcp", sens="laisse_passer")
 async def test_send_inside_the_allowlist_still_goes_through(db): ...
+
+@pytest.mark.covers("M-07", "emission", ingress="mcp", sens="controle_negatif")
+async def test_without_the_allowlist_the_same_mail_leaves(db): ...
 ```
+
+Un contrôle négatif ne vaut que ce qu'il isole : même outil, mêmes arguments, même
+aval, même transport. **Une seule** différence, la garde. Un contrôle qui change
+aussi l'outil appelé ne prouve pas la contrefactuelle — il prouve que la garde ne
+déborde pas, ce qui est un second `laisse_passer`.
 
 Un test qui asserte réellement les deux moitiés porte les deux marqueurs — c'est le
 cas de `M-08` (retenu après un approbateur, relâché après deux distincts) et de
@@ -61,10 +82,10 @@ pour trouver : il s'est produit une fois pendant l'écriture, en marquant en mas
 
 Trois exigences, apprises en écrivant les premiers :
 
-1. **Un contrôle négatif.** « Un refus a été signalé » ne prouve rien. Ce qui compte
-   est que l'outil en aval n'a jamais tourné — `proxy.calls`, `"deleted" not in ...`.
-   Cette exigence-là reste une discipline de revue : aucun outil ne juge le sérieux
-   d'une assertion.
+1. **L'aval n'a jamais tourné.** « Un refus a été signalé » ne prouve rien : ce qui
+   compte est `proxy.calls`, `"deleted" not in ...`. Cette exigence-là reste une
+   discipline de revue — aucun outil ne juge le sérieux d'une assertion. Ce qui est
+   outillé désormais, c'est qu'un contrôle négatif *existe* à côté.
 2. **Le bon sens déclaré.** Voir la troisième règle ci-dessus. Celle-ci est outillée.
 3. **Le bon chemin d'ingestion.** Un marqueur déclarant un `ingress` absent de la
    revendication est rejeté — la preuve est réelle, mais pas pour cette revendication.
