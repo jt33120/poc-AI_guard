@@ -22,7 +22,17 @@ from uuid import uuid4
 import mcp.types as types
 from mcp.server.lowlevel import Server
 
-from core import approvals, audit, db, integrity, risk, taint_store, tenant_tokens, trust
+from core import (
+    approvals,
+    audit,
+    db,
+    integrity,
+    monitor,
+    risk,
+    taint_store,
+    tenant_tokens,
+    trust,
+)
 from core.judge import Judge, resolve_ambiguous
 from core.notify import Notifier
 from core.policy import (
@@ -174,6 +184,33 @@ class PolicyBackend:
                 )
             outcome = replace(outcome, decision=Approval.human_in_the_loop, reason="taint")
 
+        # Observation window (`AD-27`, `G-25`) — désormais sur les **deux** chemins
+        # d'ingestion. Le proxy LLM la portait seul depuis le rang 4, donc un même
+        # tenant obtenait deux comportements selon la porte empruntée ; `AD-28` dit
+        # qu'une propriété vraie sur un chemin ne se lit pas comme vraie partout, et
+        # ici la divergence n'était pas voulue, seulement pas encore refermée.
+        if outcome.decision is not Approval.auto and self._observation_relaxes(outcome):
+            # `AD-27.3` : la distinction vit dans `decision`, à l'intérieur de la
+            # charge hachée — sinon « nous avons bloqué » et « nous aurions bloqué »
+            # hachent à l'identique et le vérificateur autonome ne les sépare pas.
+            recorded = f"monitor_{'deny' if outcome.decision is Approval.deny else 'hold'}"
+            logger.info("monitor_observed", extra={"tool": canonical, "decision": recorded})
+            start = time.monotonic()
+            result = await self._proxy.call_tool(name, arguments)
+            self._audit(
+                recorded,
+                canonical,
+                outcome,
+                arguments,
+                latency_ms=int((time.monotonic() - start) * 1000),
+                request_id=uuid4().hex,
+                error="downstream_error" if result.isError else None,
+            )
+            # Le marquage de taint est un état post-appel, pas un palier : un résultat
+            # porteur d'injection teinte la session que l'appel ait été observé ou non.
+            self._mark_taint(canonical, result)
+            return result
+
         if outcome.decision in (Approval.auto, Approval.notify):
             # notify-and-proceed (M11) relays like auto but is recorded distinctly.
             decision = "allow" if outcome.decision is Approval.auto else "notify"
@@ -199,6 +236,51 @@ class PolicyBackend:
             self._audit("deny", canonical, outcome, arguments, request_id=uuid4().hex)
             return _denied_result(f"'{canonical}' not permitted by policy: deny ({outcome.reason})")
         return await self._handle_hitl(name, arguments, canonical, outcome)
+
+    def _observation_relaxes(self, outcome: PolicyOutcome) -> bool:
+        """Whether an open observation window may relay this refused call (`AD-27`).
+
+        Le mode observation existe pour un client dont la policy n'est pas encore
+        écrite : sans lui, passer l'enforcement à « actif » retire tous les appels et
+        casse l'agent. Il relâche donc un **verdict de policy** — et rien d'autre.
+
+        Quatre exclusions, chacune délibérée :
+
+        * **RBAC et quarantaine d'intégrité** ne passent jamais par ici : ils
+          retournent avant l'évaluation de policy. Une fenêtre qui laisserait un agent
+          appeler un outil auquel il n'a pas droit, ou un outil empoisonné, ne serait
+          pas une fenêtre d'observation.
+        * **Une escalade de taint** (`reason == "taint"`) n'est pas une immaturité de
+          policy, c'est un signal d'attaque en cours. La relâcher transformerait la
+          défense contre l'injection indirecte en ligne de journal — or `M-02` porte un
+          `Bloqué`. *Aujourd'hui cette clause ne tranche rien* : `_taint_blocks` ne
+          s'applique qu'à `irreversible` et `external_send`, que `monitor.observes`
+          refuse déjà. Elle est gardée parce que la coïncidence est un fait des deux
+          listes et non une propriété : le jour où le taint couvrirait `write`, elle
+          devient la seule chose qui empêche une fenêtre de relâcher une action
+          teintée. `test_taint_escalation_is_never_relaxed` l'exerce directement, et
+          `test_every_class_taint_escalates_is_a_class_no_window_observes` fait échouer
+          le build si les deux listes se séparent.
+        * **Les classes qu'`AD-27.2` refuse** — irréversible, envoi externe, classe
+          inconnue. La décision appartient à `monitor.observes`, pas à ce site
+          d'appel : la garantie voyage avec la fonction.
+        * **Aucune identité, ou magasin injoignable** → on applique. `AD-10` : une
+          panne resserre une garde, elle n'en relâche pas.
+        """
+        ctx = self._approval_ctx
+        if ctx is None or ctx.gateway_token_id is None:
+            return False
+        if outcome.reason == "taint":
+            return False
+        if not monitor.observes(outcome.action_class):
+            return False
+        try:
+            with db.connection(ctx.database_url) as conn:
+                window = monitor.active_window(conn, ctx.tenant_id, ctx.gateway_token_id)
+        except Exception:
+            logger.warning("monitor_lookup_failed", extra={"tenant": ctx.tenant_id})
+            return False
+        return window is not None
 
     async def _screen_tools(self, tools: list[types.Tool]) -> list[types.Tool]:
         """Fingerprint each tool; expose only approved/unchanged ones, quarantine the rest."""
