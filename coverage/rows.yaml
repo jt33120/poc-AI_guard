@@ -31,6 +31,8 @@ ingress:
 rows:
   - id: M-01
     titre: "Injection de prompts directe"
+    famille: usage_ia
+    profils: [P1a, P1b, P2, P3, P4, P5]
     facettes:
       - cle: garde_prompt
         libelle: "garde-prompt"
@@ -43,6 +45,8 @@ rows:
 
   - id: M-02
     titre: "Injection de prompts indirecte"
+    famille: usage_ia
+    profils: [P2, P3]
     facettes:
       - cle: taint
         libelle: "garde de taint sur les résultats d'outils"
@@ -52,6 +56,8 @@ rows:
 
   - id: M-03
     titre: "Empoisonnement de données"
+    famille: usage_ia
+    profils: [P2, P5]
     facettes:
       - cle: provenance
         libelle: "déclaration de provenance des jeux de données"
@@ -60,6 +66,8 @@ rows:
 
   - id: M-04
     titre: "Vol de modèle / extraction"
+    famille: fournisseur
+    profils: [P4, P5]
     facettes:
       - cle: telemetrie
         libelle: "télémétrie de volume et de motif"
@@ -68,6 +76,8 @@ rows:
 
   - id: M-05
     titre: "Attaques par évasion (adversarial)"
+    famille: fournisseur
+    profils: [P5]
     facettes:
       - cle: robustesse
         libelle: "robustesse du modèle"
@@ -75,6 +85,8 @@ rows:
 
   - id: M-06
     titre: "Piratage d'agents autonomes"
+    famille: usage_ia
+    profils: [P3]
     facettes:
       - cle: chaine
         libelle: "chaîne de contrôle complète, plancher irréversible"
@@ -84,29 +96,41 @@ rows:
 
   - id: M-07
     titre: "Phishing hyper-personnalisé"
+    famille: cyber_classique
+    profils: [P1a, P1b, P2, P3, P4, P5]
     facettes:
       - cle: emission
         libelle: "l'agent comme émetteur — envoi hors allowlist"
+        famille: usage_ia
+        profils: [P3]
         mode: B
         ingress: [mcp]
       - cle: reception
         libelle: "réception — passerelle mail"
+        profils: [P1a, P1b, P2, P3, P4, P5]
         mode: X
 
   - id: M-08
     titre: "Usurpation par deepfake"
+    famille: cyber_classique
+    profils: [P1a, P1b, P2, P3, P4, P5]
     facettes:
       - cle: approbation
         libelle: "intégrité de l'approbation — séparation des devoirs"
+        famille: usage_ia
+        profils: [P3]
         mode: B
         ingress: [mcp]
         gaps: [G-07]
       - cle: media
         libelle: "détection du média truqué"
+        profils: [P1a, P1b, P2, P3, P4, P5]
         mode: X
 
   - id: M-09
     titre: "Malwares polymorphes"
+    famille: cyber_classique
+    profils: [P1a, P1b, P2, P3, P4, P5]
     facettes:
       - cle: endpoint
         libelle: "plan endpoint (EDR/XDR)"
@@ -114,6 +138,8 @@ rows:
 
   - id: M-10
     titre: "Exfiltration de données / PI via LLM"
+    famille: usage_ia
+    profils: [P1a, P1b, P2, P3, P4, P5]
     facettes:
       - cle: egress
         libelle: "DLP d'egress sur le chemin supervisé"
@@ -127,21 +153,28 @@ rows:
 
   - id: M-11
     titre: "Supply chain (modèles / bibliothèques)"
+    famille: usage_ia
+    profils: [P2, P3, P4]
     facettes:
       - cle: outils_mcp
         libelle: "empreinte et quarantaine des outils MCP"
+        profils: [P3]
         mode: B
         ingress: [mcp]
       - cle: bibliotheques
         libelle: "SBOM et audit de dépendances en CI"
+        profils: [P2, P3, P4]
         mode: A
       - cle: modeles_ml
         libelle: "analyse d'artefacts de modèles"
+        profils: [P4]
         mode: O
         gaps: [G-10]
 
   - id: M-12
     titre: "Privilèges excessifs (excessive agency)"
+    famille: usage_ia
+    profils: [P3]
     facettes:
       - cle: rbac
         libelle: "RBAC par outil, garde du député confus"
@@ -151,6 +184,8 @@ rows:
 
   - id: M-13
     titre: "Traitement non sécurisé des sorties"
+    famille: usage_ia
+    profils: [P3]
     facettes:
       - cle: charge_executable
         libelle: "détection de charge exécutable dans les résultats"
@@ -159,6 +194,8 @@ rows:
 
   - id: M-14
     titre: "Fuite du system prompt & secrets"
+    famille: usage_ia
+    profils: [P1a, P1b, P2, P3, P4, P5]
     facettes:
       - cle: secrets
         libelle: "coffre ; aucun secret inline, aucun secret journalisé"
@@ -172,6 +209,8 @@ rows:
 
   - id: M-15
     titre: "Validation aveugle de code (Copilot)"
+    famille: usage_ia
+    profils: [P1a, P1b]
     facettes:
       - cle: sast
         libelle: "ingestion de verdicts SAST/DAST"
@@ -183,6 +222,8 @@ rows:
 
   - id: M-16
     titre: "Décision fondée sur une hallucination"
+    famille: usage_ia
+    profils: [P1a, P1b, P2, P3, P4, P5]
     facettes:
       - cle: revue_humaine
         libelle: "attestation « décision critique sous revue humaine »"
