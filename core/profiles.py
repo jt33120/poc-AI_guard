@@ -102,6 +102,29 @@ _FAMILY_LABEL: dict[Family, str] = {
 _CEILING: dict[Profile, str] = {Profile.p1b: "D"}
 
 
+class Souverainete(StrEnum):
+    """Comment un substitut satisfait le critère de `QO-3`.
+
+    Le critère est la **dépendance opérationnelle**, pas la nationalité de l'éditeur :
+    `ruff` et `mypy` sont américains et ne percent aucune chaîne parce qu'ils
+    s'exécutent chez l'exploitant. Ce qui perce la chaîne, c'est un service appelé en
+    ligne, qui voit les données, et dont la décision dépend.
+    """
+
+    #: s'exécute dans le périmètre de l'exploitant, sans rappel réseau
+    local = "local"
+    #: service en ligne, mais sous juridiction de l'Union
+    ue = "ue"
+
+
+@dataclass(frozen=True, slots=True)
+class Substitut:
+    """Le contrôle tiers qu'une ligne `Orchestré` pilote réellement (`FR-178`)."""
+
+    nom: str
+    justification: Souverainete
+
+
 @dataclass(frozen=True, slots=True)
 class RowFacet:
     """One facet of a threat row, with the applicability it inherits or overrides."""
@@ -113,6 +136,10 @@ class RowFacet:
     profiles: frozenset[Profile]
     ingress: tuple[str, ...] = ()
     gaps: tuple[str, ...] = ()
+    #: le substitut souverain, obligatoire pour publier `Orchestré` (`FR-178`)
+    substitut: Substitut | None = None
+    #: `Orchestré` revendiqué, mais sans substitut : publié `Hors périmètre`
+    declasse: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,6 +204,29 @@ def _family(raw: Any, where: str) -> Family:
         raise ValueError(f"{where}: unknown family {raw!r} (known: {known})") from None
 
 
+def _substitut(raw: Any, where: str) -> Substitut | None:
+    """Parse a facet's sovereign substitute, fail-closed on an unknown justification.
+
+    Nommer un substitut ne le rend pas souverain : la justification dit *pourquoi* il
+    satisfait `QO-3`. Un vocabulaire fermé oblige à l'écrire — inscrire un SaaS
+    américain demande alors de déclarer `ue`, ce qu'un relecteur voit, là où un champ
+    libre laisserait passer un nom sans propriété.
+    """
+    if raw is None:
+        return None
+    if not isinstance(raw, dict) or "nom" not in raw or "justification" not in raw:
+        raise ValueError(f"{where}: `substitut` demande `nom` et `justification`.")
+    try:
+        justification = Souverainete(raw["justification"])
+    except ValueError:
+        connues = ", ".join(sorted(j.value for j in Souverainete))
+        raise ValueError(
+            f"{where}: justification de substitut inconnue "
+            f"{raw['justification']!r}. Connues : {connues}."
+        ) from None
+    return Substitut(nom=str(raw["nom"]), justification=justification)
+
+
 def load_rows(registry: Path) -> list[Row]:
     """Parse the coverage registry into rows carrying their applicability.
 
@@ -195,11 +245,19 @@ def load_rows(registry: Path) -> list[Row]:
         facets = []
         for raw in raw_row["facettes"]:
             facet_where = f"{where}/{raw['cle']}"
+            substitut = _substitut(raw.get("substitut"), facet_where)
+            # FR-178. `Orchestré` dit : nous pilotons un contrôle tiers qui le fait.
+            # Le tiers devient alors une dépendance, et la doctrine de souveraineté
+            # s'applique à lui. Sans substitut nommé, la ligne **reste** `Hors
+            # périmètre` plutôt que d'être revendiquée par un chemin qui contredit le
+            # discours -- la déclassification se fait ici, au parse, pour que la carte,
+            # le diagnostic de profil et les tests lisent tous la même chose.
+            declasse = raw["mode"] == "O" and substitut is None
             facets.append(
                 RowFacet(
                     cle=raw["cle"],
                     libelle=raw["libelle"],
-                    mode=raw["mode"],
+                    mode="X" if declasse else raw["mode"],
                     family=(
                         _family(raw["famille"], facet_where) if "famille" in raw else row_family
                     ),
@@ -208,6 +266,8 @@ def load_rows(registry: Path) -> list[Row]:
                     ),
                     ingress=tuple(raw.get("ingress") or []),
                     gaps=tuple(raw.get("gaps") or []),
+                    substitut=substitut,
+                    declasse=declasse,
                 )
             )
         # The row's declared applicability must equal what its facets add up to.

@@ -42,6 +42,7 @@ sys.path.insert(0, str(_REPO))
 from core.profiles import (  # noqa: E402 -- needs _REPO on the path first
     Family,
     Profile,
+    Substitut,
     capped_mode,
     ceiling,
     load_rows,
@@ -70,6 +71,10 @@ class Facet:
     prouve: dict[str, list[str]] = field(default_factory=dict)
     #: which halves of the claim are proven: "bloque" and/or "laisse_passer"
     sens_prouves: set[str] = field(default_factory=set)
+    #: the sovereign substitute an `Orchestré` facet pilots (`FR-178`)
+    substitut: Substitut | None = None
+    #: claimed `Orchestré`, demoted to `Hors périmètre` for want of a substitute
+    declasse: bool = False
 
     @property
     def exige_scenario(self) -> bool:
@@ -114,6 +119,8 @@ def _load_facets() -> list[Facet]:
                     gaps=list(f.gaps),
                     family=f.family,
                     profiles=f.profiles,
+                    substitut=f.substitut,
+                    declasse=f.declasse,
                 )
             )
     return facets
@@ -338,6 +345,50 @@ def _render_applicability(facets: list[Facet]) -> list[str]:
     return lines
 
 
+def _render_souverainete(facets: list[Facet]) -> list[str]:
+    """`FR-178` : ce qu'une ligne `Orchestré` pilote, et ce que ça coûte quand rien n'existe.
+
+    Une ligne `Orchestré` dit : nous ne le bloquons pas nous-mêmes, nous pilotons un
+    contrôle tiers qui le fait. Le tiers devient une dépendance, donc la doctrine de
+    souveraineté s'applique à lui. Publier la déclassification plutôt que de la taire
+    est la moitié qui compte : un lecteur voit ce que la doctrine coûte, au lieu de
+    voir une ligne manquante et de supposer un oubli.
+    """
+    orchestres: list[tuple[Facet, Substitut]] = [
+        (f, sub) for f in facets if (sub := f.substitut) is not None
+    ]
+    declasses = [f for f in facets if f.declasse]
+    if not orchestres and not declasses:
+        return []
+
+    lines = [
+        "## Contrôles orchestrés et substituts souverains",
+        "",
+        "Le critère est la **dépendance opérationnelle** (`QO-3`) : `local` s'exécute dans",
+        "le périmètre sans rappel réseau ; `ue` est un service en ligne sous juridiction de",
+        "l'Union. Une facette `Orchestré` sans substitut nommé est publiée",
+        "« Hors périmètre » — le générateur l'impose (`FR-178`).",
+        "",
+        "| Menace | Facette | Substitut | Critère |",
+        "|---|---|---|---|",
+    ]
+    for f, sub in orchestres:
+        lines.append(f"| **{f.row_id}** | {f.libelle} | {sub.nom} | `{sub.justification.value}` |")
+    for f in declasses:
+        lines.append(
+            f"| **{f.row_id}** | {f.libelle} | *aucun substitut souverain* "
+            "| ⛔ déclassé en « Hors périmètre » |"
+        )
+    if declasses:
+        lines += [
+            "",
+            f"⛔ **{len(declasses)} facette(s) déclassée(s).** C'est ce que la doctrine coûte "
+            "appliquée honnêtement : la revendication est retirée plutôt que tenue par un "
+            "chemin qui contredit le discours.",
+        ]
+    return lines
+
+
 def _render_md(facets: list[Facet], commit: str, stamp: str) -> str:
     lines = [
         "# Carte de couverture — générée",
@@ -349,6 +400,8 @@ def _render_md(facets: list[Facet], commit: str, stamp: str) -> str:
         f"Commit `{commit}` · {stamp}",
         "",
         *_render_applicability(facets),
+        "",
+        *_render_souverainete(facets),
         "",
         "## Le détail, facette par facette",
         "",
@@ -437,6 +490,17 @@ def main() -> int:
             f"FR-175 = 0 — aucun « bloquer » attribué à une ligne non Bloquée "
             f"({unattributed} occurrences génériques, hors de portée de ce garde)"
         )
+        # FR-178 ne peut pas « échouer » : la règle s'applique au parse, donc une
+        # facette sans substitut est déjà publiée `Hors périmètre` quand on arrive
+        # ici. Ce qui doit rester visible, c'est le compte -- une déclassification
+        # silencieuse serait une revendication retirée que personne ne relit.
+        orchestres = sum(1 for f in facets if f.substitut is not None)
+        declasses = [f"{f.row_id}/{f.cle}" for f in facets if f.declasse]
+        print(
+            f"FR-178 — {orchestres} facettes Orchestré avec substitut souverain nommé ; "
+            f"{len(declasses)} déclassée(s) faute de substitut"
+            + (f" : {', '.join(declasses)}" if declasses else "")
+        )
         return 0
 
     commit = _commit()
@@ -452,6 +516,12 @@ def main() -> int:
                 "libelle": f.libelle,
                 "mode_revendique": f.mode_revendique,
                 "mode_publie": f.mode_publie,
+                "substitut": (
+                    {"nom": f.substitut.nom, "justification": f.substitut.justification.value}
+                    if f.substitut
+                    else None
+                ),
+                "declasse_faute_de_substitut": f.declasse,
                 # The applicability axis travels with the machine-readable map, so a
                 # downstream reader (the client diagnostic, a published fragment)
                 # never has to re-derive it -- or derive it differently.

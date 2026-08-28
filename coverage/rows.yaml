@@ -37,6 +37,7 @@ rows:
       - cle: garde_prompt
         libelle: "garde-prompt"
         mode: O
+        substitut: {nom: "Mistral (garde-prompt)", justification: ue}
         gaps: [G-01]
       - cle: attestation
         libelle: "attestation de présence du garde"
@@ -146,6 +147,10 @@ rows:
         mode: B
         ingress: [llm_proxy]
         gaps: [G-08, G-22]
+      # Aucun substitut souverain : la découverte du Shadow AI passe par un CASB du
+      # marché, et il n'en existe pas dont la décision reste dans le périmètre. La
+      # facette est donc déclassée en `Hors périmètre` par FR-178 -- on retire la
+      # revendication plutôt que de la tenir par un chemin qui contredit le discours.
       - cle: decouverte
         libelle: "découverte du Shadow AI non supervisé"
         mode: O
@@ -169,6 +174,7 @@ rows:
         libelle: "analyse d'artefacts de modèles"
         profils: [P4]
         mode: O
+        substitut: {nom: "picklescan / modelscan", justification: local}
         gaps: [G-10]
 
   - id: M-12
@@ -205,6 +211,7 @@ rows:
       - cle: prompt
         libelle: "détection de fuite du prompt sur l'egress"
         mode: O
+        substitut: {nom: "Mistral (garde de sortie anti-leak)", justification: ue}
         gaps: [G-13]
 
   - id: M-15
@@ -215,6 +222,7 @@ rows:
       - cle: sast
         libelle: "ingestion de verdicts SAST/DAST"
         mode: O
+        substitut: {nom: "SonarQube / Semgrep en CI", justification: local}
         gaps: [G-14]
       - cle: ci
         libelle: "audit de dépendances et de secrets en CI"
