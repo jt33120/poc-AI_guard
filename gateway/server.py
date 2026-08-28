@@ -45,7 +45,7 @@ from core.policy import (
 )
 from core.tenant_tokens import authenticate_gateway_session
 from gateway.downstream import DownstreamProxy, ServerSpec
-from gateway.taint import taints_result
+from gateway.taint import exfiltration_target, taints_result
 
 logger = logging.getLogger("xsom.gateway")
 
@@ -132,6 +132,7 @@ class PolicyBackend:
         self._quarantined: set[str] = set()
         #: Reason from the last taint read, for the audit line that follows it.
         self._taint_reason: str | None = None
+        self._exfil_target: str | None = None
         # Indirect-injection taint is persisted, keyed on the agent (FR-154). It is
         # deliberately NOT held here: an object on this instance dies with the
         # connection, and a guard a reconnect defeats is not a guard.
@@ -175,7 +176,7 @@ class PolicyBackend:
 
         # Indirect-injection guard (M12): a risky action in a tainted session is
         # escalated to a human or denied, before anything runs.
-        if self._taint_blocks(outcome):
+        if self._taint_blocks(outcome, arguments):
             self._audit_gate(canonical, "tainted_action", self._taint_reason)
             if self._policy.defaults.taint_policy == "deny":
                 logger.info("tainted_action_denied", extra={"tool": canonical})
@@ -369,18 +370,30 @@ class PolicyBackend:
             return outcome
         return replace(outcome, decision=tier, reason="risk")
 
-    def _taint_blocks(self, outcome: PolicyOutcome) -> bool:
+    def _taint_blocks(self, outcome: PolicyOutcome, arguments: dict[str, Any]) -> bool:
         """Whether a risky action is gated because this agent is tainted (M12).
 
         `AD-10`: a taint that cannot be read is not a clean one. Every failure path
         answers *tainted*, so an unreachable store gates the irreversible instead of
         waving it through.
+
+        `FR-185` élargit le déclencheur : au-delà des deux classes risquées, **une
+        cible en forme d'exfiltration dans les arguments** suffit. La DLP devient une
+        entrée de la décision post-taint plutôt qu'un produit à part. Un `write` vers
+        un webhook externe n'est pas gaté en temps normal — dans une session où une
+        injection vient d'être détectée, il l'est.
+
+        Le coût en faux positifs est borné par le taint lui-même : hors session
+        teintée, rien de ceci ne s'applique.
         """
         defaults = self._policy.defaults
         if defaults.taint_policy == "off":
             return False
-        if outcome.action_class not in (ActionClass.irreversible, ActionClass.external_send):
+        risquee = outcome.action_class in (ActionClass.irreversible, ActionClass.external_send)
+        cible = exfiltration_target(arguments)
+        if not risquee and cible is None:
             return False
+        self._exfil_target = cible
         ctx = self._approval_ctx
         if ctx is None or ctx.gateway_token_id is None:
             logger.warning("taint_unresolvable", extra={"reason": "no_agent_identity"})
@@ -393,8 +406,14 @@ class PolicyBackend:
             logger.warning("taint_store_unreadable", extra={"tenant_id": ctx.tenant_id})
             self._taint_reason = "taint_store_unreadable"
             return True
-        self._taint_reason = taint.reason if taint else None
-        return taint is not None
+        if taint is None:
+            self._taint_reason = None
+            return False
+        # La raison nomme les deux signaux quand les deux sont là : « teinté » seul ne
+        # dirait pas à un opérateur *pourquoi cette action-ci* a été retenue alors
+        # qu'une autre du même palier est passée.
+        self._taint_reason = f"{taint.reason}+{cible}" if cible else taint.reason
+        return True
 
     def _mark_taint(self, canonical: str, result: types.CallToolResult) -> None:
         """Taint this agent if a relayed tool result looks like an injection (M12)."""
