@@ -114,8 +114,12 @@ def test_resolve_redacts_arguments_before_the_model_sees_them() -> None:
         "mock.mail",
         {"api_token": "sk-live-1234", "to": "ops@client.fr"},
     )
-    # Redaction is applied on the way out (CLAUDE.md 4.10). It masks by key name, so
-    # a secret-looking key never reaches the model. Content-level PII inside a value
-    # is *not* masked here -- see G-22.
+    # Two masquages complémentaires, et il a fallu les deux (G-22, fermé).
+    # Par nom de clé (`approvals.redact`) : `api_token` n'a aucune forme reconnaissable,
+    # seul son nom le trahit. Par contenu (`core.dlp`, dans le juge) : `ops@client.fr`
+    # est sous une clé anodine, et c'est le détecteur qui le voit.
     assert "sk-live-1234" not in seen[0]
-    assert "ops@client.fr" in seen[0]
+    assert "ops@client.fr" not in seen[0]
+    # La forme traverse — c'est elle qui porte la classification.
+    assert "mock.mail" in seen[0]
+    assert "to" in seen[0]
