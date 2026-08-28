@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -35,9 +36,17 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 _REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_REPO))
+
+from core.profiles import (  # noqa: E402 -- needs _REPO on the path first
+    Family,
+    Profile,
+    capped_mode,
+    ceiling,
+    load_rows,
+)
+
 _REGISTRY = _REPO / "coverage" / "rows.yaml"
 _SCENARIOS = _REPO / "coverage" / ".scenarios.json"
 _OUT_JSON = _REPO / "coverage" / "map.json"
@@ -53,6 +62,10 @@ class Facet:
     mode_revendique: str
     ingress_revendique: list[str]
     gaps: list[str]
+    #: whose problem this facet is (AD-28's sibling axis: applicability)
+    family: Family = Family.usage_ia
+    #: the profiles at which this facet is on the client's radar at all
+    profiles: frozenset[Profile] = field(default_factory=frozenset)
     #: ingress path -> node ids of the tests that passed for it
     prouve: dict[str, list[str]] = field(default_factory=dict)
     #: which halves of the claim are proven: "bloque" and/or "laisse_passer"
@@ -81,19 +94,26 @@ class Facet:
 
 
 def _load_facets() -> list[Facet]:
-    doc = yaml.safe_load(_REGISTRY.read_text(encoding="utf-8"))
+    """Flatten the registry into facets, applicability included.
+
+    Parsing goes through `core.profiles.load_rows` rather than a second YAML reader
+    here, so the generator inherits its checks -- an unknown profile, or a row whose
+    line contradicts its facets, stops the map instead of being published.
+    """
     facets = []
-    for row in doc["rows"]:
-        for f in row["facettes"]:
+    for row in load_rows(_REGISTRY):
+        for f in row.facets:
             facets.append(
                 Facet(
-                    row_id=row["id"],
-                    row_titre=row["titre"],
-                    cle=f["cle"],
-                    libelle=f["libelle"],
-                    mode_revendique=f["mode"],
-                    ingress_revendique=list(f.get("ingress") or []),
-                    gaps=list(f.get("gaps") or []),
+                    row_id=row.id,
+                    row_titre=row.titre,
+                    cle=f.cle,
+                    libelle=f.libelle,
+                    mode_revendique=f.mode,
+                    ingress_revendique=list(f.ingress),
+                    gaps=list(f.gaps),
+                    family=f.family,
+                    profiles=f.profiles,
                 )
             )
     return facets
@@ -132,6 +152,84 @@ def _attach_scenarios(facets: list[Facet]) -> list[str]:
     return errors
 
 
+# --- FR-175: only `Bloqué` licenses the verb ------------------------------------
+
+#: Where commercial language lives. A file added here is a file the gate reads;
+#: a support that is not listed is a support nobody checks, which is why the list
+#: is in the repo rather than in someone's head.
+_CLAIM_SOURCES: tuple[str, ...] = (
+    "README.md",
+    "blueprint/**/*.md",
+    "blueprint/**/*.yaml",
+    "docs/product/THREAT-COVERAGE.md",
+    "coverage/COVERAGE-MAP.md",
+)
+
+_BLOCKING_VERB = re.compile(
+    r"\b(bloqu(?:er|ons|ez|ent|e|es|ée?s?|és?)|block(?:s|ed|ing)?)\b", re.IGNORECASE
+)
+
+#: The mode name, exactly as the vocabulary spells it. `Bloqué` is a *noun* here --
+#: the public page's own heading is "cinq modes, et un seul autorise le verbe
+#: « bloquer » ", and the coverage map is a table of them. A gate that failed on the
+#: word used to state the rule is a gate someone switches off within a week.
+#:
+#: The blind spot this buys, stated rather than discovered later: a sentence that
+#: *opens* with the participle ("Bloqué par la policy, l'appel …") reads as the mode
+#: name and is not judged. Every other form is -- lowercase, and every agreement.
+_MODE_NAME = "Bloqué"
+
+
+def _claims_blocking(sentence: str) -> bool:
+    """Whether this sentence uses the verb, as opposed to naming the mode."""
+    return any(m.group(0) != _MODE_NAME for m in _BLOCKING_VERB.finditer(sentence))
+
+
+_ROW_REF = re.compile(r"\bM-\d{2}\b")
+_SENTENCE = re.compile(r"(?<=[.!?;:])\s+|\n")
+
+
+def _check_claims(facets: list[Facet]) -> tuple[list[str], int]:
+    """Refuse the verb "bloquer" on a row nothing publishes as `Bloqué` (`FR-175`).
+
+    A support that says "we block M-13" when M-13 publishes `Détecté` is the same
+    defect as a `Bloqué` claim with no scenario -- one release further downstream,
+    in front of a customer, where it costs the most.
+
+    **What this gate does not see**, said plainly rather than implied: it judges a
+    sentence that names a row. A blocking verb with no row reference is generic
+    prose about the mechanism, and no regular expression can tell an honest one
+    from an overreach. Their count is returned so the number is at least visible.
+    """
+    blocked = {f.row_id for f in facets if f.mode_publie == "B"}
+    known = {f.row_id for f in facets}
+    errors: list[str] = []
+    unattributed = 0
+
+    for pattern in _CLAIM_SOURCES:
+        for path in sorted(_REPO.glob(pattern)):
+            for sentence in _SENTENCE.split(path.read_text(encoding="utf-8")):
+                if not _claims_blocking(sentence):
+                    continue
+                rows = sorted(set(_ROW_REF.findall(sentence)))
+                if not rows:
+                    unattributed += 1
+                    continue
+                for row in rows:
+                    if row not in known:
+                        errors.append(
+                            f"{path.relative_to(_REPO)} : « bloquer » attribué à {row}, "
+                            "qui n'existe pas dans coverage/rows.yaml"
+                        )
+                    elif row not in blocked:
+                        errors.append(
+                            f"{path.relative_to(_REPO)} : « bloquer » attribué à {row}, "
+                            f"qu'aucune facette ne publie « Bloqué »\n"
+                            f"      → {sentence.strip()[:120]}"
+                        )
+    return errors, unattributed
+
+
 def _commit() -> str:
     try:
         out = subprocess.run(
@@ -165,6 +263,72 @@ _MODE_LABEL = {
 }
 
 
+_PUBLISHED_ORDER = ("B", "D", "O", "A", "NA", "X")
+
+
+def _render_applicability(facets: list[Facet]) -> list[str]:
+    """The second axis (`FR-173`): what this map is worth *to a given client*.
+
+    A single mode column reads as though every line mattered equally to everyone,
+    which is the catalogue the product exists to argue against. Crossed with the
+    usage profile, the same registry says something a prospect can act on: how much
+    of what actually concerns them we actually stop.
+
+    Rows nobody's profile activates are not dropped -- an absent line reads as an
+    oversight, a line marked inapplicable reads as an answer.
+    """
+    lines = [
+        "## Applicabilité × couverture",
+        "",
+        "Le mode dit ce que nous savons faire ; le profil dit si la ligne concerne ce",
+        "client. Les deux ensemble donnent le seul chiffre qui vaut quelque chose en",
+        "réunion. Une facette plafonnée par le profil est comptée **au plafond**, pas à",
+        "sa revendication.",
+        "",
+        "| Profil | Lignes | Facettes | "
+        + " | ".join(_MODE_LABEL[m].replace("**", "") for m in _PUBLISHED_ORDER)
+        + " |",
+        "|---" * (3 + len(_PUBLISHED_ORDER)) + "|",
+    ]
+    capped_profiles = []
+    for profile in Profile:
+        held = frozenset({profile})
+        cap = ceiling(held)
+        if cap is not None:
+            capped_profiles.append((profile, cap))
+        applicable = [f for f in facets if f.profiles & held]
+        tally = dict.fromkeys(_PUBLISHED_ORDER, 0)
+        for f in applicable:
+            tally[capped_mode(f.mode_publie, cap) if f.mode_publie != "NA" else "NA"] += 1
+        cells = " | ".join(str(tally[m]) for m in _PUBLISHED_ORDER)
+        marker = " ⛔" if cap is not None else ""
+        # Rows are what a prospect counts ("15 menaces"); facets are what we prove.
+        # Publishing only one of the two invites the other to be inferred wrongly.
+        lines.append(
+            f"| **{profile.value}** — {profile.label}{marker} "
+            f"| {len({f.row_id for f in applicable})} | {len(applicable)} | {cells} |"
+        )
+
+    ours = [f for f in facets if f.family is Family.usage_ia]
+    lines += [
+        "",
+        f"Sur {len({f.row_id for f in facets})} lignes de menace, "
+        f"{len({f.row_id for f in ours})} relèvent de notre terrain ; les autres, nous "
+        "disons qui les porte plutôt que de les retirer de la carte.",
+    ]
+    for profile, cap in capped_profiles:
+        lines += [
+            "",
+            f"⛔ **{profile.value} — {profile.label}** est plafonné à "
+            f"« {_MODE_LABEL[cap]} ». Il n'y a aucune frontière d'outils à instrumenter "
+            "devant un assistant encastré dans une suite : ses actions s'exécutent dans le "
+            "tenant et aucun gateway ne s'intercale. La colonne « Bloqué » y est "
+            "structurellement à zéro, et c'est le générateur qui l'impose — pas une "
+            "précaution de rédaction (`FR-174`).",
+        ]
+    return lines
+
+
 def _render_md(facets: list[Facet], commit: str, stamp: str) -> str:
     lines = [
         "# Carte de couverture — générée",
@@ -175,8 +339,13 @@ def _render_md(facets: list[Facet], commit: str, stamp: str) -> str:
         "",
         f"Commit `{commit}` · {stamp}",
         "",
-        "| Menace | Facette | Mode publié | Chemin d'ingestion prouvé | Scénarios | Écarts |",
-        "|---|---|---|---|---|---|",
+        *_render_applicability(facets),
+        "",
+        "## Le détail, facette par facette",
+        "",
+        "| Menace | Facette | Qui la porte | Profils | Mode publié "
+        "| Ingestion prouvée | Scén. | Écarts |",
+        "|---|---|---|---|---|---|---|---|",
     ]
     for f in facets:
         prouve = ", ".join(f"`{i}`" for i in sorted(f.prouve)) or "—"
@@ -185,9 +354,11 @@ def _render_md(facets: list[Facet], commit: str, stamp: str) -> str:
             reserve = f"non asserté : {manquants}"
             prouve = f"{prouve} · {reserve}" if f.prouve else reserve
         n = sum(len(v) for v in f.prouve.values())
+        profils = ", ".join(p.value for p in sorted(f.profiles, key=lambda x: x.value))
         lines.append(
-            f"| **{f.row_id}** {f.row_titre} | {f.libelle} | {_MODE_LABEL[f.mode_publie]} "
-            f"| {prouve} | {n or '—'} | {', '.join(f'`{g}`' for g in f.gaps) or '—'} |"
+            f"| **{f.row_id}** {f.row_titre} | {f.libelle} | {f.family.label} | {profils} "
+            f"| {_MODE_LABEL[f.mode_publie]} | {prouve} | {n or '—'} "
+            f"| {', '.join(f'`{g}`' for g in f.gaps) or '—'} |"
         )
     bloques = [f for f in facets if f.mode_publie == "B"]
     lines += [
@@ -224,13 +395,20 @@ def main() -> int:
         for manque in f.sens_manquants:
             errors.append(f"{f.row_id}/{f.cle} : {_POURQUOI_SENS[manque]}")
 
+    # FR-175. Same family as CM-7, one release further downstream: a support that
+    # says "we block M-13" is a false claim about a control, made to a customer.
+    claim_errors, unattributed = _check_claims(facets)
+    errors.extend(claim_errors)
+
     if errors:
         print("CM-7 — la carte ne peut pas être publiée :\n", file=sys.stderr)
         for e in errors:
             print(f"  ✗ {e}", file=sys.stderr)
         print(
             "\nSoit le scénario manque et il faut l'écrire, soit la revendication est "
-            "trop forte et il faut la baisser dans coverage/rows.yaml.",
+            "trop forte et il faut la baisser dans coverage/rows.yaml. Pour une phrase "
+            "refusée : réécrivez-la au mode que la ligne publie réellement — c'est plus "
+            "vite fait que de le défendre devant un client.",
             file=sys.stderr,
         )
         return 1
@@ -246,6 +424,10 @@ def main() -> int:
     if args.check:
         n = sum(1 for f in facets if f.mode_publie == "B")
         print(f"CM-7 = 0 — {n} facettes Bloqué prouvées")
+        print(
+            f"FR-175 = 0 — aucun « bloquer » attribué à une ligne non Bloquée "
+            f"({unattributed} occurrences génériques, hors de portée de ce garde)"
+        )
         return 0
 
     commit = _commit()
@@ -261,6 +443,11 @@ def main() -> int:
                 "libelle": f.libelle,
                 "mode_revendique": f.mode_revendique,
                 "mode_publie": f.mode_publie,
+                # The applicability axis travels with the machine-readable map, so a
+                # downstream reader (the client diagnostic, a published fragment)
+                # never has to re-derive it -- or derive it differently.
+                "famille": f.family.value,
+                "profils": sorted(p.value for p in f.profiles),
                 "ingress_prouve": sorted(f.prouve),
                 "ingress_non_asserte": f.ingress_manquants,
                 "sens_prouves": sorted(f.sens_prouves),

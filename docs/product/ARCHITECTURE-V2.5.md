@@ -299,7 +299,7 @@ scenarios/             # one per coverage row, each with its negative control �
 | `FR-153`..`FR-159` — enforcement core | `core/pipeline.py`, `core/constraints.py`, taint | `AD-21`, `AD-23`, `AD-33`, `AD-34`, `AD-36`, amended `AD-10` |
 | `FR-160`..`FR-171` — evidence integrity | adapters, `core/egress.py`, migrations `0019`/`0020` | `AD-22`, `AD-24`, `AD-32`, `AD-35`, `AD-38`, inherited `AD-1` |
 | ↳ `FR-160`, `161`, `162`, `164`, `169` (partiel) | **livrées** — `audit.Origin`, colonnes `declared`, garde RLS, `core/egress.py`, bloc `verification` | `AD-38`, `AD-1`, `AD-24`, `AD-28` |
-| `FR-172`..`FR-175` — triage | generated map, published artefacts | `AD-28`, `AD-30` |
+| `FR-172`..`FR-175` — triage | **livrées** — `core/profiles.py`, `core/triage.py`, `xsom triage`, carte bidimensionnelle | `AD-28`, `AD-30`, `AD-38` |
 | `FR-176`..`FR-178` — sovereignty | decision path, CI | `AD-25`, `AD-34` |
 | `FR-179`..`FR-183` — demonstrator | `core/pipeline.py`, `scenarios/` | `AD-26`, `AD-27`, `AD-29`, `AD-30`, `AD-31` |
 | `FR-184`..`FR-194` — remaining coverage | filters, registry | `AD-21`, `AD-23`, `AD-35`, `AD-36` |
