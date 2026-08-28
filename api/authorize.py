@@ -14,8 +14,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from api.deps import database_url
+from api.gateway_auth import GatewayPrincipal, get_gateway_principal
 from api.ratelimit import authorize_rate_limit, limiter
-from api.security import GatewayPrincipal, get_gateway_principal
 from core import db, decision, policy_store
 from core.config import Settings
 from core.judge import build_judge

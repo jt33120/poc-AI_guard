@@ -47,6 +47,9 @@ jobs:
       - name: Coverage claims are backed by scenarios (CM-7)
         run: uv run python scripts/gen_coverage.py --check
 
+      - name: Decision path is offline-capable (AD-25 / SM-15)
+        run: uv run python scripts/audit_sovereignty.py
+
       - name: Static security audit
         run: uv run python scripts/audit_security.py
 
