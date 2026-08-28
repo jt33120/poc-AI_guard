@@ -111,48 +111,87 @@ nous-mêmes, nous pilotons un contrôle tiers qui le fait, et nous en chaînons 
 verdict dans l'audit.* Le tiers devient alors une dépendance — et la doctrine
 s'applique à lui.
 
-| Contrôle orchestré | Outil que la matrice source recommande | Statut du substitut |
-|---|---|---|
-| Garde-prompt (`M-01`, `G-01`) | NeMo Guardrails, Llama Guard | **Résolu** — Mistral, que la stack impose déjà. Aucun fournisseur nouveau. |
-| Analyse d'artefacts ML (`M-11`, `G-10`) | picklescan, modelscan | S'exécute **localement**, sans rappel réseau. Ne perce pas la chaîne. |
-| SAST / DAST (`M-15`, `G-14`) | Snyk, SonarQube | S'exécute **localement** en CI. Ne perce pas la chaîne. |
-| Découverte du Shadow AI (`M-10`, `G-09`) | CASB du marché | **Aucun substitut souverain.** La ligne perd donc son statut `Orchestré` (`FR-178`) plutôt que de revendiquer une couverture qui traverserait la frontière. |
+**La liste vit dans `coverage/rows.yaml` et se publie dans la carte générée**
+(`coverage/COVERAGE-MAP.md`, section « Contrôles orchestrés et substituts
+souverains »). Elle n'est pas recopiée ici : ce document a porté cette table en prose
+jusqu'à ce que `FR-178` la rende mécanique, et deux tables qui disent la même chose
+finissent par ne plus la dire (`AD-30`). Ce qui reste ici est la doctrine ; le
+recensement est dérivé.
 
-**La dernière ligne est la plus importante du tableau.** Elle montre ce que la
-doctrine coûte quand elle est appliquée honnêtement : on retire une revendication
-plutôt que de la tenir par un chemin qui contredit le discours. Trois contrôles sur
-quatre s'exécutent localement ; le quatrième est déclassé.
+La règle qui la gouverne tient en une ligne, et elle est appliquée au parse du
+registre, pas à la relecture :
+
+> Une facette `Orchestré` nomme son substitut **et** le critère qui le rend souverain
+> — `local` (s'exécute dans le périmètre, sans rappel réseau) ou `ue` (service en
+> ligne sous juridiction de l'Union). Sans substitut, elle est publiée
+> `Hors périmètre`.
+
+Le vocabulaire est fermé exprès. Un champ libre laisserait écrire « conforme » et
+publier `Orchestré` sur un SaaS hors UE ; `ue` est une affirmation qu'un relecteur
+voit et peut contester.
+
+**Ce que la doctrine coûte, appliquée honnêtement.** Au dernier passage, quatre
+contrôles sur cinq ont un substitut — le garde-prompt et la garde de sortie anti-leak
+par Mistral, que la stack impose déjà ; l'analyse d'artefacts ML et le SAST/DAST
+parce qu'ils s'exécutent localement. Le cinquième, la **découverte du Shadow AI**
+(`M-10`, `G-09`), passe par un CASB du marché et n'en a aucun : la facette est donc
+déclassée en `Hors périmètre`. C'est une revendication retirée plutôt que tenue par un
+chemin qui contredit le discours — et c'est la ligne la plus instructive du lot.
+
+**Une cinquième ligne est apparue en outillant la règle.** Ce document n'en recensait
+que quatre ; le registre en publiait cinq. `M-14 / détection de fuite du prompt sur
+l'egress` était `Orchestré` sans que la question du substitut lui ait jamais été
+posée. C'est une garde de sortie, donc la même famille que le garde-prompt de `M-01`,
+et elle hérite du même substitut — mais personne ne l'avait établi. Une table tenue à
+la main perd une ligne sans que rien ne le signale ; c'est précisément pour cela
+qu'elle est dérivée maintenant.
 
 ---
 
 ## 6. Ce qui est tenu aujourd'hui, et ce qui reste à construire
 
 `AD-25` pose que la souveraineté doit être une **propriété de CI** et non une
-promesse. Elle ne l'est pas encore entièrement. La distinction est faite ici plutôt
-que laissée à découvrir.
+promesse. Elle l'est désormais : `scripts/audit_sovereignty.py` tourne à chaque build
+et publie `SM-15`.
+
+**La garantie, telle que la CI la vérifie :**
+
+> Aucun module atteignable depuis le calcul du verdict ne peut effectuer d'appel
+> sortant. Le « peut » est délibéré — la garantie vendue n'est pas « nous n'appelons
+> pas », c'est « rien ne nous en donne le moyen ». C'est donc une analyse statique du
+> graphe d'imports : une branche jamais prise sur le jeu de tests reste une
+> dépendance.
+
+Quatre modules sont déclarés **hors pli**, chacun avec la raison pour laquelle il
+n'est pas requis pour qu'un verdict soit rendu : le juge (enrichisseur, jamais
+décideur), la notification d'approbation (hors bande, son échec laisse l'action en
+attente), le relais vers l'aval (l'action elle-même, après le verdict) et la garde
+d'egress (elle résout un nom pour en refuser les plages, à l'enregistrement et à la
+connexion). La liste est fermée : un cinquième module qui gagnerait une sortie fait
+échouer le build.
 
 **Tenu, et testé aujourd'hui :**
 
 | Propriété | Où |
 |---|---|
-| Aucun nom d'hôte de l'éditeur n'est figé dans un artefact livré — un déployeur ne peut pas router son trafic d'agent, ses clés fournisseur et sa piste d'audit vers un serveur qu'il ne contrôle pas | `tests/test_no_vendor_hosts.py` (fichiers *suivis*, pas le worktree) |
-| Le juge absent ou hors budget rend le pipeline **plus strict**, jamais plus permissif | `core/judge.py` `resolve_ambiguous`, `tests/test_judge.py` (13 tests) |
-| Le blocage DLP d'egress précède l'appel fournisseur et la branche streaming : ni un en-tête ni le mode flux ne l'atteignent | `api/llm_proxy.py` `_forward`, `tests/test_llm_proxy.py` |
+| Rien sur le chemin de décision ne **peut** joindre le réseau — `SM-15 = 0`, et le graphe d'imports est parcouru à chaque build | `scripts/audit_sovereignty.py`, `tests/test_sovereignty_gate.py` |
+| Un verdict se rend, et une action irréversible est tenue, **toute sortie coupée** | `tests/test_sovereignty_gate.py` (harnais de blocage, avec son propre contrôle négatif) |
+| Une facette `Orchestré` sans substitut souverain nommé est publiée `Hors périmètre` | `core/profiles.py` (au parse), `tests/test_sovereignty_substitutes.py` |
+| Aucun nom d'hôte de l'éditeur n'est figé dans un artefact livré | `tests/test_no_vendor_hosts.py` (fichiers *suivis*, pas le worktree) |
+| Le juge absent ou hors budget rend le pipeline **plus strict**, jamais plus permissif | `core/judge.py` `resolve_ambiguous`, `tests/test_judge.py` |
+| Le blocage DLP d'egress précède l'appel fournisseur et la branche streaming | `api/llm_proxy.py` `_forward`, `tests/test_llm_proxy.py` |
+| Toute sortie passe par une aide unique qui interroge la portée visée | `core/egress.py` (`AD-24`), `tests/test_egress.py` |
 | La chaîne d'audit se vérifie localement, sans dépendance externe | `scripts/verify_chain.py` |
 | Une notification d'approbation qui échoue laisse l'action **en attente** | `core/decision.py` `_notify` |
+| La carte de couverture est générée depuis les scénarios qui passent | `scripts/gen_coverage.py` (`AD-30`, `G-18`) |
 
-**Imposé par le spine, non construit :**
+**Ce qui reste ouvert, et pourquoi :**
 
-| À construire | Décision |
+| Reste | État |
 |---|---|
-| `core/egress.py` — toute sortie passe par une aide unique ; un `httpx` direct vers une URL fournie par le tenant devient un échec de revue | `AD-24` |
-| Un test de CI qui *compte* les appels sortants sur le chemin de décision et échoue à la première apparition | `AD-25`, mesuré par `SM-15` |
-| La carte de couverture générée depuis les scénarios qui passent, jamais rédigée | `AD-30`, `G-18` |
-
-**Pourquoi le juge n'est pas une exception.** `AD-25` le traite explicitement : il
-n'est pas un filtre, il produit une classification et jamais un verdict, et son
-absence est couverte par `AD-34`. Une instance sans clé de modèle est **plus
-stricte**, pas moins — c'est vérifié par un test, pas argumenté.
+| L'analyse statique voit les sockets **Python**. Une sortie ouverte depuis une extension native (`libpq` ouvre les siens en C) échappe au harnais d'exécution | Couvert par l'analyse statique, qui juge l'import ; c'est la raison pour laquelle les deux moitiés existent |
+| L'ancre de chaîne capable d'air-gap n'a ni signataire ni clé hors base | `FR-169` première moitié — non implémentable tant qu'aucun signataire de checkpoint n'existe |
+| La découverte du Shadow AI n'a aucun substitut souverain | Déclassée par `FR-178` plutôt que revendiquée |
 
 ---
 
@@ -163,5 +202,17 @@ stricte**, pas moins — c'est vérifié par un test, pas argumenté.
 - Il ne dit pas que le client n'a aucune dépendance non européenne — son fournisseur
   de modèle en est probablement une. Il dit que **la couche de contrôle** n'en ajoute
   aucune.
-- `G-17` reste ouvert : la doctrine complète (substituts UE pour tout contrôle
-  orchestré, fonctionnement hors ligne prouvé de bout en bout) n'est pas close.
+- Il ne dit pas que **la console** fonctionne hors ligne. Elle vérifie un JWT contre
+  le JWKS de l'IdP configuré, ce qui est un appel sortant. L'IdP est un réglage et
+  aucun nom d'hôte d'éditeur n'est figé dans un artefact livré (`test_no_vendor_hosts`),
+  donc un exploitant qui héberge son Supabase reste dans son périmètre — mais c'est
+  son choix de déploiement, pas une propriété que nous vérifions. Ce que la CI vérifie
+  est plus étroit et plus fort : **rendre un verdict** ne demande rien d'autre que
+  Postgres.
+- Il ne dit pas que le harnais d'exécution voit tout : il voit les sockets Python.
+  C'est l'analyse statique qui couvre le reste, et les deux moitiés sont nécessaires.
+- `G-17` et `G-21` sont clos par `FR-176`/`FR-177`/`FR-178` : chaque contrôle
+  orchestré nomme son substitut ou se déclasse, et le fonctionnement hors ligne est
+  vérifié à chaque build plutôt qu'affirmé. Ce qui les rendait ouverts n'était pas
+  l'absence de doctrine — elle était écrite ici — mais l'absence d'un instrument qui
+  la contredise quand elle cesse d'être vraie.

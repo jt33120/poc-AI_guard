@@ -42,8 +42,8 @@ from starlette.background import BackgroundTask
 from starlette.concurrency import run_in_threadpool
 
 from api.deps import database_url
+from api.gateway_auth import GatewayPrincipal, get_gateway_principal, resolve_gateway_principal
 from api.ratelimit import limiter, llm_proxy_rate_limit
-from api.security import GatewayPrincipal, get_gateway_principal, resolve_gateway_principal
 from core import approvals, audit, billing, db, dlp, dlp_config, monitor, policy_store, pricing
 from core import usage as usage_store
 from core.config import Settings

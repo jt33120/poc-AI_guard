@@ -116,7 +116,8 @@ Console (`frontend/.env.local`): `NEXT_PUBLIC_SUPABASE_URL`,
 | `make install` | Install backend + console deps + Playwright browser. |
 | `make dev` | Run the control API (+ console); the gateway runs over stdio. |
 | `make test` | pytest + Playwright smoke. |
-| `make verify` | ruff + mypy + tests + security audit + eslint + tsc. |
+| `make verify` | ruff + mypy + tests + security audit + sovereignty gate + coverage gate + eslint + tsc. |
+| `make sovereignty-gate` | `SM-15`: fails if any module on the decision path *can* reach the network (`AD-25`). |
 | `make demo` | End-to-end break-then-control demo. |
 | `make up` / `make down` | Bring the self-hosted compose stack up / down (the volume survives `down`). |
 | `make down-hard` | `down --volumes` — **destroys the database, and with it the audit chain**. |
@@ -132,7 +133,7 @@ api/       hardened FastAPI control API (auth, authorize, policy, approvals, aud
            integrity, trust, DLP, LLM proxy, usage, signup)
 supabase/  SQL migrations (RLS, append-only audit) + the schema_migrations ledger
 frontend/  Next.js 14 console (onboarding, inspector, approvals, audit, admin)
-scripts/   audit_security, verify_chain, demo
+scripts/   audit_security, audit_sovereignty, gen_coverage, verify_chain, demo, seed_demo
 tests/     pytest suite (ephemeral Postgres harness) + Playwright e2e
 docs/      SPEC, BUILD_PLAN, SECURITY, DEPLOY, product/ (PRD, architecture, epics)
 ```

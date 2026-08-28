@@ -4,21 +4,27 @@ Supabase JWTs are verified against the project's JWKS (asymmetric keys). The
 verified principal carries the tenant id and role from ``app_metadata`` — the
 same claim RLS reads. Everything is fail-closed: no/invalid token, unconfigured
 JWKS, or missing role all deny access (401/403).
+
+**Portée.** Ce module authentifie la *console* — un humain, un JWT Supabase, un JWKS
+distant. L'authentification *machine* (jeton de passerelle, Postgres seul) vit dans
+:mod:`api.gateway_auth`, et la séparation est une propriété de souveraineté, pas un
+rangement : le chemin de décision importe la seconde, et lui rendre la première le
+ferait dépendre d'un service distant pour rendre un verdict (`AD-25`, `FR-176`).
+Remettre les deux ensemble fait échouer `scripts/audit_sovereignty.py`.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
 from typing import Any
 
 import httpx
-from fastapi import Depends, Header, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import jwt
 from jose.exceptions import JWTError
 
-from core import db, read_tokens, tenant_tokens
+from core import db, read_tokens
 from core.config import Settings
 from core.schemas import CurrentUser, Role
 
@@ -166,55 +172,6 @@ def get_ai_reader(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
         ) from None
     return _user_from_claims(claims)
-
-
-@dataclass(frozen=True)
-class GatewayPrincipal:
-    """A resolved machine-to-machine caller: its tenant and the agent (token id)."""
-
-    tenant_id: str
-    token_id: str
-
-
-def resolve_gateway_principal(request: Request, raw_token: str | None) -> GatewayPrincipal:
-    """Resolve the tenant + agent for a gateway token (from header OR URL path).
-
-    Fail-closed (CLAUDE.md §4.4): missing token, unconfigured DB, or an
-    unknown/revoked token all deny (401/503).
-    """
-    if not raw_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing gateway token"
-        )
-    url: str | None = request.app.state.database_url
-    if not url:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database not configured"
-        )
-    try:
-        with db.connection(url) as conn:
-            token_id, tenant_id = tenant_tokens.authenticate_gateway_principal(conn, raw_token)
-            conn.commit()
-    except PermissionError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid gateway token"
-        ) from None
-    return GatewayPrincipal(tenant_id=tenant_id, token_id=token_id)
-
-
-def get_gateway_principal(
-    request: Request,
-    x_gateway_token: str | None = Header(default=None, alias="X-Gateway-Token"),
-) -> GatewayPrincipal:
-    """FastAPI dependency: resolve the agent from the ``X-Gateway-Token`` header."""
-    return resolve_gateway_principal(request, x_gateway_token)
-
-
-def get_gateway_tenant(
-    principal: GatewayPrincipal = Depends(get_gateway_principal),
-) -> str:
-    """Resolve just the tenant for a machine-to-machine call (compat shim)."""
-    return principal.tenant_id
 
 
 def require_role(*roles: Role) -> Callable[..., CurrentUser]:

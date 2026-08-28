@@ -16,8 +16,9 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from api.deps import database_url, require_tenant
+from api.gateway_auth import GatewayPrincipal, get_gateway_principal
 from api.ratelimit import limiter, llm_proxy_rate_limit
-from api.security import GatewayPrincipal, get_ai_reader, get_gateway_principal
+from api.security import get_ai_reader
 from core import ai_summary, db, otlp_genai
 from core import usage as usage_store
 from core.schemas import AiCosts, AiDetail, AiIngestResult, AiSummary, CurrentUser, Role
