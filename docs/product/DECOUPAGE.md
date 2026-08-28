@@ -99,7 +99,7 @@ affirmations du produit qui ne sont pas vraies.
 | **4** | Mode observation | `FR-179`, `180` | Rang 1 | Le démonstrateur, **et** `G-25` : la bonne forme du correctif du proxy LLM est une fenêtre d'observation du plan de contrôle |
 | **5** | Le démonstrateur | `FR-181`→`183` | Rangs 3 et 4 | La preuve publique |
 | **6** | Souveraineté · **pilier 3** | `FR-176`→`178` — **clos** | `QO-3` ✅ tranchée | `G-17` et `G-21` fermés. `SM-15` est mesuré à chaque build ; une ligne `Orchestré` sans substitut se déclasse au parse |
-| **7** | Couverture P2 | `FR-184`, `185`, `186` | Rang 1 | Le terrain dit P2 avant P3 |
+| **7** | Couverture P2 | `FR-184`, `185`, `186` — **clos** | Rang 1 | Le terrain dit P2 avant P3. `G-04`, `G-08`, `G-12` et `G-22` fermés |
 | **8** | Reste de l'intégrité | `FR-163`, `165`→`168`, `170`, `171` | Rang 2 | Contraignant, non bloquant pour la démonstration |
 | **9** | Couverture P4 et au-delà | `FR-187`→`194` | Rang 7 | Suit la base installée Mistral |
 | **10** | Déployabilité, positionnement | `FR-195`→`197` | `AR-3` | `FR-197` est de la rédaction : parallélisable dès maintenant |

@@ -171,6 +171,33 @@ class ApprovalOut(BaseModel):
     decided_by: str | None
 
 
+class CorpusRequest(BaseModel):
+    """Déclarer la provenance d'un corpus ou d'une base vectorielle (`FR-184`)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=120)
+    kind: Literal["dataset", "vector_store"]
+    source: str = Field(min_length=1, max_length=500)
+    # Une attestation sans porteur n'engage personne : le champ est obligatoire, et
+    # borné pour la même raison que les autres — Pydantic strict (CLAUDE.md §4.9).
+    steward: str = Field(min_length=1, max_length=200)
+    last_reviewed_at: datetime
+
+
+class CorpusOut(BaseModel):
+    id: int
+    name: str
+    kind: str
+    source: str
+    steward: str
+    declared_at: datetime
+    declared_by: str | None
+    last_reviewed_at: datetime
+    review_age_days: int
+    stale: bool
+
+
 class MonitorWindowRequest(BaseModel):
     """Open (or extend) an observation window on one agent (G-25, FR-179)."""
 
