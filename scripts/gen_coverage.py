@@ -79,7 +79,7 @@ class Facet:
     def sens_manquants(self) -> list[str]:
         if not self.exige_scenario:
             return []
-        return [s for s in ("bloque", "laisse_passer") if s not in self.sens_prouves]
+        return [s for s in _SENS_REQUIS if s not in self.sens_prouves]
 
     @property
     def mode_publie(self) -> str:
@@ -245,11 +245,20 @@ def _commit() -> str:
 
 
 #: Why a missing half matters, said in the error rather than left to be inferred.
+#: The three parts a `Bloqué` claim is made of, in the order they are reported.
+_SENS_REQUIS = ("bloque", "laisse_passer", "controle_negatif")
+
 _POURQUOI_SENS = {
     "bloque": "aucun scénario ne prouve que l'action est refusée",
     "laisse_passer": (
         "aucun scénario ne prouve qu'un appel légitime passe encore — "
         "une garde qui refuse tout est une panne, pas un contrôle"
+    ),
+    "controle_negatif": (
+        "aucun contrôle négatif : rien ne prouve que la garde désactivée, *cette* "
+        "action atteindrait l'aval (AD-30.3). Sans lui, un `bloque` vert prouve "
+        "seulement qu'il ne s'est rien passé — un plantage, un aval injoignable ou "
+        "un nom d'outil mal orthographié satisfont « la défense a tenu »"
     ),
 }
 

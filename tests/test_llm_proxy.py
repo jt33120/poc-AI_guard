@@ -706,6 +706,7 @@ def test_dlp_redacts_pii_when_configured(
     assert "alice@example.com" not in sent and "[REDACTED:email]" in sent
 
 
+@pytest.mark.covers("M-10", "egress", ingress="llm_proxy", sens="controle_negatif")
 def test_dlp_disabled_lets_secret_through(
     db: DBHandle,
     test_verifier: TokenVerifier,
@@ -727,7 +728,11 @@ def test_dlp_disabled_lets_secret_through(
         },
     )
     assert resp.status_code == 200
-    assert fake.captured != {}  # forwarded untouched
+    # `AD-30.3`: the counterfactual has to be the *leak*, not merely a request. That
+    # a call was forwarded says nothing about whether the key was in it — and if it
+    # was not, the blocking scenario above would be proving that this key never
+    # travels, rather than that DLP stops it.
+    assert AWS_KEY in fake.captured["content"].decode()
 
 
 def test_the_providers_completion_id_never_becomes_the_audit_entrys_identity(

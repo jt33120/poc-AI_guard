@@ -83,9 +83,13 @@ def _passing(row: str, facet: str, ingress: str, sens: str = "bloque") -> dict[s
     }
 
 
-def _both(row: str, facet: str, ingress: str) -> list[dict[str, object]]:
-    """Both halves of a claim: it blocks, and a legitimate call still gets through."""
-    return [_passing(row, facet, ingress, "bloque"), _passing(row, facet, ingress, "laisse_passer")]
+def _complete(row: str, facet: str, ingress: str) -> list[dict[str, object]]:
+    """All three parts of a `Bloqué` claim: it blocks, a legitimate call still gets
+    through, and with the guard off the same dangerous call reaches the downstream."""
+    return [
+        _passing(row, facet, ingress, sens)
+        for sens in ("bloque", "laisse_passer", "controle_negatif")
+    ]
 
 
 def test_a_blocked_claim_without_a_scenario_fails_the_build(tmp_path: Path) -> None:
@@ -97,13 +101,13 @@ def test_a_blocked_claim_without_a_scenario_fails_the_build(tmp_path: Path) -> N
 
 def test_a_failing_scenario_proves_nothing(tmp_path: Path) -> None:
     # The distinction that matters: the marker existing is not the marker passing.
-    scenarios = [s | {"outcome": "failed"} for s in _both("M-99", "dur", "mcp")]
+    scenarios = [s | {"outcome": "failed"} for s in _complete("M-99", "dur", "mcp")]
     result = _run(tmp_path, scenarios)
     assert result.returncode == 1
 
 
-def test_both_halves_satisfy_the_gate(tmp_path: Path) -> None:
-    result = _run(tmp_path, _both("M-99", "dur", "mcp"))
+def test_all_three_parts_satisfy_the_gate(tmp_path: Path) -> None:
+    result = _run(tmp_path, _complete("M-99", "dur", "mcp"))
     assert result.returncode == 0, result.stderr
     assert "CM-7 = 0" in result.stdout
 
@@ -123,11 +127,26 @@ def test_a_pass_through_only_claim_fails(tmp_path: Path) -> None:
     assert "ne prouve que l'action est refusée" in result.stderr
 
 
+def test_a_claim_without_its_negative_control_fails(tmp_path: Path) -> None:
+    """`AD-30.3` — the part that is easiest to argue away and hardest to do without.
+
+    Both other halves can pass while the dangerous invocation was never going to
+    arrive: a crash, an unreachable downstream, a misspelt tool name. Then "the
+    defence held" is a statement about nothing.
+    """
+    result = _run(
+        tmp_path,
+        [_passing("M-99", "dur", "mcp", "bloque"), _passing("M-99", "dur", "mcp", "laisse_passer")],
+    )
+    assert result.returncode == 1
+    assert "aucun contrôle négatif" in result.stderr
+
+
 def test_a_marker_naming_an_unknown_facet_fails(tmp_path: Path) -> None:
     # Same shape as the closed constraint vocabulary: an unknown key is rejected,
     # never silently ignored. A typo'd marker would otherwise prove nothing while
     # looking like proof.
-    result = _run(tmp_path, _both("M-99", "inexistante", "mcp"))
+    result = _run(tmp_path, _complete("M-99", "inexistante", "mcp"))
     assert result.returncode == 1
     assert "marqueur inconnu" in result.stderr
 
@@ -136,7 +155,7 @@ def test_a_scenario_on_an_unclaimed_ingress_is_rejected(tmp_path: Path) -> None:
     # The registry claims `mcp` only. A test asserting the http path would be real
     # evidence, but not evidence for *this* claim -- accepting it would let the map
     # publish a path nobody claimed.
-    result = _run(tmp_path, _both("M-99", "dur", "http"))
+    result = _run(tmp_path, _complete("M-99", "dur", "http"))
     assert result.returncode == 1
     assert "absent de la revendication" in result.stderr
 
@@ -181,7 +200,7 @@ def test_the_same_sentence_passes_once_the_line_is_actually_blocked(tmp_path: Pa
     (tmp_path / "README.md").write_text(
         "xSOM bloque M-99 nativement, chez vous, aujourd'hui.\n", encoding="utf-8"
     )
-    result = _run(tmp_path, _both("M-99", "dur", "mcp"))
+    result = _run(tmp_path, _complete("M-99", "dur", "mcp"))
     assert result.returncode == 0, result.stderr
     assert "FR-175 = 0" in result.stdout
 

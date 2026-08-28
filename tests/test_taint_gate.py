@@ -115,7 +115,13 @@ async def test_escalate_holds_the_risky_action(db: DBHandle) -> None:
     assert "tainted_action" in _decisions(db)
 
 
+@pytest.mark.covers("M-02", "taint", ingress="mcp", sens="controle_negatif")
 async def test_taint_policy_off_is_a_no_op(db: DBHandle) -> None:
+    """`AD-30.3` — this was already the negative control; it was simply not declared.
+
+    Same injected fetch, same risky send, guard off, and the send reaches the
+    downstream. That is what makes the refusal above the taint guard's doing.
+    """
     proxy = FakeProxy({"fetch": _INJECTED})
     backend = _backend(db, proxy, "off")
     await backend.call_tool("fetch", {})

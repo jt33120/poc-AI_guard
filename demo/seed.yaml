@@ -1,0 +1,96 @@
+# Tenant de démonstration — fixture committée et relisible (FR-182, AD-31).
+#
+# **Formes réalistes, contenu entièrement fabriqué.** Aucune donnée personnelle de
+# tiers, aucune donnée de client. C'est vérifiable en lisant ce diff, et c'est le
+# point d'AD-31 : un tenant produit par un générateur ne se relit pas.
+#
+# Le domaine est celui du cabinet — appariement consultants / appels d'offres — parce
+# que c'est la forme la plus proche du métier, donc la plus crédible à raconter
+# (`QO-9`). Les noms, sociétés et références sont inventés.
+#
+# Ce que la fixture ne contient jamais, et un garde de CI le vérifie avec les
+# détecteurs du produit lui-même (`core/dlp.py`) : IBAN, numéro de sécurité sociale,
+# carte bancaire, numéro de téléphone. Les adresses e-mail sont admises seulement sur
+# les domaines réservés à la documentation (RFC 2606). Une valeur qui passe la
+# validation d'un vrai IBAN n'est pas une valeur fabriquée par distraction : c'est
+# une vraie donnée qui a glissé.
+
+version: 1
+
+tenant:
+  name: "Meridian Conseil (démo)"
+
+agents:
+  - key: sourcing
+    name: "agent-sourcing"
+    role: "Cherche des profils et prépare des dossiers de candidature."
+  - key: proposal
+    name: "agent-proposition"
+    role: "Rédige et envoie les propositions commerciales."
+
+# La policy est celle que la démonstration montre : elle exerce les mécanismes réels
+# (classification par argument, allowlist de domaines, double approbation), pas des
+# règles décoratives choisies pour bien s'afficher.
+policy: |
+  tools:
+    - name: crm.search_consultants
+      class: read
+      approval: auto
+    - name: crm.update_mission
+      class: write
+      approval: auto
+    - name: crm.delete_mission
+      class: irreversible
+      approval: human_dual
+    - name: mail.send_proposal
+      class: external_send
+      approval: human_in_the_loop
+      constraints:
+        allowed_domains: ["@example.com", "@example.org"]
+    - name: shell.bash
+      classify: by_argument
+      approval: auto
+      argument_class:
+        rules:
+          - {field: cmd, matches: "^(ls|cat|head|grep)\\b", class: read}
+          - {field: cmd, matches: "\\b(rm|dd|mkfs|shutdown)\\b", class: irreversible}
+        otherwise: irreversible
+  defaults:
+    unknown_tool: deny
+    hitl_timeout_seconds: 3600
+
+# Historique accumulé (FR-183) : dix jours d'activité, pour que la supervision
+# continue se lise comme une série et non comme un instantané. `il_y_a_jours` est
+# relatif au chargement, sinon la démo vieillit et le graphe se vide par le bord.
+historique:
+  - {il_y_a_jours: 10, agent: sourcing, outil: crm.search_consultants, classe: read, decision: allow, n: 14}
+  - {il_y_a_jours: 10, agent: proposal, outil: crm.update_mission, classe: write, decision: allow, n: 3}
+  - {il_y_a_jours: 9,  agent: sourcing, outil: crm.search_consultants, classe: read, decision: allow, n: 11}
+  - {il_y_a_jours: 9,  agent: proposal, outil: mail.send_proposal, classe: external_send, decision: hitl_pending, n: 1}
+  - {il_y_a_jours: 9,  agent: proposal, outil: mail.send_proposal, classe: external_send, decision: hitl_approved, n: 1}
+  - {il_y_a_jours: 8,  agent: sourcing, outil: shell.bash, classe: read, decision: allow, n: 4}
+  - {il_y_a_jours: 8,  agent: sourcing, outil: shell.bash, classe: irreversible, decision: hitl_pending, n: 1}
+  - {il_y_a_jours: 8,  agent: sourcing, outil: shell.bash, classe: irreversible, decision: hitl_denied, n: 1}
+  - {il_y_a_jours: 7,  agent: proposal, outil: mail.send_proposal, classe: external_send, decision: deny, n: 2}
+  - {il_y_a_jours: 6,  agent: sourcing, outil: crm.search_consultants, classe: read, decision: allow, n: 17}
+  - {il_y_a_jours: 6,  agent: proposal, outil: crm.delete_mission, classe: irreversible, decision: hitl_pending, n: 1}
+  - {il_y_a_jours: 5,  agent: proposal, outil: crm.delete_mission, classe: irreversible, decision: expired, n: 1}
+  - {il_y_a_jours: 4,  agent: sourcing, outil: crm.search_consultants, classe: read, decision: allow, n: 9}
+  - {il_y_a_jours: 4,  agent: sourcing, outil: crm.update_mission, classe: write, decision: allow, n: 6}
+  - {il_y_a_jours: 3,  agent: proposal, outil: mail.send_proposal, classe: external_send, decision: hitl_approved, n: 2}
+  - {il_y_a_jours: 2,  agent: sourcing, outil: crm.search_consultants, classe: read, decision: allow, n: 12}
+  - {il_y_a_jours: 2,  agent: proposal, outil: crm.delete_mission, classe: irreversible, decision: deny, n: 1}
+  - {il_y_a_jours: 1,  agent: sourcing, outil: shell.bash, classe: read, decision: allow, n: 5}
+  - {il_y_a_jours: 1,  agent: proposal, outil: crm.update_mission, classe: write, decision: allow, n: 4}
+
+# Une fenêtre d'observation close, pour que le rapport de promotion (FR-180) ait
+# quelque chose à montrer sans qu'on ait à en ouvrir une pendant la démonstration.
+fenetre_observation:
+  agent: sourcing
+  ouverte_il_y_a_jours: 8
+  duree_heures: 6
+  ouverte_par: "camille.roux@example.com"
+  observations:
+    - {outil: shell.bash, classe: irreversible, decision: monitor_hold, n: 3}
+    - {outil: crm.update_mission, classe: write, decision: monitor_hold, n: 2}
+    - {outil: crm.search_consultants, classe: read, decision: allow, n: 8}

@@ -182,15 +182,34 @@ def db(pg_cluster: pgcluster.EphemeralPostgres) -> Iterator[DBHandle]:
 #
 #     @pytest.mark.covers("M-06", "chaine", ingress="mcp", sens="bloque")
 #
-# `sens` says which half of the claim the test carries: `bloque` (the action was
-# refused) or `laisse_passer` (a legitimate action still went through). A `Bloqué`
-# facet needs both, because a guard that refuses everything is not a control, it is
-# an outage -- and the blocking test stays green on a gateway that blocks blindly.
-# A test asserting both halves carries both markers.
+# `sens` says which part of the claim the test carries. A `Bloqué` facet needs all
+# three, and each answers a question the other two leave open:
+#
+#   bloque           the dangerous action was refused, and the downstream was never
+#                    invoked;
+#   laisse_passer    a legitimate action still went through -- a guard that refuses
+#                    everything is not a control, it is an outage, and the blocking
+#                    test stays green on a gateway that blocks blindly;
+#   controle_negatif with that guard disabled, the *same dangerous action* reaches
+#                    the downstream (`AD-30.3`).
+#
+# The third is the one that is easy to argue away and hardest to do without. Without
+# it, a passing `bloque` proves only that nothing happened -- and a crash, an
+# unreachable downstream or a misspelt tool name all satisfy "the defence held and
+# the downstream was not invoked". `laisse_passer` does not close it either: it
+# exercises a *different* invocation, so it cannot tell whether the dangerous one
+# was stopped by the guard or was never going to arrive.
+#
+# A test asserting several parts carries several markers.
 #
 # The run records every marked test's outcome to `coverage/.scenarios.json`, and
 # `scripts/gen_coverage.py` folds that into the published map. A test that did not
 # run, or did not pass, proves nothing -- there is no third state.
+
+#: Closed vocabulary. A fourth part of a claim has to be named here *and* taught to
+#: `scripts/gen_coverage.py`, so it cannot arrive as a free-form string that the gate
+#: then silently ignores.
+_SENS = frozenset({"bloque", "laisse_passer", "controle_negatif"})
 
 _SCENARIOS_OUT = _REPO / "coverage" / ".scenarios.json"
 _scenarios_key = pytest.StashKey[list[dict[str, Any]]]()
@@ -215,8 +234,8 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]) ->
             raise ValueError(f"{item.nodeid}: @covers takes (row, facet)")
         row, facet = mark.args
         sens = mark.kwargs.get("sens")
-        if sens not in ("bloque", "laisse_passer"):
-            raise ValueError(f"{item.nodeid}: @covers needs sens='bloque'|'laisse_passer'")
+        if sens not in _SENS:
+            raise ValueError(f"{item.nodeid}: @covers needs sens in {sorted(_SENS)}")
         item.config.stash[_scenarios_key].append(
             {
                 "row": row,
