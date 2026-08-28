@@ -58,6 +58,10 @@ class Profile(StrEnum):
     p4 = "P4"  # self-hosted open weights
     p5 = "P5"  # trains or fine-tunes
 
+    @property
+    def label(self) -> str:
+        return _PROFILE_LABEL[self]
+
 
 class Family(StrEnum):
     """Whose problem this is (§2.1)."""
@@ -65,6 +69,26 @@ class Family(StrEnum):
     fournisseur = "fournisseur"  # the outfit that trains and serves the model
     cyber_classique = "cyber_classique"  # real, but it is their SOC, mail gateway, EDR
     usage_ia = "usage_ia"  # the client's, and our ground
+
+    @property
+    def label(self) -> str:
+        return _FAMILY_LABEL[self]
+
+
+_PROFILE_LABEL: dict[Profile, str] = {
+    Profile.p1a: "API hyperscaler",
+    Profile.p1b: "IA embarquée SaaS",
+    Profile.p2: "RAG interne",
+    Profile.p3: "Agents outillés",
+    Profile.p4: "Poids ouverts hébergés",
+    Profile.p5: "Entraînement / fine-tuning",
+}
+
+_FAMILY_LABEL: dict[Family, str] = {
+    Family.fournisseur: "l'éditeur du modèle",
+    Family.cyber_classique: "le SOC du client (cyber classique)",
+    Family.usage_ia: "le client — notre terrain",
+}
 
 
 #: Interposition ceilings (`FR-174`). A profile absent from this table has no

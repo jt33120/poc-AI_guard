@@ -16,6 +16,7 @@ place for it.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -34,27 +35,40 @@ ingress:
 rows:
   - id: M-99
     titre: "Menace de test"
+    famille: usage_ia
+    profils: [P3]
     facettes:
-      - {cle: dur, libelle: "revendication dure", mode: B, ingress: [mcp]}
-      - {cle: mou, libelle: "revendication molle", mode: D}
+      - {cle: dur, libelle: "revendication dure", mode: B, ingress: [mcp], profils: [P3]}
+      - {cle: mou, libelle: "revendication molle", mode: D, profils: [P3]}
 """
 
 
-def _run(tmp_path: Path, scenarios: list[dict[str, object]]) -> subprocess.CompletedProcess[str]:
-    """Run the generator against a throwaway registry + scenario report."""
+def _run(
+    tmp_path: Path, scenarios: list[dict[str, object]] | None, registry: str = _REGISTRY
+) -> subprocess.CompletedProcess[str]:
+    """Run the generator against a throwaway registry + scenario report.
+
+    `scenarios=None` writes no report at all, which is its own test case.
+    """
     cov = tmp_path / "coverage"
     cov.mkdir()
-    (cov / "rows.yaml").write_text(_REGISTRY, encoding="utf-8")
-    (cov / ".scenarios.json").write_text(json.dumps(scenarios), encoding="utf-8")
+    (cov / "rows.yaml").write_text(registry, encoding="utf-8")
+    if scenarios is not None:
+        (cov / ".scenarios.json").write_text(json.dumps(scenarios), encoding="utf-8")
     (tmp_path / "scripts").mkdir()
     (tmp_path / "scripts" / "gen_coverage.py").write_text(
         _SCRIPT.read_text(encoding="utf-8"), encoding="utf-8"
     )
+    # The script is copied so it reads the throwaway registry beside it (it anchors
+    # its data paths on its own location). Its *code* still imports `core.profiles`,
+    # which the copy cannot see from a tmp dir -- hence the real repo on PYTHONPATH.
+    env = {**os.environ, "PYTHONPATH": str(_REPO)}
     return subprocess.run(
         [sys.executable, str(tmp_path / "scripts" / "gen_coverage.py"), "--check"],
         capture_output=True,
         text=True,
         cwd=tmp_path,
+        env=env,
     )
 
 
@@ -128,19 +142,18 @@ def test_a_scenario_on_an_unclaimed_ingress_is_rejected(tmp_path: Path) -> None:
 
 
 def test_a_missing_scenario_report_fails_closed(tmp_path: Path) -> None:
-    cov = tmp_path / "coverage"
-    cov.mkdir()
-    (cov / "rows.yaml").write_text(_REGISTRY, encoding="utf-8")
-    (tmp_path / "scripts").mkdir()
-    (tmp_path / "scripts" / "gen_coverage.py").write_text(
-        _SCRIPT.read_text(encoding="utf-8"), encoding="utf-8"
-    )
-    result = subprocess.run(
-        [sys.executable, str(tmp_path / "scripts" / "gen_coverage.py"), "--check"],
-        capture_output=True,
-        text=True,
-        cwd=tmp_path,
-    )
+    result = _run(tmp_path, None)
     # No report means nothing was proven -- not that everything is fine.
     assert result.returncode == 1
     assert "fail-closed" in result.stderr
+
+
+def test_a_row_without_its_applicability_stops_the_map(tmp_path: Path) -> None:
+    """`FR-173`: the second axis is not optional decoration.
+
+    A row with no `profils` would render as applying to nobody, and a map that
+    quietly drops a threat is worse than one that admits it is uncovered.
+    """
+    result = _run(tmp_path, [], registry=_REGISTRY.replace("    profils: [P3]\n", "", 1))
+    assert result.returncode != 0
+    assert "profils" in result.stderr

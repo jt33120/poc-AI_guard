@@ -84,6 +84,10 @@ select = [
 # Same reason, one level up: these tests assert that a Cyrillic "о" and a
 # full-width "Ｉ" no longer evade the guard, so they must contain them.
 "tests/test_taint.py" = ["RUF001", "RUF002", "RUF003"]
+# RUF001: the generated map is a published French document — "Applicabilité ×
+# couverture" wants the multiplication sign, not the letter x. Nothing here is
+# parsed; these strings are rendered to Markdown.
+"scripts/gen_coverage.py" = ["RUF001"]
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI dependency-injection idiom: Depends/Security in argument defaults.
