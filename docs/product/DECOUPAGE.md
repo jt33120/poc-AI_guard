@@ -98,7 +98,7 @@ affirmations du produit qui ne sont pas vraies.
 | **3** | Le triage · **pilier 1** | `FR-172`→`175` — *`G-18` fermé* | — | Le démonstrateur. Sans lui, la démonstration retombe dans le catalogue. **La carte est désormais générée** (`coverage/`), donc `CM-7` est mesuré en continu au lieu d'être une intention |
 | **4** | Mode observation | `FR-179`, `180` | Rang 1 | Le démonstrateur, **et** `G-25` : la bonne forme du correctif du proxy LLM est une fenêtre d'observation du plan de contrôle |
 | **5** | Le démonstrateur | `FR-181`→`183` | Rangs 3 et 4 | La preuve publique |
-| **6** | Souveraineté · **pilier 3** | `FR-176`→`178` | `QO-3` ✅ tranchée | `G-17`, `G-21` |
+| **6** | Souveraineté · **pilier 3** | `FR-176`→`178` — **clos** | `QO-3` ✅ tranchée | `G-17` et `G-21` fermés. `SM-15` est mesuré à chaque build ; une ligne `Orchestré` sans substitut se déclasse au parse |
 | **7** | Couverture P2 | `FR-184`, `185`, `186` | Rang 1 | Le terrain dit P2 avant P3 |
 | **8** | Reste de l'intégrité | `FR-163`, `165`→`168`, `170`, `171` | Rang 2 | Contraignant, non bloquant pour la démonstration |
 | **9** | Couverture P4 et au-delà | `FR-187`→`194` | Rang 7 | Suit la base installée Mistral |
@@ -136,7 +136,8 @@ contrôle avec fenêtre d'observation bornée, ce qui *est* le rang 4.
 - Rang 3 (le triage) — ne dépend d'aucun autre rang. C'est le pilier 1 et il peut
   démarrer en parallèle du rang 2.
 - `FR-197` (positionnement) — de la rédaction, pas du code.
-- Rang 6 (souveraineté) — `QO-3` est tranchée, plus rien ne le retient.
+- ~~Rang 6 (souveraineté)~~ — **livré.** La doctrine était écrite ; ce qui manquait
+  était l'instrument qui la contredise quand elle cesse d'être vraie.
 
 **Séquentiel, et il faut y résister :**
 
