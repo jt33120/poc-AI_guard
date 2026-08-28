@@ -14,11 +14,15 @@ from collections import Counter
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from functools import partial
 from typing import Any
 
 import mcp.types as types
+from anyio import to_thread
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+
+from core import egress
 
 logger = logging.getLogger("xsom.gateway")
 
@@ -36,6 +40,30 @@ class UnknownToolError(Exception):
     """Raised when a relayed tool name maps to no downstream server."""
 
 
+async def validated_http_url(spec: ServerSpec) -> str:
+    """The URL an `http` server may be reached at, or raise (FR-164 / INV-7).
+
+    Checked here and not only where the row was written, because the check that
+    counts is the one on the path that connects: a row can predate the write-time
+    validation, or arrive by a route that never passed through the API schema.
+
+    Resolution blocks, so it runs off the event loop.
+    """
+    raw = spec.config.get("url")
+    if not isinstance(raw, str):
+        raise egress.EgressRejected(f"server {spec.name}: config.url must be a string")
+    try:
+        return await to_thread.run_sync(
+            partial(egress.resolve_and_check, raw, reach=egress.Reach.tenant_network)
+        )
+    except egress.EgressRejected as exc:
+        # The URL itself is the tenant's own configuration, not agent data, so naming
+        # it in the log is what makes the refusal actionable (CLAUDE.md §4.10 covers
+        # tool arguments and PII, which this is not).
+        logger.warning("downstream_url_refused", extra={"server": spec.name, "reason": str(exc)})
+        raise egress.EgressRejected(f"server {spec.name}: {exc}") from None
+
+
 @asynccontextmanager
 async def open_session(spec: ServerSpec) -> AsyncIterator[ClientSession]:
     """Open an initialized MCP client session to a downstream server."""
@@ -51,11 +79,18 @@ async def open_session(spec: ServerSpec) -> AsyncIterator[ClientSession]:
         ):
             await session.initialize()
             yield session
-    elif spec.transport == "http":  # pragma: no cover - not exercised by the hermetic suite
+    elif spec.transport == "http":
+        url = await validated_http_url(spec)
         from mcp.client.streamable_http import streamablehttp_client
 
-        async with (
-            streamablehttp_client(spec.config["url"], headers=spec.config.get("headers")) as (
+        async with (  # pragma: no cover - the connect itself needs a live server
+            streamablehttp_client(
+                url,
+                headers=spec.config.get("headers"),
+                # Without this the SDK default follows redirects, and a validated
+                # host answering 302 becomes an unvalidated fetch (FR-164).
+                httpx_client_factory=egress.no_redirect_http_client,
+            ) as (
                 read,
                 write,
                 _,

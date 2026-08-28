@@ -8,6 +8,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from core.egress import EgressRejected, Reach, check_url
+
 
 class Role(StrEnum):
     """Tenant-scoped RBAC roles (mirrors the memberships.role check constraint)."""
@@ -51,6 +53,22 @@ class Transport(StrEnum):
     http = "http"
 
 
+def _reject_bad_egress_url(value: Any) -> None:
+    """Refuse a downstream URL at write time (FR-164), before any row exists.
+
+    Text-only: a Pydantic validator must not do DNS, so the address a name
+    resolves to is judged where the connection is actually made
+    (`gateway.downstream.open_session`). This half stops the obvious ones from
+    ever reaching the table.
+    """
+    if not isinstance(value, str):
+        raise ValueError("config.url must be a string")
+    try:
+        check_url(value, reach=Reach.tenant_network)
+    except EgressRejected as exc:
+        raise ValueError(f"config.url {exc}") from None
+
+
 class ServerCreate(BaseModel):
     """Payload to declare a downstream MCP server."""
 
@@ -65,8 +83,10 @@ class ServerCreate(BaseModel):
     def _check_transport_config(self) -> ServerCreate:
         if self.transport is Transport.stdio and not self.config.get("command"):
             raise ValueError("stdio transport requires config.command")
-        if self.transport is Transport.http and not self.config.get("url"):
-            raise ValueError("http transport requires config.url")
+        if self.transport is Transport.http:
+            if not self.config.get("url"):
+                raise ValueError("http transport requires config.url")
+            _reject_bad_egress_url(self.config["url"])
         return self
 
 
@@ -78,6 +98,18 @@ class ServerUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=80)
     config: dict[str, Any] | None = None
     enabled: bool | None = None
+
+    @model_validator(mode="after")
+    def _check_config_url(self) -> ServerUpdate:
+        """An update carrying a `url` is judged like a create carrying one.
+
+        `transport` is immutable and therefore absent here, so the key itself is
+        the signal: a `config` with a `url` is going to be fetched, whatever the
+        row said before.
+        """
+        if self.config is not None and self.config.get("url"):
+            _reject_bad_egress_url(self.config["url"])
+        return self
 
 
 class ServerOut(BaseModel):

@@ -102,3 +102,46 @@ def test_create_rejects_invalid_transport_config(
         json={"name": "bad", "transport": "http", "config": {}},
     )
     assert response.status_code == 422
+
+
+def test_create_refuses_a_downstream_url_pointed_at_our_own_infrastructure(
+    db: DBHandle, test_verifier: TokenVerifier, make_token: Callable[..., str]
+) -> None:
+    """FR-164: an admin cannot register a server that spends the gateway's position.
+
+    The write-time half. Its value is that the bad row never exists; the row that
+    already exists is caught at connect time (`tests/test_egress.py`).
+    """
+    tenant = uuid4()
+    db.conn.execute("insert into tenants (id, name) values (%s, 'A')", (tenant,))
+    db.conn.commit()
+    client = _client(db.url, test_verifier)
+    token = make_token(tenant_id=str(tenant), role="admin")
+
+    for url in (
+        "http://169.254.169.254/latest/meta-data/",  # cloud instance credentials
+        "http://127.0.0.1:8000/v1/authorize",  # our own control API
+        "file:///etc/passwd",  # not a fetch at all
+    ):
+        refused = client.post(
+            "/v1/servers",
+            headers=_auth(token),
+            json={"name": "evil", "transport": "http", "config": {"url": url}},
+        )
+        assert refused.status_code == 422, url
+
+    # The other half: a tool server on the tenant's own network is registered.
+    created = client.post(
+        "/v1/servers",
+        headers=_auth(token),
+        json={"name": "crm", "transport": "http", "config": {"url": "http://10.0.0.5:9000/mcp"}},
+    )
+    assert created.status_code == 201
+
+    # And a PATCH cannot smuggle in what POST refused.
+    patched = client.patch(
+        f"/v1/servers/{created.json()['id']}",
+        headers=_auth(token),
+        json={"config": {"url": "http://169.254.169.254/latest/meta-data/"}},
+    )
+    assert patched.status_code == 422
