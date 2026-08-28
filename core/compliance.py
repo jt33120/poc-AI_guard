@@ -24,7 +24,7 @@ from typing import Any
 
 import psycopg
 
-from core import audit, export
+from core import audit, corpora, export
 from core import usage as usage_store
 from core.audit import EnforcementMode
 from core.monitor import NEVER_OBSERVED
@@ -309,6 +309,12 @@ def build_evidence_pack(
         "article_26_deployer": {
             "decision_summary": base["summary"],
             "fria": fria_scaffold(base["summary"]),
+            # FR-184 : la provenance des corpus est une **déclaration** de
+            # l'exploitant, et l'article 26 est l'endroit où ses obligations
+            # atterrissent. Elle voyage avec sa péremption : « 12 corpus déclarés »
+            # sans dire que sept n'ont pas été revus depuis deux ans transformerait
+            # une attestation en argument.
+            "corpus_provenance": corpora.provenance_section(conn),
         },
     }
     base["compliant"] = (
