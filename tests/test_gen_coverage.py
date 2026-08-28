@@ -157,3 +157,45 @@ def test_a_row_without_its_applicability_stops_the_map(tmp_path: Path) -> None:
     result = _run(tmp_path, [], registry=_REGISTRY.replace("    profils: [P3]\n", "", 1))
     assert result.returncode != 0
     assert "profils" in result.stderr
+
+
+def test_the_verb_bloquer_is_refused_on_a_line_nothing_publishes_as_blocked(
+    tmp_path: Path,
+) -> None:
+    """FR-175 — the same defect as CM-7, one release further downstream.
+
+    A support that says "we block M-99" when M-99 publishes `Détecté` is a false
+    claim about a security control, made in front of a customer. The gate reads the
+    published mode, so it cannot be argued with.
+    """
+    (tmp_path / "README.md").write_text(
+        "xSOM bloque M-99 nativement, chez vous, aujourd'hui.\n", encoding="utf-8"
+    )
+    result = _run(tmp_path, [], registry=_REGISTRY.replace("mode: B", "mode: D", 1))
+    assert result.returncode == 1
+    assert "« bloquer » attribué à M-99" in result.stderr
+
+
+def test_the_same_sentence_passes_once_the_line_is_actually_blocked(tmp_path: Path) -> None:
+    """The other half. A gate that refused every claim would be one nobody keeps on."""
+    (tmp_path / "README.md").write_text(
+        "xSOM bloque M-99 nativement, chez vous, aujourd'hui.\n", encoding="utf-8"
+    )
+    result = _run(tmp_path, _both("M-99", "dur", "mcp"))
+    assert result.returncode == 0, result.stderr
+    assert "FR-175 = 0" in result.stdout
+
+
+def test_the_mode_name_is_vocabulary_and_not_a_claim(tmp_path: Path) -> None:
+    """The public page's own heading is « un seul mode autorise le verbe bloquer ».
+
+    A gate that failed on the word used to *define* the rule would be a gate nobody
+    could keep switched on, so only conjugated verbs count.
+    """
+    (tmp_path / "README.md").write_text(
+        "M-99 est publiée en mode Bloqué ? Non : cinq modes existent, "
+        "et un seul autorise le verbe « bloquer ».\n",
+        encoding="utf-8",
+    )
+    result = _run(tmp_path, [], registry=_REGISTRY.replace("mode: B", "mode: D", 1))
+    assert result.returncode == 0, result.stderr

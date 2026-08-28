@@ -87,7 +87,7 @@ Trois menaces changent de camp selon le profil. Ce sont elles qu'il faut savoir 
 |---|---|---|
 | **Empoisonnement de données** (M-03) | le client ne détient aucun corpus | **P2** — sa base vectorielle est empoisonnable même s'il n'entraîne rien |
 | **Vol de modèle / extraction** (M-04) | le client ne fait que consommer une API | **P4** — il héberge et expose un modèle, fût-ce en interne |
-| **Attaques adverses** (M-05) | le client ne touche pas aux poids | **P5** seulement — et la conséquence reste bloquée au plan action (§3, M-05) |
+| **Attaques adverses** (M-05) | le client ne touche pas aux poids | **P5** seulement — et la conséquence reste confinée au plan action (§3, M-05) |
 
 ### 2.4 L'angle mort déclaré : l'IA embarquée SaaS (P1b)
 

@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -149,6 +150,84 @@ def _attach_scenarios(facets: list[Facet]) -> list[str]:
         if entry.get("sens"):
             facet.sens_prouves.add(entry["sens"])
     return errors
+
+
+# --- FR-175: only `Bloqué` licenses the verb ------------------------------------
+
+#: Where commercial language lives. A file added here is a file the gate reads;
+#: a support that is not listed is a support nobody checks, which is why the list
+#: is in the repo rather than in someone's head.
+_CLAIM_SOURCES: tuple[str, ...] = (
+    "README.md",
+    "blueprint/**/*.md",
+    "blueprint/**/*.yaml",
+    "docs/product/THREAT-COVERAGE.md",
+    "coverage/COVERAGE-MAP.md",
+)
+
+_BLOCKING_VERB = re.compile(
+    r"\b(bloqu(?:er|ons|ez|ent|e|es|ée?s?|és?)|block(?:s|ed|ing)?)\b", re.IGNORECASE
+)
+
+#: The mode name, exactly as the vocabulary spells it. `Bloqué` is a *noun* here --
+#: the public page's own heading is "cinq modes, et un seul autorise le verbe
+#: « bloquer » ", and the coverage map is a table of them. A gate that failed on the
+#: word used to state the rule is a gate someone switches off within a week.
+#:
+#: The blind spot this buys, stated rather than discovered later: a sentence that
+#: *opens* with the participle ("Bloqué par la policy, l'appel …") reads as the mode
+#: name and is not judged. Every other form is -- lowercase, and every agreement.
+_MODE_NAME = "Bloqué"
+
+
+def _claims_blocking(sentence: str) -> bool:
+    """Whether this sentence uses the verb, as opposed to naming the mode."""
+    return any(m.group(0) != _MODE_NAME for m in _BLOCKING_VERB.finditer(sentence))
+
+
+_ROW_REF = re.compile(r"\bM-\d{2}\b")
+_SENTENCE = re.compile(r"(?<=[.!?;:])\s+|\n")
+
+
+def _check_claims(facets: list[Facet]) -> tuple[list[str], int]:
+    """Refuse the verb "bloquer" on a row nothing publishes as `Bloqué` (`FR-175`).
+
+    A support that says "we block M-13" when M-13 publishes `Détecté` is the same
+    defect as a `Bloqué` claim with no scenario -- one release further downstream,
+    in front of a customer, where it costs the most.
+
+    **What this gate does not see**, said plainly rather than implied: it judges a
+    sentence that names a row. A blocking verb with no row reference is generic
+    prose about the mechanism, and no regular expression can tell an honest one
+    from an overreach. Their count is returned so the number is at least visible.
+    """
+    blocked = {f.row_id for f in facets if f.mode_publie == "B"}
+    known = {f.row_id for f in facets}
+    errors: list[str] = []
+    unattributed = 0
+
+    for pattern in _CLAIM_SOURCES:
+        for path in sorted(_REPO.glob(pattern)):
+            for sentence in _SENTENCE.split(path.read_text(encoding="utf-8")):
+                if not _claims_blocking(sentence):
+                    continue
+                rows = sorted(set(_ROW_REF.findall(sentence)))
+                if not rows:
+                    unattributed += 1
+                    continue
+                for row in rows:
+                    if row not in known:
+                        errors.append(
+                            f"{path.relative_to(_REPO)} : « bloquer » attribué à {row}, "
+                            "qui n'existe pas dans coverage/rows.yaml"
+                        )
+                    elif row not in blocked:
+                        errors.append(
+                            f"{path.relative_to(_REPO)} : « bloquer » attribué à {row}, "
+                            f"qu'aucune facette ne publie « Bloqué »\n"
+                            f"      → {sentence.strip()[:120]}"
+                        )
+    return errors, unattributed
 
 
 def _commit() -> str:
@@ -316,13 +395,20 @@ def main() -> int:
         for manque in f.sens_manquants:
             errors.append(f"{f.row_id}/{f.cle} : {_POURQUOI_SENS[manque]}")
 
+    # FR-175. Same family as CM-7, one release further downstream: a support that
+    # says "we block M-13" is a false claim about a control, made to a customer.
+    claim_errors, unattributed = _check_claims(facets)
+    errors.extend(claim_errors)
+
     if errors:
         print("CM-7 — la carte ne peut pas être publiée :\n", file=sys.stderr)
         for e in errors:
             print(f"  ✗ {e}", file=sys.stderr)
         print(
             "\nSoit le scénario manque et il faut l'écrire, soit la revendication est "
-            "trop forte et il faut la baisser dans coverage/rows.yaml.",
+            "trop forte et il faut la baisser dans coverage/rows.yaml. Pour une phrase "
+            "refusée : réécrivez-la au mode que la ligne publie réellement — c'est plus "
+            "vite fait que de le défendre devant un client.",
             file=sys.stderr,
         )
         return 1
@@ -338,6 +424,10 @@ def main() -> int:
     if args.check:
         n = sum(1 for f in facets if f.mode_publie == "B")
         print(f"CM-7 = 0 — {n} facettes Bloqué prouvées")
+        print(
+            f"FR-175 = 0 — aucun « bloquer » attribué à une ligne non Bloquée "
+            f"({unattributed} occurrences génériques, hors de portée de ce garde)"
+        )
         return 0
 
     commit = _commit()
