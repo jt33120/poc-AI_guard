@@ -77,6 +77,7 @@ select = [
 "core/clients.py" = ["S608"]
 "core/monitor.py" = ["S608"]
 "core/taint_store.py" = ["S608"]
+"core/promotion.py" = ["S608"]
 # RUF001/2/3 flag characters that look like Latin ones. The homoglyph table is
 # made of exactly those characters, on purpose: folding them is how a Cyrillic
 # "о" in an injected instruction stops evading the pattern (FR-153).

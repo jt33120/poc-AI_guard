@@ -191,6 +191,36 @@ class MonitorWindowOut(BaseModel):
     active: bool
 
 
+class PromotionToolLine(BaseModel):
+    """One tool's share of what enforcement would have done."""
+
+    tool: str
+    held: int
+    refused: int
+    dominant_class: str | None = None
+
+
+class PromotionReportOut(BaseModel):
+    """What enforcement would have done over the observed period (FR-180).
+
+    `has_data` exists so the console can tell "nothing was observed" from "nothing
+    would have been held": rendering the second as `0` says the opposite of what
+    the report means (`blueprint/04-ecrans/promotion.yaml`, état `partial`).
+    """
+
+    observations: int
+    held: int
+    refused: int
+    tools: list[PromotionToolLine]
+    windows: int
+    period_from: str | None = None
+    period_to: str | None = None
+    window_still_open: bool
+    has_data: bool
+    statement: str
+    never_observed: list[str]
+
+
 class DecisionRequest(BaseModel):
     """Operator decision on a pending approval."""
 

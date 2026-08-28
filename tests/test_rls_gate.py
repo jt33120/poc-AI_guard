@@ -123,3 +123,49 @@ def test_the_parser_sees_every_table_the_cluster_has(db: DBHandle) -> None:
         "They entered `public` by a route this gate does not read, so nothing checks "
         "their RLS at review time."
     )
+
+
+_PRIVILEGE_FOR = {
+    "SELECT": "select",
+    "INSERT": "insert",
+    "UPDATE": "update",
+    "DELETE": "delete",
+    "ALL": "select",
+}
+
+
+def test_every_rls_policy_can_actually_be_exercised(db: DBHandle) -> None:
+    """A policy without the matching grant is an authorisation nobody can use.
+
+    In Postgres, RLS filters rows **after** the privilege check. So
+    `create policy ... for select to authenticated` with no `grant select` does not
+    fail, does not warn, and reads in review exactly like a working authorisation —
+    while the role it names can never exercise it. It is the RLS shape of a policy
+    key that parses with no effect, and it is how `monitor_windows` and
+    `session_taint` shipped in 0017 and 0018.
+
+    Thirteen tables had it right at the time this test was written. It exists so the
+    fourteenth cannot get it wrong quietly: the two halves are written together or
+    the build says which one is missing.
+    """
+    rows = db.conn.execute(
+        "select p.tablename, p.policyname, p.cmd, r.rolname "
+        "from pg_policies p cross join lateral unnest(p.roles) as r(rolname) "
+        "where p.schemaname = 'public' and r.rolname <> 'public' "
+        "order by p.tablename, p.policyname"
+    ).fetchall()
+    assert rows, "no RLS policies found — the gate would pass vacuously"
+
+    orphans = [
+        f"{table}.{policy} ({cmd} to {role})"
+        for table, policy, cmd, role in rows
+        if not db.conn.execute(
+            "select has_table_privilege(%s, %s, %s)",
+            (role, table, _PRIVILEGE_FOR.get(cmd, "select")),
+        ).fetchone()[0]  # type: ignore[index]
+    ]
+    assert not orphans, (
+        f"these RLS policies name a role that lacks the privilege to use them: {orphans}. "
+        "Either add the matching `grant`, or drop the policy — a policy nobody can "
+        "exercise is not a permission, it is a claim about one."
+    )

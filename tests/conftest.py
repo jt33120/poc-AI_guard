@@ -32,6 +32,27 @@ _TEST_KID = "test-key"
 # ---------------------------------------------------------------------------
 # Settings / HTTP client
 # ---------------------------------------------------------------------------
+@pytest.fixture(autouse=True)
+def _hermetic_settings_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Clear every environment name `Settings` reads, before each test.
+
+    `Settings` has no `env_prefix`, so it reads bare names — `SUPABASE_URL`,
+    `MISTRAL_API_KEY`, `SENTRY_DSN`. Tests pass `_env_file=None`, which disables the
+    `.env` *file* and nothing else: `os.environ` still wins. The suite's verdict
+    therefore depended on the developer's shell, and it silently did the wrong
+    thing in exactly the tests that matter — a machine with `MISTRAL_API_KEY`
+    exported reported the judge as configured, so `doctor` looked healthier than
+    the deployment was, and a machine with `SUPABASE_URL` set reported an issuer
+    that no configuration had provided. Both pass in CI, where neither is set.
+
+    Derived from `model_fields` rather than listed, so a setting added tomorrow is
+    covered without anyone remembering this fixture exists.
+    """
+    for field in Settings.model_fields:
+        monkeypatch.delenv(field.upper(), raising=False)
+        monkeypatch.delenv(field.lower(), raising=False)
+
+
 @pytest.fixture
 def dev_settings() -> Settings:
     """Deterministic dev settings, isolated from any local .env file."""
