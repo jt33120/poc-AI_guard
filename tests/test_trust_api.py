@@ -13,6 +13,11 @@ from core import audit
 from core.config import Settings
 from tests.conftest import DBHandle
 
+# `log_event` requires the ingestion adapter to name its door (FR-160). These
+# tests exercise the audit store itself, not a door, so they all state the same
+# one; the tests that care which door it was assert on it explicitly.
+_ORIGIN = audit.Origin.mcp_gateway()
+
 
 def _client(db_url: str, verifier: TokenVerifier) -> TestClient:
     app = create_app(Settings(_env_file=None, env="dev", database_url=db_url))
@@ -36,9 +41,15 @@ def test_trust_view_reports_streaks(
 ) -> None:
     tenant = _tenant(db)
     for _ in range(5):
-        audit.log_event(db.conn, tenant_id=tenant, decision="allow", tool_name="crm.read")
-    audit.log_event(db.conn, tenant_id=tenant, decision="deny", tool_name="crm.write")
-    audit.log_event(db.conn, tenant_id=tenant, decision="allow", tool_name="crm.write")
+        audit.log_event(
+            db.conn, tenant_id=tenant, decision="allow", tool_name="crm.read", origin=_ORIGIN
+        )
+    audit.log_event(
+        db.conn, tenant_id=tenant, decision="deny", tool_name="crm.write", origin=_ORIGIN
+    )
+    audit.log_event(
+        db.conn, tenant_id=tenant, decision="allow", tool_name="crm.write", origin=_ORIGIN
+    )
 
     client = _client(db.url, test_verifier)
     rows = client.get("/v1/trust", headers=_auth(make_token(tenant_id=tenant, role="viewer")))
@@ -53,7 +64,9 @@ def test_trust_view_is_tenant_isolated(
     db: DBHandle, test_verifier: TokenVerifier, make_token: Callable[..., str]
 ) -> None:
     tenant = _tenant(db)
-    audit.log_event(db.conn, tenant_id=tenant, decision="allow", tool_name="crm.read")
+    audit.log_event(
+        db.conn, tenant_id=tenant, decision="allow", tool_name="crm.read", origin=_ORIGIN
+    )
     client = _client(db.url, test_verifier)
     other = make_token(tenant_id=str(uuid4()), role="viewer")
     assert client.get("/v1/trust", headers=_auth(other)).json() == []

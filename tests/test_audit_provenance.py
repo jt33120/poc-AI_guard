@@ -19,6 +19,11 @@ import psycopg
 from core import audit
 from tests.conftest import DBHandle
 
+# `log_event` requires the ingestion adapter to name its door (FR-160). These
+# tests exercise the audit store itself, not a door, so they all state the same
+# one; the tests that care which door it was assert on it explicitly.
+_ORIGIN = audit.Origin.mcp_gateway()
+
 
 def _rows(conn: psycopg.Connection) -> list[dict[str, Any]]:
     return audit.list_events(conn)
@@ -34,6 +39,7 @@ def test_a_declared_identifier_never_becomes_the_entrys_identity(db: DBHandle) -
         request_id="srv-derived-0001",
         client_request_id="whatever-the-agent-called-it",
         upstream_request_id="chatcmpl-chosen-by-the-provider",
+        origin=_ORIGIN,
     )
     db.conn.commit()
 
@@ -55,7 +61,12 @@ def test_declared_values_stay_out_of_the_hashed_payload(db: DBHandle) -> None:
     """
     tenant_a, tenant_b = uuid4().hex, uuid4().hex
     plain = audit.log_event(
-        db.conn, tenant_id=tenant_a, decision="allow", tool_name="t", request_id="fixed"
+        db.conn,
+        tenant_id=tenant_a,
+        decision="allow",
+        tool_name="t",
+        request_id="fixed",
+        origin=_ORIGIN,
     )
     embellished = audit.log_event(
         db.conn,
@@ -65,6 +76,7 @@ def test_declared_values_stay_out_of_the_hashed_payload(db: DBHandle) -> None:
         request_id="fixed",
         client_request_id="../../etc/passwd",
         upstream_request_id="' or 1=1 --",
+        origin=_ORIGIN,
     )
     db.conn.commit()
     # Different tenants, so both start from GENESIS; the payloads differ only by
@@ -95,6 +107,7 @@ def test_the_chain_still_verifies_across_the_new_columns(db: DBHandle) -> None:
             tool_name=f"t{index}",
             request_id=uuid4().hex,
             client_request_id=f"agent-{index}" if index % 2 else None,
+            origin=_ORIGIN,
         )
     db.conn.commit()
     result = audit.verify_chain(db.conn, tenant)

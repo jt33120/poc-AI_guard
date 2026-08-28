@@ -7,6 +7,11 @@ import pytest
 from core import audit, compliance
 from tests.conftest import DBHandle
 
+# `log_event` requires the ingestion adapter to name its door (FR-160). These
+# tests exercise the audit store itself, not a door, so they all state the same
+# one; the tests that care which door it was assert on it explicitly.
+_ORIGIN = audit.Origin.mcp_gateway()
+
 _TENANT = "00000000-0000-0000-0000-000000000001"  # usage_events.tenant_id is uuid
 
 
@@ -54,15 +59,15 @@ def test_enforce_retention_purge_refuses_below_floor(db: DBHandle) -> None:
 
 # --- article 12: chain integrity --------------------------------------------
 def test_chain_integrity_reports_ok(db: DBHandle) -> None:
-    audit.log_event(db.conn, tenant_id="t1", decision="allow", tool_name="a.b")
-    audit.log_event(db.conn, tenant_id="t1", decision="deny", tool_name="a.c")
+    audit.log_event(db.conn, tenant_id="t1", decision="allow", tool_name="a.b", origin=_ORIGIN)
+    audit.log_event(db.conn, tenant_id="t1", decision="deny", tool_name="a.c", origin=_ORIGIN)
     result = compliance.chain_integrity(db.conn, "t1")
     assert result["ok"] is True and result["entries"] == 2 and result["first_broken_id"] is None
 
 
 def test_chain_integrity_reports_tampering(db: DBHandle) -> None:
-    audit.log_event(db.conn, tenant_id="t1", decision="allow", tool_name="a.b")
-    audit.log_event(db.conn, tenant_id="t1", decision="allow", tool_name="a.c")
+    audit.log_event(db.conn, tenant_id="t1", decision="allow", tool_name="a.b", origin=_ORIGIN)
+    audit.log_event(db.conn, tenant_id="t1", decision="allow", tool_name="a.c", origin=_ORIGIN)
     with db.conn.transaction():
         db.conn.execute("set local session_replication_role = replica")
         db.conn.execute(
@@ -75,22 +80,36 @@ def test_chain_integrity_reports_tampering(db: DBHandle) -> None:
 # --- article 14: human oversight coverage -----------------------------------
 def test_oversight_flags_auto_allowed_irreversible(db: DBHandle) -> None:
     # An irreversible action that was auto-allowed = an oversight gap.
-    audit.log_event(db.conn, tenant_id="t1", decision="allow", action_class="irreversible")
+    audit.log_event(
+        db.conn, tenant_id="t1", decision="allow", action_class="irreversible", origin=_ORIGIN
+    )
     coverage = compliance.oversight_coverage(db.conn)
     assert coverage["gated"] == 1 and coverage["auto_allowed"] == 1
     assert coverage["coverage_ok"] is False
 
 
 def test_oversight_ok_when_gated_by_human(db: DBHandle) -> None:
-    audit.log_event(db.conn, tenant_id="t1", decision="hitl_approved", action_class="irreversible")
-    audit.log_event(db.conn, tenant_id="t1", decision="allow", action_class="read")
+    audit.log_event(
+        db.conn,
+        tenant_id="t1",
+        decision="hitl_approved",
+        action_class="irreversible",
+        origin=_ORIGIN,
+    )
+    audit.log_event(db.conn, tenant_id="t1", decision="allow", action_class="read", origin=_ORIGIN)
     coverage = compliance.oversight_coverage(db.conn)
     assert coverage["auto_allowed"] == 0 and coverage["coverage_ok"] is True
 
 
 # --- readiness status --------------------------------------------------------
 def test_status_ready_when_clean(db: DBHandle) -> None:
-    audit.log_event(db.conn, tenant_id="t1", decision="hitl_approved", action_class="irreversible")
+    audit.log_event(
+        db.conn,
+        tenant_id="t1",
+        decision="hitl_approved",
+        action_class="irreversible",
+        origin=_ORIGIN,
+    )
     st = compliance.status(db.conn, "t1", retention_floor_days=183)
     assert st["chain_ok"] is True and st["oversight_coverage_ok"] is True
     assert st["retention_ok"] is True and st["ready"] is True
@@ -98,14 +117,20 @@ def test_status_ready_when_clean(db: DBHandle) -> None:
 
 
 def test_status_not_ready_when_retention_floor_too_low(db: DBHandle) -> None:
-    audit.log_event(db.conn, tenant_id="t1", decision="allow", action_class="read")
+    audit.log_event(db.conn, tenant_id="t1", decision="allow", action_class="read", origin=_ORIGIN)
     st = compliance.status(db.conn, "t1", retention_floor_days=90)
     assert st["retention_ok"] is False and st["ready"] is False
 
 
 # --- article 26 / evidence pack ---------------------------------------------
 def test_evidence_pack_carries_article_mapping(db: DBHandle) -> None:
-    audit.log_event(db.conn, tenant_id="t1", decision="hitl_approved", action_class="irreversible")
+    audit.log_event(
+        db.conn,
+        tenant_id="t1",
+        decision="hitl_approved",
+        action_class="irreversible",
+        origin=_ORIGIN,
+    )
     events = audit.list_events(db.conn)
     pack = compliance.build_evidence_pack(
         db.conn, tenant_id="t1", events=events, approvals=[], retention_floor_days=183

@@ -8,10 +8,29 @@ import pytest
 from core import audit
 from tests.conftest import DBHandle
 
+# `log_event` requires the ingestion adapter to name its door (FR-160). These
+# tests exercise the audit store itself, not a door, so they all state the same
+# one; the tests that care which door it was assert on it explicitly.
+_ORIGIN = audit.Origin.mcp_gateway()
+
 
 def test_log_event_chains_entries(db: DBHandle) -> None:
-    audit.log_event(db.conn, tenant_id="t1", decision="allow", tool_name="a.b", args_hash="x" * 64)
-    audit.log_event(db.conn, tenant_id="t1", decision="deny", tool_name="a.c", args_hash="y" * 64)
+    audit.log_event(
+        db.conn,
+        tenant_id="t1",
+        decision="allow",
+        tool_name="a.b",
+        args_hash="x" * 64,
+        origin=_ORIGIN,
+    )
+    audit.log_event(
+        db.conn,
+        tenant_id="t1",
+        decision="deny",
+        tool_name="a.c",
+        args_hash="y" * 64,
+        origin=_ORIGIN,
+    )
     rows = db.conn.execute("select prev_hash, entry_hash from audit_log order by id").fetchall()
     assert rows[0][0] == audit.GENESIS
     assert rows[1][0] == rows[0][1]  # each entry chains to the previous one
@@ -20,8 +39,8 @@ def test_log_event_chains_entries(db: DBHandle) -> None:
 
 
 def test_verify_chain_detects_tampering(db: DBHandle) -> None:
-    audit.log_event(db.conn, tenant_id="t1", decision="allow", tool_name="a.b")
-    audit.log_event(db.conn, tenant_id="t1", decision="allow", tool_name="a.c")
+    audit.log_event(db.conn, tenant_id="t1", decision="allow", tool_name="a.b", origin=_ORIGIN)
+    audit.log_event(db.conn, tenant_id="t1", decision="allow", tool_name="a.c", origin=_ORIGIN)
     # Simulate an attacker with elevated access bypassing the append-only triggers.
     with db.conn.transaction():
         db.conn.execute("set local session_replication_role = replica")
@@ -33,7 +52,7 @@ def test_verify_chain_detects_tampering(db: DBHandle) -> None:
 
 
 def test_only_args_hash_is_stored(db: DBHandle) -> None:
-    audit.log_event(db.conn, tenant_id="t1", decision="allow", args_hash="a" * 64)
+    audit.log_event(db.conn, tenant_id="t1", decision="allow", args_hash="a" * 64, origin=_ORIGIN)
     row = db.conn.execute("select args_hash from audit_log limit 1").fetchone()
     assert row is not None and len(row[0]) == 64
     cols = {
@@ -46,7 +65,7 @@ def test_only_args_hash_is_stored(db: DBHandle) -> None:
 
 
 def test_append_only_triggers_block_update_and_delete(db: DBHandle) -> None:
-    audit.log_event(db.conn, tenant_id="t1", decision="allow")
+    audit.log_event(db.conn, tenant_id="t1", decision="allow", origin=_ORIGIN)
     with pytest.raises(psycopg.errors.RaiseException):
         db.conn.execute("update audit_log set decision = 'x'")
     db.conn.rollback()
@@ -56,8 +75,8 @@ def test_append_only_triggers_block_update_and_delete(db: DBHandle) -> None:
 
 
 def test_chain_is_per_tenant(db: DBHandle) -> None:
-    audit.log_event(db.conn, tenant_id="t1", decision="allow")
-    audit.log_event(db.conn, tenant_id="t2", decision="allow")
+    audit.log_event(db.conn, tenant_id="t1", decision="allow", origin=_ORIGIN)
+    audit.log_event(db.conn, tenant_id="t2", decision="allow", origin=_ORIGIN)
     rows = db.conn.execute("select prev_hash from audit_log order by id").fetchall()
     assert all(r[0] == audit.GENESIS for r in rows)  # each tenant starts from GENESIS
     assert audit.verify_chain(db.conn).ok is True

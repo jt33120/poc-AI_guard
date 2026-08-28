@@ -13,6 +13,11 @@ from core import audit
 from core.config import Settings
 from tests.conftest import DBHandle
 
+# `log_event` requires the ingestion adapter to name its door (FR-160). These
+# tests exercise the audit store itself, not a door, so they all state the same
+# one; the tests that care which door it was assert on it explicitly.
+_ORIGIN = audit.Origin.mcp_gateway()
+
 
 def _client(db_url: str, verifier: TokenVerifier, *, retention_days: int = 183) -> TestClient:
     app = create_app(
@@ -40,9 +45,15 @@ def test_status_ready_when_clean(
 ) -> None:
     tenant = _tenant(db)
     audit.log_event(
-        db.conn, tenant_id=tenant, decision="hitl_approved", action_class="irreversible"
+        db.conn,
+        tenant_id=tenant,
+        decision="hitl_approved",
+        action_class="irreversible",
+        origin=_ORIGIN,
     )
-    audit.log_event(db.conn, tenant_id=tenant, decision="allow", action_class="read")
+    audit.log_event(
+        db.conn, tenant_id=tenant, decision="allow", action_class="read", origin=_ORIGIN
+    )
     client = _client(db.url, test_verifier)
     token = make_token(tenant_id=tenant, role="viewer")
 
@@ -60,7 +71,9 @@ def test_status_flags_oversight_gap(
 ) -> None:
     tenant = _tenant(db)
     # An irreversible action auto-allowed = an oversight gap -> not ready.
-    audit.log_event(db.conn, tenant_id=tenant, decision="allow", action_class="irreversible")
+    audit.log_event(
+        db.conn, tenant_id=tenant, decision="allow", action_class="irreversible", origin=_ORIGIN
+    )
     client = _client(db.url, test_verifier)
     token = make_token(tenant_id=tenant, role="viewer")
 
@@ -74,7 +87,9 @@ def test_status_not_ready_when_retention_floor_too_low(
     db: DBHandle, test_verifier: TokenVerifier, make_token: Callable[..., str]
 ) -> None:
     tenant = _tenant(db)
-    audit.log_event(db.conn, tenant_id=tenant, decision="allow", action_class="read")
+    audit.log_event(
+        db.conn, tenant_id=tenant, decision="allow", action_class="read", origin=_ORIGIN
+    )
     client = _client(db.url, test_verifier, retention_days=90)  # below the 183-day floor
     token = make_token(tenant_id=tenant, role="viewer")
 
@@ -88,7 +103,9 @@ def test_status_is_tenant_isolated(
     db: DBHandle, test_verifier: TokenVerifier, make_token: Callable[..., str]
 ) -> None:
     tenant = _tenant(db)
-    audit.log_event(db.conn, tenant_id=tenant, decision="allow", action_class="read")
+    audit.log_event(
+        db.conn, tenant_id=tenant, decision="allow", action_class="read", origin=_ORIGIN
+    )
     client = _client(db.url, test_verifier)
     other = make_token(tenant_id=str(uuid4()), role="viewer")
 
@@ -101,9 +118,15 @@ def test_export_json_and_pdf(
 ) -> None:
     tenant = _tenant(db)
     audit.log_event(
-        db.conn, tenant_id=tenant, decision="hitl_approved", action_class="irreversible"
+        db.conn,
+        tenant_id=tenant,
+        decision="hitl_approved",
+        action_class="irreversible",
+        origin=_ORIGIN,
     )
-    audit.log_event(db.conn, tenant_id=tenant, decision="deny", action_class="external_send")
+    audit.log_event(
+        db.conn, tenant_id=tenant, decision="deny", action_class="external_send", origin=_ORIGIN
+    )
     client = _client(db.url, test_verifier)
     token = make_token(tenant_id=tenant, role="admin")
 

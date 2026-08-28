@@ -276,6 +276,9 @@ class AuditEntry(BaseModel):
     user_id: str | None
     request_id: str | None
     gateway_token_id: str | None = None
+    # Which door, and in what posture. Null on entries written before 0020.
+    ingress: str | None = None
+    enforcement_mode: str | None = None
     declared: DeclaredIdentifiers = Field(default_factory=DeclaredIdentifiers)
 
 

@@ -265,6 +265,9 @@ def _inspect(
                 request_id=request_id,
                 upstream_request_id=upstream_id,
                 gateway_token_id=gateway_token_id,
+                # `observing` was read from the control plane in `_observing`, never
+                # from this request -- which is the whole of FR-160 on this path.
+                origin=audit.Origin.llm_proxy(observing=observing),
             )
         if usage is not None:
             model, prompt_tokens, completion_tokens = usage
@@ -337,6 +340,10 @@ def _audit_egress(
                 args_hash=scan.digest(),
                 error="dlp:" + ",".join(scan.kinds),
                 gateway_token_id=gateway_token_id,
+                # `enforcing`, and not because nobody passed anything: an observation
+                # window relaxes *tool calls* it may cover (`monitor.observes`), never
+                # egress DLP, which is about what leaves rather than what is done.
+                origin=audit.Origin.llm_proxy(observing=False),
             )
             conn.commit()
     except Exception:  # audit is best-effort; a blocked call stays blocked regardless

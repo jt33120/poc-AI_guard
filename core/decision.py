@@ -65,6 +65,9 @@ def _audit(
             args_hash=args_hash,
             gateway_token_id=gateway_token_id,
             client_request_id=client_request_id,
+            # The cooperative door. Fixed here, not passed in: an adapter states
+            # what it is, it does not accept being told (FR-160).
+            origin=audit.Origin.authorize_api(),
         )
 
 
