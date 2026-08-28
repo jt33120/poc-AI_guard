@@ -151,6 +151,16 @@ rows:
       # marché, et il n'en existe pas dont la décision reste dans le périmètre. La
       # facette est donc déclassée en `Hors périmètre` par FR-178 -- on retire la
       # revendication plutôt que de la tenir par un chemin qui contredit le discours.
+      # FR-185 / G-08 : la DLP entre dans la décision *post-taint*. Facette distincte
+      # de `egress` — celle-ci porte sur le chemin MCP et sur les arguments d'une
+      # action, pas sur le scan du prompt sortant du proxy. Les confondre publierait
+      # une preuve MCP sous une revendication `llm_proxy`.
+      - cle: post_taint
+        libelle: "cible d'exfiltration dans les arguments d'une action post-taint"
+        mode: B
+        ingress: [mcp]
+        gaps: [G-08]
+
       - cle: decouverte
         libelle: "découverte du Shadow AI non supervisé"
         mode: O

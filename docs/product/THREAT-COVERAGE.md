@@ -146,7 +146,7 @@ Légende écart : ✅ couvert · ⚠️ partiel / durci à faire · ❌ absent
 
 | # | Menace | Mode | État réel du code | Écart |
 |---|---|---|---|---|
-| **M-10** | Exfiltration de données / PI via LLM | **B** (chemin supervisé) / **O** (découverte) | ✅ `core/dlp.py:59-75` (secret bloqué / PII signalé / entropie), `api/llm_proxy.py`, coffre `core/secrets.py`. ⚠️ `FR-64` (DLP post-taint) **différé**. ❌ Découverte du Shadow AI non supervisé = territoire CASB. | `G-08` `G-09` |
+| **M-10** | Exfiltration de données / PI via LLM | **B** (chemin supervisé) / **O** (découverte) | ✅ `core/dlp.py:59-75` (secret bloqué / PII signalé / entropie), `api/llm_proxy.py`, coffre `core/secrets.py`. ✅ `FR-64` (DLP post-taint) livré — facette `post_taint`. ❌ Découverte du Shadow AI non supervisé = territoire CASB. | `G-08` `G-09` |
 | **M-11** | Supply chain (modèles / bibliothèques) | **B** (outils MCP) / **A** (libs) / **O** (modèles ML) | ✅ Outils MCP : empreinte + quarantaine, `gateway/server.py:130-134`, `FR-53/54/68` — différenciateur revendiqué (PRD.md:1087). ✅ Libs : SBOM `FR-141`, `pip-audit` + `trufflehog` en CI. ❌ Modèles ML (picklescan/modelscan) : absent. | `G-10` |
 
 **M-10 — Chemin d'ingestion (`AD-28`).** Le `Bloqué` porte sur l'**egress du proxy LLM**, et il y est inconditionnel : le blocage DLP précède l'appel amont et la branche streaming, donc ni l'en-tête `x-xsom-mode` ni le mode flux ne l'atteignent (§8.3). Il ne porte **pas** sur la garde d'appels d'outils du même proxy, qui relève de `M-06`/`M-12` et tombe sous `G-25`/`G-26`.
@@ -158,7 +158,7 @@ Légende écart : ✅ couvert · ⚠️ partiel / durci à faire · ❌ absent
 | # | Menace | Mode | État réel du code | Écart |
 |---|---|---|---|---|
 | **M-12** | Privilèges excessifs (excessive agency) | **B** | ✅ RBAC par outil `gateway/server.py:238-252`, jetons scopés, défaut `unknown_tool: deny` (`FR-107`). ⚠️ `FR-44/45/81` différés. **⛔ `core/policy.py:252-256` : fail-open confirmé.** | `G-11` |
-| **M-13** | Traitement non sécurisé des sorties | **D** + O | ❌ Rien. `FR-69` enregistre volontairement « statut et classe d'erreur uniquement — jamais le corps du résultat » (PRD.md:576). | `G-12` |
+| **M-13** | Traitement non sécurisé des sorties | **D** + O | ✅ `gateway/taint.py` — charge exécutable détectée sur le canal du taint, qui porte déjà le corps du résultat là où `FR-69` ne journalise que statut et classe d'erreur. Reste `D` : ce qui est bloqué est l'action *suivante*, pas le résultat. | ~~`G-12`~~ |
 | **M-14** | Fuite du system prompt & secrets | **B** (secrets) / **O** (prompt) | ✅ Coffre `core/secrets.py`, `FR-111` rejette les secrets inline, `FR-37` les exclut des événements, `gen_ai.system_instructions` sur liste de rejet à l'ingestion (`FR-137`). ❌ Détection de fuite du prompt lui-même : absent. | `G-13` |
 
 **M-13 — l'opportunité asymétrique.** Le produit affirme ne pas lire les résultats d'outils… alors que **le garde de taint les lit déjà** (`gateway/taint.py:35`). Le canal de lecture existe et est instrumenté. Étendre la détection aux charges exécutables (SQL/HTML/shell) dans les sorties est donc bien moins coûteux qu'il n'y paraît : c'est un détecteur supplémentaire sur un flux déjà scanné, pas un nouveau plan d'architecture.
@@ -262,11 +262,11 @@ Chaque `G-nn` deviendra une ou plusieurs exigences fonctionnelles, numérotées 
 | `G-05` | Détecteur d'extraction déterministe (volume / motif de requêtage) + alerte | M-04 | Moyenne |
 | `G-06` | ~~Classification déterministe des outils exécuteurs~~ — **fermé.** `classify: by_argument` + prédicat borné (`core/predicates.py`) : un exécuteur est classé par ce qu'on lui demande, sans juge, tout imprévu prenant le plafond déclaré. | M-06, M-15 | ✅ |
 | `G-07` | **Requalifié** : contrainte *sur du non-construit*, pas défaut vivant. Il n'existe aucun canal d'approbation interactif — `core/notify.py` envoie un e-mail portant un identifiant, jamais un porteur, et `POST /v1/approvals/{id}/decision` prend l'identité du décideur dans le JWT vérifié, jamais du payload. À tenir le jour où un canal est construit (`FR-159`) ; l'invariant est désormais asserté. | M-08 | ✅ (invariant verrouillé) |
-| `G-08` | Activation de `FR-64` (DLP en entrée des décisions post-taint) | M-10 | Haute |
+| ~~`G-08`~~ | ~~Activation de `FR-64` (DLP en entrée des décisions post-taint)~~ — **fermé** (`FR-185`). Une cible en forme d'exfiltration dans les **arguments** d'une action post-taint élève le verdict, y compris pour une classe que la policy ne gate pas : un `write` vers un webhook externe passe en temps normal, pas dans une session où une injection vient d'être détectée. Facette `M-10 / post_taint` distincte de `egress` — celle-ci porte sur le chemin MCP et sur les arguments, pas sur le scan du prompt sortant. Le coût en faux positifs est borné par le taint lui-même. | M-10 | ✅ |
 | `G-09` | Inventaire du Shadow AI : découverte des outils non supervisés (orchestré) | M-10 | Moyenne |
 | `G-10` | Analyse d'artefacts de modèles ML (orchestré) + entrée au registre | M-11 | Basse |
 | `G-11` | Fail-closed sur clé de contrainte inconnue — EXH-2 | M-12 | **Critique (D-2)** |
-| `G-12` | Détection de charge exécutable dans les résultats d'outils (extension du canal de taint) | M-13 | Moyenne |
+| ~~`G-12`~~ | ~~Détection de charge exécutable dans les résultats d'outils~~ — **fermé** (`FR-186`). Branchée sur le canal du taint, qui porte déjà le corps du résultat, plutôt que sur un second chemin d'inspection. Périmètre étroit et assumé : tube vers un interpréteur, URI `data:` porteuse de HTML, shebang, `eval`/`exec` sur chaîne, `<script>` **couplé à** une exfiltration — et un blob base64 qui *décode* vers l'un de ceux-là. `<script>` seul n'est pas un signal : une page récupérée en contient presque toujours. | M-13 | ✅ |
 | `G-13` | Détection de fuite de system prompt sur l'egress (orchestré / extension DLP) | M-14 | Basse |
 | `G-14` | Ingestion de verdicts SAST/DAST comme preuve chaînée (`FR-145`, différé) | M-15 | Basse |
 | `G-15` | Attestation « décision critique sous revue humaine » adossée au HITL existant | M-16 | Faible coût, fort rendement |
