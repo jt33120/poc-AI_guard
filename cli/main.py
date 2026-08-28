@@ -17,9 +17,11 @@ import argparse
 import getpass
 import os
 import sys
+import textwrap
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
 from uuid import UUID
 
@@ -27,10 +29,21 @@ import psycopg
 from pydantic import ValidationError
 from pydantic_settings import SettingsError
 
-from core import db, migrate, secrets, signup, tenant_tokens
+from core import db, migrate, secrets, signup, tenant_tokens, triage
 from core.config import Settings, get_settings
 from core.notify import SmtpNotifier, build_notifier
 from core.schemas import SignupRequest
+
+_PUBLISHED_MAP = Path(__file__).resolve().parents[1] / "coverage" / "map.json"
+
+_MODE_LABEL = {
+    "B": "Bloqué",
+    "D": "Détecté",
+    "O": "Orchestré",
+    "A": "Attesté",
+    "X": "Hors périmètre",
+    "NA": "non asserté",
+}
 
 #: Environment variable carrying the console admin password for ``bootstrap``.
 #: Never a command-line flag: argv is world-readable in ``ps`` and is kept by the
@@ -599,6 +612,46 @@ def cmd_doctor(settings: Settings, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_triage(settings: Settings, args: argparse.Namespace) -> int:
+    """Position a client on the usage profiles and print what actually concerns them.
+
+    Takes no database and no settings: the diagnostic is a conversation held in
+    front of a prospect, not a query against their deployment.
+    """
+    del settings
+    try:
+        held = triage.parse_profiles(args.profils)
+    except ValueError as exc:
+        print(f"triage: {exc}", file=sys.stderr)
+        return 2
+    carte = Path(args.carte) if args.carte else _PUBLISHED_MAP
+    try:
+        report = triage.diagnose(carte, held)
+    except triage.MapUnavailable as exc:
+        print(f"triage: {exc}", file=sys.stderr)
+        return 1
+
+    held_labels = ", ".join(f"{p.value} ({p.label})" for p in sorted(held, key=lambda p: p.value))
+    print(f"Profil retenu : {held_labels}\n")
+    print(textwrap.fill(report.statement(), width=88))
+
+    print("\nCe qui vous concerne")
+    for line in report.applicable:
+        # The owner is printed on applicable lines too: "phishing concerns you, and
+        # reception belongs to your mail gateway" is a more useful sentence than a
+        # row of `Hors périmètre` with no explanation of whose scope it is in.
+        print(f"  {line.id}  {line.titre}  —  {line.owner}")
+        for lib, mode in line.facets:
+            print(f"        {lib} : {_MODE_LABEL[mode]}")
+
+    if report.not_applicable:
+        print("\nCe qui ne vous concerne pas, et qui le porte")
+        for line in report.not_applicable:
+            print(f"  {line.id}  {line.titre}")
+            print(f"        {line.owner}")
+    return 0
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -606,7 +659,9 @@ def build_parser() -> argparse.ArgumentParser:
     """The command surface. Kept flat: an operator should not have to explore it."""
     parser = argparse.ArgumentParser(
         prog="python -m cli",
-        description="xSOM AI Guard — operator commands (migrate, bootstrap, token, doctor).",
+        description=(
+            "xSOM AI Guard — operator commands (migrate, bootstrap, token, doctor, triage)."
+        ),
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -644,6 +699,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     sub.add_parser("doctor", help="diagnose this deployment and print what to fix")
+
+    triage_cmd = sub.add_parser(
+        "triage", help="position a client on the usage profiles and print what concerns them"
+    )
+    triage_cmd.add_argument(
+        "--profils",
+        required=True,
+        help=(
+            "comma-separated usage profiles, e.g. P1a,P2,P3 "
+            "(see docs/product/THREAT-COVERAGE.md §2.2)"
+        ),
+    )
+    triage_cmd.add_argument(
+        "--carte",
+        help="published coverage map to quote (default: coverage/map.json in this checkout)",
+    )
     return parser
 
 
@@ -652,6 +723,7 @@ _COMMANDS = {
     "bootstrap": cmd_bootstrap,
     "token": cmd_token,
     "doctor": cmd_doctor,
+    "triage": cmd_triage,
 }
 
 

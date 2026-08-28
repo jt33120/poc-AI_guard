@@ -353,6 +353,11 @@ def main() -> int:
                 "libelle": f.libelle,
                 "mode_revendique": f.mode_revendique,
                 "mode_publie": f.mode_publie,
+                # The applicability axis travels with the machine-readable map, so a
+                # downstream reader (the client diagnostic, a published fragment)
+                # never has to re-derive it -- or derive it differently.
+                "famille": f.family.value,
+                "profils": sorted(p.value for p in f.profiles),
                 "ingress_prouve": sorted(f.prouve),
                 "ingress_non_asserte": f.ingress_manquants,
                 "sens_prouves": sorted(f.sens_prouves),

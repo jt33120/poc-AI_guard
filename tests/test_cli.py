@@ -6,6 +6,7 @@ deployment — so these tests also cover the upgrade path an existing operator h
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
@@ -478,3 +479,63 @@ def test_a_bad_env_file_value_is_reported_not_raised(db: DBHandle) -> None:
     assert "Traceback" not in result.stderr
     assert "invalid configuration" in result.stderr
     assert "audit_retention_days" in result.stderr
+
+
+def test_triage_positions_a_client_and_refuses_to_invent_a_map(
+    db: DBHandle, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    """FR-172 at the operator's fingertips, including what it does with no map.
+
+    The absent-map path matters more than it looks: `coverage/map.json` is derived
+    and gitignored, so "no map" is the state of a fresh checkout. Printing a
+    diagnostic there would mean claiming coverage nothing has proven.
+    """
+    settings = _settings(db)
+
+    absent = _run(
+        ["triage", "--profils", "P3", "--carte", str(tmp_path / "nope.json")], settings, capsys
+    )
+    assert absent[0] == 1
+    assert "rien ne peut être annoncé" in absent[1]
+
+    unknown = _run(["triage", "--profils", "P9"], settings, capsys)
+    assert unknown[0] == 2
+    assert "unknown profile" in unknown[1]
+
+    carte = tmp_path / "map.json"
+    carte.write_text(
+        json.dumps(
+            {
+                "facettes": [
+                    {
+                        "menace": "M-06",
+                        "titre": "Piratage d'agents autonomes",
+                        "facette": "chaine",
+                        "libelle": "chaîne de contrôle complète",
+                        "mode_revendique": "B",
+                        "mode_publie": "B",
+                        "famille": "usage_ia",
+                        "profils": ["P3"],
+                    },
+                    {
+                        "menace": "M-05",
+                        "titre": "Attaques par évasion",
+                        "facette": "robustesse",
+                        "libelle": "robustesse du modèle",
+                        "mode_revendique": "X",
+                        "mode_publie": "X",
+                        "famille": "fournisseur",
+                        "profils": ["P5"],
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    code, out = _run(["triage", "--profils", "P3", "--carte", str(carte)], settings, capsys)
+    assert code == 0
+    assert "2 lignes de la matrice" in out
+    assert "1 vous concernent" in out
+    assert "bloquons 1" in out
+    # The line that is not theirs is named, not dropped.
+    assert "M-05" in out and "l'éditeur du modèle" in out
