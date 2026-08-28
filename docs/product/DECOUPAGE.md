@@ -116,7 +116,7 @@ plutôt qu'en le supposant. Aucun ne crée de rang nouveau — chacun se rattach
 
 | Écart | Sujet | Rattaché à | Sévérité |
 |---|---|---|---|
-| `G-22` | La rédaction avant envoi au juge masque par *nom de clé*, pas par contenu : une PII dans la valeur d'une clé anodine atteint le modèle | Rang 7 (couverture P2, avec la DLP) | Haute |
+| `G-22` | ~~La rédaction avant envoi au juge masque par *nom de clé*, pas par contenu~~ — **fermé.** Deux frontières étaient concernées, pas une : le juge et la notification SMTP. Le dry-run que l'humain approuve garde son contenu — l'asymétrie est le correctif, pas un oubli | Rang 7 — livré | ✅ |
 | `G-23` | `business_hours_only` retiré de `SPEC.md` faute d'implémentation ; demande un fuseau par tenant | Rang 8 | Basse |
 | `G-24` | `allowed_clients` n'est appliqué que par le gateway MCP : la même policy n'est pas également bornée sur `/v1/authorize` | Rang 1 (divergence d'ingress) | Haute |
 | `G-25` | ~~Le mode d'enforcement lu dans un en-tête de requête~~ — **fermé.** Fenêtre d'observation de plan de contrôle, bornée, réservée à l'`admin` | Rang 4 — livré | ✅ |

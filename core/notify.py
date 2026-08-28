@@ -3,6 +3,12 @@
 Notifications are best-effort and must never carry secrets/PII — only the
 redacted dry-run summary (CLAUDE.md §4.10). Callers treat failures as non-fatal:
 a missed notification leaves the approval pending (safe), it never executes.
+
+Cette promesse est tenue **ici**, au point d'envoi, et non par les appelants. Le
+résumé qui arrive vient de `approvals.build_dry_run`, qui masque par nom de clé
+parce que sa première lecture est humaine : un opérateur ne peut pas approuver un
+virement dont le bénéficiaire lui est caché. Un e-mail, lui, sort du périmètre — il
+passe donc les détecteurs du produit avant de partir (`G-22`).
 """
 
 from __future__ import annotations
@@ -11,6 +17,8 @@ import smtplib
 from dataclasses import dataclass
 from email.message import EmailMessage
 from typing import TYPE_CHECKING, Protocol
+
+from core import dlp
 
 if TYPE_CHECKING:
     from core.config import Settings
@@ -44,10 +52,11 @@ class SmtpNotifier:
         message["Subject"] = f"[xSOM AI Guard] Approval required: {approval_id}"
         message["From"] = self.sender
         message["To"] = self.recipient
+        safe = dlp.redact_text(summary, dlp.scan_text(summary))
         message.set_content(
             f"An agent action requires your approval.\n\n"
             f"Approval ID: {approval_id}\n"
-            f"Effect (dry-run): {summary}\n"
+            f"Effect (dry-run): {safe}\n"
             f"Expires at: {expires_at}\n"
         )
         with smtplib.SMTP(self.host, self.port, timeout=10) as smtp:

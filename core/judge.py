@@ -5,7 +5,8 @@ action class, and (2) generating compliance-export narratives. The judge never
 authorizes or denies — it only classifies; the deterministic matrix + HITL keep
 the decision. On any doubt, error, or budget exhaustion it over-classifies to
 ``irreversible`` (the most cautious class). Cost is bounded by a call cap, and
-only *redacted* arguments are ever sent to the model (CLAUDE.md §4.10).
+only *redacted* arguments are ever sent to the model (CLAUDE.md §4.10) — and the
+judge enforces that itself rather than trusting its caller to have done it.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ import json
 from collections.abc import Callable
 from typing import Any
 
+from core import dlp
 from core.approvals import redact
 from core.policy import ActionClass, PolicyOutcome, escalate_for_class
 
@@ -52,12 +54,24 @@ class Judge:
     def _over_budget(self) -> bool:
         return self._calls >= self._max_calls
 
-    def classify(self, tool_name: str, redacted_arguments: dict[str, Any]) -> ActionClass:
-        """Resolve an ambiguous tool to an action class (irreversible on any doubt)."""
+    def classify(self, tool_name: str, arguments: dict[str, Any]) -> ActionClass:
+        """Resolve an ambiguous tool to an action class (irreversible on any doubt).
+
+        The argument is not assumed redacted. `approvals.redact` masks by **key name**,
+        so une PII dans la valeur d'une clé anodine (`body`, `text`) la traversait —
+        c'est `G-22`. Le juge est un tiers hors périmètre : il passe donc les
+        détecteurs du produit sur la charge sérialisée, ce qui couvre aussi les
+        valeurs imbriquées qu'un masquage clé-par-clé ne voit pas.
+
+        Les mêmes détecteurs que la DLP d'egress, pas une seconde série de motifs :
+        deux jeux de règles divergent, et le jour où ils divergent le produit bloque
+        chez un client ce qu'il laisse filer vers son propre juge.
+        """
         if self._over_budget():
             return ActionClass.irreversible
         self._calls += 1
-        user = json.dumps({"tool": tool_name, "arguments": redacted_arguments}, sort_keys=True)
+        user = json.dumps({"tool": tool_name, "arguments": arguments}, sort_keys=True)
+        user = dlp.redact_text(user, dlp.scan_text(user))
         try:
             raw = self._completer(_CLASSIFY_SYSTEM, user)
             value = json.loads(raw).get("action_class")
