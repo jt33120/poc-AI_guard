@@ -302,6 +302,7 @@ scenarios/             # one per coverage row, each with its negative control �
 | `FR-172`..`FR-175` — triage | **livrées** — `core/profiles.py`, `core/triage.py`, `xsom triage`, carte bidimensionnelle | `AD-28`, `AD-30`, `AD-38` |
 | `FR-176`..`FR-178` — sovereignty | decision path, CI | `AD-25`, `AD-34` |
 | `FR-179`..`FR-183` — demonstrator | `core/pipeline.py`, `scenarios/` | `AD-26`, `AD-27`, `AD-29`, `AD-30`, `AD-31` |
+| ↳ `FR-179`, `FR-180` | **livrées** — `core/promotion.py`, `/v1/promotion`, bloc `observation` de l'Evidence Pack. Ouvert : l'observation ne couvre que le proxy LLM ; l'étendre à la passerelle MCP est un arbitrage de sécurité, pas une extension. | `AD-27.2`, `AD-38`, `FR-160` |
 | `FR-184`..`FR-194` — remaining coverage | filters, registry | `AD-21`, `AD-23`, `AD-35`, `AD-36` |
 | `FR-195`..`FR-197` — deployment, identity, positioning | deployment envelope, docs | `AD-29`, `AD-32` |
 | `FR-198`, `FR-199` — defects the review surfaced | policy engine (**shipped**) | `AD-34`, `AD-23`, `AD-37` |
