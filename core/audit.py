@@ -67,6 +67,13 @@ def _payload(
     return json.dumps(event, sort_keys=True, separators=(",", ":"))
 
 
+# The rule this module holds (FR-161 / INV-3): **only server-derived values enter
+# `_payload`**. Anything a client or an upstream declared is an annex column. Two
+# reasons, and the second is the one that bites: a declared value in the hashed
+# payload lets whoever declares it choose part of what the chain attests, and an
+# export reader cannot tell an attested fact from a repeated claim.
+
+
 def compute_entry_hash(prev_hash: str, payload: str) -> str:
     return hashlib.sha256((prev_hash + payload).encode("utf-8")).hexdigest()
 
@@ -86,8 +93,15 @@ def log_event(
     latency_ms: int | None = None,
     error: str | None = None,
     gateway_token_id: str | None = None,
+    client_request_id: str | None = None,
+    upstream_request_id: str | None = None,
 ) -> str:
-    """Append one hash-chained audit entry for a decision. Returns its entry_hash."""
+    """Append one hash-chained audit entry for a decision. Returns its entry_hash.
+
+    `request_id` must be server-derived; `client_request_id` (what the agent
+    called it) and `upstream_request_id` (what the LLM provider called it) are
+    declared values and are kept apart from it — see the note above `log_event`.
+    """
     ts = datetime.now(UTC)
     with conn.transaction():
         # Serialize chain writes per tenant to avoid two entries sharing a prev_hash.
@@ -112,14 +126,15 @@ def log_event(
             error=error,
         )
         entry_hash = compute_entry_hash(prev_hash, payload)
-        # gateway_token_id is an ANNEX column (agent attribution): it is NOT part
-        # of `payload`/the hash chain, so existing entries keep verifying (§4.2).
+        # ANNEX columns: agent attribution and the two declared identifiers. None of
+        # them is part of `payload`/the hash chain, so existing entries keep verifying
+        # (§4.2, AD-1) -- and none of them is attested by it either.
         conn.execute(
             "insert into audit_log "
             "(ts, tenant_id, user_id, request_id, tool_name, action_class, decision, "
             " policy_rule_id, judge_used, args_hash, latency_ms, error, gateway_token_id, "
-            " prev_hash, entry_hash) "
-            "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            " client_request_id, upstream_request_id, prev_hash, entry_hash) "
+            "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
             (
                 ts,
                 tenant_id,
@@ -134,6 +149,8 @@ def log_event(
                 latency_ms,
                 error,
                 gateway_token_id,
+                client_request_id,
+                upstream_request_id,
                 prev_hash,
                 entry_hash,
             ),
@@ -224,7 +241,8 @@ def list_events(
     params.append(limit)
     rows = conn.execute(
         "select id, ts, tool_name, action_class, decision, policy_rule_id, judge_used, "
-        "args_hash, latency_ms, error, user_id, request_id, gateway_token_id from audit_log"
+        "args_hash, latency_ms, error, user_id, request_id, gateway_token_id, "
+        "client_request_id, upstream_request_id from audit_log"
         + where
         + " order by id desc limit %s",
         tuple(params),
@@ -244,6 +262,11 @@ def list_events(
             "user_id": r[10],
             "request_id": r[11],
             "gateway_token_id": str(r[12]) if r[12] else None,
+            # Everything above is derived by the server from something it verified.
+            # Everything an agent or an upstream merely *said* lives in here, in one
+            # labelled box, so a reader of the export cannot mistake a claim for a
+            # fact by reading past a flag (FR-161 / INV-3).
+            "declared": {"client_request_id": r[13], "upstream_request_id": r[14]},
         }
         for r in rows
     ]

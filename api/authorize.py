@@ -47,6 +47,10 @@ def request_authorization(
         timeout_seconds=policy.defaults.hitl_timeout_seconds,
         notifier=build_notifier(settings),
         gateway_token_id=principal.token_id,
+        # Was accepted, length-checked and dropped -- a decorative input field, the
+        # very shape FR-156 forbids in a published example. It now does what its name
+        # promises, as a declared value (FR-161).
+        client_request_id=payload.request_id,
     )
 
 

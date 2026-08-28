@@ -728,3 +728,60 @@ def test_dlp_disabled_lets_secret_through(
     )
     assert resp.status_code == 200
     assert fake.captured != {}  # forwarded untouched
+
+
+def test_the_providers_completion_id_never_becomes_the_audit_entrys_identity(
+    db: DBHandle,
+    test_verifier: TokenVerifier,
+    make_token: Callable[..., str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """FR-161 — the defect this requirement was written for, on the path that had it.
+
+    `audit_log.request_id` is inside the hash-chained payload. It used to be filled
+    from `data["id"]` — the response body of whoever answers this connection. An
+    upstream (or anything able to answer as one) therefore chose part of what the
+    chain attests, and could hand back an id that collides with a real gateway
+    request. It is now a server-minted id, with the provider's own kept beside it
+    and labelled as declared.
+    """
+    tid = _tenant(db)
+    client = _client(db.url, test_verifier)
+    admin = make_token(tenant_id=tid, role="admin")
+    assert (
+        client.put(
+            "/v1/policy", headers={"Authorization": f"Bearer {admin}"}, json={"yaml": AUTO_POLICY}
+        ).status_code
+        == 200
+    )
+    raw = client.post(
+        "/v1/gateway-tokens", headers={"Authorization": f"Bearer {admin}"}, json={"name": "bot"}
+    ).json()["token"]
+
+    hostile = json.loads(json.dumps(UPSTREAM_BODY))
+    hostile["id"] = "../../../etc/passwd"
+    monkeypatch.setattr(llm_proxy, "_http", lambda: _FakeClient(_FakeResp(hostile)))
+
+    assert (
+        client.post(
+            "/proxy/openai/v1/chat/completions",
+            headers={"X-Gateway-Token": raw, "Authorization": "Bearer sk-agentkey"},
+            json={"model": "gpt-4o", "messages": [{"role": "user", "content": "hi"}]},
+        ).status_code
+        == 200
+    )
+
+    with psycopg.connect(db.url) as check:
+        rows = check.execute(
+            "select request_id, upstream_request_id, client_request_id from audit_log "
+            "where tenant_id = %s",
+            (tid,),
+        ).fetchall()
+    assert len(rows) == 2  # one row per tool call in the completion
+    minted = {r[0] for r in rows}
+    assert minted != {"../../../etc/passwd"}
+    assert all(len(r) == 32 for r in minted)
+    # One id per inspected response, so the calls of a single completion still group.
+    assert len(minted) == 1
+    assert {r[1] for r in rows} == {"../../../etc/passwd"}
+    assert {r[2] for r in rows} == {None}

@@ -135,3 +135,37 @@ def test_gateway_token_endpoints_are_admin_only(
         == 403
     )
     assert client.get("/v1/gateway-tokens", headers=_auth(operator)).status_code == 403
+
+
+def test_the_agents_own_request_id_is_stored_as_declared_not_as_the_entrys_identity(
+    db: DBHandle, test_verifier: TokenVerifier, make_token: Callable[..., str]
+) -> None:
+    """FR-161 — and FR-156, since the field used to be accepted and dropped.
+
+    `AuthorizeRequest.request_id` was validated for length and then discarded: a
+    decorative input on the contract, which is the same defect as a decorative
+    constraint in a policy. It now does what its name promises — and it does it
+    *beside* the audit entry's identity, never as it, because nothing verifies it.
+    """
+    tid = _tenant(db)
+    client = _client(db.url, test_verifier)
+    admin = make_token(tenant_id=tid, role="admin")
+    assert (
+        client.put("/v1/policy", headers=_auth(admin), json={"yaml": POLICY_YAML}).status_code
+        == 200
+    )
+    raw = client.post("/v1/gateway-tokens", headers=_auth(admin), json={"name": "a"}).json()[
+        "token"
+    ]
+
+    verdict = client.post(
+        "/v1/authorize",
+        headers={"X-Gateway-Token": raw},
+        json={"tool": "mock.echo", "arguments": {}, "request_id": "agent-trace-42"},
+    )
+    assert verdict.status_code == 200 and verdict.json()["decision"] == "allow"
+
+    (entry,) = client.get("/v1/audit", headers=_auth(admin)).json()
+    assert entry["declared"]["client_request_id"] == "agent-trace-42"
+    assert entry["request_id"] != "agent-trace-42"
+    assert len(entry["request_id"]) == 32  # a server-minted uuid4 hex, every time

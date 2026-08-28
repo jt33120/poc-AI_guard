@@ -244,8 +244,24 @@ class GatewayTokenCreated(GatewayTokenOut):
     token: str
 
 
+class DeclaredIdentifiers(BaseModel):
+    """Identifiers an agent or an upstream *said*, which nothing verified (FR-161).
+
+    Kept in their own object rather than beside the derived fields: an auditor
+    reading an export must not have to remember which of two adjacent strings
+    the server minted and which one the audited party chose.
+    """
+
+    client_request_id: str | None = None
+    upstream_request_id: str | None = None
+
+
 class AuditEntry(BaseModel):
-    """An immutable audit-log entry (metadata only)."""
+    """An immutable audit-log entry (metadata only).
+
+    Every field but `declared` is derived by the server from something it
+    verified — a JWT, a gateway token, its own clock, its own decision.
+    """
 
     id: int
     ts: str | None
@@ -260,6 +276,7 @@ class AuditEntry(BaseModel):
     user_id: str | None
     request_id: str | None
     gateway_token_id: str | None = None
+    declared: DeclaredIdentifiers = Field(default_factory=DeclaredIdentifiers)
 
 
 class AgentOut(BaseModel):
