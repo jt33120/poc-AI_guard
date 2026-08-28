@@ -6,7 +6,7 @@ COMPOSE ?= docker compose
 XSOM_API_PORT ?= 8000
 
 .PHONY: install frontend-install dev test verify demo lint fmt fmt-check typecheck audit \
-        coverage-gate coverage-map verify-frontend test-frontend clean up down down-hard logs ps
+        coverage-gate coverage-map verify-frontend test-frontend seed-demo clean up down down-hard logs ps
 
 install:           ## Install backend + frontend deps
 	$(UV) sync
@@ -53,6 +53,9 @@ audit:             ## Static security audit (fails on CRITICAL)
 # CLAUDE.md §8. Frontend checks are skipped cleanly until M7 scaffolds frontend/.
 verify: lint fmt-check typecheck test audit coverage-gate verify-frontend
 	@echo ">> verify: OK"
+
+seed-demo:         ## Load the committed demonstration tenant (FR-182/183)
+	$(UV) run python scripts/seed_demo.py
 
 coverage-gate:     ## CM-7: every `Bloqué` claim is backed by a passing scenario
 	$(UV) run python scripts/gen_coverage.py --check

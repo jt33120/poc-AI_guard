@@ -94,7 +94,7 @@ class ChainResult:
     count: int = 0
 
 
-def _payload(
+def payload_v1(
     *,
     ts_iso: str,
     tenant_id: str,
@@ -126,8 +126,16 @@ def _payload(
     return json.dumps(event, sort_keys=True, separators=(",", ":"))
 
 
+# Public, and named for its version: `AD-1` freezes this shape, and the demo seeder
+# (`scripts/seed_demo.py`) has to build the same bytes to lay down a chain that
+# `verify_chain` accepts. Publishing the function is how the two stay identical --
+# a second implementation of the payload would drift, and a drifted verifier is a
+# verifier that passes a log it should reject. It grants nothing: the shape is in
+# the source either way.
+
+
 # The rule this module holds (FR-161 / INV-3): **only server-derived values enter
-# `_payload`**. Anything a client or an upstream declared is an annex column. Two
+# `payload_v1`**. Anything a client or an upstream declared is an annex column. Two
 # reasons, and the second is the one that bites: a declared value in the hashed
 # payload lets whoever declares it choose part of what the chain attests, and an
 # export reader cannot tell an attested fact from a repeated claim.
@@ -171,7 +179,7 @@ def log_event(
             (tenant_id,),
         ).fetchone()
         prev_hash = prev_row[0] if prev_row else GENESIS
-        payload = _payload(
+        payload = payload_v1(
             ts_iso=ts.astimezone(UTC).isoformat(),
             tenant_id=tenant_id,
             user_id=user_id,
@@ -238,7 +246,7 @@ def verify_chain(conn: psycopg.Connection, tenant_id: str | None = None) -> Chai
         stored_prev, stored_entry = r[13], r[14]
         if stored_prev != expected_prev:
             return ChainResult(ok=False, broken_id=r[0], count=len(rows))
-        payload = _payload(
+        payload = payload_v1(
             ts_iso=r[1].astimezone(UTC).isoformat(),
             tenant_id=row_tenant,
             user_id=r[3],
