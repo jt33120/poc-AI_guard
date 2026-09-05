@@ -104,6 +104,16 @@ class Diagnostic:
         return tuple(line for line in self.applicable if line.blocked)
 
     @property
+    def ours(self) -> tuple[ThreatLine, ...]:
+        """Les lignes applicables qui relèvent de **notre** terrain (`Family.usage_ia`).
+
+        Défini ici et pas chez l'appelant : « sur notre terrain » est la notion que le
+        discours commercial répète, et deux lecteurs du même registre qui la calculent
+        chacun de leur côté finissent par en donner deux chiffres.
+        """
+        return tuple(line for line in self.applicable if line.family is Family.usage_ia)
+
+    @property
     def owners(self) -> dict[str, int]:
         """Who carries the lines that are not this client's — counted, and named."""
         return dict(Counter(line.owner for line in self.not_applicable))

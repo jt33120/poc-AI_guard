@@ -45,6 +45,11 @@ frontend/playwright-report/
 /_bmad/config.user.toml
 
 # Generated coverage artefacts (AD-30: the map is derived, never authored).
+#
+# `map.json` n'y est plus : le diagnostic de profil la sert à l'exécution, et un
+# artefact publié qui n'existe pas dans l'image déployée n'est pas publié. Ce
+# qu'`AD-30` garantit est désormais tenu par une garde de fraîcheur dans
+# `gen_coverage.py --check`, qui échoue si la carte commitée diffère de ce que la
+# génération produit — une garde vaut mieux qu'une absence de fichier.
 /coverage/.scenarios.json
-/coverage/map.json
 /coverage/COVERAGE-MAP.md

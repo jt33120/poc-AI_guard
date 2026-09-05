@@ -484,6 +484,12 @@ def main() -> int:
         )
 
     if args.check:
+        # La carte commitée est servie à l'exécution par le diagnostic de profil :
+        # périmée, elle montre une revendication périmée à un prospect. La garde
+        # remplace le `.gitignore` comme tenue d'`AD-30`.
+        if (stale := _stale_map(facets)) is not None:
+            print(f"  ✗ {stale}", file=sys.stderr)
+            return 1
         n = sum(1 for f in facets if f.mode_publie == "B")
         print(f"CM-7 = 0 — {n} facettes Bloqué prouvées")
         print(
@@ -505,7 +511,44 @@ def main() -> int:
 
     commit = _commit()
     stamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
-    payload: dict[str, Any] = {
+    payload = _payload(facets, commit, stamp)
+    _OUT_JSON.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    _OUT_MD.write_text(_render_md(facets, commit, stamp), encoding="utf-8")
+    print(f"carte écrite : {_OUT_MD.relative_to(_REPO)} · {_OUT_JSON.relative_to(_REPO)}")
+    return 0
+
+
+def _stale_map(facets: list[Facet]) -> str | None:
+    """La carte commitée diffère-t-elle de ce que la génération produit aujourd'hui ?
+
+    `coverage/map.json` est **commitée** depuis que le diagnostic de profil la sert à
+    l'exécution : un artefact publié qui n'existe pas dans l'image déployée n'est pas
+    publié. Ce qu'`AD-30` garantit — la carte est dérivée, jamais rédigée — est donc
+    tenu par cette comparaison plutôt que par le `.gitignore`.
+
+    Seul `facettes` est comparé. `commit` et `genere_le` changent à chaque exécution
+    et ne disent rien du contenu ; les inclure ferait échouer la garde à chaque fois,
+    et une garde qui échoue toujours s'apprend à être contournée.
+    """
+    if not _OUT_JSON.exists():
+        return f"{_OUT_JSON.relative_to(_REPO)} absente — lancez `make coverage-map`."
+    try:
+        commitee = json.loads(_OUT_JSON.read_text(encoding="utf-8")).get("facettes")
+    except (OSError, ValueError):
+        return f"{_OUT_JSON.relative_to(_REPO)} illisible — régénérez-la."
+    if commitee != _payload(facets, "", "")["facettes"]:
+        return (
+            f"{_OUT_JSON.relative_to(_REPO)} ne correspond plus au registre ni aux "
+            "scénarios. Lancez `make coverage-map` et commitez le résultat — la carte "
+            "est servie à l'exécution, donc une carte périmée est une revendication "
+            "périmée montrée à un prospect."
+        )
+    return None
+
+
+def _payload(facets: list[Facet], commit: str, stamp: str) -> dict[str, Any]:
+    """The machine-readable map. `facettes` is the substance; the rest is provenance."""
+    return {
         "commit": commit,
         "genere_le": stamp,
         "facettes": [
@@ -536,10 +579,6 @@ def main() -> int:
             for f in facets
         ],
     }
-    _OUT_JSON.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
-    _OUT_MD.write_text(_render_md(facets, commit, stamp), encoding="utf-8")
-    print(f"carte écrite : {_OUT_MD.relative_to(_REPO)} · {_OUT_JSON.relative_to(_REPO)}")
-    return 0
 
 
 if __name__ == "__main__":

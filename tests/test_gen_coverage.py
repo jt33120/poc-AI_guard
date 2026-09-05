@@ -63,8 +63,22 @@ def _run(
     # its data paths on its own location). Its *code* still imports `core.profiles`,
     # which the copy cannot see from a tmp dir -- hence the real repo on PYTHONPATH.
     env = {**os.environ, "PYTHONPATH": str(_REPO)}
+    script = str(tmp_path / "scripts" / "gen_coverage.py")
+
+    # La carte est désormais un artefact **commité**, servi à l'exécution par le
+    # diagnostic public : `--check` refuse une carte absente ou périmée. Le bac à
+    # sable rejoue donc la séquence réelle — générer, puis vérifier — au lieu de
+    # vérifier dans un répertoire où aucune carte n'a jamais été écrite. Une garde
+    # qu'on désactiverait pour faire passer ses propres tests ne garderait rien.
+    generation = subprocess.run(
+        [sys.executable, script], capture_output=True, text=True, cwd=tmp_path, env=env
+    )
+    if generation.returncode != 0:
+        # La génération échoue sur les registres que les tests veulent voir refusés :
+        # dans ce cas c'est *elle* le verdict, et il porte le message attendu.
+        return generation
     return subprocess.run(
-        [sys.executable, str(tmp_path / "scripts" / "gen_coverage.py"), "--check"],
+        [sys.executable, script, "--check"],
         capture_output=True,
         text=True,
         cwd=tmp_path,

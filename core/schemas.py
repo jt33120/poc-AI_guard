@@ -171,6 +171,20 @@ class ApprovalOut(BaseModel):
     decided_by: str | None
 
 
+class TriageRequest(BaseModel):
+    """Diagnostic public de profil (`QO-7`). Collecte de donnée personnelle : bornée."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    profiles: list[Literal["P1a", "P1b", "P2", "P3", "P4", "P5"]] = Field(
+        min_length=1, max_length=6
+    )
+    # `EmailStr` demanderait `email-validator` en dépendance ; la borne de longueur et
+    # la validation au bord (`core/leads.capture`) suffisent, et n'ajoutent pas un
+    # paquet hors de la liste imposée par CLAUDE.md §3.
+    email: str = Field(min_length=3, max_length=254)
+
+
 class CorpusRequest(BaseModel):
     """Déclarer la provenance d'un corpus ou d'une base vectorielle (`FR-184`)."""
 
