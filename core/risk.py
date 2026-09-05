@@ -19,16 +19,7 @@ import re
 from typing import Any
 
 from core import dlp
-from core.policy import ActionClass, Approval, RiskBands
-
-#: Approval severity order (higher = stricter); risk may only move *up* it.
-_ORDER = {
-    Approval.auto: 0,
-    Approval.notify: 1,
-    Approval.human_in_the_loop: 2,
-    Approval.human_dual: 3,
-    Approval.deny: 4,
-}
+from core.policy import ActionClass, Approval, RiskBands, raise_to
 
 #: Base risk by reversibility of the action class.
 _BASE: dict[ActionClass, int] = {
@@ -142,4 +133,4 @@ def escalate_by_risk(
     score = risk_score(action_class, arguments, seen_before=seen_before)
     score = max(0, score - trust_discount(clean_streak))
     tier = band(score, bands, action_class)
-    return tier if _ORDER[tier] > _ORDER[base] else base
+    return raise_to(base, tier)

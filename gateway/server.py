@@ -41,6 +41,7 @@ from core.policy import (
     Policy,
     PolicyOutcome,
     evaluate,
+    raise_to,
     service_down_verdict,
 )
 from core.tenant_tokens import authenticate_gateway_session
@@ -183,7 +184,18 @@ class PolicyBackend:
                 return _denied_result(
                     f"'{canonical}' denied: session tainted by a prior tool result"
                 )
-            outcome = replace(outcome, decision=Approval.human_in_the_loop, reason="taint")
+            # `FR-170` : le garde contribue un **minimum**, il n'écrase pas. Écraser
+            # relâchait le verdict quand la policy était plus stricte que le palier
+            # du taint — un `deny` de règle devenait une attente approuvable, et le
+            # quorum d'un `human_dual` tombait de 2 à 1. Dans la session teintée,
+            # précisément : l'injection réussie *ouvrait* la porte qu'elle visait.
+            # `reason` reste posé inconditionnellement — `_observation_relaxes` en
+            # dépend pour refuser de relâcher une escalade de taint.
+            outcome = replace(
+                outcome,
+                decision=raise_to(outcome.decision, Approval.human_in_the_loop),
+                reason="taint",
+            )
 
         # Observation window (`AD-27`, `G-25`) — désormais sur les **deux** chemins
         # d'ingestion. Le proxy LLM la portait seul depuis le rang 4, donc un même
