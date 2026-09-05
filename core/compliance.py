@@ -24,7 +24,7 @@ from typing import Any
 
 import psycopg
 
-from core import audit, corpora, export
+from core import audit, corpora, export, verdicts
 from core import usage as usage_store
 from core.audit import EnforcementMode
 from core.monitor import NEVER_OBSERVED
@@ -329,6 +329,7 @@ EVIDENCE_SECTIONS: frozenset[str] = frozenset(
         "article_26_deployer.decision_summary",
         "article_26_deployer.fria",
         "article_26_deployer.corpus_provenance",
+        "article_26_deployer.third_party_verdicts",
     }
 )
 
@@ -397,6 +398,11 @@ def build_evidence_pack(
             # sans dire que sept n'ont pas été revus depuis deux ans transformerait
             # une attestation en argument.
             "corpus_provenance": corpora.provenance_section(conn),
+            # `FR-191` : les verdicts d'analyseurs tiers reçus du client. Sous
+            # l'article 26 parce que ce sont les obligations de l'**exploitant** qui
+            # y atterrissent, et que ces contrôles sont les siens : ils tournent dans
+            # sa CI, avec ses règles. Nous n'en attestons que la réception.
+            "third_party_verdicts": verdicts.provenance_section(conn),
         },
     }
     base["compliant"] = (

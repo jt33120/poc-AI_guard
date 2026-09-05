@@ -1,6 +1,6 @@
 {
-  "commit": "f5113b6",
-  "genere_le": "2026-09-05 15:49 UTC",
+  "commit": "3d36bda",
+  "genere_le": "2026-09-05 16:09 UTC",
   "facettes": [
     {
       "menace": "M-01",
@@ -572,8 +572,8 @@
       "titre": "Supply chain (modèles / bibliothèques)",
       "facette": "bibliotheques",
       "libelle": "SBOM et audit de dépendances en CI",
-      "mode_revendique": "X",
-      "mode_publie": "X",
+      "mode_revendique": "A",
+      "mode_publie": "A",
       "substitut": null,
       "declasse_faute_de_substitut": false,
       "famille": "usage_ia",
@@ -594,7 +594,7 @@
           "id": "LLM03"
         }
       ],
-      "raison": "L'audit de dépendances tourne en CI (`pip-audit`) mais l'Evidence Pack n'en porte  aucune section. `FR-191`."
+      "raison": null
     },
     {
       "menace": "M-11",
@@ -798,8 +798,8 @@
       "titre": "Validation aveugle de code (Copilot)",
       "facette": "sast",
       "libelle": "ingestion de verdicts SAST/DAST",
-      "mode_revendique": "X",
-      "mode_publie": "X",
+      "mode_revendique": "O",
+      "mode_publie": "O",
       "substitut": {
         "nom": "SonarQube / Semgrep en CI",
         "justification": "local"
@@ -810,10 +810,16 @@
         "P1a",
         "P1b"
       ],
-      "ingress_prouve": [],
+      "ingress_prouve": [
+        "http"
+      ],
       "ingress_non_asserte": [],
-      "sens_prouves": [],
-      "scenarios": [],
+      "sens_prouves": [
+        "verdict_tiers"
+      ],
+      "scenarios": [
+        "tests/test_verdicts.py::test_a_third_party_verdict_enters_a_chain"
+      ],
       "ecarts": [
         "G-14"
       ],
@@ -824,15 +830,15 @@
           "id": "LLM09"
         }
       ],
-      "raison": "Les analyseurs tournent chez le client, mais aucun de leurs verdicts n'entre dans la  chaîne : nous n'en prouvons donc rien. `FR-191`."
+      "raison": null
     },
     {
       "menace": "M-15",
       "titre": "Validation aveugle de code (Copilot)",
       "facette": "ci",
       "libelle": "audit de dépendances et de secrets en CI",
-      "mode_revendique": "X",
-      "mode_publie": "X",
+      "mode_revendique": "A",
+      "mode_publie": "A",
       "substitut": null,
       "declasse_faute_de_substitut": false,
       "famille": "usage_ia",
@@ -852,7 +858,7 @@
           "id": "LLM09"
         }
       ],
-      "raison": "L'audit de dépendances et de secrets tourne en CI ; l'Evidence Pack n'en porte  aucune section. `FR-191`."
+      "raison": null
     },
     {
       "menace": "M-16",

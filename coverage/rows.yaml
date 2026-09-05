@@ -222,10 +222,9 @@ rows:
       - cle: bibliotheques
         libelle: "SBOM et audit de dépendances en CI"
         profils: [P2, P3, P4]
-        mode: X
-        raison: >-
-          L'audit de dépendances tourne en CI (`pip-audit`) mais l'Evidence Pack n'en porte 
-          aucune section. `FR-191`.
+        mode: A
+        section: article_26_deployer.third_party_verdicts
+
       - cle: modeles_ml
         libelle: "analyse d'artefacts de modèles"
         profils: [P4]
@@ -292,18 +291,13 @@ rows:
     facettes:
       - cle: sast
         libelle: "ingestion de verdicts SAST/DAST"
-        mode: X
-        raison: >-
-          Les analyseurs tournent chez le client, mais aucun de leurs verdicts n'entre dans la 
-          chaîne : nous n'en prouvons donc rien. `FR-191`.
+        mode: O
         substitut: {nom: "SonarQube / Semgrep en CI", justification: local}
         gaps: [G-14]
       - cle: ci
         libelle: "audit de dépendances et de secrets en CI"
-        mode: X
-        raison: >-
-          L'audit de dépendances et de secrets tourne en CI ; l'Evidence Pack n'en porte 
-          aucune section. `FR-191`.
+        mode: A
+        section: article_26_deployer.third_party_verdicts
 
   - id: M-16
     titre: "Décision fondée sur une hallucination"
