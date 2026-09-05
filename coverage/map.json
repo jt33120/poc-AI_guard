@@ -1,6 +1,6 @@
 {
-  "commit": "06e64ad",
-  "genere_le": "2026-09-05 12:58 UTC",
+  "commit": "416f656",
+  "genere_le": "2026-09-05 17:10 UTC",
   "facettes": [
     {
       "menace": "M-01",
@@ -23,13 +23,32 @@
         "P4",
         "P5"
       ],
-      "ingress_prouve": [],
+      "ingress_prouve": [
+        "llm_proxy"
+      ],
       "ingress_non_asserte": [],
-      "sens_prouves": [],
-      "scenarios": [],
+      "sens_prouves": [
+        "verdict_tiers"
+      ],
+      "scenarios": [
+        "tests/test_prompt_guard.py::test_a_flagged_prompt_is_relayed_and_its_verdict_is_chained"
+      ],
       "ecarts": [
         "G-01"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM01"
+        },
+        {
+          "taxonomie": "mitre_atlas",
+          "version": "v4.9.0",
+          "id": "AML.T0051"
+        }
+      ],
+      "raison": null
     },
     {
       "menace": "M-01",
@@ -55,7 +74,20 @@
       "scenarios": [],
       "ecarts": [
         "G-01"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM01"
+        },
+        {
+          "taxonomie": "mitre_atlas",
+          "version": "v4.9.0",
+          "id": "AML.T0051"
+        }
+      ],
+      "raison": null
     },
     {
       "menace": "M-02",
@@ -93,7 +125,20 @@
       "ecarts": [
         "G-02",
         "G-03"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM01"
+        },
+        {
+          "taxonomie": "mitre_atlas",
+          "version": "v4.9.0",
+          "id": "AML.T0051"
+        }
+      ],
+      "raison": null
     },
     {
       "menace": "M-03",
@@ -115,15 +160,23 @@
       "scenarios": [],
       "ecarts": [
         "G-04"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM04"
+        }
+      ],
+      "raison": null
     },
     {
       "menace": "M-04",
       "titre": "Vol de modèle / extraction",
       "facette": "telemetrie",
       "libelle": "télémétrie de volume et de motif",
-      "mode_revendique": "D",
-      "mode_publie": "D",
+      "mode_revendique": "X",
+      "mode_publie": "X",
       "substitut": null,
       "declasse_faute_de_substitut": false,
       "famille": "fournisseur",
@@ -137,7 +190,15 @@
       "scenarios": [],
       "ecarts": [
         "G-05"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM10"
+        }
+      ],
+      "raison": "La télémétrie de volume existe (`usage_events`) mais elle est cadrée équité et coût,  jamais anti-extraction : aucun seuil, aucun verdict, aucune entrée chaînée.  `FR-187`, profil P4, hors de ce lot."
     },
     {
       "menace": "M-05",
@@ -156,7 +217,9 @@
       "ingress_non_asserte": [],
       "sens_prouves": [],
       "scenarios": [],
-      "ecarts": []
+      "ecarts": [],
+      "referentiels": [],
+      "raison": "Robustesse adversariale du modèle : c'est le travail de l'éditeur qui l'entraîne, pas de la passerelle qui l'appelle."
     },
     {
       "menace": "M-06",
@@ -196,7 +259,15 @@
       ],
       "ecarts": [
         "G-06"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM06"
+        }
+      ],
+      "raison": null
     },
     {
       "menace": "M-07",
@@ -225,7 +296,9 @@
         "tests/test_coverage_gate.py::test_send_outside_the_allowlist_is_denied_and_never_relayed",
         "tests/test_coverage_gate.py::test_without_the_allowlist_the_same_mail_leaves"
       ],
-      "ecarts": []
+      "ecarts": [],
+      "referentiels": [],
+      "raison": null
     },
     {
       "menace": "M-07",
@@ -249,7 +322,9 @@
       "ingress_non_asserte": [],
       "sens_prouves": [],
       "scenarios": [],
-      "ecarts": []
+      "ecarts": [],
+      "referentiels": [],
+      "raison": "Réception du phishing : passerelle de messagerie et EDR du client. Nous couvrons l'agent comme *émetteur*, pas comme destinataire."
     },
     {
       "menace": "M-08",
@@ -280,7 +355,9 @@
       ],
       "ecarts": [
         "G-07"
-      ]
+      ],
+      "referentiels": [],
+      "raison": null
     },
     {
       "menace": "M-08",
@@ -304,7 +381,9 @@
       "ingress_non_asserte": [],
       "sens_prouves": [],
       "scenarios": [],
-      "ecarts": []
+      "ecarts": [],
+      "referentiels": [],
+      "raison": "Détection de média synthétique : ni notre métier ni notre point d'interposition. Nous couvrons l'intégrité de l'approbation, pas l'authenticité du média."
     },
     {
       "menace": "M-09",
@@ -328,7 +407,9 @@
       "ingress_non_asserte": [],
       "sens_prouves": [],
       "scenarios": [],
-      "ecarts": []
+      "ecarts": [],
+      "referentiels": [],
+      "raison": "Plan endpoint et poste de travail : SOC du client. Une passerelle d'actions ne voit pas le poste."
     },
     {
       "menace": "M-10",
@@ -365,7 +446,15 @@
       "ecarts": [
         "G-08",
         "G-22"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM02"
+        }
+      ],
+      "raison": null
     },
     {
       "menace": "M-10",
@@ -401,17 +490,25 @@
       ],
       "ecarts": [
         "G-08"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM02"
+        }
+      ],
+      "raison": null
     },
     {
       "menace": "M-10",
       "titre": "Exfiltration de données / PI via LLM",
       "facette": "decouverte",
-      "libelle": "découverte du Shadow AI non supervisé",
-      "mode_revendique": "X",
-      "mode_publie": "X",
+      "libelle": "inventaire déclaré du Shadow AI non supervisé",
+      "mode_revendique": "A",
+      "mode_publie": "A",
       "substitut": null,
-      "declasse_faute_de_substitut": true,
+      "declasse_faute_de_substitut": false,
       "famille": "usage_ia",
       "profils": [
         "P1a",
@@ -427,7 +524,15 @@
       "scenarios": [],
       "ecarts": [
         "G-09"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM02"
+        }
+      ],
+      "raison": null
     },
     {
       "menace": "M-11",
@@ -458,7 +563,15 @@
         "tests/test_integrity_gate.py::test_poisoned_tool_is_quarantined_and_uncallable",
         "tests/test_integrity_gate.py::test_without_screening_the_drifted_tool_is_relayed"
       ],
-      "ecarts": []
+      "ecarts": [],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM03"
+        }
+      ],
+      "raison": null
     },
     {
       "menace": "M-11",
@@ -479,15 +592,23 @@
       "ingress_non_asserte": [],
       "sens_prouves": [],
       "scenarios": [],
-      "ecarts": []
+      "ecarts": [],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM03"
+        }
+      ],
+      "raison": null
     },
     {
       "menace": "M-11",
       "titre": "Supply chain (modèles / bibliothèques)",
       "facette": "modeles_ml",
       "libelle": "analyse d'artefacts de modèles",
-      "mode_revendique": "O",
-      "mode_publie": "O",
+      "mode_revendique": "X",
+      "mode_publie": "X",
       "substitut": {
         "nom": "picklescan / modelscan",
         "justification": "local"
@@ -503,7 +624,15 @@
       "scenarios": [],
       "ecarts": [
         "G-10"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM03"
+        }
+      ],
+      "raison": "Aucun scanner d'artefacts n'est piloté et aucun de ses verdicts n'est chaîné.  `FR-188`, profil P4, hors de ce lot."
     },
     {
       "menace": "M-12",
@@ -536,7 +665,15 @@
       "ecarts": [
         "G-11",
         "G-24"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM06"
+        }
+      ],
+      "raison": null
     },
     {
       "menace": "M-13",
@@ -557,15 +694,25 @@
       "ingress_non_asserte": [],
       "sens_prouves": [
         "bloque",
+        "detecte",
         "laisse_passer"
       ],
       "scenarios": [
         "tests/test_taint_gate.py::test_a_result_carrying_an_ordinary_web_page_does_not_gate",
-        "tests/test_taint_gate.py::test_an_executable_payload_in_a_result_gates_the_next_risky_action"
+        "tests/test_taint_gate.py::test_an_executable_payload_in_a_result_gates_the_next_risky_action",
+        "tests/test_taint_gate.py::test_the_detection_is_written_to_the_chain_and_names_its_agent"
       ],
       "ecarts": [
         "G-12"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM05"
+        }
+      ],
+      "raison": null
     },
     {
       "menace": "M-14",
@@ -605,19 +752,24 @@
       ],
       "ecarts": [
         "G-13"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM07"
+        }
+      ],
+      "raison": null
     },
     {
       "menace": "M-14",
       "titre": "Fuite du system prompt & secrets",
       "facette": "prompt",
-      "libelle": "détection de fuite du prompt sur l'egress",
-      "mode_revendique": "O",
-      "mode_publie": "O",
-      "substitut": {
-        "nom": "Mistral (garde de sortie anti-leak)",
-        "justification": "ue"
-      },
+      "libelle": "détection de régurgitation **verbatim** du prompt système sur l'egress",
+      "mode_revendique": "D",
+      "mode_publie": "D",
+      "substitut": null,
       "declasse_faute_de_substitut": false,
       "famille": "usage_ia",
       "profils": [
@@ -628,13 +780,27 @@
         "P4",
         "P5"
       ],
-      "ingress_prouve": [],
+      "ingress_prouve": [
+        "llm_proxy"
+      ],
       "ingress_non_asserte": [],
-      "sens_prouves": [],
-      "scenarios": [],
+      "sens_prouves": [
+        "detecte"
+      ],
+      "scenarios": [
+        "tests/test_prompt_leak.py::test_a_leak_is_chained_attributed_and_the_response_still_goes_through"
+      ],
       "ecarts": [
         "G-13"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM07"
+        }
+      ],
+      "raison": null
     },
     {
       "menace": "M-15",
@@ -653,13 +819,27 @@
         "P1a",
         "P1b"
       ],
-      "ingress_prouve": [],
+      "ingress_prouve": [
+        "http"
+      ],
       "ingress_non_asserte": [],
-      "sens_prouves": [],
-      "scenarios": [],
+      "sens_prouves": [
+        "verdict_tiers"
+      ],
+      "scenarios": [
+        "tests/test_verdicts.py::test_a_third_party_verdict_enters_a_chain"
+      ],
       "ecarts": [
         "G-14"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM09"
+        }
+      ],
+      "raison": null
     },
     {
       "menace": "M-15",
@@ -679,7 +859,15 @@
       "ingress_non_asserte": [],
       "sens_prouves": [],
       "scenarios": [],
-      "ecarts": []
+      "ecarts": [],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM09"
+        }
+      ],
+      "raison": null
     },
     {
       "menace": "M-16",
@@ -705,7 +893,15 @@
       "scenarios": [],
       "ecarts": [
         "G-15"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM09"
+        }
+      ],
+      "raison": null
     }
   ]
 }

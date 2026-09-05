@@ -230,7 +230,11 @@ def mint_agent(db: DBHandle, tenant_id: str, name: str = "agent") -> str:
 #: Closed vocabulary. A fourth part of a claim has to be named here *and* taught to
 #: `scripts/gen_coverage.py`, so it cannot arrive as a free-form string that the gate
 #: then silently ignores.
-_SENS = frozenset({"bloque", "laisse_passer", "controle_negatif"})
+#: Le vocabulaire des sens, un par preuve exigible de la doctrine (§1).
+#: `detecte` et `verdict_tiers` sont arrivés avec la généralisation de `CM-7` aux
+#: modes `D` et `O` : jusque-là ces deux modes se publiaient sans qu'aucun scénario
+#: n'ait à exister.
+_SENS = frozenset({"bloque", "laisse_passer", "controle_negatif", "detecte", "verdict_tiers"})
 
 _SCENARIOS_OUT = _REPO / "coverage" / ".scenarios.json"
 _scenarios_key = pytest.StashKey[list[dict[str, Any]]]()

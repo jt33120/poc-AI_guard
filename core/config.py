@@ -61,6 +61,15 @@ class Settings(BaseSettings):
     mistral_api_key: str | None = Field(default=None, max_length=255)
     mistral_model: str = Field(default="mistral/mistral-small-latest", max_length=120)
     judge_max_calls: int = Field(default=200, ge=1, le=100_000)
+
+    # --- Garde-prompt tiers (`FR-193`) — LiteLLM -> Mistral, opt-in ------------
+    #
+    # Éteint par défaut, et l'asymétrie avec le juge est voulue : l'absence du juge
+    # *durcit* la décision (`AD-34`), l'absence du garde-prompt ne change aucun
+    # verdict — il n'est sur le chemin d'aucune décision. Ce qu'elle change, c'est ce
+    # que l'Evidence Pack a le droit de dire.
+    prompt_guard_enabled: bool = False
+    prompt_guard_max_calls: int = Field(default=500, ge=1, le=100_000)
     # slowapi limit string for the costly export endpoint.
     export_rate_limit: str = Field(default="30/minute", max_length=40)
     # slowapi limit string for the agent authorization endpoint (machine-to-machine).

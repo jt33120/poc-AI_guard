@@ -39,9 +39,11 @@ from typing import Any
 _REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO))
 
+from core.compliance import EVIDENCE_SECTIONS  # noqa: E402
 from core.profiles import (  # noqa: E402 -- needs _REPO on the path first
     Family,
     Profile,
+    Referentiel,
     Substitut,
     capped_mode,
     ceiling,
@@ -75,23 +77,75 @@ class Facet:
     substitut: Substitut | None = None
     #: claimed `Orchestré`, demoted to `Hors périmètre` for want of a substitute
     declasse: bool = False
+    #: la section d'Evidence Pack qui porte une facette `Attesté`
+    section: str | None = None
+    #: pourquoi une facette `Hors périmètre` n'est pas couverte
+    raison: str | None = None
+    #: les taxonomies techniques auxquelles cette facette se rattache (`FR-194`)
+    referentiels: tuple[Referentiel, ...] = ()
+    #: la section déclarée est absente du pack réellement produit
+    section_absente: bool = False
+
+    @property
+    def sens_requis(self) -> tuple[str, ...]:
+        """Les sens que la preuve exigible de ce mode demande (doctrine §1)."""
+        return _SENS_PAR_MODE.get(self.mode_revendique, ())
 
     @property
     def exige_scenario(self) -> bool:
-        return self.mode_revendique == "B"
+        return bool(self.sens_requis)
+
+    @property
+    def exige_section(self) -> bool:
+        return self.mode_revendique in _MODES_A_SECTION
+
+    @property
+    def exige_raison(self) -> bool:
+        return self.mode_revendique in _MODES_A_RAISON
 
     @property
     def sens_manquants(self) -> list[str]:
-        if not self.exige_scenario:
-            return []
-        return [s for s in _SENS_REQUIS if s not in self.sens_prouves]
+        return [s for s in self.sens_requis if s not in self.sens_prouves]
+
+    @property
+    def preuve_manquante(self) -> str | None:
+        """Pourquoi ce mode ne peut pas être publié, ou ``None`` s'il est prouvé."""
+        if self.exige_scenario:
+            if not self.prouve:
+                attendus = ", ".join(f"`{s}`" for s in self.sens_requis)
+                return f"aucun scénario ne l'asserte (sens attendu : {attendus})"
+            if self.sens_manquants:
+                return "; ".join(_POURQUOI_SENS[s] for s in self.sens_manquants)
+            return None
+        if self.exige_section:
+            if self.section is None:
+                return (
+                    "aucune section d'Evidence Pack déclarée — « Attesté » promet de "
+                    "prouver que la mesure existe chez le client, et cette preuve est "
+                    "une section du pack, pas une ligne de registre"
+                )
+            if self.section_absente:
+                return (
+                    f"la section déclarée `{self.section}` n'existe pas dans "
+                    "l'Evidence Pack produit"
+                )
+        if self.exige_raison and not self.raison:
+            return (
+                "aucune `raison` déclarée — la doctrine publie la ligne non couverte "
+                "*avec sa raison*, et c'est ce qui en fait un atout de crédibilité "
+                "plutôt qu'un silence"
+            )
+        return None
 
     @property
     def mode_publie(self) -> str:
-        """The mode we may actually publish. `Bloqué` survives only if fully proven."""
-        if not self.exige_scenario:
-            return self.mode_revendique
-        return "B" if self.prouve and not self.sens_manquants else "NA"
+        """Le mode que nous avons le droit de publier — pour **chaque** mode, pas `B` seul.
+
+        Une facette dont la preuve exigible manque tombe en `NA` (« non asserté »).
+        C'est la version honnête du silence : nous ne retirons pas la ligne de la
+        carte, nous disons que nous ne l'attestons pas encore.
+        """
+        return "NA" if self.preuve_manquante is not None else self.mode_revendique
 
     @property
     def ingress_manquants(self) -> list[str]:
@@ -121,6 +175,10 @@ def _load_facets() -> list[Facet]:
                     profiles=f.profiles,
                     substitut=f.substitut,
                     declasse=f.declasse,
+                    section=f.section,
+                    raison=f.raison,
+                    referentiels=f.referentiels,
+                    section_absente=(f.section is not None and f.section not in EVIDENCE_SECTIONS),
                 )
             )
     return facets
@@ -251,10 +309,50 @@ def _commit() -> str:
         return "inconnu"
 
 
-#: Why a missing half matters, said in the error rather than left to be inferred.
-#: The three parts a `Bloqué` claim is made of, in the order they are reported.
-_SENS_REQUIS = ("bloque", "laisse_passer", "controle_negatif")
+#: La preuve exigible de **chaque** mode, telle que la doctrine la fixe
+#: (`docs/product/THREAT-COVERAGE.md` §1), et non du seul mode `Bloqué`.
+#:
+#: `CM-7` n'a longtemps gardé que `B`. Les douze autres facettes — cinq `Orchestré`,
+#: cinq `Attesté`, deux `Détecté` — publiaient donc leur mode sans qu'aucun garde ne
+#: le vérifie, alors que la doctrine énonce pour chacune une preuve exigible. Une
+#: revendication publiée que rien ne contrôle est exactement le défaut que ce produit
+#: vend contre : il n'y avait pas de raison de s'en exempter.
+#:
+#: Ce que chaque mode doit produire, et pourquoi c'est vérifiable mécaniquement :
+#:
+#: * `B` — « l'action n'a pas lieu ». Trois sens : le refus, le laisser-passer, et le
+#:   contrôle négatif qui prouve que le refus est l'œuvre de la garde.
+#: * `D` — « vous le voyez, horodaté et **attribué** ». Un scénario qui prouve que la
+#:   détection écrit une entrée chaînée portant l'agent. C'est la phrase que le
+#:   commercial a le droit de dire, transformée en assertion.
+#: * `O` — « nous intégrons et prouvons le contrôle ». Un scénario qui prouve qu'un
+#:   verdict **tiers** entre dans la chaîne — s'ajoutant au substitut nommé que
+#:   `FR-178` exige déjà, lequel dit qui est le tiers, pas qu'on lise son verdict.
+#: * `A` — « nous prouvons que la mesure existe chez vous ». Une section d'Evidence
+#:   Pack déclarée et **présente** (`core.compliance.EVIDENCE_SECTIONS`).
+#: * `X` — rien à prouver : c'est l'aveu, et le publier est un atout.
+_SENS_PAR_MODE: dict[str, tuple[str, ...]] = {
+    "B": ("bloque", "laisse_passer", "controle_negatif"),
+    "D": ("detecte",),
+    "O": ("verdict_tiers",),
+    "A": (),
+    "X": (),
+}
 
+#: Les modes dont la preuve est une section d'Evidence Pack plutôt qu'un scénario.
+_MODES_A_SECTION = ("A",)
+
+#: `X` n'est pas l'absence de revendication, c'en est une : « déclaré non couvert,
+#: **avec la raison** » (doctrine §1, `FR-144`). Le dire est présenté comme un atout de
+#: crédibilité — il ne l'est que si la raison voyage avec la ligne. Sans cette règle,
+#: `X` serait la case où l'on range ce qu'on préfère ne pas expliquer, et la
+#: généralisation de `CM-7` aurait créé sa propre échappatoire.
+_MODES_A_RAISON = ("X",)
+
+#: Rétro-compatibilité de lecture : le vocabulaire complet des sens.
+_SENS_REQUIS = tuple(dict.fromkeys(s for sens in _SENS_PAR_MODE.values() for s in sens))
+
+#: Why a missing half matters, said in the error rather than left to be inferred.
 _POURQUOI_SENS = {
     "bloque": "aucun scénario ne prouve que l'action est refusée",
     "laisse_passer": (
@@ -266,6 +364,16 @@ _POURQUOI_SENS = {
         "action atteindrait l'aval (AD-30.3). Sans lui, un `bloque` vert prouve "
         "seulement qu'il ne s'est rien passé — un plantage, un aval injoignable ou "
         "un nom d'outil mal orthographié satisfont « la défense a tenu »"
+    ),
+    "detecte": (
+        "aucun scénario ne prouve que la détection écrit une entrée chaînée qui "
+        "porte son agent. « Détecté » promet « vous le voyez, horodaté et attribué » : "
+        "sans cette entrée, le produit voit peut-être, mais le client ne voit rien"
+    ),
+    "verdict_tiers": (
+        "aucun scénario ne prouve qu'un verdict tiers entre dans la chaîne. "
+        "« Orchestré » promet que nous pilotons le contrôle et prouvons son verdict ; "
+        "nommer le substitut dit seulement de qui il s'agit"
     ),
 }
 
@@ -406,8 +514,8 @@ def _render_md(facets: list[Facet], commit: str, stamp: str) -> str:
         "## Le détail, facette par facette",
         "",
         "| Menace | Facette | Qui la porte | Profils | Mode publié "
-        "| Ingestion prouvée | Scén. | Écarts |",
-        "|---|---|---|---|---|---|---|---|",
+        "| Ingestion prouvée | Scén. | Réf. techniques | Écarts |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     for f in facets:
         prouve = ", ".join(f"`{i}`" for i in sorted(f.prouve)) or "—"
@@ -420,6 +528,7 @@ def _render_md(facets: list[Facet], commit: str, stamp: str) -> str:
         lines.append(
             f"| **{f.row_id}** {f.row_titre} | {f.libelle} | {f.family.label} | {profils} "
             f"| {_MODE_LABEL[f.mode_publie]} | {prouve} | {n or '—'} "
+            f"| {_render_referentiels(f)} "
             f"| {', '.join(f'`{g}`' for g in f.gaps) or '—'} |"
         )
     bloques = [f for f in facets if f.mode_publie == "B"]
@@ -427,8 +536,42 @@ def _render_md(facets: list[Facet], commit: str, stamp: str) -> str:
         "",
         f"**{len(bloques)} facettes publiées `Bloqué`**, chacune adossée à au moins un scénario "
         "qui passe. Une facette revendiquée `Bloqué` sans scénario ne franchit pas le build.",
+        "",
+        *_render_non_couvert(facets),
     ]
     return "\n".join(lines) + "\n"
+
+
+def _render_referentiels(f: Facet) -> str:
+    """La correspondance de taxonomie, millésime compris (`FR-194`).
+
+    Le millésime est affiché et non masqué : `LLM01` seul n'identifie rien, OWASP
+    ayant renuméroté entre 2023 et 2025. C'est ce que l'équipe sécurité d'en face
+    vérifiera en premier.
+    """
+    if not f.referentiels:
+        return "—"
+    return ", ".join(f"`{r.identifiant}` ({r.version})" for r in f.referentiels)
+
+
+def _render_non_couvert(facets: list[Facet]) -> list[str]:
+    """Les lignes non couvertes, **avec leur raison** — `FR-144`.
+
+    La doctrine en fait un atout de crédibilité, ce qu'elles ne sont que si la raison
+    est publiée avec la ligne. Une carte qui listerait « Hors périmètre » sans dire
+    pourquoi ferait exactement l'inverse : elle donnerait à lire un trou.
+    """
+    non_couvert = [f for f in facets if f.mode_publie == "X"]
+    if not non_couvert:
+        return []
+    lines = [
+        "## Ce que nous ne couvrons pas, et pourquoi",
+        "",
+        "| Menace | Facette | Raison |",
+        "|---|---|---|",
+    ]
+    lines += [f"| **{f.row_id}** | {f.libelle} | {f.raison or '—'} |" for f in non_couvert]
+    return lines
 
 
 def main() -> int:
@@ -443,19 +586,17 @@ def main() -> int:
     facets = _load_facets()
     errors = _attach_scenarios(facets)
 
-    # Rule 1 -- CM-7. A `Bloqué` claim with no passing scenario is a false statement.
-    unproven = [f for f in facets if f.exige_scenario and not f.prouve]
-    for f in unproven:
-        errors.append(
-            f"{f.row_id}/{f.cle} revendique « Bloqué » et aucun scénario ne l'asserte ({f.libelle})"
-        )
-
-    # Rule 3. Blocking-only proves the guard refuses, not that it discriminates.
+    # `CM-7`, généralisé. Une revendication publiée dont la preuve exigible manque est
+    # une fausse déclaration, quel que soit son mode — `Orchestré` et `Attesté` ne sont
+    # pas des modes « faibles » qu'on pourrait s'accorder sans les tenir, ce sont des
+    # phrases différentes vendues au même client.
     for f in facets:
-        if not f.prouve:
-            continue
-        for manque in f.sens_manquants:
-            errors.append(f"{f.row_id}/{f.cle} : {_POURQUOI_SENS[manque]}")
+        manque = f.preuve_manquante
+        if manque is not None:
+            errors.append(
+                f"{f.row_id}/{f.cle} revendique « {_MODE_LABEL[f.mode_revendique]} » : "
+                f"{manque} ({f.libelle})"
+            )
 
     # FR-175. Same family as CM-7, one release further downstream: a support that
     # says "we block M-13" is a false claim about a control, made to a customer.
@@ -500,10 +641,16 @@ def main() -> int:
         # facette sans substitut est déjà publiée `Hors périmètre` quand on arrive
         # ici. Ce qui doit rester visible, c'est le compte -- une déclassification
         # silencieuse serait une revendication retirée que personne ne relit.
-        orchestres = sum(1 for f in facets if f.substitut is not None)
+        # Le compte porte sur ce qui est **publié** `Orchestré`, pas sur ce qui déclare
+        # un substitut : une facette peut garder le sien tout en étant descendue faute
+        # d'avoir chaîné un verdict. Compter les substituts dirait « 4 facettes
+        # Orchestré » sur une carte qui n'en publie aucune.
+        orchestres = sum(1 for f in facets if f.mode_publie == "O")
+        en_attente = sum(1 for f in facets if f.mode_publie != "O" and f.substitut is not None)
         declasses = [f"{f.row_id}/{f.cle}" for f in facets if f.declasse]
         print(
-            f"FR-178 — {orchestres} facettes Orchestré avec substitut souverain nommé ; "
+            f"FR-178 — {orchestres} facette(s) publiée(s) Orchestré avec substitut "
+            f"souverain nommé ; {en_attente} avec substitut mais sans verdict chaîné ; "
             f"{len(declasses)} déclassée(s) faute de substitut"
             + (f" : {', '.join(declasses)}" if declasses else "")
         )
@@ -575,6 +722,17 @@ def _payload(facets: list[Facet], commit: str, stamp: str) -> dict[str, Any]:
                 "sens_prouves": sorted(f.sens_prouves),
                 "scenarios": sorted(t for v in f.prouve.values() for t in v),
                 "ecarts": f.gaps,
+                # `FR-194` : la correspondance voyage avec la carte lisible par machine.
+                # C'est le langage des équipes sécurité en face ; la leur laisser
+                # re-dériver produirait une seconde correspondance, et deux
+                # correspondances de la même ligne finissent par diverger.
+                "referentiels": [
+                    {"taxonomie": r.taxonomie.value, "version": r.version, "id": r.identifiant}
+                    for r in f.referentiels
+                ],
+                # Pourquoi une ligne non couverte ne l'est pas : la doctrine publie la
+                # raison, et c'est elle qui en fait un atout plutôt qu'un silence.
+                "raison": f.raison,
             }
             for f in facets
         ],

@@ -44,6 +44,13 @@ _BUCKETS: dict[str, str] = {
     # Recorded guard events rather than verdicts on an action: a tool that drifted,
     # a session marked tainted, a DLP finding on a body that still went out.
     "taint_marked": "guard_recorded",
+    # `FR-190` / `FR-193` : trois observations sur le chemin du proxy. Ce sont des
+    # événements de garde, pas des verdicts sur une action — les compter comme des
+    # refus gonflerait le récit de conformité avec ce que nous n'avons pas empêché.
+    "prompt_leak_verbatim": "guard_recorded",
+    "prompt_guard_flagged": "guard_recorded",
+    "prompt_guard_clean": "guard_recorded",
+    "prompt_guard_unavailable": "guard_recorded",
     "tool_drift": "guard_recorded",
     "poison_suspected": "guard_recorded",
     "tool_quarantined": "guard_recorded",

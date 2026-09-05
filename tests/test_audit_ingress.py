@@ -31,7 +31,7 @@ from core.config import Settings
 from core.policy import parse_policy
 from gateway.downstream import DownstreamProxy, ServerSpec
 from gateway.server import ApprovalContext, PolicyBackend
-from tests.conftest import DBHandle
+from tests.conftest import DBHandle, mint_agent
 from tests.test_llm_proxy import _FakeClient, _FakeResp
 
 _MOCK = Path(__file__).resolve().parent / "fixtures" / "mock_mcp_server.py"
@@ -223,3 +223,76 @@ def test_the_proxy_door_takes_its_posture_from_the_control_plane(
         == 200
     )
     assert (Ingress.llm_proxy.value, EnforcementMode.observing.value) in _doors(db.url, tenant)
+
+
+# ---------------------------------------------------------------------------
+# L'attribution sur la porte obligatoire
+# ---------------------------------------------------------------------------
+def _mcp_backend(db: DBHandle, tenant: str, token_id: str) -> PolicyBackend:
+    proxy = DownstreamProxy(
+        [
+            ServerSpec(
+                name="mock",
+                transport="stdio",
+                config={"command": sys.executable, "args": [str(_MOCK)]},
+            )
+        ]
+    )
+    return PolicyBackend(
+        parse_policy(_POLICY_YAML),
+        proxy,
+        ApprovalContext(
+            database_url=db.url,
+            tenant_id=tenant,
+            timeout_seconds=60,
+            gateway_token_id=token_id,
+        ),
+    )
+
+
+async def test_every_mcp_audit_line_names_its_agent(db: DBHandle) -> None:
+    """`AD-28` — le proxy LLM attribuait ses lignes, le gateway MCP non.
+
+    La colonne existe depuis `0006` et le contexte porte l'identité à chaque appel :
+    elle sert déjà au taint, à la fenêtre d'observation et à l'ordre d'arrêt. Seuls les
+    deux sites d'audit ne la passaient pas, si bien que **toute** ligne du chemin
+    obligatoire était anonyme.
+
+    Ce n'était pas cosmétique. Trois fonctionnalités livrées lisent cette colonne : le
+    compte d'actions par agent (`core/agents.py`), le compte par client
+    (`core/clients.py`) et le filtre `agent` de l'explorateur d'audit
+    (`core/audit.py`). Toutes rendaient zéro sur le gateway — et `scripts/seed_demo.py`
+    écrit la colonne, donc la démonstration montrait une attribution que le produit ne
+    produisait pas.
+    """
+    tenant = _tenant(db)
+    token_id = mint_agent(db, tenant)
+    backend = _mcp_backend(db, tenant, token_id)
+
+    await backend.call_tool("echo", {"text": "hi"})  # relayé → `_audit`
+    await backend.call_tool("inconnu", {})  # refusé → `_audit` sur un outil inconnu
+
+    rows = db.conn.execute(
+        "select decision, gateway_token_id from audit_log order by id"
+    ).fetchall()
+    assert rows, "aucune ligne d'audit : le test ne prouverait rien"
+    anonymes = [r[0] for r in rows if r[1] is None]
+    assert not anonymes, f"lignes anonymes sur la porte obligatoire : {anonymes}"
+    assert {str(r[1]) for r in rows} == {token_id}
+
+
+async def test_the_per_agent_action_count_sees_mcp_traffic(db: DBHandle) -> None:
+    """La conséquence, mesurée là où un opérateur la regarde.
+
+    `list_agents` joint `audit_log` sur `gateway_token_id` : elle comptait 0 action
+    pour tout agent MCP, quelle que soit son activité.
+    """
+    from core import agents
+
+    tenant = _tenant(db)
+    token_id = mint_agent(db, tenant)
+    await _mcp_backend(db, tenant, token_id).call_tool("echo", {"text": "hi"})
+
+    listed = [a for a in agents.list_agents(db.conn) if a["id"] == token_id]
+    assert len(listed) == 1
+    assert listed[0]["actions"] >= 1

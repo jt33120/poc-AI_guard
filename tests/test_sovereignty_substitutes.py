@@ -105,18 +105,35 @@ def test_the_rule_only_touches_orchestrated_facets(tmp_path: Path) -> None:
 # --- Le registre réel -------------------------------------------------------------
 
 
-def test_shadow_ai_discovery_is_declassed_in_the_real_registry() -> None:
-    """La ligne que la doctrine sacrifie, et la raison pour laquelle elle existe.
+def test_shadow_ai_discovery_never_returns_to_orchestrated_by_distraction() -> None:
+    """La ligne que la doctrine sacrifie, et ce qu'il en reste.
 
-    `ARCHI-SOUVERAINE` §5 : la découverte du Shadow AI passe par un CASB du marché, et
-    il n'en existe aucun dont la décision reste dans le périmètre. C'est la ligne qui
-    montre ce que la doctrine coûte quand on l'applique — si elle repassait `Orchestré`
-    un jour, ce serait par un substitut nommé, pas par distraction.
+    `ARCHI-SOUVERAINE` §5 : la découverte du Shadow AI passerait par un CASB du marché,
+    et il n'en existe aucun dont la décision reste dans le périmètre. C'est la ligne qui
+    montre ce que la doctrine coûte quand on l'applique.
+
+    Elle a longtemps été publiée `Hors périmètre`, déclassée au parse faute de
+    substitut. `FR-189` la remonte à **`Attesté`** — ce qui est exactement la
+    destination que `QO-3` avait fixée (« la ligne descend d'`Orchestré` à `Attesté` »)
+    et non un retour furtif à `Orchestré` : nous n'orchestrons toujours personne, nous
+    rendons une déclaration auditable, et la section d'Evidence Pack qui la porte est
+    ce qui l'autorise.
+
+    L'invariant que ce test garde est donc celui de sa docstring d'origine — pas la
+    valeur `X`, qui n'était que l'état d'attente : **cette facette n'est jamais
+    `Orchestré` sans substitut nommé.** Le voisin ci-dessous le tient pour tout le
+    registre ; ici on l'épingle sur la ligne qui l'a motivé.
     """
     facets = {(r.id, f.cle): f for r in load_rows(_REGISTRY) for f in r.facets}
     decouverte = facets[("M-10", "decouverte")]
-    assert decouverte.declasse is True
-    assert decouverte.mode == "X"
+
+    assert decouverte.mode != "O", (
+        "retour à `Orchestré` : un substitut souverain a-t-il été nommé ?"
+    )
+    assert decouverte.substitut is None  # toujours aucun CASB dans le périmètre
+    # Ce qui l'autorise à être publiée : une section d'Evidence Pack, pas un tiers.
+    assert decouverte.mode == "A"
+    assert decouverte.section == "article_26_deployer.shadow_ai"
 
 
 def test_every_published_orchestrated_facet_names_its_substitute() -> None:

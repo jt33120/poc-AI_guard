@@ -522,6 +522,9 @@ class PolicyBackend:
                     decision=decision,
                     tool_name=tool_name,
                     error=reason,
+                    # Qui a fait ça. Sans cette ligne, tout refus de garde sur la porte
+                    # obligatoire est anonyme — voir la note de `_audit`.
+                    gateway_token_id=ctx.gateway_token_id,
                     origin=audit.Origin.mcp_gateway(),
                 )
         except Exception:  # audit is best-effort; never break the call path
@@ -556,6 +559,16 @@ class PolicyBackend:
                     args_hash=approvals.args_hash(arguments),
                     latency_ms=latency_ms,
                     error=error,
+                    # **Qui** a fait ça. Le proxy LLM le passait (`api/llm_proxy.py`), le
+                    # gateway non : toute ligne d'audit du chemin MCP était anonyme, et la
+                    # colonne existe pourtant depuis `0006`. Deux fonctionnalités livrées
+                    # s'en nourrissent et rendaient donc zéro sur la porte obligatoire —
+                    # le compte d'actions par agent (`core/agents.py`) et par client
+                    # (`core/clients.py`), plus le filtre `agent` de l'explorateur d'audit
+                    # (`core/audit.py`). `scripts/seed_demo.py` l'écrit, lui : la
+                    # démonstration affichait une attribution que le produit ne produisait
+                    # pas.
+                    gateway_token_id=ctx.gateway_token_id,
                     # The mandatory door: an agent speaking MCP cannot route around it.
                     origin=audit.Origin.mcp_gateway(),
                 )

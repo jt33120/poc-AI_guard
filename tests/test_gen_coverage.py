@@ -39,7 +39,54 @@ rows:
     profils: [P3]
     facettes:
       - {cle: dur, libelle: "revendication dure", mode: B, ingress: [mcp], profils: [P3]}
-      - {cle: mou, libelle: "revendication molle", mode: D, profils: [P3]}
+      # Une facette sans preuve exigible : depuis la généralisation de `CM-7` aux
+      # modes `D`/`O`/`A`, seul `X` peut être publié sans rien produire. Les règles
+      # de ces trois modes ont leurs propres registres, plus bas.
+      - {cle: mou, libelle: "revendication molle", mode: X, profils: [P3],
+         raison: "hors de notre point d'interposition"}
+"""
+
+#: Un registre par mode non-`B`, pour éprouver la preuve exigible de chacun.
+_REGISTRY_D = """
+version: 1
+ingress:
+  mcp: "Gateway MCP"
+rows:
+  - id: M-99
+    titre: "Menace de test"
+    famille: usage_ia
+    profils: [P3]
+    facettes:
+      - {cle: vu, libelle: "on le voit", mode: D, ingress: [mcp], profils: [P3]}
+"""
+
+_REGISTRY_O = """
+version: 1
+ingress:
+  mcp: "Gateway MCP"
+rows:
+  - id: M-99
+    titre: "Menace de test"
+    famille: usage_ia
+    profils: [P3]
+    facettes:
+      - cle: tiers
+        libelle: "un tiers le fait"
+        mode: O
+        ingress: [mcp]
+        profils: [P3]
+        substitut: {nom: "Outil tiers", justification: local}
+"""
+
+_REGISTRY_A = """
+version: 1
+rows:
+  - id: M-99
+    titre: "Menace de test"
+    famille: usage_ia
+    profils: [P3]
+    facettes:
+      - {cle: atteste, libelle: "nous l'attestons", mode: A, profils: [P3]}
 """
 
 
@@ -230,5 +277,86 @@ def test_the_mode_name_is_vocabulary_and_not_a_claim(tmp_path: Path) -> None:
         "et un seul autorise le verbe « bloquer ».\n",
         encoding="utf-8",
     )
-    result = _run(tmp_path, [], registry=_REGISTRY.replace("mode: B", "mode: D", 1))
+    # `X` plutôt que `D` : depuis la généralisation de `CM-7`, un `D` sans scénario est
+    # lui-même refusé, et le test ne parlerait plus de ce qu'il teste — le verbe.
+    result = _run(
+        tmp_path,
+        [],
+        registry=_REGISTRY.replace(
+            "mode: B, ingress: [mcp]", 'mode: X, raison: "non couvert", ingress: [mcp]', 1
+        ),
+    )
+    assert result.returncode == 0, result.stderr
+
+
+# ---------------------------------------------------------------------------
+# `CM-7` généralisé : chaque mode a sa preuve exigible, pas seulement `Bloqué`
+# ---------------------------------------------------------------------------
+# Le gate ne gardait que `B`. Les modes `D`, `O` et `A` publiaient donc leur
+# revendication sans qu'aucun contrôle ne l'exige, alors que la doctrine (§1) énonce
+# une preuve pour chacun. Douze facettes sur vingt-cinq étaient dans ce cas.
+#
+# Les trois paires ci-dessous suivent le même schéma : sans la preuve, la carte est
+# refusée ; avec elle, elle passe. C'est ce qui distingue un gate d'une intention.
+
+
+def test_a_detected_claim_without_a_scenario_fails_the_build(tmp_path: Path) -> None:
+    """« Détecté » promet « vous le voyez, horodaté et attribué »."""
+    result = _run(tmp_path, [], registry=_REGISTRY_D)
+    assert result.returncode == 1
+    assert "M-99/vu" in result.stderr and "Détecté" in result.stderr
+
+
+def test_a_detected_claim_with_its_scenario_passes(tmp_path: Path) -> None:
+    result = _run(tmp_path, [_passing("M-99", "vu", "mcp", "detecte")], registry=_REGISTRY_D)
+    assert result.returncode == 0, result.stderr
+
+
+def test_an_orchestrated_claim_needs_more_than_a_named_substitute(tmp_path: Path) -> None:
+    """Nommer le tiers dit **qui** il est, pas que nous lisons son verdict.
+
+    C'est la distinction que `FR-178` laissait ouverte : il exige un substitut
+    souverain, donc il empêche de revendiquer `Orchestré` sans savoir de qui on parle.
+    Il n'empêche pas de le revendiquer sans jamais chaîner une seule ligne de ce que
+    le tiers a dit — ce qui était le cas des cinq facettes `O` du registre.
+    """
+    result = _run(tmp_path, [], registry=_REGISTRY_O)
+    assert result.returncode == 1
+    assert "M-99/tiers" in result.stderr and "verdict_tiers" in result.stderr
+
+
+def test_an_orchestrated_claim_with_a_chained_verdict_passes(tmp_path: Path) -> None:
+    result = _run(
+        tmp_path, [_passing("M-99", "tiers", "mcp", "verdict_tiers")], registry=_REGISTRY_O
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_an_attested_claim_without_a_section_fails_the_build(tmp_path: Path) -> None:
+    """« Attesté » se prouve par une section d'Evidence Pack, pas par un mot en YAML."""
+    result = _run(tmp_path, [], registry=_REGISTRY_A)
+    assert result.returncode == 1
+    assert "M-99/atteste" in result.stderr and "Evidence Pack" in result.stderr
+
+
+def test_an_attested_claim_naming_a_section_that_does_not_exist_fails(tmp_path: Path) -> None:
+    """Le contrôle qui empêche la déclaration d'être auto-réalisatrice.
+
+    Sans lui, il suffirait d'écrire n'importe quel chemin pour publier « Attesté » —
+    le registre attesterait de lui-même, ce qui est précisément le défaut que ce gate
+    existe pour empêcher.
+    """
+    registry = _REGISTRY_A.replace(
+        "profils: [P3]}", "profils: [P3], section: article_99_inexistant.section_fantome}"
+    )
+    result = _run(tmp_path, [], registry=registry)
+    assert result.returncode == 1
+    assert "n'existe pas dans l'Evidence Pack" in result.stderr
+
+
+def test_an_attested_claim_naming_a_real_section_passes(tmp_path: Path) -> None:
+    registry = _REGISTRY_A.replace(
+        "profils: [P3]}", "profils: [P3], section: article_26_deployer.corpus_provenance}"
+    )
+    result = _run(tmp_path, [], registry=registry)
     assert result.returncode == 0, result.stderr

@@ -59,6 +59,17 @@ _HORS_PLI: dict[str, str] = {
         "seulement après un verdict `allow`. Le schéma d'`ARCHI-SOUVERAINE` §2 le dit "
         "ainsi : « relais après décision, jamais avant »."
     ),
+    "core.prompt_guard": (
+        "Le garde-prompt tiers (`FR-193`). Cinquième entrée de cette liste fermée, "
+        "donc à défendre : ce module appelle un service en ligne — Mistral, juridiction "
+        "de l'Union, déjà imposé par la stack pour le juge, donc zéro fournisseur "
+        "nouveau (`QO-3`). Ce qui l'autorise ici n'est pas cette souveraineté mais le "
+        "fait qu'il n'est **sur le chemin d'aucune décision** : son verdict est observé "
+        "et chaîné, jamais lu par un garde. `M-01/garde_prompt` est publiée "
+        "`Orchestré` et non `Bloqué`, et un scénario prouve qu'un prompt signalé est "
+        "quand même relayé — le jour où ce verdict retiendrait une action, ce module "
+        "devrait rentrer dans le pli et cette entrée disparaître."
+    ),
     "core.egress": (
         "La garde d'egress (AD-24). Elle résout un nom pour en refuser les plages "
         "interdites — à l'enregistrement d'un serveur en aval et à la connexion, jamais "
