@@ -458,9 +458,26 @@ def _constraint_floor(rule: ToolRule, base: Approval) -> Approval:
     floor = base
     for key, value in rule.constraints.items():
         forced = _FLOOR_CONSTRAINTS.get(key)
-        if forced is not None and value and _APPROVAL_ORDER[forced] > _APPROVAL_ORDER[floor]:
-            floor = forced
+        if forced is not None and value:
+            floor = raise_to(floor, forced)
     return floor
+
+
+def raise_to(base: Approval, minimum: Approval) -> Approval:
+    """Fold a guard's verdict into ``base``, keeping the stricter of the two (`AD-21.1`).
+
+    **A guard contributes a minimum tier; it can never relax an earlier verdict.**
+    That is `FR-170`, and the reason it is a function rather than a convention: the
+    property held here as long as every escalation site happened to be written as a
+    comparison, and stopped holding the moment one was written as an assignment --
+    `gateway/server.py` overwrote the decision with ``human_in_the_loop``, which
+    *lowered* a rule's ``deny`` and halved a ``human_dual``'s quorum, in exactly the
+    session where an injection had just been detected.
+
+    Every site that tightens a decision folds through this function, so a future
+    guard is incapable of loosening one by accident.
+    """
+    return base if _APPROVAL_ORDER[base] >= _APPROVAL_ORDER[minimum] else minimum
 
 
 def escalate_for_class(base: Approval, action_class: ActionClass) -> Approval:
@@ -474,7 +491,7 @@ def escalate_for_class(base: Approval, action_class: ActionClass) -> Approval:
         if action_class in (ActionClass.external_send, ActionClass.irreversible)
         else Approval.auto
     )
-    return base if _APPROVAL_ORDER[base] >= _APPROVAL_ORDER[floor] else floor
+    return raise_to(base, floor)
 
 
 def service_down_verdict(policy: Policy, action_class: ActionClass | None) -> Approval:

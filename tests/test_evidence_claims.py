@@ -34,6 +34,8 @@ _VOCABULARY = {
     "expired": 1,  # core/decision.py::_TERMINAL
     "rbac_denied": 1,  # gateway/server.py::_audit_gate
     "tainted_action": 1,  # gateway/server.py::_audit_gate
+    "agent_stopped": 1,  # gateway/server.py::_stop_blocks -- jeton révoqué
+    "stop_state_unreadable": 1,  # idem -- état d'arrêt illisible
     "taint_marked": 1,  # gateway/server.py::_audit_gate
     "tool_drift": 1,  # gateway/server.py::_INTEGRITY_DECISION
     "poison_suspected": 1,  # idem

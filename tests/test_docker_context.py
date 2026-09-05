@@ -50,6 +50,9 @@ def _excluded(relative_path: str) -> bool:
     "path",
     [
         "supabase/migrations/0001_init_tenancy.sql",
+        # `FR-167` : sans le manifeste dans l'image, la vérification de complétude
+        # passe à vide et l'image tronquée redevient indétectable.
+        "supabase/migrations/MANIFEST.sha256",
         "core/migrate.py",
         "deploy/auth_compat.sql",
         "scripts/audit_security.py",

@@ -25,10 +25,20 @@ from core import monitor
 from core.policy import ActionClass, Approval, PolicyOutcome, parse_policy
 from gateway.downstream import DownstreamProxy, ServerSpec
 from gateway.server import ApprovalContext, PolicyBackend
-from tests.conftest import DBHandle
+from tests.conftest import DBHandle, mint_agent
 
 _MOCK = Path(__file__).resolve().parent / "fixtures" / "mock_mcp_server.py"
-_TOKEN = "tok-observed"
+#: L'identité de l'agent observé, mintée une fois par tenant. Depuis `FR-166` la
+#: passerelle relit ce jeton à chaque appel pour savoir si un opérateur a arrêté
+#: l'agent : un identifiant inventé se lirait comme un jeton introuvable, donc révoqué.
+_TOKENS: dict[str, str] = {}
+
+
+def _token(db: DBHandle, tenant_id: str) -> str:
+    if tenant_id not in _TOKENS:
+        _TOKENS[tenant_id] = mint_agent(db, tenant_id, "observed")
+    return _TOKENS[tenant_id]
+
 
 _POLICY = parse_policy(
     """
@@ -48,7 +58,8 @@ def _tenant(db: DBHandle) -> str:
     return tenant_id
 
 
-def _backend(db: DBHandle, tenant_id: str, *, token_id: str | None = _TOKEN) -> PolicyBackend:
+def _backend(db: DBHandle, tenant_id: str, *, token_id: str | None = "") -> PolicyBackend:
+    """``token_id=""`` (le défaut) veut dire « l'agent observé » ; ``None``, pas d'identité."""
     proxy = DownstreamProxy(
         [
             ServerSpec(
@@ -62,14 +73,18 @@ def _backend(db: DBHandle, tenant_id: str, *, token_id: str | None = _TOKEN) -> 
         database_url=db.url,
         tenant_id=tenant_id,
         timeout_seconds=3600,
-        gateway_token_id=token_id,
+        gateway_token_id=_token(db, tenant_id) if token_id == "" else token_id,
     )
     return PolicyBackend(_POLICY, proxy, ctx)
 
 
-def _open(db: DBHandle, tenant_id: str, token_id: str = _TOKEN) -> None:
+def _open(db: DBHandle, tenant_id: str, token_id: str = "") -> None:
     monitor.open_window(
-        db.conn, tenant_id=tenant_id, gateway_token_id=token_id, hours=2, max_hours=24
+        db.conn,
+        tenant_id=tenant_id,
+        gateway_token_id=_token(db, tenant_id) if token_id == "" else token_id,
+        hours=2,
+        max_hours=24,
     )
     db.conn.commit()
 
@@ -133,7 +148,7 @@ async def test_an_open_window_relays_a_held_action_of_an_observable_class(
             database_url=db.url,
             tenant_id=tenant_id,
             timeout_seconds=3600,
-            gateway_token_id=_TOKEN,
+            gateway_token_id=_token(db, tenant_id),
         ),
     )
 
@@ -322,7 +337,7 @@ async def test_a_window_never_relaxes_a_tainted_action_with_an_exfiltration_targ
             database_url=db.url,
             tenant_id=tenant_id,
             timeout_seconds=3600,
-            gateway_token_id=_TOKEN,
+            gateway_token_id=_token(db, tenant_id),
         ),
     )
 
@@ -383,7 +398,7 @@ async def test_a_window_never_relaxes_an_rbac_refusal(db: DBHandle) -> None:
             database_url=db.url,
             tenant_id=tenant_id,
             timeout_seconds=3600,
-            gateway_token_id=_TOKEN,
+            gateway_token_id=_token(db, tenant_id),
             client_id="c2",  # hors de l'allowlist
         ),
     )

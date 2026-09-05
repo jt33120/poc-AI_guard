@@ -21,6 +21,66 @@ export const STR = {
     fr: "Réveil du serveur sécurisé — le premier chargement après une période d'inactivité peut prendre jusqu'à une minute.",
   },
 
+  // Public profile diagnostic (QO-7)
+  "triage.title": {
+    en: "What of this actually concerns you?",
+    fr: "Qu'est-ce qui vous concerne vraiment ?",
+  },
+  "triage.lede": {
+    en: "The market shows you a list of AI threats. Most of them are not yours. Tick how your organisation uses AI and see which lines apply, which are ours to hold, and which we block today.",
+    fr: "Le marché vous montre une liste de menaces IA. La plupart ne sont pas les vôtres. Cochez la façon dont votre organisation utilise l'IA, et voyez quelles lignes vous concernent, lesquelles sont sur notre terrain, et lesquelles nous bloquons aujourd'hui.",
+  },
+  "triage.profiles": { en: "How do you use AI?", fr: "Comment utilisez-vous l'IA ?" },
+  "triage.p1a": { en: "We call a hyperscaler API", fr: "Nous appelons une API hyperscaler" },
+  "triage.p1a.hint": {
+    en: "Azure OpenAI, Bedrock and the like, from our own code.",
+    fr: "Azure OpenAI, Bedrock et similaires, depuis notre propre code.",
+  },
+  "triage.p1b": { en: "AI embedded in a SaaS suite", fr: "IA embarquée dans une suite SaaS" },
+  "triage.p1b.hint": {
+    en: "Copilot, Gemini in Workspace and the like.",
+    fr: "Copilot, Gemini dans Workspace et similaires.",
+  },
+  "triage.p2": { en: "Internal RAG over our documents", fr: "RAG interne sur nos documents" },
+  "triage.p2.hint": {
+    en: "The AI reads our own corpora to answer.",
+    fr: "L'IA lit nos propres corpus pour répondre.",
+  },
+  "triage.p3": { en: "Tooled agents that act", fr: "Agents outillés qui agissent" },
+  "triage.p3.hint": {
+    en: "The AI sends, writes, pays or deploys — it does not only answer.",
+    fr: "L'IA envoie, écrit, paie ou déploie — elle ne fait pas que répondre.",
+  },
+  "triage.p4": { en: "Self-hosted open weights", fr: "Poids ouverts auto-hébergés" },
+  "triage.p4.hint": {
+    en: "We run the model ourselves.",
+    fr: "Nous exécutons le modèle nous-mêmes.",
+  },
+  "triage.p5": { en: "We train or fine-tune", fr: "Nous entraînons ou affinons" },
+  "triage.p5.hint": {
+    en: "Our own training or fine-tuning pipelines.",
+    fr: "Nos propres chaînes d'entraînement ou d'affinage.",
+  },
+  "triage.email": { en: "Professional e-mail", fr: "E-mail professionnel" },
+  "triage.submit": { en: "See my diagnostic", fr: "Voir mon diagnostic" },
+  "triage.busy": { en: "Computing…", fr: "Calcul en cours…" },
+  "triage.needprofile": {
+    en: "Tick at least one — the diagnostic is the crossing of your usage with what we prove.",
+    fr: "Cochez-en au moins un — le diagnostic est le croisement de votre usage avec ce que nous prouvons.",
+  },
+  "triage.failed": { en: "The diagnostic could not be computed.", fr: "Le diagnostic n'a pas pu être calculé." },
+  "triage.result.lines": { en: "threat lines", fr: "lignes de menace" },
+  "triage.result.applicable": { en: "concern you", fr: "vous concernent" },
+  "triage.result.ours": { en: "are ours to hold", fr: "sont sur notre terrain" },
+  "triage.result.blocked": { en: "we block today", fr: "nous bloquons aujourd'hui" },
+  "triage.result.again": { en: "Change my answers", fr: "Modifier mes réponses" },
+  // The purpose statement is rendered from the API response, never hardcoded here:
+  // the text that governs a collection must travel with the collection.
+  "triage.privacy.before": {
+    en: "Your address is used to get back to you about this diagnostic. It is neither sold nor passed to a third party, and you may ask for its deletion at any time.",
+    fr: "Votre adresse sert à vous recontacter au sujet de ce diagnostic. Elle n'est ni revendue ni transmise à un tiers, et vous pouvez demander sa suppression à tout moment.",
+  },
+
   // Welcome / landing
   "welcome.badge": {
     en: "AI agent action governance",

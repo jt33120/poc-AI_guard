@@ -75,6 +75,27 @@ def revoke(conn: psycopg.Connection, tenant_id: str, token_id: str) -> bool:
     return row is not None
 
 
+def revoked(conn: psycopg.Connection, tenant_id: str, token_id: str) -> bool:
+    """Whether this agent's token has been revoked — read fresh, per call.
+
+    `FR-166`. The MCP gateway resolves the token **once**, when the process starts,
+    and never looked at it again: an operator revoking a token stopped nothing until
+    the agent happened to reconnect. `/v1/authorize` re-reads it on every request, so
+    the same order had two different effects depending on the door the agent came
+    through — and the MCP one is the mandatory door (`AD-28`).
+
+    A token that no longer exists counts as revoked: fail-closed on the row we cannot
+    find. Connection failures are **not** caught here; the caller decides what an
+    unreadable stop state means for the class of action at hand, which it cannot do
+    from inside this function.
+    """
+    row = conn.execute(
+        "select revoked_at from gateway_tokens where id = %s and tenant_id = %s",
+        (token_id, tenant_id),
+    ).fetchone()
+    return row is None or row[0] is not None
+
+
 def hash_token(raw: str) -> str:
     """Return the SHA-256 hex digest stored in ``gateway_tokens.token_hash``."""
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()

@@ -90,3 +90,46 @@ test("editing the policy saves a new version", async ({ page, context }) => {
   await page.getByRole("button", { name: "Save policy" }).click();
   await expect(page.getByText("Policy saved (version 2).")).toBeVisible();
 });
+
+// --- Public profile diagnostic (QO-7) ------------------------------------------
+//
+// No `authed()`: the whole point is that a prospect with no account reaches it.
+// A test that signed in first would pass on a screen locked behind a login.
+
+const DIAGNOSTIC = {
+  profiles: ["P1a", "P2", "P3"],
+  lines: 16,
+  applicable: 14,
+  ours: 11,
+  blocked: 8,
+  statement:
+    "Sur les 16 lignes de la matrice de menaces, 14 vous concernent réellement compte tenu de votre usage. Sur ces 14, nous en bloquons 8 nativement, chez vous, aujourd'hui.",
+  privacy:
+    "Votre adresse sert à vous recontacter au sujet de ce diagnostic. Base légale : intérêt légitime (prospection B2B).",
+};
+
+test("a prospect with no account gets a diagnostic after giving an e-mail", async ({ page }) => {
+  let sent: { profiles?: string[]; email?: string } = {};
+  await page.route("**/api/triage", async (route) => {
+    sent = JSON.parse(route.request().postData() ?? "{}");
+    await route.fulfill({ json: DIAGNOSTIC });
+  });
+
+  await page.goto("/triage");
+
+  // The purpose is readable BEFORE anything is handed over — a purpose met only
+  // after the fact was not disclosed.
+  await expect(page.getByText(/ni revendue ni transmise|neither sold nor passed/)).toBeVisible();
+
+  // Nothing ticked: the submit is refused, so an empty diagnostic can never be
+  // presented as an answer.
+  await expect(page.getByRole("button", { name: /diagnostic|Voir mon/i })).toBeDisabled();
+
+  await page.getByRole("checkbox").first().check();
+  await page.getByLabel(/E-mail|Professional/).fill("prospect@exemple-client.test");
+  await page.getByRole("button", { name: /diagnostic|Voir mon/i }).click();
+
+  await expect(page.getByTestId("triage-statement")).toContainText("nous en bloquons 8");
+  expect(sent.email).toBe("prospect@exemple-client.test");
+  expect(sent.profiles).toEqual(["P1a"]);
+});

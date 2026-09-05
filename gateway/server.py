@@ -41,6 +41,7 @@ from core.policy import (
     Policy,
     PolicyOutcome,
     evaluate,
+    raise_to,
     service_down_verdict,
 )
 from core.tenant_tokens import authenticate_gateway_session
@@ -133,6 +134,7 @@ class PolicyBackend:
         #: Reason from the last taint read, for the audit line that follows it.
         self._taint_reason: str | None = None
         self._exfil_target: str | None = None
+        self._stop_reason: str | None = None
         # Indirect-injection taint is persisted, keyed on the agent (FR-154). It is
         # deliberately NOT held here: an object on this instance dies with the
         # connection, and a guard a reconnect defeats is not a guard.
@@ -171,6 +173,18 @@ class PolicyBackend:
         # irreversible rather than letting the rule's approval stand (AD-34).
         outcome = resolve_ambiguous(outcome, self._judge, canonical, arguments)
 
+        # `FR-166` — l'ordre d'arrêt de l'opérateur, relu **par appel**.
+        #
+        # Placé ici et pas plus haut : la direction d'échec est conditionnée à la
+        # classe (`AD-33`), donc le garde ne peut pas s'exprimer avant que la classe
+        # soit connue. Placé avant le risque et le taint parce qu'un agent arrêté ne
+        # doit pas voir sa demande *graduée* : elle n'a pas à être évaluée du tout.
+        stopped = self._stop_blocks(outcome)
+        if stopped is not None:
+            logger.info("agent_stopped", extra={"tool": canonical, "reason": stopped})
+            self._audit_gate(canonical, stopped, self._stop_reason)
+            return _denied_result(f"'{canonical}' denied: {self._stop_reason}")
+
         # Graduated autonomy (M11): risk-score an `auto` outcome and tighten it.
         outcome = self._apply_risk(canonical, outcome, arguments)
 
@@ -183,7 +197,18 @@ class PolicyBackend:
                 return _denied_result(
                     f"'{canonical}' denied: session tainted by a prior tool result"
                 )
-            outcome = replace(outcome, decision=Approval.human_in_the_loop, reason="taint")
+            # `FR-170` : le garde contribue un **minimum**, il n'écrase pas. Écraser
+            # relâchait le verdict quand la policy était plus stricte que le palier
+            # du taint — un `deny` de règle devenait une attente approuvable, et le
+            # quorum d'un `human_dual` tombait de 2 à 1. Dans la session teintée,
+            # précisément : l'injection réussie *ouvrait* la porte qu'elle visait.
+            # `reason` reste posé inconditionnellement — `_observation_relaxes` en
+            # dépend pour refuser de relâcher une escalade de taint.
+            outcome = replace(
+                outcome,
+                decision=raise_to(outcome.decision, Approval.human_in_the_loop),
+                reason="taint",
+            )
 
         # Observation window (`AD-27`, `G-25`) — désormais sur les **deux** chemins
         # d'ingestion. Le proxy LLM la portait seul depuis le rang 4, donc un même
@@ -315,6 +340,46 @@ class PolicyBackend:
         for tool_name, (status, reason) in quarantined.items():
             self._audit_gate(tool_name, _INTEGRITY_DECISION[status], reason)
         return exposed
+
+    def _stop_blocks(self, outcome: PolicyOutcome) -> str | None:
+        """La décision d'audit si cet agent est arrêté, ou ``None`` s'il peut continuer.
+
+        `FR-166`. Trois états de plan de contrôle sont gelés au démarrage du processus
+        MCP — le jeton, la policy, la liste des serveurs — et aucun n'est relu ensuite.
+        Un opérateur qui révoque le jeton d'un agent ne l'arrête donc pas tant qu'il ne
+        se reconnecte pas, alors que `/v1/authorize` relit le même jeton à chaque
+        requête. Ce n'était pas un choix : c'est une divergence d'ingestion (`AD-28`),
+        et elle porte sur la porte obligatoire.
+
+        Ce garde ne relit que le jeton — l'ordre d'arrêt qui existe déjà
+        (`POST /v1/gateway-tokens/{id}/revoke`, `cli token revoke`, le bouton console).
+        La policy et les serveurs restent gelés ; les dégeler demande de décider ce
+        qu'une republication en cours de session doit faire d'un appel en vol, et ce
+        n'est pas la question de ce FR.
+
+        **Direction d'échec.** Un état d'arrêt illisible refuse tout sauf la lecture.
+        C'est plus strict que les deux autres gardes qui plafonnent aux classes
+        risquées (`service_down_verdict`, `_taint_blocks`), et délibérément : ceux-là
+        arbitrent une heuristique ou une file d'attente, celui-ci exécute un ordre
+        explicite d'un humain. Un arrêt d'urgence s'invoque pendant un incident,
+        c'est-à-dire au moment précis où la base est dégradée — un arrêt qui cesse de
+        valoir quand la base tousse n'est pas un arrêt.
+        """
+        ctx = self._approval_ctx
+        if ctx is None or ctx.gateway_token_id is None:
+            return None  # pas d'identité d'agent : les autres gardes tiennent ce cas
+        try:
+            with db.connection(ctx.database_url) as conn:
+                if not tenant_tokens.revoked(conn, ctx.tenant_id, ctx.gateway_token_id):
+                    return None
+        except Exception:
+            logger.warning("stop_state_unreadable", extra={"tenant_id": ctx.tenant_id})
+            if outcome.action_class is ActionClass.read:
+                return None
+            self._stop_reason = "stop state unreadable"
+            return "stop_state_unreadable"
+        self._stop_reason = "agent stopped by an operator (token revoked)"
+        return "agent_stopped"
 
     def _rbac_blocks(self, canonical: str) -> str | None:
         """Reason a call must be refused by per-tool RBAC, or None if allowed.
