@@ -24,7 +24,7 @@ from typing import Any
 
 import psycopg
 
-from core import audit, corpora, export, prompt_guard, verdicts
+from core import audit, corpora, export, prompt_guard, shadow_ai, verdicts
 from core import usage as usage_store
 from core.audit import EnforcementMode
 from core.monitor import NEVER_OBSERVED
@@ -197,6 +197,15 @@ def prompt_guard_attestation(conn: psycopg.Connection, settings: Any = None) -> 
     return prompt_guard.attestation_section(enabled=enabled, provider=provider, seen=seen)
 
 
+def _shadow_ai_section(conn: psycopg.Connection) -> dict[str, Any]:
+    """`FR-189` — l'inventaire déposé, ou l'aveu qu'il n'y en a pas."""
+    courant = shadow_ai.current(conn)
+    if courant is None:
+        return shadow_ai.attestation_section(None)
+    inventory, window = courant
+    return shadow_ai.attestation_section(inventory, window=window)
+
+
 def oldest_entry_age_days(conn: psycopg.Connection) -> int | None:
     """Age in days of the oldest audit entry (None if the log is empty)."""
     row = conn.execute(
@@ -349,6 +358,7 @@ EVIDENCE_SECTIONS: frozenset[str] = frozenset(
         "article_26_deployer.corpus_provenance",
         "article_26_deployer.third_party_verdicts",
         "article_26_deployer.prompt_guard",
+        "article_26_deployer.shadow_ai",
     }
 )
 
@@ -425,6 +435,10 @@ def build_evidence_pack(
             "third_party_verdicts": verdicts.provenance_section(conn),
             # `FR-193` : la présence du garde-prompt, attestée depuis le journal.
             "prompt_guard": prompt_guard_attestation(conn, settings),
+            # `FR-189` : l'inventaire du Shadow AI, dérivé d'un extrait fourni par
+            # l'exploitant. Absent, il est publié **comme absent** : le silence se
+            # lirait « aucun Shadow AI », qui est l'inverse de la vérité.
+            "shadow_ai": _shadow_ai_section(conn),
         },
     }
     base["compliant"] = (

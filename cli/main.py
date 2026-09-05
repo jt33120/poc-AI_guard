@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import json
 import os
 import sys
 import textwrap
@@ -29,7 +30,7 @@ import psycopg
 from pydantic import ValidationError
 from pydantic_settings import SettingsError
 
-from core import db, migrate, secrets, signup, tenant_tokens, triage
+from core import db, migrate, secrets, shadow_ai, signup, tenant_tokens, triage
 from core.config import Settings, get_settings
 from core.notify import SmtpNotifier, build_notifier
 from core.schemas import SignupRequest
@@ -725,7 +726,70 @@ def build_parser() -> argparse.ArgumentParser:
         "--carte",
         help="published coverage map to quote (default: coverage/map.json in this checkout)",
     )
+
+    shadow = sub.add_parser(
+        "shadow-ai",
+        help="derive the Shadow AI inventory from a local egress extract (the file stays here)",
+    )
+    shadow.add_argument(
+        "extrait", help="CSV `host,requests,actor_hash` produced by the client's own SOC"
+    )
+    shadow.add_argument(
+        "--supervises",
+        help="comma-separated hosts already routed through xSOM (everything else is shadow)",
+    )
     return parser
+
+
+def cmd_shadow_ai(settings: Settings, args: argparse.Namespace) -> int:
+    """Dériver l'inventaire du Shadow AI depuis un extrait local, et l'imprimer.
+
+    **Le fichier ne quitte pas ce poste.** C'est la raison d'être de cette commande :
+    le parsing et la classification tournent ici, et seul l'inventaire agrégé est
+    ensuite déposé par `PUT /v1/shadow-ai`. Le jour où le produit irait chercher ce
+    journal lui-même — un connecteur vers un proxy, une tâche périodique, une route
+    qui accepte le fichier — il serait devenu le CASB que `QO-3` a refusé.
+
+    L'extrait attendu est minimal, une ligne par couple (hôte, poste) :
+    `host,requests,actor_hash`. L'empreinte est produite par le client : l'inventaire
+    dit « combien de postes », jamais « lesquels ».
+    """
+    del settings
+    chemin = Path(args.extrait)
+    if not chemin.is_file():
+        raise CliError(f"extrait introuvable : {chemin}")
+    lignes = [ligne for ligne in chemin.read_text(encoding="utf-8").splitlines() if ligne.strip()]
+    observations, rejets = shadow_ai.parse_observations(lignes)
+    supervises = frozenset(
+        h.strip().lower() for h in (args.supervises or "").split(",") if h.strip()
+    )
+    inventaire = shadow_ai.classify(observations, supervised_hosts=supervises, rejected=rejets)
+
+    print(f"Lignes lues : {len(observations)} · rejetées : {rejets}")
+    print(f"Hôtes non classés : {inventaire.unclassified}")
+    print("\nSupervisé")
+    for service, acteurs in inventaire.supervised.items() or {"(aucun)": 0}.items():
+        print(f"  {service} : {acteurs} poste(s)")
+    print("\nShadow AI — usages qu'aucune supervision ne couvre")
+    for service, acteurs in inventaire.shadow.items() or {"(aucun)": 0}.items():
+        print(f"  {service} : {acteurs} poste(s)")
+    print(
+        "\nÀ déposer via PUT /v1/shadow-ai (seul cet inventaire agrégé traverse le "
+        "réseau ; l'extrait reste ici) :"
+    )
+    print(
+        json.dumps(
+            {
+                "supervised": inventaire.supervised,
+                "shadow": inventaire.shadow,
+                "unclassified": inventaire.unclassified,
+                "rejected": inventaire.rejected,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+    return 0
 
 
 _COMMANDS = {
@@ -734,6 +798,7 @@ _COMMANDS = {
     "token": cmd_token,
     "doctor": cmd_doctor,
     "triage": cmd_triage,
+    "shadow-ai": cmd_shadow_ai,
 }
 
 

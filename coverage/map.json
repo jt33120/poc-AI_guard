@@ -1,6 +1,6 @@
 {
-  "commit": "1c5a164",
-  "genere_le": "2026-09-05 16:42 UTC",
+  "commit": "416f656",
+  "genere_le": "2026-09-05 17:10 UTC",
   "facettes": [
     {
       "menace": "M-01",
@@ -504,11 +504,11 @@
       "menace": "M-10",
       "titre": "Exfiltration de données / PI via LLM",
       "facette": "decouverte",
-      "libelle": "découverte du Shadow AI non supervisé",
-      "mode_revendique": "X",
-      "mode_publie": "X",
+      "libelle": "inventaire déclaré du Shadow AI non supervisé",
+      "mode_revendique": "A",
+      "mode_publie": "A",
       "substitut": null,
-      "declasse_faute_de_substitut": true,
+      "declasse_faute_de_substitut": false,
       "famille": "usage_ia",
       "profils": [
         "P1a",
@@ -532,7 +532,7 @@
           "id": "LLM02"
         }
       ],
-      "raison": "Revendiqué « Orchestré » sans substitut souverain nommé : piloter un contrôle tiers en fait une dépendance, et une dépendance qu'on ne peut pas nommer ne peut pas être revendiquée (`FR-178`)."
+      "raison": null
     },
     {
       "menace": "M-11",

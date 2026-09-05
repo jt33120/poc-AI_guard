@@ -225,6 +225,49 @@ class VerdictRequest(BaseModel):
     ran_at: datetime
 
 
+class ShadowAiRequest(BaseModel):
+    """L'inventaire **dérivé** du Shadow AI (`FR-189`).
+
+    Ce schéma *est* la frontière. Il n'y a aucun champ pour une ligne de journal, une
+    URL ou un identifiant : la route ne peut donc pas recevoir de brut, même si
+    quelqu'un le lui envoyait. Le parsing vit côté client (`python -m cli shadow-ai`),
+    et seul ce résumé traverse le réseau — sans quoi nous serions le CASB que `QO-3` a
+    refusé, et la ligne devrait redescendre plutôt que monter.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    window_start: datetime
+    window_end: datetime
+    #: service reconnu -> nombre d'acteurs distincts. Des entiers, jamais des noms.
+    supervised: dict[str, int] = Field(default_factory=dict)
+    shadow: dict[str, int] = Field(default_factory=dict)
+    #: hôtes que le catalogue n'a pas su classer, et lignes refusées : comptés, parce
+    #: qu'un inventaire qui tait ce qu'il n'a pas lu se présente comme complet.
+    unclassified: int = Field(default=0, ge=0)
+    rejected: int = Field(default=0, ge=0)
+
+    @model_validator(mode="after")
+    def _window_is_ordered(self) -> ShadowAiRequest:
+        """Une fenêtre inversée est refusée **au bord**, pas par la base.
+
+        La contrainte existe aussi en SQL, et c'est voulu — une garde qui ne vit que
+        dans le schéma d'API laisse passer ce qui entre par une autre porte. Mais la
+        laisser lever au niveau de la base rendait un 500 avec une trace, ce que
+        `CLAUDE.md` §4.8 interdit : la validation stricte de Pydantic (§4.9) est
+        l'endroit où une erreur de client se dit comme telle.
+        """
+        if self.window_end <= self.window_start:
+            raise ValueError("`window_end` doit être postérieure à `window_start`")
+        return self
+
+
+class ShadowAiOut(BaseModel):
+    declared: bool
+    window: str | None = None
+    shadow_actors: int = 0
+
+
 class VerdictOut(BaseModel):
     """Ce que l'ingestion rend : de quoi retrouver le reçu et vérifier la chaîne."""
 

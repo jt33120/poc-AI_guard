@@ -41,6 +41,7 @@ from api.ratelimit import limiter
 from api.read_tokens import router as read_tokens_router
 from api.security import build_verifier, get_current_user
 from api.servers import router as servers_router
+from api.shadow_ai import router as shadow_ai_router
 from api.signup import router as signup_router
 from api.triage import router as triage_router
 from api.trust import router as trust_router
@@ -151,6 +152,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(trust_router)
     app.include_router(corpora_router)
     app.include_router(verdicts_router)
+    app.include_router(shadow_ai_router)
     app.include_router(triage_router)
     app.include_router(signup_router)
 

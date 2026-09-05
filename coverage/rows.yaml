@@ -197,8 +197,15 @@ rows:
         gaps: [G-08]
 
       - cle: decouverte
-        libelle: "découverte du Shadow AI non supervisé"
-        mode: O
+        libelle: "inventaire déclaré du Shadow AI non supervisé"
+        # `QO-3` a tranché : le marché CASB est intégralement hors UE et ce sont des
+        # services qui voient tout le trafic, donc pas de substitut souverain crédible.
+        # `FR-178` fait descendre la ligne d'`Orchestré` à `Attesté` — et le libellé
+        # suit, parce que « découverte » laissait entendre que nous allions chercher.
+        # Nous ne cherchons rien : nous recevons un extrait et nous en dérivons une
+        # déclaration auditable.
+        mode: A
+        section: article_26_deployer.shadow_ai
         gaps: [G-09]
 
   - id: M-11
