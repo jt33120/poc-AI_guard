@@ -24,10 +24,15 @@ is a table that entered the schema by a route this gate does not police.
 
 from __future__ import annotations
 
+import contextlib
 import re
 from pathlib import Path
+from uuid import uuid4
+
+import psycopg
 
 from tests.conftest import DBHandle
+from tests.test_rls import _act_as
 
 _MIGRATIONS = Path(__file__).resolve().parents[1] / "supabase" / "migrations"
 
@@ -169,3 +174,175 @@ def test_every_rls_policy_can_actually_be_exercised(db: DBHandle) -> None:
         "Either add the matching `grant`, or drop the policy — a policy nobody can "
         "exercise is not a permission, it is a claim about one."
     )
+
+
+# ---------------------------------------------------------------------------
+# `FR-165` — une ligne d'appartenance ne peut pas changer de tenant
+# ---------------------------------------------------------------------------
+# La revue annonçait des policies d'écriture trop laxistes sur `memberships`. Il n'en
+# existe aucune : le schéma n'accorde que `select` à `authenticated`, donc `FR-165`
+# est vrai **par absence**, et rien ne garde cette propriété. Les deux tests ci-dessous
+# sont ce qui la tiendra quand la première policy d'écriture arrivera.
+#
+# Deux pièges, mesurés plutôt que supposés :
+#
+# 1. **Ne pas exiger un `with check` littéral.** Postgres recopie `USING` en
+#    `WITH CHECK` quand ce dernier est absent, donc `for update using (tenant_id = jwt)`
+#    refuse déjà le déplacement. Appliquer la *lettre* de `FR-165` rejetterait cette
+#    policy sûre et exigerait une clause redondante : le garde encoderait l'erreur de
+#    spécification du FR au lieu de tenir sa propriété.
+# 2. **Ne pas sélectionner les tables par le nom de colonne `tenant_id`.** `tenants`
+#    porte son rattachement sous `id` (0001) : un critère « la table a une colonne
+#    `tenant_id` » a exactement le même mode d'échec qu'une liste blanche, par une
+#    autre route — il périme dès qu'une table nomme sa clé autrement. La colonne de
+#    rattachement se **lit dans la policy existante**, elle ne se devine pas.
+
+_JWT_TENANT = "app_metadata"
+
+# `pg_policies` rend le prédicat normalisé, p. ex.
+# `(tenant_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'tenant_id'::text))::uuid)`.
+_TENANCY_COLUMN = re.compile(
+    r"""\(?\s*([a-z_][a-z0-9_]*)\s*=\s*\(*\s*\(*\s*auth\.jwt\(\)""", re.IGNORECASE
+)
+
+
+def _tenancy_columns(db: DBHandle) -> dict[str, str]:
+    """`{table: colonne de rattachement}`, lu dans les policies de lecture existantes.
+
+    Une table est « à tenant » si l'une de ses policies compare une de ses colonnes à
+    la revendication de tenant du JWT. C'est la définition que le schéma porte
+    lui-même, donc elle ne périme pas quand une table nomme sa clé autrement.
+    """
+    rows = db.conn.execute(
+        "select tablename, qual from pg_policies where schemaname = 'public' and qual is not null"
+    ).fetchall()
+    columns: dict[str, str] = {}
+    for table, qual in rows:
+        if _JWT_TENANT not in qual:
+            continue
+        match = _TENANCY_COLUMN.search(qual)
+        assert match is not None, (
+            f"{table}: a policy references the JWT tenant claim in a shape this gate "
+            f"cannot read ({qual!r}). Fail-closed: teach the gate the shape rather "
+            "than let a tenancy predicate go unchecked."
+        )
+        columns[table] = match.group(1)
+    return columns
+
+
+def test_write_policies_pin_the_tenant(db: DBHandle) -> None:
+    """Toute policy d'écriture sur une table à tenant fixe le tenant, dans les deux sens.
+
+    Postgres évalue `USING` sur la ligne **avant** et `WITH CHECK` sur la ligne
+    **après**. Un `update` dont seul le `using` porte le prédicat de tenant ne peut
+    donc pas déplacer une ligne — le check effectif est alors la copie du `using`.
+    Ce qui est refusé ici, c'est un check effectif qui **ne mentionne pas** le
+    rattachement : `with check (true)` (la ligne part chez le voisin) et
+    `using (true)` (la ligne du voisin est atteinte).
+    """
+    tenancy = _tenancy_columns(db)
+    assert tenancy, "no tenancy policy found — the gate would pass vacuously"
+
+    rows = db.conn.execute(
+        "select tablename, policyname, cmd, qual, with_check from pg_policies "
+        "where schemaname = 'public' and cmd in ('INSERT', 'UPDATE', 'DELETE', 'ALL') "
+        "order by tablename, policyname"
+    ).fetchall()
+
+    unpinned = [
+        f"{table}.{policy} ({cmd})"
+        for table, policy, cmd, qual, with_check in rows
+        if table in tenancy
+        and not _pins(with_check if with_check is not None else qual, tenancy[table])
+    ]
+    assert not unpinned, (
+        f"these write policies do not pin the tenant: {unpinned}. A row can be written "
+        "into — or out of — a foreign tenant through them, which is cross-tenant "
+        "escalation by the very policy added to enforce isolation (CLAUDE.md §4.3)."
+    )
+
+
+def _pins(check: str | None, column: str) -> bool:
+    """Le check effectif contraint-il la colonne de rattachement à la revendication ?"""
+    if check is None:
+        return False  # fail-closed: pas de check = rien ne contraint l'écriture
+    return column in check and _JWT_TENANT in check
+
+
+def test_a_row_cannot_be_moved_to_another_tenant(db: DBHandle) -> None:
+    """La propriété elle-même, mesurée : `update ... set tenant_id = <victime>`.
+
+    Sans clause `where`, délibérément — c'est la seule forme qui échappe au check
+    dérivé de la policy de lecture, donc la seule qui teste vraiment l'écriture.
+    Vert aujourd'hui par absence de grant ; il le restera par présence d'un check.
+    """
+    conn = db.conn
+    tenant_a, tenant_b, user_a = uuid4(), uuid4(), uuid4()
+    conn.execute("insert into tenants (id, name) values (%s, 'A'), (%s, 'B')", (tenant_a, tenant_b))
+    conn.execute("insert into auth.users (id) values (%s)", (user_a,))
+    conn.execute(
+        "insert into memberships (user_id, tenant_id, role) values (%s, %s, 'admin')",
+        (user_a, tenant_a),
+    )
+    conn.commit()
+
+    for table in ("memberships", "gateway_tokens", "tenants"):
+        conn.execute("begin")
+        _act_as(conn, user_a, tenant_a)
+        column = "id" if table == "tenants" else "tenant_id"
+        # Aucun grant d'écriture aujourd'hui : le refus arrive avant même la policy.
+        with contextlib.suppress(psycopg.errors.InsufficientPrivilege):
+            conn.execute(f"update {table} set {column} = %s", (tenant_b,))  # noqa: S608
+        conn.rollback()
+
+    moved = conn.execute(
+        "select count(*) from memberships where tenant_id = %s", (tenant_b,)
+    ).fetchone()
+    assert moved is not None and moved[0] == 0
+
+
+def test_the_write_policy_gate_is_not_vacuous(db: DBHandle) -> None:
+    """Le contrôle négatif, sans lequel le garde passerait vide — et pour toujours.
+
+    Aucune policy d'écriture n'existe aujourd'hui, donc `test_write_policies_pin_the_tenant`
+    itère sur zéro ligne. On installe donc la forme exploitable dans une transaction
+    **annulée**, et on exige deux choses : que le détecteur la signale, et que la
+    relocalisation réussisse réellement — c'est cette seconde moitié qui prouve que
+    l'assertion comportementale ci-dessus est capable de rougir, plutôt que de
+    constater un simple `permission denied`.
+    """
+    conn = db.conn
+    tenant_a, tenant_b, user_a = uuid4(), uuid4(), uuid4()
+    conn.execute("insert into tenants (id, name) values (%s, 'A'), (%s, 'B')", (tenant_a, tenant_b))
+    conn.execute("insert into auth.users (id) values (%s)", (user_a,))
+    conn.execute(
+        "insert into memberships (user_id, tenant_id, role) values (%s, %s, 'admin')",
+        (user_a, tenant_a),
+    )
+    conn.commit()
+
+    conn.execute("begin")
+    conn.execute("grant update on memberships to authenticated")
+    conn.execute(
+        "create policy memberships_neg on memberships for update to authenticated "
+        "using (tenant_id = (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::uuid) "
+        "with check (true)"
+    )
+
+    # 1. Le détecteur statique la voit.
+    flagged = conn.execute(
+        "select policyname, with_check from pg_policies "
+        "where schemaname = 'public' and tablename = 'memberships' and cmd = 'UPDATE'"
+    ).fetchall()
+    assert flagged and not _pins(flagged[0][1], "tenant_id")
+
+    # 2. Et elle déplace vraiment la ligne : l'assertion comportementale sait rougir.
+    _act_as(conn, user_a, tenant_a)
+    conn.execute("update memberships set tenant_id = %s", (tenant_b,))
+    conn.execute("reset role")
+    moved = conn.execute(
+        "select count(*) from memberships where tenant_id = %s", (tenant_b,)
+    ).fetchone()
+    assert moved is not None and moved[0] == 1
+
+    conn.rollback()  # rien de tout ceci ne survit au test

@@ -100,7 +100,7 @@ affirmations du produit qui ne sont pas vraies.
 | **5** | Le démonstrateur | `FR-181`→`183` | Rangs 3 et 4 | La preuve publique |
 | **6** | Souveraineté · **pilier 3** | `FR-176`→`178` — **clos** | `QO-3` ✅ tranchée | `G-17` et `G-21` fermés. `SM-15` est mesuré à chaque build ; une ligne `Orchestré` sans substitut se déclasse au parse |
 | **7** | Couverture P2 | `FR-184`, `185`, `186` — **clos** | Rang 1 | Le terrain dit P2 avant P3. `G-04`, `G-08`, `G-12` et `G-22` fermés |
-| **8** | Reste de l'intégrité | `FR-163`, `165`→`168`, `170`, `171` | Rang 2 | Contraignant, non bloquant pour la démonstration |
+| **8** | Reste de l'intégrité | `FR-163`, `165`→`168`, `170`, `171` — **clos** | Rang 2 | Deux défauts **vivants** trouvés en vérifiant : `FR-170` (le garde de taint relâchait le verdict) et `FR-167` (une image tronquée démarrait verte). Voir §5 bis |
 | **9** | Couverture P4 et au-delà | `FR-187`→`194` | Rang 7 | Suit la base installée Mistral |
 | **10** | Déployabilité, positionnement | `FR-195`→`197` | `AR-3` | `FR-197` est de la rédaction : parallélisable dès maintenant |
 
@@ -121,6 +121,37 @@ plutôt qu'en le supposant. Aucun ne crée de rang nouveau — chacun se rattach
 | `G-24` | `allowed_clients` n'est appliqué que par le gateway MCP : la même policy n'est pas également bornée sur `/v1/authorize` | Rang 1 (divergence d'ingress) | Haute |
 | `G-25` | ~~Le mode d'enforcement lu dans un en-tête de requête~~ — **fermé.** Fenêtre d'observation de plan de contrôle, bornée, réservée à l'`admin` | Rang 4 — livré | ✅ |
 | `G-26` | ~~La branche streaming contourne la garde d'appels d'outils, sans ligne d'audit~~ — **option `B` livrée** : l'absence est inscrite (`streamed_uninspected`). La couverture réelle (`C`) attend son déclencheur : un client `P3` routant ses agents par le proxy | Rang 7 — livré (`B`) | ✅ |
+
+### 5 bis. Ce que le rang 8 a trouvé, et ce qu'il a corrigé
+
+Les sept constats du rang 8 venaient d'une revue écrite contre un **plan**, pas contre
+le code livré. Vérifiés un par un contre le dépôt, puis attaqués par trois lentilles
+adverses chacun (citations, le garde mord-il, périmètre), **six sur sept décrivaient un
+autre mécanisme que celui qui existe** — `core/control_events.py`, la table `halts`,
+`tools/xsom_verify.py` n'ont jamais été écrits. Le septième (`FR-168`) était surestimé :
+la divulgation qu'il annonce n'existe pas.
+
+La leçon n'est pas que la revue avait tort. C'est que **deux défauts vivants se
+cachaient derrière des constats faux**, et qu'aucun n'aurait été trouvé en corrigeant
+les constats à la lettre :
+
+| Trouvé | Gravité | Ce que le constat disait |
+|---|---|---|
+| `gateway/server.py` **écrasait** la décision en session teintée : un `deny` de règle devenait une attente approuvable, un `human_dual` perdait la moitié de son quorum, et un **outil inconnu** aussi — `CLAUDE.md` §4.4 et la revendication publiée `M-06 / Bloqué` tombaient | Vivant, exploitable | Un `trust_discount` dans `core/risk.py`, qui s'avère plafonné et inoffensif |
+| `pending()` fait confiance au **disque** : image tronquée + base vierge ⇒ 15 des 22 migrations disparaissent avec `schema_current: true` | Vivant, sur `docker compose up` | Une sonde d'adoption par groupe, qui est déjà par fichier depuis longtemps |
+| Deux `fail-open` résiduels dans `adopt_baseline` (sonde trigger non scopée au schéma, fichier absent retiré du contrôle de contiguïté) | Latent | — |
+| La charge hachée acceptait du texte libre non borné, sur deux portes d'ingestion (`AD-28`) ; un nom d'outil malformé d'un amont **supprimait sa propre ligne d'audit** | Latent | Une colonne `note` d'événement de plan de contrôle, qui n'existe pas |
+| Aucun ordre d'arrêt n'atteint une session MCP vivante — le jeton est lu une fois au démarrage, alors que `/v1/authorize` le relit à chaque requête | Divergence d'ingestion | Un arrêt d'urgence trop laxiste en panne — il n'y a pas d'arrêt du tout |
+| La représentation canonique du journal n'était figée par rien : un changement *cohérent* rend invérifiable la chaîne déjà écrite, sans qu'aucun test le voie | Latent, irréparable | Le format du `ts`, exact mais un obstacle sur trois |
+| Aucun garde de **surface** : une route publique nouvelle passait la CI en vert | Latent | Une divulgation par `/health/ready`, déjà fermée et déjà gardée |
+
+Trois propriétés vraies « par absence » ont reçu le garde qui les tiendra quand la
+fonctionnalité arrivera : pas de policy d'écriture sans prédicat de tenant (`FR-165`),
+pas de note libre dans le journal inaltérable (`FR-163`), pas de route publique
+non déclarée (`FR-168`). Chaque correctif a été vérifié **rouge en le retirant** ; un
+garde qu'on n'a pas vu mordre n'est pas un garde.
+
+---
 
 **`G-25` est la raison de remonter le rang 4.** La PRD le plaçait en quatre « seulement
 parce qu'il ne bloque pas le tournage ». Il s'avère maintenant être le véhicule du
