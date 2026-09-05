@@ -141,3 +141,30 @@ def test_evidence_pack_carries_article_mapping(db: DBHandle) -> None:
     assert "coverage_ok" in articles["article_14_human_oversight"]
     assert "fria" in articles["article_26_deployer"]
     assert pack["compliant"] is True
+
+
+def test_the_declared_sections_are_the_ones_the_pack_produces(db: DBHandle) -> None:
+    """`EVIDENCE_SECTIONS` est un contrat, pas un commentaire.
+
+    Une facette `Attesté` déclare la section d'Evidence Pack qui la porte, et le
+    générateur de carte refuse une section absente de cette liste. La liste doit donc
+    correspondre à ce que le pack **produit réellement** : une section qu'on y écrit
+    sans l'implémenter rendrait une revendication `Attesté` vérifiable contre une
+    constante au lieu du produit.
+
+    L'inclusion va dans un seul sens, délibérément : le pack peut porter des blocs que
+    la carte ne revendique pas (une facette n'a pas à exister pour chaque section),
+    mais aucune section déclarée ne peut manquer du pack.
+    """
+    pack = compliance.build_evidence_pack(
+        db.conn, tenant_id="t1", events=[], approvals=[], retention_floor_days=183
+    )
+    reels = {
+        f"{article}.{section}" for article, blocs in pack["articles"].items() for section in blocs
+    }
+    manquantes = compliance.EVIDENCE_SECTIONS - reels
+    assert not manquantes, (
+        f"sections déclarées que le pack ne produit pas : {sorted(manquantes)}. "
+        "Soit la section est à implémenter, soit la déclaration est à retirer — une "
+        "facette « Attesté » adossée à une section absente est une revendication vide."
+    )

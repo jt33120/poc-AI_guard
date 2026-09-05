@@ -140,6 +140,12 @@ class RowFacet:
     substitut: Substitut | None = None
     #: `Orchestré` revendiqué, mais sans substitut : publié `Hors périmètre`
     declasse: bool = False
+    #: la section d'Evidence Pack qui porte une facette `Attesté` (chemin
+    #: `article.section`, vérifié contre `core.compliance.EVIDENCE_SECTIONS`)
+    section: str | None = None
+    #: pourquoi une facette `Hors périmètre` ne l'est pas — la doctrine exige que la
+    #: ligne non couverte soit publiée *avec sa raison* (`FR-144`)
+    raison: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -227,6 +233,31 @@ def _substitut(raw: Any, where: str) -> Substitut | None:
     return Substitut(nom=str(raw["nom"]), justification=justification)
 
 
+#: La raison qu'une facette `Orchestré` sans substitut publie d'elle-même (`FR-178`).
+_RAISON_SANS_SUBSTITUT = (
+    "Revendiqué « Orchestré » sans substitut souverain nommé : piloter un contrôle "
+    "tiers en fait une dépendance, et une dépendance qu'on ne peut pas nommer ne peut "
+    "pas être revendiquée (`FR-178`)."
+)
+
+
+def _section(raw: Any, where: str) -> str | None:
+    """La section d'Evidence Pack d'une facette `Attesté`, en chemin `article.section`.
+
+    Validée ici sur la forme seulement. L'existence de la section est vérifiée par le
+    générateur de carte, qui la confronte à `core.compliance.EVIDENCE_SECTIONS` — le
+    parseur ne doit pas importer le module de conformité, qui parle à la base.
+    """
+    if raw is None:
+        return None
+    texte = str(raw)
+    if texte.count(".") != 1 or not all(texte.split(".")):
+        raise ValueError(
+            f"{where}: `section` doit être un chemin `article.section` (reçu {texte!r})."
+        )
+    return texte
+
+
 def load_rows(registry: Path) -> list[Row]:
     """Parse the coverage registry into rows carrying their applicability.
 
@@ -268,6 +299,15 @@ def load_rows(registry: Path) -> list[Row]:
                     gaps=tuple(raw.get("gaps") or []),
                     substitut=substitut,
                     declasse=declasse,
+                    section=_section(raw.get("section"), facet_where),
+                    # Le déclassement de `FR-178` porte sa propre raison : il la
+                    # connaît, et la faire écrire à la main dupliquerait ce que le
+                    # code sait déjà — deux textes qui finiraient par diverger.
+                    raison=(
+                        str(raw["raison"])
+                        if raw.get("raison")
+                        else (_RAISON_SANS_SUBSTITUT if declasse else None)
+                    ),
                 )
             )
         # The row's declared applicability must equal what its facets add up to.

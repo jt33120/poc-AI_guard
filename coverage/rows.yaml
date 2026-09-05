@@ -36,12 +36,19 @@ rows:
     facettes:
       - cle: garde_prompt
         libelle: "garde-prompt"
-        mode: O
+        mode: X
+        raison: >-
+          Le garde-prompt souverain (Mistral) n'est pas encore appelé et aucun de ses verdicts 
+          n'entre dans la chaîne. `FR-193` : orchestrer et attester le contrôle tiers — jamais 
+          le construire, ce serait le pare-feu de prompts que nous ne sommes pas.
         substitut: {nom: "Mistral (garde-prompt)", justification: ue}
         gaps: [G-01]
       - cle: attestation
         libelle: "attestation de présence du garde"
-        mode: A
+        mode: X
+        raison: >-
+          L'Evidence Pack ne porte aucune section attestant la présence du garde-prompt. 
+          `FR-193`.
         gaps: [G-01]
 
   - id: M-02
@@ -63,6 +70,10 @@ rows:
       - cle: provenance
         libelle: "déclaration de provenance des jeux de données"
         mode: A
+        # `FR-184`, livré au rang 7 : la section existait déjà dans l'Evidence Pack et
+        # rien ne la reliait à la revendication. C'est précisément ce que la
+        # généralisation de `CM-7` rend impossible.
+        section: article_26_deployer.corpus_provenance
         gaps: [G-04]
 
   - id: M-04
@@ -72,7 +83,11 @@ rows:
     facettes:
       - cle: telemetrie
         libelle: "télémétrie de volume et de motif"
-        mode: D
+        mode: X
+        raison: >-
+          La télémétrie de volume existe (`usage_events`) mais elle est cadrée équité et coût, 
+          jamais anti-extraction : aucun seuil, aucun verdict, aucune entrée chaînée. 
+          `FR-187`, profil P4, hors de ce lot.
         gaps: [G-05]
 
   - id: M-05
@@ -83,6 +98,8 @@ rows:
       - cle: robustesse
         libelle: "robustesse du modèle"
         mode: X
+        raison: >-
+          Robustesse adversariale du modèle : c'est le travail de l'éditeur qui l'entraîne, pas de la passerelle qui l'appelle.
 
   - id: M-06
     titre: "Piratage d'agents autonomes"
@@ -110,6 +127,8 @@ rows:
         libelle: "réception — passerelle mail"
         profils: [P1a, P1b, P2, P3, P4, P5]
         mode: X
+        raison: >-
+          Réception du phishing : passerelle de messagerie et EDR du client. Nous couvrons l'agent comme *émetteur*, pas comme destinataire.
 
   - id: M-08
     titre: "Usurpation par deepfake"
@@ -127,6 +146,8 @@ rows:
         libelle: "détection du média truqué"
         profils: [P1a, P1b, P2, P3, P4, P5]
         mode: X
+        raison: >-
+          Détection de média synthétique : ni notre métier ni notre point d'interposition. Nous couvrons l'intégrité de l'approbation, pas l'authenticité du média.
 
   - id: M-09
     titre: "Malwares polymorphes"
@@ -136,6 +157,8 @@ rows:
       - cle: endpoint
         libelle: "plan endpoint (EDR/XDR)"
         mode: X
+        raison: >-
+          Plan endpoint et poste de travail : SOC du client. Une passerelle d'actions ne voit pas le poste.
 
   - id: M-10
     titre: "Exfiltration de données / PI via LLM"
@@ -179,11 +202,17 @@ rows:
       - cle: bibliotheques
         libelle: "SBOM et audit de dépendances en CI"
         profils: [P2, P3, P4]
-        mode: A
+        mode: X
+        raison: >-
+          L'audit de dépendances tourne en CI (`pip-audit`) mais l'Evidence Pack n'en porte 
+          aucune section. `FR-191`.
       - cle: modeles_ml
         libelle: "analyse d'artefacts de modèles"
         profils: [P4]
-        mode: O
+        mode: X
+        raison: >-
+          Aucun scanner d'artefacts n'est piloté et aucun de ses verdicts n'est chaîné. 
+          `FR-188`, profil P4, hors de ce lot.
         substitut: {nom: "picklescan / modelscan", justification: local}
         gaps: [G-10]
 
@@ -220,7 +249,10 @@ rows:
         gaps: [G-13]
       - cle: prompt
         libelle: "détection de fuite du prompt sur l'egress"
-        mode: O
+        mode: X
+        raison: >-
+          La fuite de prompt système sur l'egress n'est pas mesurée : les deux moitiés sont en 
+          main dans le proxy, rien ne les met en face l'une de l'autre. `FR-190`.
         substitut: {nom: "Mistral (garde de sortie anti-leak)", justification: ue}
         gaps: [G-13]
 
@@ -231,12 +263,18 @@ rows:
     facettes:
       - cle: sast
         libelle: "ingestion de verdicts SAST/DAST"
-        mode: O
+        mode: X
+        raison: >-
+          Les analyseurs tournent chez le client, mais aucun de leurs verdicts n'entre dans la 
+          chaîne : nous n'en prouvons donc rien. `FR-191`.
         substitut: {nom: "SonarQube / Semgrep en CI", justification: local}
         gaps: [G-14]
       - cle: ci
         libelle: "audit de dépendances et de secrets en CI"
-        mode: A
+        mode: X
+        raison: >-
+          L'audit de dépendances et de secrets tourne en CI ; l'Evidence Pack n'en porte 
+          aucune section. `FR-191`.
 
   - id: M-16
     titre: "Décision fondée sur une hallucination"
@@ -246,4 +284,8 @@ rows:
       - cle: revue_humaine
         libelle: "attestation « décision critique sous revue humaine »"
         mode: A
+        # `FR-192`. La section porte sa propre limite : elle atteste qu'un humain a
+        # regardé, pas que sa conclusion était bonne (non-objectif « pas une
+        # plateforme d'évaluation de modèle »).
+        section: article_14_human_oversight.critical_decision_review
         gaps: [G-15]

@@ -1,14 +1,14 @@
 {
-  "commit": "06e64ad",
-  "genere_le": "2026-09-05 12:58 UTC",
+  "commit": "263223b",
+  "genere_le": "2026-09-05 15:36 UTC",
   "facettes": [
     {
       "menace": "M-01",
       "titre": "Injection de prompts directe",
       "facette": "garde_prompt",
       "libelle": "garde-prompt",
-      "mode_revendique": "O",
-      "mode_publie": "O",
+      "mode_revendique": "X",
+      "mode_publie": "X",
       "substitut": {
         "nom": "Mistral (garde-prompt)",
         "justification": "ue"
@@ -36,8 +36,8 @@
       "titre": "Injection de prompts directe",
       "facette": "attestation",
       "libelle": "attestation de présence du garde",
-      "mode_revendique": "A",
-      "mode_publie": "A",
+      "mode_revendique": "X",
+      "mode_publie": "X",
       "substitut": null,
       "declasse_faute_de_substitut": false,
       "famille": "usage_ia",
@@ -122,8 +122,8 @@
       "titre": "Vol de modèle / extraction",
       "facette": "telemetrie",
       "libelle": "télémétrie de volume et de motif",
-      "mode_revendique": "D",
-      "mode_publie": "D",
+      "mode_revendique": "X",
+      "mode_publie": "X",
       "substitut": null,
       "declasse_faute_de_substitut": false,
       "famille": "fournisseur",
@@ -465,8 +465,8 @@
       "titre": "Supply chain (modèles / bibliothèques)",
       "facette": "bibliotheques",
       "libelle": "SBOM et audit de dépendances en CI",
-      "mode_revendique": "A",
-      "mode_publie": "A",
+      "mode_revendique": "X",
+      "mode_publie": "X",
       "substitut": null,
       "declasse_faute_de_substitut": false,
       "famille": "usage_ia",
@@ -486,8 +486,8 @@
       "titre": "Supply chain (modèles / bibliothèques)",
       "facette": "modeles_ml",
       "libelle": "analyse d'artefacts de modèles",
-      "mode_revendique": "O",
-      "mode_publie": "O",
+      "mode_revendique": "X",
+      "mode_publie": "X",
       "substitut": {
         "nom": "picklescan / modelscan",
         "justification": "local"
@@ -557,11 +557,13 @@
       "ingress_non_asserte": [],
       "sens_prouves": [
         "bloque",
+        "detecte",
         "laisse_passer"
       ],
       "scenarios": [
         "tests/test_taint_gate.py::test_a_result_carrying_an_ordinary_web_page_does_not_gate",
-        "tests/test_taint_gate.py::test_an_executable_payload_in_a_result_gates_the_next_risky_action"
+        "tests/test_taint_gate.py::test_an_executable_payload_in_a_result_gates_the_next_risky_action",
+        "tests/test_taint_gate.py::test_the_detection_is_written_to_the_chain_and_names_its_agent"
       ],
       "ecarts": [
         "G-12"
@@ -612,8 +614,8 @@
       "titre": "Fuite du system prompt & secrets",
       "facette": "prompt",
       "libelle": "détection de fuite du prompt sur l'egress",
-      "mode_revendique": "O",
-      "mode_publie": "O",
+      "mode_revendique": "X",
+      "mode_publie": "X",
       "substitut": {
         "nom": "Mistral (garde de sortie anti-leak)",
         "justification": "ue"
@@ -641,8 +643,8 @@
       "titre": "Validation aveugle de code (Copilot)",
       "facette": "sast",
       "libelle": "ingestion de verdicts SAST/DAST",
-      "mode_revendique": "O",
-      "mode_publie": "O",
+      "mode_revendique": "X",
+      "mode_publie": "X",
       "substitut": {
         "nom": "SonarQube / Semgrep en CI",
         "justification": "local"
@@ -666,8 +668,8 @@
       "titre": "Validation aveugle de code (Copilot)",
       "facette": "ci",
       "libelle": "audit de dépendances et de secrets en CI",
-      "mode_revendique": "A",
-      "mode_publie": "A",
+      "mode_revendique": "X",
+      "mode_publie": "X",
       "substitut": null,
       "declasse_faute_de_substitut": false,
       "famille": "usage_ia",

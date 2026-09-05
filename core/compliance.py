@@ -125,6 +125,60 @@ def oversight_coverage(conn: psycopg.Connection) -> dict[str, Any]:
     }
 
 
+#: Les décisions qui disent qu'un humain a été saisi. `expired` en fait partie : une
+#: demande qui a expiré **a** été soumise à revue et n'a pas été approuvée — la compter
+#: hors revue ferait disparaître le cas où la supervision a fonctionné en ne répondant
+#: pas, qui est précisément celui qu'un évaluateur cherche.
+_HUMAN_DECISIONS = ("hitl_pending", "hitl_approved", "hitl_denied", "expired")
+
+
+def critical_decision_review(conn: psycopg.Connection) -> dict[str, Any]:
+    """`FR-192` — l'attestation « décision critique sous revue humaine ».
+
+    **Ce qu'elle atteste :** que les actions de classe critique — irréversible et envoi
+    externe — sont passées par une revue humaine, avec le compte de celles qui ont été
+    approuvées, refusées, laissées expirer, ou qui attendent encore.
+
+    **Ce qu'elle n'atteste pas, et le bloc le dit lui-même :** la *qualité* de la
+    décision. `PRD` §5.2 — xSOM n'est pas une plateforme d'évaluation de modèle, et ce
+    FR ne score aucune hallucination. Un humain a regardé ; nous le prouvons. Ce qu'il
+    a conclu ne nous appartient pas.
+
+    La source est le journal **chaîné**, jamais la table `approvals` : celle-ci est
+    mutable par construction (une approbation change d'état), donc une attestation qui
+    la lirait serait adossée à ce qu'on peut réécrire. Toute la valeur de la section
+    tient à ce que sa source ne le soit pas.
+    """
+    row = conn.execute(
+        "select "
+        " count(*) filter (where action_class = any(%s)) as critical, "
+        " count(*) filter (where action_class = any(%s) and decision = any(%s)) as reviewed, "
+        " count(*) filter (where decision = 'hitl_approved') as approved, "
+        " count(*) filter (where decision = 'hitl_denied') as refused, "
+        " count(*) filter (where decision = 'expired') as expired, "
+        " count(*) filter (where decision = 'hitl_pending') as pending "
+        "from audit_log",
+        (list(_GATED_CLASSES), list(_GATED_CLASSES), list(_HUMAN_DECISIONS)),
+    ).fetchone()
+    critical, reviewed, approved, refused, expired, pending = (
+        (int(v) for v in row) if row else (0, 0, 0, 0, 0, 0)
+    )
+    return {
+        "critical_actions": critical,
+        "under_human_review": reviewed,
+        "approved": approved,
+        "refused": refused,
+        "expired_unanswered": expired,
+        "awaiting_review": pending,
+        "source": "chained audit log",
+        "attests": (
+            "Qu'une action de classe critique a été soumise à un humain, horodatée et "
+            "attribuée dans un journal inaltérable. Pas la qualité de la décision "
+            "prise : xSOM n'évalue aucun modèle et ne score aucune hallucination."
+        ),
+    }
+
+
 def oldest_entry_age_days(conn: psycopg.Connection) -> int | None:
     """Age in days of the oldest audit entry (None if the log is empty)."""
     row = conn.execute(
@@ -255,6 +309,30 @@ def _oversight_scope(ingress_mix: dict[str, int]) -> dict[str, Any]:
     }
 
 
+#: Les sections que l'Evidence Pack produit, en chemins `article.section`.
+#:
+#: La généralisation de `CM-7` aux modes `D`/`O`/`A` a besoin d'un vocabulaire fermé :
+#: une facette `Attesté` déclare la section qui la porte, et le générateur de carte
+#: refuse une section absente d'ici. Sans cela, « Attesté » se revendique en écrivant
+#: un mot dans un YAML — ce qui est exactement la revendication non gardée que le
+#: produit existe pour ne pas commettre.
+#:
+#: `tests/test_compliance.py` compare cette liste au pack **réellement construit**,
+#: donc elle ne peut pas dériver de ce que le code produit.
+EVIDENCE_SECTIONS: frozenset[str] = frozenset(
+    {
+        "article_12_record_keeping.tamper_evident",
+        "article_12_record_keeping.verification",
+        "article_14_human_oversight.scope",
+        "article_14_human_oversight.observation",
+        "article_14_human_oversight.critical_decision_review",
+        "article_26_deployer.decision_summary",
+        "article_26_deployer.fria",
+        "article_26_deployer.corpus_provenance",
+    }
+)
+
+
 def build_evidence_pack(
     conn: psycopg.Connection,
     *,
@@ -305,6 +383,10 @@ def build_evidence_pack(
             # FR-179: an unenforced period does not get to sit silently inside a
             # supervision proof. It is disclosed with the figures it affects.
             "observation": observation_disclosure(conn, tenant_id),
+            # `FR-192` : l'attestation de revue humaine sur les décisions critiques.
+            # Elle vit sous l'article 14 parce que c'est l'article de la supervision,
+            # et elle porte sa propre limite — ce qu'elle n'atteste pas.
+            "critical_decision_review": critical_decision_review(conn),
         },
         "article_26_deployer": {
             "decision_summary": base["summary"],
