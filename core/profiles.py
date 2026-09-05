@@ -35,8 +35,10 @@ import yaml
 __all__ = [
     "Family",
     "Profile",
+    "Referentiel",
     "Row",
     "RowFacet",
+    "Taxonomie",
     "applicable_rows",
     "capped_mode",
     "ceiling",
@@ -117,6 +119,39 @@ class Souverainete(StrEnum):
     ue = "ue"
 
 
+class Taxonomie(StrEnum):
+    """Les référentiels auxquels une ligne de menace peut se rattacher (`FR-194`).
+
+    **Fermée, et c'est là toute la règle.** `AR-1` / `EXH-7` tracent la frontière
+    entre une taxonomie *technique* — s'y aligner est descriptif — et un référentiel
+    de *management* (ISO 42001, SOC 2, NIST AI RMF, NIS2, DORA, ANSSI), dont la
+    correspondance engage le jugement d'un assesseur en exercice. La revue le dit
+    sans détour : « une correspondance qu'un auditeur rejette est pire que pas de
+    correspondance ».
+
+    Un champ libre laisserait écrire `ISO 42001` sans que personne ne le voie passer.
+    L'énumération oblige à modifier ce fichier, donc à le défendre en revue.
+    """
+
+    owasp_llm = "owasp_llm"
+    mitre_atlas = "mitre_atlas"
+
+
+@dataclass(frozen=True, slots=True)
+class Referentiel:
+    """Une correspondance vers une taxonomie technique, **millésimée**.
+
+    La version n'est pas décorative : `LLM01` seul n'identifie rien, OWASP ayant
+    renuméroté entre 2023 et 2025 — `LLM10` y est passé de « Model Theft » à
+    « Unbounded Consumption ». Une correspondance sans millésime est précisément
+    celle qu'un auditeur rejette.
+    """
+
+    taxonomie: Taxonomie
+    version: str
+    identifiant: str
+
+
 @dataclass(frozen=True, slots=True)
 class Substitut:
     """Le contrôle tiers qu'une ligne `Orchestré` pilote réellement (`FR-178`)."""
@@ -146,6 +181,8 @@ class RowFacet:
     #: pourquoi une facette `Hors périmètre` ne l'est pas — la doctrine exige que la
     #: ligne non couverte soit publiée *avec sa raison* (`FR-144`)
     raison: str | None = None
+    #: les taxonomies techniques auxquelles cette facette se rattache (`FR-194`)
+    referentiels: tuple[Referentiel, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -241,6 +278,47 @@ _RAISON_SANS_SUBSTITUT = (
 )
 
 
+def _referentiels(raw: Any, where: str) -> tuple[Referentiel, ...]:
+    """Parse les correspondances de taxonomie, fail-closed sur tout ce qui n'est pas su.
+
+    Trois refus, et chacun ferme une façon différente de publier une correspondance
+    qu'un auditeur rejetterait : une taxonomie hors de l'énumération (donc un
+    référentiel de management déguisé), un millésime absent, un identifiant vide.
+    """
+    if raw is None:
+        return ()
+    if not isinstance(raw, list):
+        raise ValueError(f"{where}: `referentiels` doit être une liste.")
+    out: list[Referentiel] = []
+    for entree in raw:
+        if not isinstance(entree, dict):
+            raise ValueError(f"{where}: chaque référentiel est un dict.")
+        manquants = [k for k in ("taxonomie", "version", "id") if not entree.get(k)]
+        if manquants:
+            raise ValueError(
+                f"{where}: référentiel incomplet, il manque {', '.join(manquants)}. "
+                "Le millésime est obligatoire : `LLM01` sans version n'identifie rien."
+            )
+        try:
+            taxonomie = Taxonomie(entree["taxonomie"])
+        except ValueError:
+            connues = ", ".join(sorted(t.value for t in Taxonomie))
+            raise ValueError(
+                f"{where}: taxonomie inconnue {entree['taxonomie']!r}. Connues : "
+                f"{connues}. Les référentiels de management (ISO 42001, SOC 2, NIS2, "
+                "DORA, ANSSI) sont délibérément hors de cette liste — leur "
+                "correspondance demande le jugement d'un assesseur (`AR-1`)."
+            ) from None
+        out.append(
+            Referentiel(
+                taxonomie=taxonomie,
+                version=str(entree["version"]),
+                identifiant=str(entree["id"]),
+            )
+        )
+    return tuple(out)
+
+
 def _section(raw: Any, where: str) -> str | None:
     """La section d'Evidence Pack d'une facette `Attesté`, en chemin `article.section`.
 
@@ -273,6 +351,11 @@ def load_rows(registry: Path) -> list[Row]:
         where = raw_row["id"]
         row_family = _family(raw_row["famille"], where)
         row_profiles = _profiles(raw_row["profils"], where)
+        # `FR-194` : la correspondance de taxonomie est une propriété de la **ligne**
+        # de menace — « M-01 ≡ LLM01 » parle de la menace, pas de l'une de ses
+        # facettes. Elle s'hérite donc comme `famille` et `profils`, et se surcharge
+        # au même endroit quand une facette diverge réellement.
+        row_referentiels = _referentiels(raw_row.get("referentiels"), where)
         facets = []
         for raw in raw_row["facettes"]:
             facet_where = f"{where}/{raw['cle']}"
@@ -303,6 +386,11 @@ def load_rows(registry: Path) -> list[Row]:
                     # Le déclassement de `FR-178` porte sa propre raison : il la
                     # connaît, et la faire écrire à la main dupliquerait ce que le
                     # code sait déjà — deux textes qui finiraient par diverger.
+                    referentiels=(
+                        _referentiels(raw["referentiels"], facet_where)
+                        if "referentiels" in raw
+                        else row_referentiels
+                    ),
                     raison=(
                         str(raw["raison"])
                         if raw.get("raison")

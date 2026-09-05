@@ -43,6 +43,7 @@ from core.compliance import EVIDENCE_SECTIONS  # noqa: E402
 from core.profiles import (  # noqa: E402 -- needs _REPO on the path first
     Family,
     Profile,
+    Referentiel,
     Substitut,
     capped_mode,
     ceiling,
@@ -80,6 +81,8 @@ class Facet:
     section: str | None = None
     #: pourquoi une facette `Hors périmètre` n'est pas couverte
     raison: str | None = None
+    #: les taxonomies techniques auxquelles cette facette se rattache (`FR-194`)
+    referentiels: tuple[Referentiel, ...] = ()
     #: la section déclarée est absente du pack réellement produit
     section_absente: bool = False
 
@@ -174,6 +177,7 @@ def _load_facets() -> list[Facet]:
                     declasse=f.declasse,
                     section=f.section,
                     raison=f.raison,
+                    referentiels=f.referentiels,
                     section_absente=(f.section is not None and f.section not in EVIDENCE_SECTIONS),
                 )
             )
@@ -510,8 +514,8 @@ def _render_md(facets: list[Facet], commit: str, stamp: str) -> str:
         "## Le détail, facette par facette",
         "",
         "| Menace | Facette | Qui la porte | Profils | Mode publié "
-        "| Ingestion prouvée | Scén. | Écarts |",
-        "|---|---|---|---|---|---|---|---|",
+        "| Ingestion prouvée | Scén. | Réf. techniques | Écarts |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     for f in facets:
         prouve = ", ".join(f"`{i}`" for i in sorted(f.prouve)) or "—"
@@ -524,6 +528,7 @@ def _render_md(facets: list[Facet], commit: str, stamp: str) -> str:
         lines.append(
             f"| **{f.row_id}** {f.row_titre} | {f.libelle} | {f.family.label} | {profils} "
             f"| {_MODE_LABEL[f.mode_publie]} | {prouve} | {n or '—'} "
+            f"| {_render_referentiels(f)} "
             f"| {', '.join(f'`{g}`' for g in f.gaps) or '—'} |"
         )
     bloques = [f for f in facets if f.mode_publie == "B"]
@@ -531,8 +536,42 @@ def _render_md(facets: list[Facet], commit: str, stamp: str) -> str:
         "",
         f"**{len(bloques)} facettes publiées `Bloqué`**, chacune adossée à au moins un scénario "
         "qui passe. Une facette revendiquée `Bloqué` sans scénario ne franchit pas le build.",
+        "",
+        *_render_non_couvert(facets),
     ]
     return "\n".join(lines) + "\n"
+
+
+def _render_referentiels(f: Facet) -> str:
+    """La correspondance de taxonomie, millésime compris (`FR-194`).
+
+    Le millésime est affiché et non masqué : `LLM01` seul n'identifie rien, OWASP
+    ayant renuméroté entre 2023 et 2025. C'est ce que l'équipe sécurité d'en face
+    vérifiera en premier.
+    """
+    if not f.referentiels:
+        return "—"
+    return ", ".join(f"`{r.identifiant}` ({r.version})" for r in f.referentiels)
+
+
+def _render_non_couvert(facets: list[Facet]) -> list[str]:
+    """Les lignes non couvertes, **avec leur raison** — `FR-144`.
+
+    La doctrine en fait un atout de crédibilité, ce qu'elles ne sont que si la raison
+    est publiée avec la ligne. Une carte qui listerait « Hors périmètre » sans dire
+    pourquoi ferait exactement l'inverse : elle donnerait à lire un trou.
+    """
+    non_couvert = [f for f in facets if f.mode_publie == "X"]
+    if not non_couvert:
+        return []
+    lines = [
+        "## Ce que nous ne couvrons pas, et pourquoi",
+        "",
+        "| Menace | Facette | Raison |",
+        "|---|---|---|",
+    ]
+    lines += [f"| **{f.row_id}** | {f.libelle} | {f.raison or '—'} |" for f in non_couvert]
+    return lines
 
 
 def main() -> int:
@@ -683,6 +722,17 @@ def _payload(facets: list[Facet], commit: str, stamp: str) -> dict[str, Any]:
                 "sens_prouves": sorted(f.sens_prouves),
                 "scenarios": sorted(t for v in f.prouve.values() for t in v),
                 "ecarts": f.gaps,
+                # `FR-194` : la correspondance voyage avec la carte lisible par machine.
+                # C'est le langage des équipes sécurité en face ; la leur laisser
+                # re-dériver produirait une seconde correspondance, et deux
+                # correspondances de la même ligne finissent par diverger.
+                "referentiels": [
+                    {"taxonomie": r.taxonomie.value, "version": r.version, "id": r.identifiant}
+                    for r in f.referentiels
+                ],
+                # Pourquoi une ligne non couverte ne l'est pas : la doctrine publie la
+                # raison, et c'est elle qui en fait un atout plutôt qu'un silence.
+                "raison": f.raison,
             }
             for f in facets
         ],

@@ -1,6 +1,6 @@
 {
-  "commit": "263223b",
-  "genere_le": "2026-09-05 15:36 UTC",
+  "commit": "f5113b6",
+  "genere_le": "2026-09-05 15:49 UTC",
   "facettes": [
     {
       "menace": "M-01",
@@ -29,7 +29,20 @@
       "scenarios": [],
       "ecarts": [
         "G-01"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM01"
+        },
+        {
+          "taxonomie": "mitre_atlas",
+          "version": "v4.9.0",
+          "id": "AML.T0051"
+        }
+      ],
+      "raison": "Le garde-prompt souverain (Mistral) n'est pas encore appelé et aucun de ses verdicts  n'entre dans la chaîne. `FR-193` : orchestrer et attester le contrôle tiers — jamais  le construire, ce serait le pare-feu de prompts que nous ne sommes pas."
     },
     {
       "menace": "M-01",
@@ -55,7 +68,20 @@
       "scenarios": [],
       "ecarts": [
         "G-01"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM01"
+        },
+        {
+          "taxonomie": "mitre_atlas",
+          "version": "v4.9.0",
+          "id": "AML.T0051"
+        }
+      ],
+      "raison": "L'Evidence Pack ne porte aucune section attestant la présence du garde-prompt.  `FR-193`."
     },
     {
       "menace": "M-02",
@@ -93,7 +119,20 @@
       "ecarts": [
         "G-02",
         "G-03"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM01"
+        },
+        {
+          "taxonomie": "mitre_atlas",
+          "version": "v4.9.0",
+          "id": "AML.T0051"
+        }
+      ],
+      "raison": null
     },
     {
       "menace": "M-03",
@@ -115,7 +154,15 @@
       "scenarios": [],
       "ecarts": [
         "G-04"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM04"
+        }
+      ],
+      "raison": null
     },
     {
       "menace": "M-04",
@@ -137,7 +184,15 @@
       "scenarios": [],
       "ecarts": [
         "G-05"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM10"
+        }
+      ],
+      "raison": "La télémétrie de volume existe (`usage_events`) mais elle est cadrée équité et coût,  jamais anti-extraction : aucun seuil, aucun verdict, aucune entrée chaînée.  `FR-187`, profil P4, hors de ce lot."
     },
     {
       "menace": "M-05",
@@ -156,7 +211,9 @@
       "ingress_non_asserte": [],
       "sens_prouves": [],
       "scenarios": [],
-      "ecarts": []
+      "ecarts": [],
+      "referentiels": [],
+      "raison": "Robustesse adversariale du modèle : c'est le travail de l'éditeur qui l'entraîne, pas de la passerelle qui l'appelle."
     },
     {
       "menace": "M-06",
@@ -196,7 +253,15 @@
       ],
       "ecarts": [
         "G-06"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM06"
+        }
+      ],
+      "raison": null
     },
     {
       "menace": "M-07",
@@ -225,7 +290,9 @@
         "tests/test_coverage_gate.py::test_send_outside_the_allowlist_is_denied_and_never_relayed",
         "tests/test_coverage_gate.py::test_without_the_allowlist_the_same_mail_leaves"
       ],
-      "ecarts": []
+      "ecarts": [],
+      "referentiels": [],
+      "raison": null
     },
     {
       "menace": "M-07",
@@ -249,7 +316,9 @@
       "ingress_non_asserte": [],
       "sens_prouves": [],
       "scenarios": [],
-      "ecarts": []
+      "ecarts": [],
+      "referentiels": [],
+      "raison": "Réception du phishing : passerelle de messagerie et EDR du client. Nous couvrons l'agent comme *émetteur*, pas comme destinataire."
     },
     {
       "menace": "M-08",
@@ -280,7 +349,9 @@
       ],
       "ecarts": [
         "G-07"
-      ]
+      ],
+      "referentiels": [],
+      "raison": null
     },
     {
       "menace": "M-08",
@@ -304,7 +375,9 @@
       "ingress_non_asserte": [],
       "sens_prouves": [],
       "scenarios": [],
-      "ecarts": []
+      "ecarts": [],
+      "referentiels": [],
+      "raison": "Détection de média synthétique : ni notre métier ni notre point d'interposition. Nous couvrons l'intégrité de l'approbation, pas l'authenticité du média."
     },
     {
       "menace": "M-09",
@@ -328,7 +401,9 @@
       "ingress_non_asserte": [],
       "sens_prouves": [],
       "scenarios": [],
-      "ecarts": []
+      "ecarts": [],
+      "referentiels": [],
+      "raison": "Plan endpoint et poste de travail : SOC du client. Une passerelle d'actions ne voit pas le poste."
     },
     {
       "menace": "M-10",
@@ -365,7 +440,15 @@
       "ecarts": [
         "G-08",
         "G-22"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM02"
+        }
+      ],
+      "raison": null
     },
     {
       "menace": "M-10",
@@ -401,7 +484,15 @@
       ],
       "ecarts": [
         "G-08"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM02"
+        }
+      ],
+      "raison": null
     },
     {
       "menace": "M-10",
@@ -427,7 +518,15 @@
       "scenarios": [],
       "ecarts": [
         "G-09"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM02"
+        }
+      ],
+      "raison": "Revendiqué « Orchestré » sans substitut souverain nommé : piloter un contrôle tiers en fait une dépendance, et une dépendance qu'on ne peut pas nommer ne peut pas être revendiquée (`FR-178`)."
     },
     {
       "menace": "M-11",
@@ -458,7 +557,15 @@
         "tests/test_integrity_gate.py::test_poisoned_tool_is_quarantined_and_uncallable",
         "tests/test_integrity_gate.py::test_without_screening_the_drifted_tool_is_relayed"
       ],
-      "ecarts": []
+      "ecarts": [],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM03"
+        }
+      ],
+      "raison": null
     },
     {
       "menace": "M-11",
@@ -479,7 +586,15 @@
       "ingress_non_asserte": [],
       "sens_prouves": [],
       "scenarios": [],
-      "ecarts": []
+      "ecarts": [],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM03"
+        }
+      ],
+      "raison": "L'audit de dépendances tourne en CI (`pip-audit`) mais l'Evidence Pack n'en porte  aucune section. `FR-191`."
     },
     {
       "menace": "M-11",
@@ -503,7 +618,15 @@
       "scenarios": [],
       "ecarts": [
         "G-10"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM03"
+        }
+      ],
+      "raison": "Aucun scanner d'artefacts n'est piloté et aucun de ses verdicts n'est chaîné.  `FR-188`, profil P4, hors de ce lot."
     },
     {
       "menace": "M-12",
@@ -536,7 +659,15 @@
       "ecarts": [
         "G-11",
         "G-24"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM06"
+        }
+      ],
+      "raison": null
     },
     {
       "menace": "M-13",
@@ -567,7 +698,15 @@
       ],
       "ecarts": [
         "G-12"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM05"
+        }
+      ],
+      "raison": null
     },
     {
       "menace": "M-14",
@@ -607,7 +746,15 @@
       ],
       "ecarts": [
         "G-13"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM07"
+        }
+      ],
+      "raison": null
     },
     {
       "menace": "M-14",
@@ -636,7 +783,15 @@
       "scenarios": [],
       "ecarts": [
         "G-13"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM07"
+        }
+      ],
+      "raison": "La fuite de prompt système sur l'egress n'est pas mesurée : les deux moitiés sont en  main dans le proxy, rien ne les met en face l'une de l'autre. `FR-190`."
     },
     {
       "menace": "M-15",
@@ -661,7 +816,15 @@
       "scenarios": [],
       "ecarts": [
         "G-14"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM09"
+        }
+      ],
+      "raison": "Les analyseurs tournent chez le client, mais aucun de leurs verdicts n'entre dans la  chaîne : nous n'en prouvons donc rien. `FR-191`."
     },
     {
       "menace": "M-15",
@@ -681,7 +844,15 @@
       "ingress_non_asserte": [],
       "sens_prouves": [],
       "scenarios": [],
-      "ecarts": []
+      "ecarts": [],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM09"
+        }
+      ],
+      "raison": "L'audit de dépendances et de secrets tourne en CI ; l'Evidence Pack n'en porte  aucune section. `FR-191`."
     },
     {
       "menace": "M-16",
@@ -707,7 +878,15 @@
       "scenarios": [],
       "ecarts": [
         "G-15"
-      ]
+      ],
+      "referentiels": [
+        {
+          "taxonomie": "owasp_llm",
+          "version": "2025",
+          "id": "LLM09"
+        }
+      ],
+      "raison": null
     }
   ]
 }

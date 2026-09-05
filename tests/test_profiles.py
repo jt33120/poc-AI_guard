@@ -16,6 +16,7 @@ import yaml
 from core.profiles import (
     Family,
     Profile,
+    Taxonomie,
     applicable_rows,
     capped_mode,
     ceiling,
@@ -143,3 +144,97 @@ def test_no_facet_can_be_published_as_blocked_to_a_copilot_only_client() -> None
         if Profile.p1b in facet.profiles
     }
     assert "B" not in published, f"a Bloqué claim survived the P1b ceiling: {published}"
+
+
+# ---------------------------------------------------------------------------
+# `FR-194` — la correspondance de taxonomie est déclarative, fermée et millésimée
+# ---------------------------------------------------------------------------
+# La correspondance existait déjà, en prose, dans `docs/product/THREAT-COVERAGE.md`
+# (« M-01→LLM01, M-03→LLM04, … »). Rien ne la vérifiait et rien ne la publiait.
+# `FR-194` la fait descendre dans le registre, où elle est parsée fail-closed.
+
+
+def _registry(tmp_path: Path, referentiels: str) -> Path:
+    registry = tmp_path / "rows.yaml"
+    registry.write_text(
+        "rows:\n"
+        "  - id: M-99\n"
+        '    titre: "Menace de test"\n'
+        "    famille: usage_ia\n"
+        "    profils: [P3]\n"
+        f"{referentiels}"
+        "    facettes:\n"
+        '      - {cle: f, libelle: "facette", mode: X, profils: [P3], raison: "raison"}\n',
+        encoding="utf-8",
+    )
+    return registry
+
+
+def test_a_management_framework_is_refused_by_the_vocabulary(tmp_path: Path) -> None:
+    """`AR-1` tient par l'énumération, pas par la discipline du rédacteur.
+
+    La frontière passe entre une taxonomie **technique** — s'y aligner est descriptif —
+    et un référentiel de **management** dont la correspondance engage le jugement d'un
+    assesseur. Un champ libre laisserait écrire `ISO 42001` sans que personne ne le
+    voie ; ici il faut modifier `core/profiles.py`, donc le défendre en revue.
+    """
+    registry = _registry(
+        tmp_path,
+        '    referentiels:\n      - {taxonomie: iso_42001, version: "2023", id: "8.3"}\n',
+    )
+    with pytest.raises(ValueError, match="taxonomie inconnue"):
+        load_rows(registry)
+
+
+def test_a_reference_without_its_vintage_is_refused(tmp_path: Path) -> None:
+    """`LLM01` seul n'identifie rien.
+
+    OWASP a renuméroté entre 2023 et 2025 — `LLM10` y est passé de « Model Theft » à
+    « Unbounded Consumption ». Une correspondance sans millésime est précisément celle
+    qu'un auditeur rejette, ce dont `EXH-7` met en garde.
+    """
+    registry = _registry(tmp_path, "    referentiels:\n      - {taxonomie: owasp_llm, id: LLM01}\n")
+    with pytest.raises(ValueError, match="version"):
+        load_rows(registry)
+
+
+def test_the_mapping_is_inherited_from_the_row(tmp_path: Path) -> None:
+    """« M-01 ≡ LLM01 » parle de la menace, pas de l'une de ses facettes."""
+    registry = _registry(
+        tmp_path,
+        '    referentiels:\n      - {taxonomie: owasp_llm, version: "2025", id: LLM01}\n',
+    )
+    rows = load_rows(registry)
+    assert rows[0].facets[0].referentiels[0].identifiant == "LLM01"
+    assert rows[0].facets[0].referentiels[0].version == "2025"
+
+
+def test_the_published_registry_maps_what_the_doctrine_says_it_maps() -> None:
+    """Les huit correspondances écrites en prose sont bien celles du registre.
+
+    `docs/product/THREAT-COVERAGE.md` les énonce depuis longtemps ; c'était de la
+    documentation, donc une chose qui dérive. Ce test en fait un contrat — et il
+    échouerait si quelqu'un changeait l'une sans changer l'autre.
+    """
+    rows = {r.id: r for r in load_rows(_REGISTRY)}
+    owasp = {
+        rid: next(
+            (
+                r.identifiant
+                for r in rows[rid].facets[0].referentiels
+                if r.taxonomie is Taxonomie.owasp_llm
+            ),
+            None,
+        )
+        for rid in ("M-01", "M-03", "M-10", "M-11", "M-12", "M-13", "M-14", "M-16")
+    }
+    assert owasp == {
+        "M-01": "LLM01",
+        "M-03": "LLM04",
+        "M-10": "LLM02",
+        "M-11": "LLM03",
+        "M-12": "LLM06",
+        "M-13": "LLM05",
+        "M-14": "LLM07",
+        "M-16": "LLM09",
+    }

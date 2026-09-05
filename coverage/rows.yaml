@@ -33,6 +33,9 @@ rows:
     titre: "Injection de prompts directe"
     famille: usage_ia
     profils: [P1a, P1b, P2, P3, P4, P5]
+    referentiels:
+      - {taxonomie: owasp_llm, version: "2025", id: LLM01}
+      - {taxonomie: mitre_atlas, version: "v4.9.0", id: AML.T0051}
     facettes:
       - cle: garde_prompt
         libelle: "garde-prompt"
@@ -55,6 +58,10 @@ rows:
     titre: "Injection de prompts indirecte"
     famille: usage_ia
     profils: [P2, P3]
+    referentiels:
+        # LLM01:2025 couvre explicitement l'injection directe et indirecte
+      - {taxonomie: owasp_llm, version: "2025", id: LLM01}
+      - {taxonomie: mitre_atlas, version: "v4.9.0", id: AML.T0051}
     facettes:
       - cle: taint
         libelle: "garde de taint sur les résultats d'outils"
@@ -66,6 +73,8 @@ rows:
     titre: "Empoisonnement de données"
     famille: usage_ia
     profils: [P2, P5]
+    referentiels:
+      - {taxonomie: owasp_llm, version: "2025", id: LLM04}
     facettes:
       - cle: provenance
         libelle: "déclaration de provenance des jeux de données"
@@ -80,6 +89,10 @@ rows:
     titre: "Vol de modèle / extraction"
     famille: fournisseur
     profils: [P4, P5]
+    referentiels:
+        # LLM10:2025 « Unbounded Consumption » absorbe l'extraction de modèle, qui 
+        #   était LLM10:2023 « Model Theft » — d'où le millésime obligatoire
+      - {taxonomie: owasp_llm, version: "2025", id: LLM10}
     facettes:
       - cle: telemetrie
         libelle: "télémétrie de volume et de motif"
@@ -105,6 +118,9 @@ rows:
     titre: "Piratage d'agents autonomes"
     famille: usage_ia
     profils: [P3]
+    referentiels:
+        # un agent détourné agit au-delà de son mandat : c'est « Excessive Agency »
+      - {taxonomie: owasp_llm, version: "2025", id: LLM06}
     facettes:
       - cle: chaine
         libelle: "chaîne de contrôle complète, plancher irréversible"
@@ -164,6 +180,8 @@ rows:
     titre: "Exfiltration de données / PI via LLM"
     famille: usage_ia
     profils: [P1a, P1b, P2, P3, P4, P5]
+    referentiels:
+      - {taxonomie: owasp_llm, version: "2025", id: LLM02}
     facettes:
       - cle: egress
         libelle: "DLP d'egress sur le chemin supervisé"
@@ -193,6 +211,8 @@ rows:
     titre: "Supply chain (modèles / bibliothèques)"
     famille: usage_ia
     profils: [P2, P3, P4]
+    referentiels:
+      - {taxonomie: owasp_llm, version: "2025", id: LLM03}
     facettes:
       - cle: outils_mcp
         libelle: "empreinte et quarantaine des outils MCP"
@@ -220,6 +240,8 @@ rows:
     titre: "Privilèges excessifs (excessive agency)"
     famille: usage_ia
     profils: [P3]
+    referentiels:
+      - {taxonomie: owasp_llm, version: "2025", id: LLM06}
     facettes:
       - cle: rbac
         libelle: "RBAC par outil, garde du député confus"
@@ -231,6 +253,8 @@ rows:
     titre: "Traitement non sécurisé des sorties"
     famille: usage_ia
     profils: [P3]
+    referentiels:
+      - {taxonomie: owasp_llm, version: "2025", id: LLM05}
     facettes:
       - cle: charge_executable
         libelle: "détection de charge exécutable dans les résultats"
@@ -241,6 +265,8 @@ rows:
     titre: "Fuite du system prompt & secrets"
     famille: usage_ia
     profils: [P1a, P1b, P2, P3, P4, P5]
+    referentiels:
+      - {taxonomie: owasp_llm, version: "2025", id: LLM07}
     facettes:
       - cle: secrets
         libelle: "coffre ; aucun secret inline, aucun secret journalisé"
@@ -260,6 +286,9 @@ rows:
     titre: "Validation aveugle de code (Copilot)"
     famille: usage_ia
     profils: [P1a, P1b]
+    referentiels:
+        # LLM09:2025 « Misinformation » nomme la génération de code non sûr
+      - {taxonomie: owasp_llm, version: "2025", id: LLM09}
     facettes:
       - cle: sast
         libelle: "ingestion de verdicts SAST/DAST"
@@ -280,6 +309,8 @@ rows:
     titre: "Décision fondée sur une hallucination"
     famille: usage_ia
     profils: [P1a, P1b, P2, P3, P4, P5]
+    referentiels:
+      - {taxonomie: owasp_llm, version: "2025", id: LLM09}
     facettes:
       - cle: revue_humaine
         libelle: "attestation « décision critique sous revue humaine »"

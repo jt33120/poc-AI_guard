@@ -242,7 +242,7 @@ Décision : les quatre familles sont retenues. `FR-131` mappe déjà EU AI Act, 
 
 | Famille | Rôle | Coût |
 |---|---|---|
-| **OWASP LLM Top 10 + MITRE ATLAS** | Colonne vertébrale technique. La matrice s'y aligne presque 1:1 (M-01→LLM01, M-03→LLM04, M-10→LLM02, M-11→LLM03, M-12→LLM06, M-13→LLM05, M-14→LLM07, M-16→LLM09). Langage des équipes sécurité en face. | Faible — extension de table |
+| **OWASP LLM Top 10 + MITRE ATLAS** | Colonne vertébrale technique. Langage des équipes sécurité en face. **Livré (`FR-194`)** : la correspondance vit dans `coverage/rows.yaml`, millésimée, et se publie avec la carte — elle n'est plus une phrase de documentation qui dérive. Le vocabulaire est **fermé** : y écrire un référentiel de management (ISO 42001, SOC 2, NIS2, DORA, ANSSI) échoue au parse, ce qui est la façon dont `AR-1` tient. | Livré |
 | **EU AI Act + RGPD** | Déjà produit (`FR-131`, exports art. 12/14/26). | Nul — existant |
 | **NIS2 + DORA** | Attendu des grands comptes régulés (finance, assurance, OIV/OSE). Fort levier commercial. | Élevé — travail de correspondance |
 | **ANSSI / SecNumCloud** | L'axe souveraineté au sens français. Contraint la stack d'hébergement. | Élevé — contraint l'architecture |
