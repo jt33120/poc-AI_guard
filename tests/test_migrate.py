@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import shutil
 import threading
 from collections.abc import Iterator
 from pathlib import Path
@@ -252,3 +253,121 @@ def test_ledger_is_denied_to_tenant_facing_roles(bare_db: DBHandle) -> None:
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
         conn.execute("select * from schema_migrations")
     conn.rollback()
+
+
+# ---------------------------------------------------------------------------
+# `FR-167` — une histoire incomplète ne peut pas se déclarer courante
+# ---------------------------------------------------------------------------
+def _shipped(tmp_path: Path, *, drop: str | None = None) -> Path:
+    """Une copie du répertoire de migrations, éventuellement amputée d'un fichier.
+
+    C'est la forme exacte d'une image mal construite : le code est là, le manifeste
+    est là, un `.sql` manque.
+    """
+    directory = tmp_path / "migrations"
+    shutil.copytree(migrate.MIGRATIONS_DIR, directory)
+    if drop is not None:
+        (directory / drop).unlink()
+    return directory
+
+
+def test_the_manifest_lists_every_shipped_migration() -> None:
+    """Le manifeste est à jour — sinon il ne garde rien.
+
+    Un manifeste périmé est pire qu'aucun : il nomme moins de fichiers que l'image
+    n'en porte, donc la vérification passe en ignorant précisément les migrations
+    récentes. C'est la même fraîcheur que `coverage/map.json` (`AD-30`), et le
+    correctif est la même commande : `make migrations-manifest`.
+    """
+    assert migrate.MANIFEST.read_text(encoding="utf-8") == migrate.render_manifest()
+    assert sorted(migrate.read_manifest()) == _ALL_FILES
+
+
+def test_apply_all_refuses_a_truncated_migrations_directory(
+    bare_db: DBHandle, tmp_path: Path
+) -> None:
+    """Le chemin de démarrage par défaut : `python -m cli migrate` sur une base vierge.
+
+    Sans ce refus — mesuré — le runner applique les 21 fichiers restants, `pending()`
+    revient vide parce qu'il compare le registre au **disque**, `/health/ready`
+    répond `schema_current: true`, et ni `public.dlp_config` ni sa policy RLS
+    n'existent. Le gate de démarrage est vert et l'isolation manque.
+    """
+    directory = _shipped(tmp_path, drop="0010_dlp_config.sql")
+    conn = bare_db.conn
+
+    with pytest.raises(migrate.IncompleteMigrations) as excinfo:
+        migrate.apply_all(conn, directory)
+    assert excinfo.value.missing == ["0010_dlp_config.sql"]
+    assert migrate.applied(conn) == []  # refuser, c'est ne rien appliquer du tout
+
+
+def test_apply_all_refuses_a_modified_migration_on_a_virgin_database(
+    bare_db: DBHandle, tmp_path: Path
+) -> None:
+    """L'autre moitié : le fichier est là, ses octets ne sont plus ceux du manifeste.
+
+    Sur une base déjà migrée, `verify_integrity` attrape la dérive contre le
+    registre. Sur une base **vierge** il n'y a pas de registre, donc rien ne la
+    voyait — et la migration réécrite s'appliquait puis s'enregistrait comme si
+    elle avait toujours été ainsi.
+    """
+    directory = _shipped(tmp_path)
+    target = directory / "0010_dlp_config.sql"
+    target.write_text(target.read_text(encoding="utf-8") + "\n-- edited\n", encoding="utf-8")
+
+    with pytest.raises(migrate.IncompleteMigrations) as excinfo:
+        migrate.apply_all(bare_db.conn, directory)
+    assert excinfo.value.drifted == ["0010_dlp_config.sql"]
+
+
+def test_a_complete_directory_still_applies(bare_db: DBHandle, tmp_path: Path) -> None:
+    """Le contrôle qui empêche les deux refus ci-dessus d'être une panne générale."""
+    directory = _shipped(tmp_path)
+    assert migrate.apply_all(bare_db.conn, directory) == _ALL_FILES
+
+
+def test_adopt_baseline_refuses_when_a_baseline_file_is_missing_from_disk(
+    bare_db: DBHandle, tmp_path: Path
+) -> None:
+    """Un fichier baseline absent était retiré du contrôle de contiguïté, en silence.
+
+    Conséquence mesurée : une base réellement mixte (tout le baseline sauf 0010) vue
+    par une image sans `0010_dlp_config.sql` n'était plus mixte — 13 fichiers
+    adoptés, tête atteinte, `schema_current: true`, `public.dlp_config` absente.
+    """
+    directory = _shipped(tmp_path, drop="0010_dlp_config.sql")
+    with pytest.raises(migrate.MigrationError) as excinfo:
+        migrate.adopt_baseline(bare_db.conn, directory)
+    assert "0010_dlp_config.sql" in str(excinfo.value)
+    assert migrate.applied(bare_db.conn) == []
+
+
+def test_the_trigger_sentinel_ignores_a_same_named_trigger_in_another_schema(
+    bare_db: DBHandle,
+) -> None:
+    """La sonde `trigger` ne filtrait pas le schéma, contrairement aux deux autres.
+
+    Un `audit_log` d'archive portant le même trigger suffisait à faire adopter
+    `0005_audit_log.sql` — donc à déclarer appliqués la table d'audit append-only et
+    ses triggers anti-mutation (`CLAUDE.md` §4.2) sur une base où `public.audit_log`
+    n'existe pas.
+    """
+    conn = bare_db.conn
+    _apply_files(conn, _BASELINE_FILES[:4])
+    conn.execute("create schema archive")
+    conn.execute("create table archive.audit_log (id int)")
+    conn.execute(
+        "create function archive.noop() returns trigger language plpgsql as "
+        "$$ begin return null; end $$"
+    )
+    conn.execute(
+        "create trigger audit_log_no_delete before delete on archive.audit_log "
+        "for each row execute function archive.noop()"
+    )
+    conn.commit()
+
+    sentinel = next(s for s in migrate._BASELINE if s.filename == "0005_audit_log.sql")
+    assert migrate._object_exists(conn, sentinel) is False
+    assert migrate.adopt_baseline(conn) == _BASELINE_FILES[:4]
+    assert conn.execute("select to_regclass('public.audit_log')").fetchone() == (None,)

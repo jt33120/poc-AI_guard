@@ -166,12 +166,22 @@ def _migration_errors() -> Iterator[None]:
             "  fix: restore the file to the exact content that was applied. A released "
             "migration is never edited; a change ships as a new file."
         ) from None
+    except migrate.IncompleteMigrations as exc:
+        raise CliError(
+            f"{exc}\n"
+            "  fix: run this against a complete checkout or image — the migrations "
+            "directory shipped incomplete. Check .dockerignore and the COPY layer."
+        ) from None
     except migrate.MixedBaseline as exc:
         raise CliError(
             f"{exc}\n"
             "  fix: bring the database to a state this runner can explain (apply the "
             "missing files by hand, or restore a backup), then re-run."
         ) from None
+    except migrate.MigrationError as exc:
+        # La classe de base, catchée après ses filles : sans cette clause un refus
+        # nouveau (le fichier baseline absent du disque) sortirait en traceback.
+        raise CliError(str(exc)) from None
     except psycopg.Error as exc:
         raise CliError(
             f"migration failed, nothing was left half-applied: {_reason(exc)}\n"
