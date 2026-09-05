@@ -55,6 +55,7 @@ from core import (
     policy_store,
     pricing,
     prompt_guard,
+    prompt_leak,
 )
 from core import usage as usage_store
 from core.config import Settings
@@ -397,6 +398,41 @@ def _audit_prompt_guard(
         logger.warning("prompt_guard_audit_failed", extra={"tenant_id": tenant_id})
 
 
+def _audit_prompt_leak(
+    url: str,
+    tenant_id: str,
+    gateway_token_id: str | None,
+    provider: str,
+    digest: str,
+    words: int,
+) -> None:
+    """Chaîner une régurgitation verbatim du prompt système (`FR-190`, `M-14/prompt`).
+
+    Mode `Détecté` : nous enregistrons, nous n'interrompons pas. La réponse est déjà
+    partie vers l'agent quand cette ligne s'écrit, et c'est voulu — réécrire une
+    complétion serait de la modération de sortie, que le produit n'est pas.
+
+    Dans la chaîne : l'empreinte du prompt et la **longueur** de la suite recopiée.
+    Jamais le texte, ni celui du prompt ni celui de la sortie (§4.10) — la longueur
+    suffit à un opérateur pour juger de la gravité, et elle ne fuit rien.
+    """
+    try:
+        with db.connection(url) as conn:
+            audit.log_event(
+                conn,
+                tenant_id=tenant_id,
+                decision=prompt_leak.DECISION,
+                tool_name=f"{provider}.prompt_leak",
+                args_hash=digest,
+                error=f"verbatim_words={words}",
+                gateway_token_id=gateway_token_id,
+                origin=audit.Origin.llm_proxy(observing=False),
+            )
+            conn.commit()
+    except Exception:  # observation best-effort ; elle ne retient jamais la réponse
+        logger.warning("prompt_leak_audit_failed", extra={"tenant_id": tenant_id})
+
+
 def _audit_egress(
     url: str,
     tenant_id: str,
@@ -580,6 +616,21 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
         except ValueError:
             data = None
         if isinstance(data, dict):
+            # `FR-190` — le modèle a-t-il recraché ses propres consignes, mot pour mot ?
+            # Après la réponse, sans la modifier : `Détecté`, pas `Bloqué`.
+            reference = prompt_leak.system_prompt(body)
+            if reference:
+                mots = prompt_leak.leaked_span(reference, prompt_leak.completion_text(data))
+                if mots is not None:
+                    await run_in_threadpool(
+                        _audit_prompt_leak,
+                        url,
+                        principal.tenant_id,
+                        principal.token_id,
+                        provider,
+                        prompt_leak.prompt_digest(reference),
+                        mots,
+                    )
             await run_in_threadpool(
                 _inspect,
                 url,

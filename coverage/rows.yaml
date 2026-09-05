@@ -267,12 +267,16 @@ rows:
         ingress: [mcp, http]
         gaps: [G-13]
       - cle: prompt
-        libelle: "détection de fuite du prompt sur l'egress"
-        mode: X
-        raison: >-
-          La fuite de prompt système sur l'egress n'est pas mesurée : les deux moitiés sont en 
-          main dans le proxy, rien ne les met en face l'une de l'autre. `FR-190`.
-        substitut: {nom: "Mistral (garde de sortie anti-leak)", justification: ue}
+        # Le libellé dit **verbatim**, et c'est le mot qui compte. Le détecteur voit
+        # une suite contiguë recopiée ; une paraphrase lui échappe. « Détection de
+        # fuite du prompt » se lirait comme beaucoup plus que ce que nous tenons —
+        # le mode était bon, c'est la phrase qu'il fallait resserrer (`FR-175`).
+        libelle: "détection de régurgitation **verbatim** du prompt système sur l'egress"
+        mode: D
+        # Le substitut « Mistral (garde de sortie anti-leak) » est retiré : il
+        # appartenait au plan `Orchestré`. Le détecteur livré est déterministe et
+        # reste dans le pli de souveraineté — il n'y a aucun tiers à nommer.
+        ingress: [llm_proxy]
         gaps: [G-13]
 
   - id: M-15

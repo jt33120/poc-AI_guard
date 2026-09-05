@@ -37,6 +37,10 @@ _VOCABULARY = {
     "agent_stopped": 1,  # gateway/server.py::_stop_blocks -- jeton révoqué
     "stop_state_unreadable": 1,  # idem -- état d'arrêt illisible
     "taint_marked": 1,  # gateway/server.py::_audit_gate
+    "prompt_leak_verbatim": 1,  # api/llm_proxy.py::_audit_prompt_leak (`FR-190`)
+    "prompt_guard_flagged": 1,  # api/llm_proxy.py::_audit_prompt_guard (`FR-193`)
+    "prompt_guard_clean": 1,  # idem
+    "prompt_guard_unavailable": 1,  # idem — un garde muet ne certifie rien
     "tool_drift": 1,  # gateway/server.py::_INTEGRITY_DECISION
     "poison_suspected": 1,  # idem
     "tool_quarantined": 1,  # idem

@@ -1,6 +1,6 @@
 {
-  "commit": "5784b42",
-  "genere_le": "2026-09-05 16:27 UTC",
+  "commit": "1c5a164",
+  "genere_le": "2026-09-05 16:42 UTC",
   "facettes": [
     {
       "menace": "M-01",
@@ -766,13 +766,10 @@
       "menace": "M-14",
       "titre": "Fuite du system prompt & secrets",
       "facette": "prompt",
-      "libelle": "détection de fuite du prompt sur l'egress",
-      "mode_revendique": "X",
-      "mode_publie": "X",
-      "substitut": {
-        "nom": "Mistral (garde de sortie anti-leak)",
-        "justification": "ue"
-      },
+      "libelle": "détection de régurgitation **verbatim** du prompt système sur l'egress",
+      "mode_revendique": "D",
+      "mode_publie": "D",
+      "substitut": null,
       "declasse_faute_de_substitut": false,
       "famille": "usage_ia",
       "profils": [
@@ -783,10 +780,16 @@
         "P4",
         "P5"
       ],
-      "ingress_prouve": [],
+      "ingress_prouve": [
+        "llm_proxy"
+      ],
       "ingress_non_asserte": [],
-      "sens_prouves": [],
-      "scenarios": [],
+      "sens_prouves": [
+        "detecte"
+      ],
+      "scenarios": [
+        "tests/test_prompt_leak.py::test_a_leak_is_chained_attributed_and_the_response_still_goes_through"
+      ],
       "ecarts": [
         "G-13"
       ],
@@ -797,7 +800,7 @@
           "id": "LLM07"
         }
       ],
-      "raison": "La fuite de prompt système sur l'egress n'est pas mesurée : les deux moitiés sont en  main dans le proxy, rien ne les met en face l'une de l'autre. `FR-190`."
+      "raison": null
     },
     {
       "menace": "M-15",
