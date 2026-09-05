@@ -42,6 +42,7 @@ from api.read_tokens import router as read_tokens_router
 from api.security import build_verifier, get_current_user
 from api.servers import router as servers_router
 from api.signup import router as signup_router
+from api.triage import router as triage_router
 from api.trust import router as trust_router
 from api.usage import router as usage_router
 from core.config import Settings, get_settings
@@ -143,6 +144,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(promotion_router)
     app.include_router(trust_router)
     app.include_router(corpora_router)
+    app.include_router(triage_router)
     app.include_router(signup_router)
 
     return app

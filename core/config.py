@@ -50,6 +50,8 @@ class Settings(BaseSettings):
     # never the frontend (CLAUDE.md §4.6). Signup is disabled if unset.
     supabase_service_role_key: str | None = Field(default=None, max_length=600)
     signup_rate_limit: str = Field(default="10/hour", max_length=40)
+    # Diagnostic public : ouvert et en écriture (il capture un lead), donc borné.
+    triage_rate_limit: str = Field(default="20/hour", max_length=40)
 
     # --- Database (backend / service_role connection) — M1 ---------------
     # psycopg DSN. Backend writes use a role that bypasses RLS (service_role).

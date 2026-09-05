@@ -1,0 +1,709 @@
+{
+  "commit": "3c640e9",
+  "genere_le": "2026-09-05 07:40 UTC",
+  "facettes": [
+    {
+      "menace": "M-01",
+      "titre": "Injection de prompts directe",
+      "facette": "garde_prompt",
+      "libelle": "garde-prompt",
+      "mode_revendique": "O",
+      "mode_publie": "O",
+      "substitut": {
+        "nom": "Mistral (garde-prompt)",
+        "justification": "ue"
+      },
+      "declasse_faute_de_substitut": false,
+      "famille": "usage_ia",
+      "profils": [
+        "P1a",
+        "P1b",
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "ingress_prouve": [],
+      "ingress_non_asserte": [],
+      "sens_prouves": [],
+      "scenarios": [],
+      "ecarts": [
+        "G-01"
+      ]
+    },
+    {
+      "menace": "M-01",
+      "titre": "Injection de prompts directe",
+      "facette": "attestation",
+      "libelle": "attestation de présence du garde",
+      "mode_revendique": "A",
+      "mode_publie": "A",
+      "substitut": null,
+      "declasse_faute_de_substitut": false,
+      "famille": "usage_ia",
+      "profils": [
+        "P1a",
+        "P1b",
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "ingress_prouve": [],
+      "ingress_non_asserte": [],
+      "sens_prouves": [],
+      "scenarios": [],
+      "ecarts": [
+        "G-01"
+      ]
+    },
+    {
+      "menace": "M-02",
+      "titre": "Injection de prompts indirecte",
+      "facette": "taint",
+      "libelle": "garde de taint sur les résultats d'outils",
+      "mode_revendique": "B",
+      "mode_publie": "B",
+      "substitut": null,
+      "declasse_faute_de_substitut": false,
+      "famille": "usage_ia",
+      "profils": [
+        "P2",
+        "P3"
+      ],
+      "ingress_prouve": [
+        "mcp"
+      ],
+      "ingress_non_asserte": [],
+      "sens_prouves": [
+        "bloque",
+        "controle_negatif",
+        "laisse_passer"
+      ],
+      "scenarios": [
+        "tests/test_taint_gate.py::test_a_different_agent_is_not_tainted_by_its_neighbour",
+        "tests/test_taint_gate.py::test_a_french_injection_gates_the_risky_action",
+        "tests/test_taint_gate.py::test_a_reconnect_does_not_wash_the_taint_off",
+        "tests/test_taint_gate.py::test_clean_result_does_not_gate",
+        "tests/test_taint_gate.py::test_escalate_holds_the_risky_action",
+        "tests/test_taint_gate.py::test_taint_policy_off_is_a_no_op",
+        "tests/test_taint_gate.py::test_tainted_result_then_risky_action_is_denied"
+      ],
+      "ecarts": [
+        "G-02",
+        "G-03"
+      ]
+    },
+    {
+      "menace": "M-03",
+      "titre": "Empoisonnement de données",
+      "facette": "provenance",
+      "libelle": "déclaration de provenance des jeux de données",
+      "mode_revendique": "A",
+      "mode_publie": "A",
+      "substitut": null,
+      "declasse_faute_de_substitut": false,
+      "famille": "usage_ia",
+      "profils": [
+        "P2",
+        "P5"
+      ],
+      "ingress_prouve": [],
+      "ingress_non_asserte": [],
+      "sens_prouves": [],
+      "scenarios": [],
+      "ecarts": [
+        "G-04"
+      ]
+    },
+    {
+      "menace": "M-04",
+      "titre": "Vol de modèle / extraction",
+      "facette": "telemetrie",
+      "libelle": "télémétrie de volume et de motif",
+      "mode_revendique": "D",
+      "mode_publie": "D",
+      "substitut": null,
+      "declasse_faute_de_substitut": false,
+      "famille": "fournisseur",
+      "profils": [
+        "P4",
+        "P5"
+      ],
+      "ingress_prouve": [],
+      "ingress_non_asserte": [],
+      "sens_prouves": [],
+      "scenarios": [],
+      "ecarts": [
+        "G-05"
+      ]
+    },
+    {
+      "menace": "M-05",
+      "titre": "Attaques par évasion (adversarial)",
+      "facette": "robustesse",
+      "libelle": "robustesse du modèle",
+      "mode_revendique": "X",
+      "mode_publie": "X",
+      "substitut": null,
+      "declasse_faute_de_substitut": false,
+      "famille": "fournisseur",
+      "profils": [
+        "P5"
+      ],
+      "ingress_prouve": [],
+      "ingress_non_asserte": [],
+      "sens_prouves": [],
+      "scenarios": [],
+      "ecarts": []
+    },
+    {
+      "menace": "M-06",
+      "titre": "Piratage d'agents autonomes",
+      "facette": "chaine",
+      "libelle": "chaîne de contrôle complète, plancher irréversible",
+      "mode_revendique": "B",
+      "mode_publie": "B",
+      "substitut": null,
+      "declasse_faute_de_substitut": false,
+      "famille": "usage_ia",
+      "profils": [
+        "P3"
+      ],
+      "ingress_prouve": [
+        "mcp"
+      ],
+      "ingress_non_asserte": [],
+      "sens_prouves": [
+        "bloque",
+        "controle_negatif",
+        "laisse_passer"
+      ],
+      "scenarios": [
+        "tests/test_coverage_gate.py::test_a_destructive_executor_invocation_is_held",
+        "tests/test_coverage_gate.py::test_a_harmless_executor_invocation_still_runs",
+        "tests/test_coverage_gate.py::test_without_argument_classification_the_destructive_invocation_runs",
+        "tests/test_hitl_gate.py::test_approval_service_down_fails_closed",
+        "tests/test_hitl_gate.py::test_auto_tool_still_relays",
+        "tests/test_hitl_gate.py::test_denied_is_never_relayed",
+        "tests/test_hitl_gate.py::test_expired_is_never_relayed",
+        "tests/test_hitl_gate.py::test_irreversible_held_then_approved_relays_once",
+        "tests/test_policy_gate.py::test_auto_tool_is_relayed",
+        "tests/test_policy_gate.py::test_irreversible_tool_is_held_not_relayed",
+        "tests/test_policy_gate.py::test_unknown_tool_is_denied"
+      ],
+      "ecarts": [
+        "G-06"
+      ]
+    },
+    {
+      "menace": "M-07",
+      "titre": "Phishing hyper-personnalisé",
+      "facette": "emission",
+      "libelle": "l'agent comme émetteur — envoi hors allowlist",
+      "mode_revendique": "B",
+      "mode_publie": "B",
+      "substitut": null,
+      "declasse_faute_de_substitut": false,
+      "famille": "usage_ia",
+      "profils": [
+        "P3"
+      ],
+      "ingress_prouve": [
+        "mcp"
+      ],
+      "ingress_non_asserte": [],
+      "sens_prouves": [
+        "bloque",
+        "controle_negatif",
+        "laisse_passer"
+      ],
+      "scenarios": [
+        "tests/test_coverage_gate.py::test_send_inside_the_allowlist_still_goes_through",
+        "tests/test_coverage_gate.py::test_send_outside_the_allowlist_is_denied_and_never_relayed",
+        "tests/test_coverage_gate.py::test_without_the_allowlist_the_same_mail_leaves"
+      ],
+      "ecarts": []
+    },
+    {
+      "menace": "M-07",
+      "titre": "Phishing hyper-personnalisé",
+      "facette": "reception",
+      "libelle": "réception — passerelle mail",
+      "mode_revendique": "X",
+      "mode_publie": "X",
+      "substitut": null,
+      "declasse_faute_de_substitut": false,
+      "famille": "cyber_classique",
+      "profils": [
+        "P1a",
+        "P1b",
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "ingress_prouve": [],
+      "ingress_non_asserte": [],
+      "sens_prouves": [],
+      "scenarios": [],
+      "ecarts": []
+    },
+    {
+      "menace": "M-08",
+      "titre": "Usurpation par deepfake",
+      "facette": "approbation",
+      "libelle": "intégrité de l'approbation — séparation des devoirs",
+      "mode_revendique": "B",
+      "mode_publie": "B",
+      "substitut": null,
+      "declasse_faute_de_substitut": false,
+      "famille": "usage_ia",
+      "profils": [
+        "P3"
+      ],
+      "ingress_prouve": [
+        "mcp"
+      ],
+      "ingress_non_asserte": [],
+      "sens_prouves": [
+        "bloque",
+        "controle_negatif",
+        "laisse_passer"
+      ],
+      "scenarios": [
+        "tests/test_coverage_gate.py::test_dual_approval_needs_two_distinct_humans_at_the_gateway",
+        "tests/test_coverage_gate.py::test_dual_approval_needs_two_distinct_humans_at_the_gateway",
+        "tests/test_coverage_gate.py::test_without_the_approval_gate_the_same_delete_executes"
+      ],
+      "ecarts": [
+        "G-07"
+      ]
+    },
+    {
+      "menace": "M-08",
+      "titre": "Usurpation par deepfake",
+      "facette": "media",
+      "libelle": "détection du média truqué",
+      "mode_revendique": "X",
+      "mode_publie": "X",
+      "substitut": null,
+      "declasse_faute_de_substitut": false,
+      "famille": "cyber_classique",
+      "profils": [
+        "P1a",
+        "P1b",
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "ingress_prouve": [],
+      "ingress_non_asserte": [],
+      "sens_prouves": [],
+      "scenarios": [],
+      "ecarts": []
+    },
+    {
+      "menace": "M-09",
+      "titre": "Malwares polymorphes",
+      "facette": "endpoint",
+      "libelle": "plan endpoint (EDR/XDR)",
+      "mode_revendique": "X",
+      "mode_publie": "X",
+      "substitut": null,
+      "declasse_faute_de_substitut": false,
+      "famille": "cyber_classique",
+      "profils": [
+        "P1a",
+        "P1b",
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "ingress_prouve": [],
+      "ingress_non_asserte": [],
+      "sens_prouves": [],
+      "scenarios": [],
+      "ecarts": []
+    },
+    {
+      "menace": "M-10",
+      "titre": "Exfiltration de données / PI via LLM",
+      "facette": "egress",
+      "libelle": "DLP d'egress sur le chemin supervisé",
+      "mode_revendique": "B",
+      "mode_publie": "B",
+      "substitut": null,
+      "declasse_faute_de_substitut": false,
+      "famille": "usage_ia",
+      "profils": [
+        "P1a",
+        "P1b",
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "ingress_prouve": [
+        "llm_proxy"
+      ],
+      "ingress_non_asserte": [],
+      "sens_prouves": [
+        "bloque",
+        "controle_negatif",
+        "laisse_passer"
+      ],
+      "scenarios": [
+        "tests/test_llm_proxy.py::test_dlp_blocks_secret_before_forwarding",
+        "tests/test_llm_proxy.py::test_dlp_disabled_lets_secret_through",
+        "tests/test_llm_proxy.py::test_dlp_flags_pii_but_forwards_unchanged"
+      ],
+      "ecarts": [
+        "G-08",
+        "G-22"
+      ]
+    },
+    {
+      "menace": "M-10",
+      "titre": "Exfiltration de données / PI via LLM",
+      "facette": "post_taint",
+      "libelle": "cible d'exfiltration dans les arguments d'une action post-taint",
+      "mode_revendique": "B",
+      "mode_publie": "B",
+      "substitut": null,
+      "declasse_faute_de_substitut": false,
+      "famille": "usage_ia",
+      "profils": [
+        "P1a",
+        "P1b",
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "ingress_prouve": [
+        "mcp"
+      ],
+      "ingress_non_asserte": [],
+      "sens_prouves": [
+        "bloque",
+        "controle_negatif",
+        "laisse_passer"
+      ],
+      "scenarios": [
+        "tests/test_taint_gate.py::test_a_post_taint_read_without_an_outbound_target_still_runs",
+        "tests/test_taint_gate.py::test_an_exfiltration_target_gates_an_otherwise_ungated_class",
+        "tests/test_taint_gate.py::test_the_same_outbound_target_is_relayed_in_a_clean_session"
+      ],
+      "ecarts": [
+        "G-08"
+      ]
+    },
+    {
+      "menace": "M-10",
+      "titre": "Exfiltration de données / PI via LLM",
+      "facette": "decouverte",
+      "libelle": "découverte du Shadow AI non supervisé",
+      "mode_revendique": "X",
+      "mode_publie": "X",
+      "substitut": null,
+      "declasse_faute_de_substitut": true,
+      "famille": "usage_ia",
+      "profils": [
+        "P1a",
+        "P1b",
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "ingress_prouve": [],
+      "ingress_non_asserte": [],
+      "sens_prouves": [],
+      "scenarios": [],
+      "ecarts": [
+        "G-09"
+      ]
+    },
+    {
+      "menace": "M-11",
+      "titre": "Supply chain (modèles / bibliothèques)",
+      "facette": "outils_mcp",
+      "libelle": "empreinte et quarantaine des outils MCP",
+      "mode_revendique": "B",
+      "mode_publie": "B",
+      "substitut": null,
+      "declasse_faute_de_substitut": false,
+      "famille": "usage_ia",
+      "profils": [
+        "P3"
+      ],
+      "ingress_prouve": [
+        "mcp"
+      ],
+      "ingress_non_asserte": [],
+      "sens_prouves": [
+        "bloque",
+        "controle_negatif",
+        "laisse_passer"
+      ],
+      "scenarios": [
+        "tests/test_integrity_gate.py::test_clean_tool_is_auto_approved_and_relayed",
+        "tests/test_integrity_gate.py::test_drifted_tool_is_quarantined",
+        "tests/test_integrity_gate.py::test_new_tool_quarantined_when_auto_approve_off",
+        "tests/test_integrity_gate.py::test_poisoned_tool_is_quarantined_and_uncallable",
+        "tests/test_integrity_gate.py::test_without_screening_the_drifted_tool_is_relayed"
+      ],
+      "ecarts": []
+    },
+    {
+      "menace": "M-11",
+      "titre": "Supply chain (modèles / bibliothèques)",
+      "facette": "bibliotheques",
+      "libelle": "SBOM et audit de dépendances en CI",
+      "mode_revendique": "A",
+      "mode_publie": "A",
+      "substitut": null,
+      "declasse_faute_de_substitut": false,
+      "famille": "usage_ia",
+      "profils": [
+        "P2",
+        "P3",
+        "P4"
+      ],
+      "ingress_prouve": [],
+      "ingress_non_asserte": [],
+      "sens_prouves": [],
+      "scenarios": [],
+      "ecarts": []
+    },
+    {
+      "menace": "M-11",
+      "titre": "Supply chain (modèles / bibliothèques)",
+      "facette": "modeles_ml",
+      "libelle": "analyse d'artefacts de modèles",
+      "mode_revendique": "O",
+      "mode_publie": "O",
+      "substitut": {
+        "nom": "picklescan / modelscan",
+        "justification": "local"
+      },
+      "declasse_faute_de_substitut": false,
+      "famille": "usage_ia",
+      "profils": [
+        "P4"
+      ],
+      "ingress_prouve": [],
+      "ingress_non_asserte": [],
+      "sens_prouves": [],
+      "scenarios": [],
+      "ecarts": [
+        "G-10"
+      ]
+    },
+    {
+      "menace": "M-12",
+      "titre": "Privilèges excessifs (excessive agency)",
+      "facette": "rbac",
+      "libelle": "RBAC par outil, garde du député confus",
+      "mode_revendique": "B",
+      "mode_publie": "B",
+      "substitut": null,
+      "declasse_faute_de_substitut": false,
+      "famille": "usage_ia",
+      "profils": [
+        "P3"
+      ],
+      "ingress_prouve": [
+        "mcp"
+      ],
+      "ingress_non_asserte": [],
+      "sens_prouves": [
+        "bloque",
+        "controle_negatif",
+        "laisse_passer"
+      ],
+      "scenarios": [
+        "tests/test_rbac_gate.py::test_allowed_client_may_call",
+        "tests/test_rbac_gate.py::test_foreign_client_is_denied_and_audited",
+        "tests/test_rbac_gate.py::test_missing_client_is_denied",
+        "tests/test_rbac_gate.py::test_without_the_client_allowlist_the_same_tool_is_relayed"
+      ],
+      "ecarts": [
+        "G-11",
+        "G-24"
+      ]
+    },
+    {
+      "menace": "M-13",
+      "titre": "Traitement non sécurisé des sorties",
+      "facette": "charge_executable",
+      "libelle": "détection de charge exécutable dans les résultats",
+      "mode_revendique": "D",
+      "mode_publie": "D",
+      "substitut": null,
+      "declasse_faute_de_substitut": false,
+      "famille": "usage_ia",
+      "profils": [
+        "P3"
+      ],
+      "ingress_prouve": [
+        "mcp"
+      ],
+      "ingress_non_asserte": [],
+      "sens_prouves": [
+        "bloque",
+        "laisse_passer"
+      ],
+      "scenarios": [
+        "tests/test_taint_gate.py::test_a_result_carrying_an_ordinary_web_page_does_not_gate",
+        "tests/test_taint_gate.py::test_an_executable_payload_in_a_result_gates_the_next_risky_action"
+      ],
+      "ecarts": [
+        "G-12"
+      ]
+    },
+    {
+      "menace": "M-14",
+      "titre": "Fuite du system prompt & secrets",
+      "facette": "secrets",
+      "libelle": "coffre ; aucun secret inline, aucun secret journalisé",
+      "mode_revendique": "B",
+      "mode_publie": "B",
+      "substitut": null,
+      "declasse_faute_de_substitut": false,
+      "famille": "usage_ia",
+      "profils": [
+        "P1a",
+        "P1b",
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "ingress_prouve": [
+        "http",
+        "mcp"
+      ],
+      "ingress_non_asserte": [],
+      "sens_prouves": [
+        "bloque",
+        "controle_negatif",
+        "laisse_passer"
+      ],
+      "scenarios": [
+        "tests/test_coverage_gate.py::test_a_secret_argument_never_reaches_the_audit_log_over_http",
+        "tests/test_coverage_gate.py::test_a_secret_argument_never_reaches_the_audit_log_over_http",
+        "tests/test_coverage_gate.py::test_a_secret_argument_never_reaches_the_audit_log_over_mcp",
+        "tests/test_coverage_gate.py::test_a_secret_argument_never_reaches_the_audit_log_over_mcp",
+        "tests/test_coverage_gate.py::test_the_secret_reaches_the_verdict_path_and_is_absent_only_from_the_log",
+        "tests/test_coverage_gate.py::test_the_secret_really_travelled_and_is_absent_only_from_the_log"
+      ],
+      "ecarts": [
+        "G-13"
+      ]
+    },
+    {
+      "menace": "M-14",
+      "titre": "Fuite du system prompt & secrets",
+      "facette": "prompt",
+      "libelle": "détection de fuite du prompt sur l'egress",
+      "mode_revendique": "O",
+      "mode_publie": "O",
+      "substitut": {
+        "nom": "Mistral (garde de sortie anti-leak)",
+        "justification": "ue"
+      },
+      "declasse_faute_de_substitut": false,
+      "famille": "usage_ia",
+      "profils": [
+        "P1a",
+        "P1b",
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "ingress_prouve": [],
+      "ingress_non_asserte": [],
+      "sens_prouves": [],
+      "scenarios": [],
+      "ecarts": [
+        "G-13"
+      ]
+    },
+    {
+      "menace": "M-15",
+      "titre": "Validation aveugle de code (Copilot)",
+      "facette": "sast",
+      "libelle": "ingestion de verdicts SAST/DAST",
+      "mode_revendique": "O",
+      "mode_publie": "O",
+      "substitut": {
+        "nom": "SonarQube / Semgrep en CI",
+        "justification": "local"
+      },
+      "declasse_faute_de_substitut": false,
+      "famille": "usage_ia",
+      "profils": [
+        "P1a",
+        "P1b"
+      ],
+      "ingress_prouve": [],
+      "ingress_non_asserte": [],
+      "sens_prouves": [],
+      "scenarios": [],
+      "ecarts": [
+        "G-14"
+      ]
+    },
+    {
+      "menace": "M-15",
+      "titre": "Validation aveugle de code (Copilot)",
+      "facette": "ci",
+      "libelle": "audit de dépendances et de secrets en CI",
+      "mode_revendique": "A",
+      "mode_publie": "A",
+      "substitut": null,
+      "declasse_faute_de_substitut": false,
+      "famille": "usage_ia",
+      "profils": [
+        "P1a",
+        "P1b"
+      ],
+      "ingress_prouve": [],
+      "ingress_non_asserte": [],
+      "sens_prouves": [],
+      "scenarios": [],
+      "ecarts": []
+    },
+    {
+      "menace": "M-16",
+      "titre": "Décision fondée sur une hallucination",
+      "facette": "revue_humaine",
+      "libelle": "attestation « décision critique sous revue humaine »",
+      "mode_revendique": "A",
+      "mode_publie": "A",
+      "substitut": null,
+      "declasse_faute_de_substitut": false,
+      "famille": "usage_ia",
+      "profils": [
+        "P1a",
+        "P1b",
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "ingress_prouve": [],
+      "ingress_non_asserte": [],
+      "sens_prouves": [],
+      "scenarios": [],
+      "ecarts": [
+        "G-15"
+      ]
+    }
+  ]
+}

@@ -33,3 +33,8 @@ def policy_draft_rate_limit() -> str:
 def signup_rate_limit() -> str:
     """Dynamic limit string for the public self-serve signup endpoint."""
     return get_settings().signup_rate_limit
+
+
+def triage_rate_limit() -> str:
+    """Dynamic limit string for the public profile-diagnostic endpoint."""
+    return get_settings().triage_rate_limit
