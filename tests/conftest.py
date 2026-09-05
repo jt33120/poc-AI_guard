@@ -177,6 +177,27 @@ def db(pg_cluster: pgcluster.EphemeralPostgres) -> Iterator[DBHandle]:
         admin.close()
 
 
+def mint_agent(db: DBHandle, tenant_id: str, name: str = "agent") -> str:
+    """L'identifiant d'un jeton de passerelle **vivant** — l'identité réelle d'un agent.
+
+    Le harnais passait jusqu'ici des identifiants synthétiques (`"agent-1"`,
+    `"tok-observed"`) : `session_taint.gateway_token_id` est un `text`, donc rien ne
+    s'y opposait. Ils décrivaient pourtant un agent dont le jeton n'existe pas, ce
+    qu'aucune session de production ne peut être — `authenticate_gateway_session` est
+    la seule façon d'en obtenir un.
+
+    Depuis `FR-166` la passerelle relit ce jeton à chaque appel pour savoir si un
+    opérateur a arrêté l'agent, donc la fiction ne tient plus : elle se lit comme un
+    jeton introuvable, c'est-à-dire révoqué. Les tests qui exercent la passerelle
+    portent maintenant une identité que la base connaît.
+    """
+    from core import tenant_tokens
+
+    _, view = tenant_tokens.mint(db.conn, tenant_id=tenant_id, name=name)
+    db.conn.commit()
+    return str(view["id"])
+
+
 # --- Coverage scenarios (AD-26, AD-30) ---------------------------------------
 # A gate test may declare the coverage facet it proves:
 #

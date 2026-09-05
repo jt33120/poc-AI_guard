@@ -36,6 +36,11 @@ _BUCKETS: dict[str, str] = {
     "expired": "refused",
     "rbac_denied": "refused",
     "tainted_action": "refused",
+    # `FR-166` : l'ordre d'arrêt d'un opérateur, et l'état d'arrêt illisible. Sans
+    # ces deux lignes ils tomberaient en `unclassified` dans le récit de conformité —
+    # une action refusée qui ne se compte pas comme refusée.
+    "agent_stopped": "refused",
+    "stop_state_unreadable": "refused",
     # Recorded guard events rather than verdicts on an action: a tool that drifted,
     # a session marked tainted, a DLP finding on a body that still went out.
     "taint_marked": "guard_recorded",
