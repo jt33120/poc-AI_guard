@@ -24,7 +24,7 @@ from typing import Any
 
 import psycopg
 
-from core import audit, corpora, export, verdicts
+from core import audit, corpora, export, prompt_guard, verdicts
 from core import usage as usage_store
 from core.audit import EnforcementMode
 from core.monitor import NEVER_OBSERVED
@@ -179,6 +179,24 @@ def critical_decision_review(conn: psycopg.Connection) -> dict[str, Any]:
     }
 
 
+def prompt_guard_attestation(conn: psycopg.Connection, settings: Any = None) -> dict[str, Any]:
+    """`FR-193` — attester la **présence** du garde-prompt tiers (`M-01/attestation`).
+
+    Le compte des verdicts chaînés est lu dans le journal, pas dans la configuration :
+    un garde déclaré actif qui n'a jamais rendu un verdict est un garde qui ne tourne
+    pas, et un `configured: true` seul ne le dirait pas. C'est la même exigence de
+    fraîcheur que `corpora` impose aux déclarations de provenance.
+    """
+    rows = conn.execute(
+        "select decision, count(*) from audit_log where decision = any(%s) group by decision",
+        ([prompt_guard.FLAGGED, prompt_guard.CLEAN, prompt_guard.UNAVAILABLE],),
+    ).fetchall()
+    seen = {decision: int(n) for decision, n in rows}
+    enabled = bool(getattr(settings, "prompt_guard_enabled", False))
+    provider = str(getattr(settings, "mistral_model", "")) if enabled else ""
+    return prompt_guard.attestation_section(enabled=enabled, provider=provider, seen=seen)
+
+
 def oldest_entry_age_days(conn: psycopg.Connection) -> int | None:
     """Age in days of the oldest audit entry (None if the log is empty)."""
     row = conn.execute(
@@ -330,6 +348,7 @@ EVIDENCE_SECTIONS: frozenset[str] = frozenset(
         "article_26_deployer.fria",
         "article_26_deployer.corpus_provenance",
         "article_26_deployer.third_party_verdicts",
+        "article_26_deployer.prompt_guard",
     }
 )
 
@@ -344,6 +363,7 @@ def build_evidence_pack(
     range_to: str | None = None,
     retention_floor_days: int = MIN_RETENTION_DAYS,
     narrator: export.Narrator | None = None,
+    settings: Any = None,
 ) -> dict[str, Any]:
     """Assemble the EU AI Act evidence pack (art. 12/14/26) as a JSON-ready dict.
 
@@ -403,6 +423,8 @@ def build_evidence_pack(
             # y atterrissent, et que ces contrôles sont les siens : ils tournent dans
             # sa CI, avec ses règles. Nous n'en attestons que la réception.
             "third_party_verdicts": verdicts.provenance_section(conn),
+            # `FR-193` : la présence du garde-prompt, attestée depuis le journal.
+            "prompt_guard": prompt_guard_attestation(conn, settings),
         },
     }
     base["compliant"] = (

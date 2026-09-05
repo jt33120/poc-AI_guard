@@ -49,6 +49,7 @@ from api.verdicts import router as verdicts_router
 from core.config import Settings, get_settings
 from core.logging import configure_logging
 from core.observability import init_observability
+from core.prompt_guard import build_guard
 from core.schemas import CurrentUser
 from core.signup import build_auth_admin
 
@@ -103,6 +104,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.auth_admin = build_auth_admin(settings)
     app.state.database_url = settings.database_url
     app.state.limiter = limiter
+    # `FR-193` : `None` quand le garde-prompt n'est pas activé, et le proxy le lit
+    # ainsi. Un garde éteint ne change aucun verdict — il n'est sur le chemin d'aucune
+    # décision — mais il change ce que l'Evidence Pack a le droit d'attester.
+    app.state.prompt_guard = build_guard(settings)
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
     @app.get("/health", tags=["meta"])

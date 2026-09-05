@@ -1,14 +1,14 @@
 {
-  "commit": "3d36bda",
-  "genere_le": "2026-09-05 16:09 UTC",
+  "commit": "5784b42",
+  "genere_le": "2026-09-05 16:27 UTC",
   "facettes": [
     {
       "menace": "M-01",
       "titre": "Injection de prompts directe",
       "facette": "garde_prompt",
       "libelle": "garde-prompt",
-      "mode_revendique": "X",
-      "mode_publie": "X",
+      "mode_revendique": "O",
+      "mode_publie": "O",
       "substitut": {
         "nom": "Mistral (garde-prompt)",
         "justification": "ue"
@@ -23,10 +23,16 @@
         "P4",
         "P5"
       ],
-      "ingress_prouve": [],
+      "ingress_prouve": [
+        "llm_proxy"
+      ],
       "ingress_non_asserte": [],
-      "sens_prouves": [],
-      "scenarios": [],
+      "sens_prouves": [
+        "verdict_tiers"
+      ],
+      "scenarios": [
+        "tests/test_prompt_guard.py::test_a_flagged_prompt_is_relayed_and_its_verdict_is_chained"
+      ],
       "ecarts": [
         "G-01"
       ],
@@ -42,15 +48,15 @@
           "id": "AML.T0051"
         }
       ],
-      "raison": "Le garde-prompt souverain (Mistral) n'est pas encore appelé et aucun de ses verdicts  n'entre dans la chaîne. `FR-193` : orchestrer et attester le contrôle tiers — jamais  le construire, ce serait le pare-feu de prompts que nous ne sommes pas."
+      "raison": null
     },
     {
       "menace": "M-01",
       "titre": "Injection de prompts directe",
       "facette": "attestation",
       "libelle": "attestation de présence du garde",
-      "mode_revendique": "X",
-      "mode_publie": "X",
+      "mode_revendique": "A",
+      "mode_publie": "A",
       "substitut": null,
       "declasse_faute_de_substitut": false,
       "famille": "usage_ia",
@@ -81,7 +87,7 @@
           "id": "AML.T0051"
         }
       ],
-      "raison": "L'Evidence Pack ne porte aucune section attestant la présence du garde-prompt.  `FR-193`."
+      "raison": null
     },
     {
       "menace": "M-02",

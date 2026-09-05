@@ -44,7 +44,18 @@ from starlette.concurrency import run_in_threadpool
 from api.deps import database_url
 from api.gateway_auth import GatewayPrincipal, get_gateway_principal, resolve_gateway_principal
 from api.ratelimit import limiter, llm_proxy_rate_limit
-from core import approvals, audit, billing, db, dlp, dlp_config, monitor, policy_store, pricing
+from core import (
+    approvals,
+    audit,
+    billing,
+    db,
+    dlp,
+    dlp_config,
+    monitor,
+    policy_store,
+    pricing,
+    prompt_guard,
+)
 from core import usage as usage_store
 from core.config import Settings
 from core.policy import ActionClass, Approval, Policy, evaluate
@@ -321,6 +332,71 @@ def _load_dlp_state(url: str, tenant_id: str, settings: Settings) -> dlp_config.
         return dlp_config.load(conn, tenant_id, settings)
 
 
+def _extract_prompt(body: bytes) -> str:
+    """Le texte que l'agent soumet, tous rôles confondus, pour le garde tiers.
+
+    Concaténer plutôt que ne prendre que le dernier message : une injection se loge
+    aussi bien dans un `system` fabriqué par l'agent que dans le tour courant, et un
+    garde qui ne regarderait qu'une moitié attesterait d'un contrôle qui n'a pas eu
+    lieu sur l'autre.
+    """
+    try:
+        data = json.loads(body)
+    except Exception:
+        return ""
+    morceaux: list[str] = []
+    for message in data.get("messages") or []:
+        contenu = (message or {}).get("content")
+        if isinstance(contenu, str):
+            morceaux.append(contenu)
+        elif isinstance(contenu, list):
+            morceaux += [
+                bloc["text"]
+                for bloc in contenu
+                if isinstance(bloc, dict) and isinstance(bloc.get("text"), str)
+            ]
+    systeme = data.get("system")
+    if isinstance(systeme, str):
+        morceaux.append(systeme)
+    return "\n".join(morceaux)
+
+
+def _audit_prompt_guard(
+    url: str,
+    tenant_id: str,
+    gateway_token_id: str | None,
+    provider: str,
+    verdict: prompt_guard.Verdict,
+) -> None:
+    """Chaîner le verdict du garde tiers (`FR-193`). Best-effort, et **jamais bloquant**.
+
+    C'est la preuve exigible du mode `Orchestré` : le verdict d'un tiers entre dans la
+    chaîne. Ce qui n'y entre pas, c'est le prompt — seulement son empreinte et les
+    catégories que le tiers a rendues (`CLAUDE.md` §4.10).
+
+    Aucun appelant ne lit le retour de cette fonction, et c'est le point : sur ce
+    chemin, un verdict ne peut pas retenir une requête. `M-01/garde_prompt` est
+    publiée `Orchestré`, pas `Bloqué`.
+    """
+    try:
+        with db.connection(url) as conn:
+            audit.log_event(
+                conn,
+                tenant_id=tenant_id,
+                decision=verdict.decision,
+                tool_name=f"{provider}.prompt_guard",
+                args_hash=verdict.prompt_digest,
+                error=",".join(verdict.categories) or None,
+                gateway_token_id=gateway_token_id,
+                # `enforcing` : une fenêtre d'observation relâche des *appels d'outils*,
+                # jamais une observation — il n'y a rien à relâcher ici.
+                origin=audit.Origin.llm_proxy(observing=False),
+            )
+            conn.commit()
+    except Exception:  # l'observation est best-effort ; elle ne retient jamais l'appel
+        logger.warning("prompt_guard_audit_failed", extra={"tenant_id": tenant_id})
+
+
 def _audit_egress(
     url: str,
     tenant_id: str,
@@ -420,6 +496,24 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
                 )
             if scan.redacted_body is not None:
                 body = scan.redacted_body
+
+    # `FR-193` — le garde-prompt tiers. Il tourne **après** la DLP (qui, elle, peut
+    # refuser) et son verdict n'est lu par personne : la requête part quoi qu'il ait
+    # dit. C'est ce que `Orchestré` autorise à revendiquer, et l'endroit exact où le
+    # produit s'arrête de ne pas être un pare-feu de prompts.
+    guard = getattr(request.app.state, "prompt_guard", None)
+    if guard is not None:
+        texte = _extract_prompt(body)
+        if texte:
+            verdict = await run_in_threadpool(guard.inspect, texte)
+            await run_in_threadpool(
+                _audit_prompt_guard,
+                url,
+                principal.tenant_id,
+                principal.token_id,
+                provider,
+                verdict,
+            )
 
     # The agent being controlled does not get to say whether it is controlled
     # (G-25). Enforcement is the default; only an open control-plane window, opened

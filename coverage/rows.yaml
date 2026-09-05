@@ -39,19 +39,13 @@ rows:
     facettes:
       - cle: garde_prompt
         libelle: "garde-prompt"
-        mode: X
-        raison: >-
-          Le garde-prompt souverain (Mistral) n'est pas encore appelé et aucun de ses verdicts 
-          n'entre dans la chaîne. `FR-193` : orchestrer et attester le contrôle tiers — jamais 
-          le construire, ce serait le pare-feu de prompts que nous ne sommes pas.
+        mode: O
         substitut: {nom: "Mistral (garde-prompt)", justification: ue}
         gaps: [G-01]
       - cle: attestation
         libelle: "attestation de présence du garde"
-        mode: X
-        raison: >-
-          L'Evidence Pack ne porte aucune section attestant la présence du garde-prompt. 
-          `FR-193`.
+        mode: A
+        section: article_26_deployer.prompt_guard
         gaps: [G-01]
 
   - id: M-02
