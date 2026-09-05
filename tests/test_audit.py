@@ -62,6 +62,18 @@ def test_only_args_hash_is_stored(db: DBHandle) -> None:
         ).fetchall()
     }
     assert "arguments" not in cols and "args" not in cols  # no raw-args column exists
+    # `FR-163`, seconde clause : aucune note libre d'opérateur dans le journal
+    # inaltérable. Ce test lit le **schéma vivant**, donc il attrape une colonne
+    # arrivée par n'importe quelle route — un `alter table` hors migration comme un
+    # fichier que le parseur de `test_rls_gate.py` ne saurait pas lire.
+    #
+    # Il n'y en a aucune aujourd'hui, et c'est le moment de l'interdire : `audit_log`
+    # n'a aucun chemin d'effacement, donc une note d'opérateur y serait un puits de
+    # PII permanent — à rebours de `CLAUDE.md` §4.10 et de la position sur
+    # l'effacement. Les motifs libres se stockent sur la ligne mutable de l'objet et
+    # sont référencés par empreinte, comme la règle de policy YAML le fait déjà.
+    free_text = {"note", "notes", "comment", "comments", "justification", "memo", "free_text"}
+    assert not (cols & free_text) and not {c for c in cols if c.endswith("_reason_text")}
 
 
 def test_append_only_triggers_block_update_and_delete(db: DBHandle) -> None:

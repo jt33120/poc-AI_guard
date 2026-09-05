@@ -94,6 +94,62 @@ class ChainResult:
     count: int = 0
 
 
+#: Longueur maximale d'un champ de la charge hachée alimenté depuis l'extérieur.
+#:
+#: `FR-163`. `audit_log` est append-only jusque pour `service_role` et n'a aucun
+#: chemin d'effacement : ce qui entre dans la charge y reste. Or deux des trois portes
+#: laissaient passer une chaîne **choisie par un tiers** — un nom d'outil que la
+#: résolution MCP n'a pas reconnu (donc choisi par l'agent), et le nom d'outil lu dans
+#: la réponse du fournisseur LLM. La troisième, `AuthorizeRequest.tool`, posait déjà
+#: cette borne exacte ; l'écart n'était pas qu'il fallait choisir une limite, c'est que
+#: deux portes sur trois ne l'appliquaient pas (`AD-28`).
+MAX_FIELD = 200
+
+
+def _bounded(value: object | None) -> str | None:
+    """Borner un champ **avant** qu'il n'entre dans le hachage.
+
+    Tronquer, jamais lever : les six appelants enveloppent ``log_event`` dans un
+    best-effort, donc lever ferait *disparaître* la ligne d'audit d'un appel refusé.
+    Perdre la preuve est pire que la borner.
+
+    La valeur tronquée est celle qui est hachée **et** celle qui est insérée.
+    ``verify_chain`` recalcule depuis les colonnes stockées : borner d'un seul côté
+    rendrait l'entrée définitivement invérifiable, sur une table qu'aucun UPDATE ne
+    répare.
+
+    La coercition en chaîne n'est pas de la défense en profondeur. Un amont qui
+    renvoie ``name: {"a": 1}`` fait échouer l'insertion dans une colonne ``text``,
+    donc emporte l'écriture d'audit avec elle : le nom d'outil malformé était une
+    suppression de sa propre trace.
+    """
+    if value is None:
+        return None
+    text = value if isinstance(value, str) else str(value)
+    return text if len(text) <= MAX_FIELD else text[: MAX_FIELD - 1] + "\u2026"
+
+
+def canonical_ts(value: datetime) -> str:
+    """La représentation canonique de l'horodatage dans la charge v1.
+
+    Figée : ``datetime.astimezone(UTC).isoformat()``. Suffixe toujours ``+00:00``,
+    jamais ``Z`` ; partie fractionnaire **absente** quand les microsecondes sont
+    nulles. Toute autre forme change les octets hachés et rend invérifiable la chaîne
+    déjà écrite — voir ``docs/AUDIT_FORMAT.md``, qui est le contrat.
+
+    Cette fonction existe pour qu'il y ait **un** endroit à changer, et donc un seul
+    à défendre : l'expression était répétée littéralement sur quatre sites, et une
+    modification cohérente des quatre restait invisible pour toute la suite, qui
+    écrit et vérifie dans le même processus.
+
+    Un horodatage naïf est refusé plutôt que supposé UTC : supposer produit une entrée
+    fausse *et* vérifiable, ce qui est le pire des deux mondes (`CLAUDE.md` §9).
+    """
+    if value.tzinfo is None:
+        raise ValueError("audit ts must be timezone-aware")
+    return value.astimezone(UTC).isoformat()
+
+
 def payload_v1(
     *,
     ts_iso: str,
@@ -171,6 +227,10 @@ def log_event(
     declared values and are kept apart from it — see the note above `log_event`.
     """
     ts = datetime.now(UTC)
+    # `FR-163` : borner AVANT le hachage, et hacher exactement ce qui sera stocké.
+    tool_name = _bounded(tool_name)
+    policy_rule_id = _bounded(policy_rule_id)
+    error = _bounded(error)
     with conn.transaction():
         # Serialize chain writes per tenant to avoid two entries sharing a prev_hash.
         conn.execute("select pg_advisory_xact_lock(hashtext(%s))", (tenant_id,))
@@ -180,7 +240,7 @@ def log_event(
         ).fetchone()
         prev_hash = prev_row[0] if prev_row else GENESIS
         payload = payload_v1(
-            ts_iso=ts.astimezone(UTC).isoformat(),
+            ts_iso=canonical_ts(ts),
             tenant_id=tenant_id,
             user_id=user_id,
             request_id=request_id,
@@ -247,7 +307,7 @@ def verify_chain(conn: psycopg.Connection, tenant_id: str | None = None) -> Chai
         if stored_prev != expected_prev:
             return ChainResult(ok=False, broken_id=r[0], count=len(rows))
         payload = payload_v1(
-            ts_iso=r[1].astimezone(UTC).isoformat(),
+            ts_iso=canonical_ts(r[1]),
             tenant_id=row_tenant,
             user_id=r[3],
             request_id=r[4],
@@ -321,7 +381,7 @@ def list_events(
     return [
         {
             "id": r[0],
-            "ts": r[1].astimezone(UTC).isoformat() if r[1] else None,
+            "ts": canonical_ts(r[1]) if r[1] else None,
             "tool_name": r[2],
             "action_class": r[3],
             "decision": r[4],

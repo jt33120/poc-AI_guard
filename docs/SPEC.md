@@ -172,7 +172,7 @@ Par événement : construire le dict sans `entry_hash`, lire `prev_hash` (dernie
 ```
 entry_hash = sha256( prev_hash + json.dumps(event, sort_keys=True, separators=(',',':')) )
 ```
-INSERT append-only. `scripts/verify_chain.py` relit dans l'ordre et recalcule : toute rupture = altération. **Jamais loggé** : valeurs d'arguments sensibles, secrets, PII, contenu — uniquement métadonnées + `args_hash`. Exports : AI Act (registre des décisions + preuves de supervision humaine via `approvals` + trace par requête) ; RGPD (journal de traitement, endpoint d'effacement, rétention configurable).
+INSERT append-only. `scripts/verify_chain.py` relit dans l'ordre et recalcule : toute rupture = altération. **La représentation canonique — les douze clés, l'ordre, les séparateurs, le format de l'horodatage — est figée dans [`docs/AUDIT_FORMAT.md`](AUDIT_FORMAT.md)** : ce sont des octets de stockage, pas un détail d'implémentation, et un changement cohérent rendrait la chaîne déjà écrite invérifiable. **Jamais loggé** : valeurs d'arguments sensibles, secrets, PII, contenu — uniquement métadonnées + `args_hash`. Exports : AI Act (registre des décisions + preuves de supervision humaine via `approvals` + trace par requête) ; RGPD (journal de traitement, endpoint d'effacement, rétention configurable).
 
 ---
 

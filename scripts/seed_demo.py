@@ -79,7 +79,7 @@ def _chain_row(
     prev_hash = prev[0] if prev else audit.GENESIS
     request_id = uuid4().hex
     payload = audit.payload_v1(
-        ts_iso=at.astimezone(UTC).isoformat(),
+        ts_iso=audit.canonical_ts(at),
         tenant_id=tenant_id,
         user_id=None,
         request_id=request_id,
