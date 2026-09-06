@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 
 import { LanguageProvider } from "@/lib/i18n";
+import { getLang, translate } from "@/lib/lang";
 import "./globals.css";
 
 // Les trois voix du système xSOM, reprises de `xsom.fr`. Elles ont des rôles
@@ -44,19 +45,42 @@ const mono = localFont({
   fallback: ["ui-monospace", "SF Mono", "Menlo", "monospace"],
 });
 
-export const metadata: Metadata = {
-  title: "xSOM AI Guard",
-  description:
-    "Passerelle de contrôle des actions pour agents IA. Chaque appel d'outil reçoit un " +
-    "verdict de politique, les actions irréversibles attendent un humain, et tout entre " +
-    "dans un journal d'audit chaîné.",
-};
+// Résolue par requête, depuis la langue du visiteur. Une `metadata` statique aurait
+// annoncé un titre anglais à un lecteur français, et l'inverse, ce qui est exactement
+// ce qu'un moteur de recherche indexe.
+//
+// Pas d'`alternates.languages` : la langue tient à un cookie, les deux versions
+// partagent donc la même URL. Déclarer un `hreflang` `en` pointant sur `/` serait
+// faux, et un robot, qui n'a pas de cookie, verrait de toute façon le français aux
+// deux adresses. Conséquence assumée et notée : **seul le français est indexable**.
+// Rendre l'anglais indexable demande des routes de langue, pas une balise de plus.
+export function generateMetadata(): Metadata {
+  const lang = getLang();
+  const titre = `xSOM AI Guard · ${translate(lang, "meta.tagline")}`;
+  const description = translate(lang, "meta.description");
+  return {
+    title: { default: titre, template: "%s · xSOM AI Guard" },
+    description,
+    openGraph: {
+      title: titre,
+      description,
+      locale: lang === "fr" ? "fr_FR" : "en_US",
+      type: "website",
+      siteName: "xSOM AI Guard",
+    },
+  };
+}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // `<html lang>` était écrit en dur à `fr` pendant que la page rendait l'anglais par
+  // défaut : l'attribut contredisait le texte qu'il qualifiait. Un lecteur d'écran
+  // lisait donc de l'anglais avec une voix française. Résolu, il ne peut plus mentir
+  // ni dans un sens ni dans l'autre.
+  const lang = getLang();
   return (
-    <html lang="fr" className={`${saira.variable} ${inter.variable} ${mono.variable}`}>
+    <html lang={lang} className={`${saira.variable} ${inter.variable} ${mono.variable}`}>
       <body className="min-h-screen font-sans antialiased">
-        <LanguageProvider>{children}</LanguageProvider>
+        <LanguageProvider initial={lang}>{children}</LanguageProvider>
       </body>
     </html>
   );

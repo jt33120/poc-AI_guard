@@ -244,7 +244,7 @@ Ordonnés. Chacun est autonome, vérifiable, et livrable en PR séparée.
 |---|---|---|---|
 | **L0** | **Assainissement** | Retirer les quatre chiffres non adossés du hero, à commencer par le « < 1 s ». Retirer les 88 tirets. | Une faute de doctrine est en ligne maintenant. Rien ne se construit par-dessus. |
 | **L1** | **Fondations de marque** | Porter les jetons cuivre, les trois polices auto-hébergées, les rayons, les jetons contextuels clair/sombre. | Tout le visuel en dépend. |
-| **L2** | **Socle des pages publiques** | Sortir du `"use client"` global pour retrouver `metadata`, OG et `<html lang>`. Routes de langue. | Sans ça, pas de SEO : aucune page ne peut exporter de métadonnées aujourd'hui. |
+| **L2** | **Socle des pages publiques** | Sortir du `"use client"` global pour retrouver `metadata`, OG et `<html lang>`. ~~Routes de langue.~~ | **Fait, sauf les routes de langue** — voir §5 ter. Le français est indexable, l'anglais ne l'est pas. |
 | **L3** | **Exposer la carte au front** | Un endpoint ou un artefact committé qui sert `coverage/map.json` et le triage, par l'unité correcte. | Le socle de données du relevé. |
 | **L4** | **Le gate marketing** | `gen_marketing.py --check`, en CI. | **Avant** d'écrire la page, pas après. |
 | **L5** | **Le relevé des menaces** | La section, le sélecteur de profil, les trois contenus d'ouverture. | Le cœur. |
@@ -275,6 +275,37 @@ La page vit dans le POC et reste adossée à `coverage/map.json` et au moteur de
 donc le gate marketing tourne dans la même CI. Le vitrine reçoit une **page d'entrée**
 qui renvoie vers elle : elle ne duplique aucun chiffre, sans quoi il faudrait un second
 gate sur un dépôt où il ne pourrait pas s'exécuter.
+
+---
+
+## 5 ter. Ce que `L2` a livré, et ce qu'il a coûté
+
+Le socle est posé : `app/page.tsx` et `app/executive-preview/page.tsx` sont redevenus
+des composants **serveur**, le dictionnaire est sorti de `lib/i18n.tsx` vers
+`lib/strings.ts` pour que le serveur puisse le lire, et la langue tient dans un cookie
+que le serveur relit avant de rendre. Le site démarre en français, `<html lang>` dit
+enfin la vérité, et chaque page publique porte un titre et une description.
+
+**Mesuré, pas estimé.** La page d'accueil passe de **2,56 ko à 187 o** de JS de page :
+le balisage entier ne part plus dans le navigateur. Elle passe aussi de statique (`○`)
+à rendue à la demande (`ƒ`), ce qui **ne coûte rien de réel** : le `matcher` du
+middleware est `/((?!_next/static|_next/image|favicon.ico).*)`, il attrapait déjà `/`,
+et aucune requête n'était donc servie depuis un cache statique avant ce lot.
+
+**Le coût, lui, est ailleurs, et il est assumé.** La langue tenant à un cookie, les
+deux versions partagent une URL. `alternates.languages` a donc été **retiré** du layout
+racine : il déclarait un `hreflang` `en` pointant sur `/`, ce qui était faux. La
+conséquence se dit sans détour : **seul le français est indexable.** Un robot n'a pas
+de cookie, il verra le français, ce qui est le marché visé — mais l'anglais n'entrera
+dans aucun index tant qu'il n'aura pas sa propre route. C'est la moitié de `L2` qui
+n'est pas faite, et elle est nommée ici plutôt que passée sous silence.
+
+**Une hypothèse vérifiée, puis abandonnée.** J'avais relevé que le middleware appelle
+`supabase.auth.getUser()` sur *tous* les chemins, y compris la page d'accueil, et donc
+qu'un visiteur anonyme payait un aller-retour réseau pour rien. Mesure faite en
+pointant `NEXT_PUBLIC_SUPABASE_URL` sur un serveur qui compte ses requêtes : **zéro
+appel** sur trois visites anonymes de `/`. Sans cookie d'authentification, `getUser()`
+court-circuite localement. Le défaut n'existe pas, et le correctif n'a pas été écrit.
 
 ---
 

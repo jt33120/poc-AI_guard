@@ -43,8 +43,8 @@ test("approving a held action from the UI clears it from the queue", async ({ pa
 
   await page.goto("/approvals");
   await expect(page.getByText("Execute crm.delete_contact")).toBeVisible();
-  await page.getByRole("button", { name: "Approve" }).click();
-  await expect(page.getByText("No pending approvals.")).toBeVisible();
+  await page.getByRole("button", { name: "Approuver" }).click();
+  await expect(page.getByText("Aucune validation en attente.")).toBeVisible();
 });
 
 test("audit explorer lists entries and offers exports", async ({ page, context }) => {
@@ -87,8 +87,8 @@ test("editing the policy saves a new version", async ({ page, context }) => {
 
   await page.goto("/admin");
   await expect(page.getByText("version 1")).toBeVisible();
-  await page.getByRole("button", { name: "Save policy" }).click();
-  await expect(page.getByText("Policy saved (version 2).")).toBeVisible();
+  await page.getByRole("button", { name: "Enregistrer la politique" }).click();
+  await expect(page.getByText("Politique enregistrée (version 2).")).toBeVisible();
 });
 
 // --- Public profile diagnostic (QO-7) ------------------------------------------
@@ -132,4 +132,67 @@ test("a prospect with no account gets a diagnostic after giving an e-mail", asyn
   await expect(page.getByTestId("triage-statement")).toContainText("nous en bloquons 8");
   expect(sent.email).toBe("prospect@exemple-client.test");
   expect(sent.profiles).toEqual(["P1a"]);
+});
+
+// --- Langue et métadonnées (L2) ------------------------------------------------
+//
+// Ces quatre affirmations tenaient toutes au même défaut : le dictionnaire vivait
+// dans un hook, donc toute page affichant un mot était un composant client, donc
+// aucune page ne pouvait exporter `metadata`, et la langue n'était connue qu'après
+// hydratation. Le site démarrait en anglais alors que `<html lang>` était écrit en
+// dur à `fr`, et il n'y avait ni titre ni description à indexer.
+
+test("un visiteur sans cookie reçoit le français, et le document le déclare", async ({ page }) => {
+  const reponse = await page.goto("/");
+
+  // L'attribut **et** le texte, dans la même assertion : c'est là qu'était le défaut.
+  // `lang` valait `fr` en dur pendant que le texte sortait en anglais, si bien qu'un
+  // lecteur d'écran lisait de l'anglais avec une voix française. Vérifier l'un sans
+  // l'autre laisserait ce désaccord passer.
+  await expect(page.locator("html")).toHaveAttribute("lang", "fr");
+  await expect(page.getByText("Déployez vos agents IA en production.")).toBeVisible();
+
+  // Le titre et la description existent, et sont français. Sans ce lot il n'y avait
+  // ni l'un ni l'autre : une page cliente ne peut pas en exporter.
+  await expect(page).toHaveTitle(/Le contrôle des actions de vos agents IA/);
+  const description = await page
+    .locator('head meta[name="description"]')
+    .getAttribute("content");
+  expect(description).toContain("gateway MCP");
+
+  // Le français est dans la **première réponse**, pas posé après coup. Avant ce lot,
+  // le serveur rendait l'anglais — il ne pouvait pas lire `localStorage` — et le
+  // navigateur basculait ensuite : un robot, qui n'hydrate pas, n'a jamais vu que
+  // l'anglais. (Que la page soit devenue un composant serveur ne se lit pas ici mais
+  // dans le poids du bundle : 2,56 ko de JS de page avant, 187 o après.)
+  const html = (await reponse?.text()) ?? "";
+  expect(html).toContain("Déployez vos agents IA en production.");
+});
+
+test("basculer en anglais tient au rechargement", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "EN" }).click();
+  await expect(page.getByText("Ship AI agents to production.")).toBeVisible();
+
+  // Le rechargement est le point : la préférence tient dans un cookie que le serveur
+  // relit, elle ne vit pas seulement dans l'état d'un composant.
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(page.getByText("Ship AI agents to production.")).toBeVisible();
+  await expect(page).toHaveTitle(/Action control for your AI agents/);
+});
+
+test("les écrans d'authentification et la console refusent l'indexation", async ({ page }) => {
+  for (const chemin of ["/login", "/signup", "/forgot-password"]) {
+    await page.goto(chemin);
+    await expect(page.locator('head meta[name="robots"]')).toHaveAttribute(
+      "content",
+      /noindex/,
+    );
+  }
+
+  // La page publique, elle, doit rester indexable : un `noindex` posé trop large
+  // retirerait le site des résultats sans que rien ne le signale.
+  await page.goto("/");
+  await expect(page.locator('head meta[name="robots"]')).toHaveCount(0);
 });

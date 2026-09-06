@@ -31,7 +31,11 @@ import re
 from pathlib import Path
 
 _RACINE = Path(__file__).resolve().parent.parent
-_I18N = _RACINE / "frontend" / "lib" / "i18n.tsx"
+# `L2` a sorti le dictionnaire de `i18n.tsx` : tant qu'il y vivait, toute page
+# affichant un mot devenait un composant client, donc incapable d'exporter
+# `metadata`. Le contrôle de non-vacuité ci-dessous a signalé le déplacement en
+# passant au rouge, ce qui est précisément la raison pour laquelle il existe.
+_I18N = _RACINE / "frontend" / "lib" / "strings.ts"
 
 
 def _chaines() -> list[tuple[str, str]]:
