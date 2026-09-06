@@ -7,13 +7,6 @@ import { LanguageToggle, type StrKey, useT } from "@/lib/i18n";
 
 const DEMO_MAILTO = "mailto:julian.talou@xsom.fr?subject=xSOM%20AI%20Guard%20—%20demo";
 
-const STATS: [StrKey, StrKey][] = [
-  ["land.stat.1.v", "land.stat.1.l"],
-  ["land.stat.2.v", "land.stat.2.l"],
-  ["land.stat.3.v", "land.stat.3.l"],
-  ["land.stat.4.v", "land.stat.4.l"],
-];
-
 const STEPS: [StrKey, StrKey][] = [
   ["land.how.s1.t", "land.how.s1.b"],
   ["land.how.s2.t", "land.how.s2.b"],
@@ -131,15 +124,6 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Stats band */}
-        <div className="mt-14 grid grid-cols-2 gap-4 md:grid-cols-4">
-          {STATS.map(([v, l]) => (
-            <div key={v} className="card p-5">
-              <div className="text-3xl font-extrabold tracking-tight text-brand-bright">{t(v)}</div>
-              <div className="muted mt-1.5 text-sm leading-snug">{t(l)}</div>
-            </div>
-          ))}
-        </div>
       </section>
 
       {/* Problem */}
