@@ -314,3 +314,44 @@ test("ouvrir une ligne hors périmètre affiche la raison publiée dans la carte
   // exige qu'une ligne non couverte soit publiée **avec sa raison**.
   await expect(page.getByText(/usage_events/)).toBeVisible();
 });
+
+// --- Le rejeu (L6) -------------------------------------------------------------
+//
+// `AD-26` : une vidéo est l'enregistrement d'une exécution qui passe, jamais un
+// substitut. Ces deux tests tiennent ce que cela impose à l'écran.
+
+test("le rejeu montre deux traces réelles, et le même appel des deux côtés", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /Injection de prompts indirecte/ }).click();
+
+  const panneau = page.locator("#menaces").getByText("Le même appel, joué deux fois");
+  await expect(panneau).toBeVisible();
+
+  // Les deux colonnes, nommées. Le sens de lecture est le propos : à gauche l'action
+  // arrive, à droite elle est refusée.
+  await expect(page.getByText("Garde retiré", { exact: true })).toBeVisible();
+  await expect(page.getByText("Garde en place", { exact: true })).toBeVisible();
+
+  // Le point de divergence est dit, une fois. Sans lui, un lecteur compare deux
+  // listes sans savoir où regarder.
+  await expect(page.getByText(/cessent d'être la même/)).toBeVisible();
+
+  // Et les traces sont nommées : un rejeu anonyme n'est pas vérifiable, nommé il se
+  // relance. C'est ce qui le distingue d'une animation.
+  await expect(page.getByText(/tests\/test_taint_gate\.py::/).first()).toBeVisible();
+});
+
+test("une ligne sans rejeu publie sa raison plutôt qu'un cadre vide", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /Fuite du system prompt/ }).click();
+
+  // `M-14` ne peut pas être rejouée : sa preuve est qu'un argument secret n'atteint
+  // pas le journal, si bien que les deux exécutions décident légitimement `allow`.
+  // Publier deux colonnes identiques y montrerait un écran où rien ne se passe.
+  await expect(page.getByText(/la preuve est une \*\*absence\*\*|preuve est une/)).toBeVisible();
+  await expect(
+    page.locator("#menaces").getByText("Le même appel, joué deux fois"),
+  ).toHaveCount(0);
+});

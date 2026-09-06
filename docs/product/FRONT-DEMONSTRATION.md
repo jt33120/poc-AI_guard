@@ -255,7 +255,7 @@ Ordonnés. Chacun est autonome, vérifiable, et livrable en PR séparée.
 | **L3** | **Exposer la carte au front** | ~~Un endpoint ou un artefact committé~~ **les deux** : l'artefact pour le statique, la route pour le profil-dépendant. | **Fait** — voir §5 quater. |
 | **L4** | **Le gate marketing** | `gen_marketing.py --check`, en CI. | **Fait, et avant la page** — voir §5 quinquies. |
 | **L5** | **Le relevé des menaces** | La section, le sélecteur de profil, ~~les trois~~ **les quatre** contenus d'ouverture. | **Fait** — voir §5 sexies. |
-| **L6** | **Le rejeu** | Étendre le hook pytest qui écrit déjà `.scenarios.json` pour capturer la séquence d'audit ; un générateur ; un lecteur. Les 8 lignes. | Les « vidéos ». Dépend de L5 pour son emplacement. |
+| **L6** | **Le rejeu** | Le hook de capture, le générateur, le lecteur. ~~Les 8 lignes.~~ **7 rejeux + 1 raison publiée.** | **Fait** — voir §5 septies. |
 | **L7** | **Pour qui** | La section, adossée au moteur de triage. | |
 | **L8** | **La démo, porte 1** | L'instantané généré, les quatre écrans, le bandeau. | |
 | **L9** | **`/mise-en-oeuvre`** | Les trois voies, la capture de `make demo`. | |
@@ -338,7 +338,14 @@ demandent à `GET /v1/threats?profiles=`, servi par `core.triage`.
 publiée `Bloqué` », et `gen_coverage.py` n'accorde `Bloqué` qu'avec les deux moitiés de
 la preuve, le blocage **et** son contrôle négatif. Aucune liste n'est tenue à jour : le
 §1.1 annonçait 8 lignes sur 16, le générateur en trouve 8 — `M-02`, `M-06`, `M-07`,
-`M-08`, `M-10`, `M-11`, `M-12`, `M-14`. `L6` filmera celles-là et pas d'autres.
+`M-08`, `M-10`, `M-11`, `M-12`, `M-14`.
+
+*Corrigé après coup par `L6`* : sept d'entre elles sont effectivement rejouables.
+`M-14` ne l'est pas, et pour une raison de fond — sa preuve est qu'un argument secret
+**n'atteint pas** le journal, si bien que les deux exécutions autorisent légitimement
+l'appel et qu'il n'y a rien à mettre côte à côte. « Rejouable » et « publiée `Bloqué` »
+ne coïncident donc pas tout à fait, et le §5 septies dit lequel des deux la page
+annonce.
 
 **La route est publique, et le gel de surface l'a exigée par écrit.**
 `tests/test_public_surface.py` est passé au rouge à l'ajout de `GET /v1/threats`, en
@@ -446,6 +453,61 @@ page ne classe pas, et la clé de facette permet la jointure.
 relevé a introduit douze boutons contenant « en » (« Empoisonnement », « Agents »,
 « entraînons »). Le sélecteur était juste tant que la page était courte, ce qui est la
 définition d'un sélecteur fragile. `exact: true`.
+
+---
+
+## 5 septies. Ce que `L6` a livré, et les trois défauts qu'il a fait tomber
+
+Le rejeu est en ligne : deux traces d'audit **réelles**, côte à côte, capturées pendant
+l'exécution de la suite de tests. `AD-26` l'exige — une vidéo est l'enregistrement d'une
+exécution qui passe, jamais un substitut. Rien n'est animé ni reconstitué.
+
+Le hook de capture tire parti d'un fait du dépôt : chaque test marqué `@covers` reçoit
+une base neuve, donc son `audit_log` **est** sa séquence. Rien à soustraire.
+
+### Trois défauts, chacun ouvert par le précédent
+
+**Un défaut d'audit, trouvé par une règle d'affichage.** La règle d'appariement exige
+que les deux colonnes exercent les mêmes outils, sans quoi « le même appel joué deux
+fois » est faux — et invisiblement faux. Elle a refusé `M-11` : le contrôle négatif
+enregistrait `mock.echo`, le scénario bloquant `echo`, alors que les deux tests appellent
+`call_tool("echo")` avec la même policy. En remontant : un seul des cinq sites
+`_audit_gate` journalisait le nom nu. **Un export d'audit filtré par nom d'outil manquait
+donc toutes les mises en quarantaine.** Corrigé et livré séparément.
+
+**Un rejeu qui ne démontrait rien.** `M-11` débloqué, le générateur a rendu 8/8, mais
+`M-14` sortait avec **deux colonnes identiques**. La règle exigeait les mêmes outils, pas
+des issues différentes. Or `M-14` prouve qu'un argument secret n'atteint **pas** le
+journal : les deux exécutions autorisent légitimement l'appel, et ce qui les sépare est
+ce que le journal ne consigne pas, par construction. La différence **est** une absence.
+
+Exiger huit rejeux poussait donc à en publier un qui ne montre rien, soit exactement
+l'écran où rien ne se passe que ce lot existe pour éviter. Le bon invariant n'est pas
+« huit rejeux » mais **« aucune rangée ne s'ouvre sur du vide »** : le générateur refuse
+un couple dégénéré, `M-14` est déclarée dans une table avec sa raison, et cette raison
+est publiée sur la page comme une facette non couverte publie la sienne (`FR-144`).
+
+**Une lacune dans le garde de copie de `L0`.** La raison de `M-14` s'affichait avec du
+gras Markdown, des accents graves et un **tiret cadratin** — le tic même que `L0` a
+retiré. Le garde ne lisait que `lib/strings.ts` ; la copie visible vient désormais aussi
+d'artefacts générés. Étendu, et les deux nouveaux gardes vérifiés rouges.
+
+### Ce que le rejeu montre, et ce qu'il ne montre pas
+
+Les deux colonnes partagent leur première entrée — même décision, même outil, **même
+empreinte d'arguments** — donc littéralement le même appel. Puis elles bifurquent, et un
+filet cuivre marque le rang dans chacune.
+
+Trois champs sont écartés, pour trois raisons différentes : `latency_ms`, parce que
+`perf/overhead.json` refuse de publier une latence ; `tenant_id` et `user_id`, qui
+n'apprennent rien ; `entry_hash` et `prev_hash`, parce que `payload_v1` hache
+l'horodatage et l'identifiant de requête, si bien qu'ils changent à chaque exécution et
+qu'aucun gate d'égalité ne pourrait les tenir. À leur place, la **propriété vérifiée** :
+`core.audit.verify_chain` a confronté la chaîne au moment de la capture.
+
+Aucune table de traduction des décisions n'est écrite. Le vocabulaire est ouvert, et une
+correspondance figée côté page afficherait un jour un refus en gris. Le générateur
+calcule le **point de divergence** : dérivé, il ne se périme pas.
 
 ---
 

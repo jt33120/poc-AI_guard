@@ -28,6 +28,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import { useT, type StrKey } from "@/lib/i18n";
 import { FAITS_PUBLIES } from "@/lib/facts";
+import { ReplayPanel } from "@/components/ReplayPanel";
+import { rejeuDe } from "@/lib/replays";
 import { RELEVE, fetchReleveProfil, type LigneMenace, type ReleveProfil } from "@/lib/threats";
 
 //: Les profils, dans l'ordre de la chaîne de valeur. Les libellés réutilisent les clés
@@ -252,12 +254,12 @@ function Ouverture({
 
   if (ligne.ouverture === "rejeu") {
     return (
-      <div className="space-y-3">
-        <h4 className="font-display text-sm font-bold text-brand-bright">
-          {t("ledger.open.rejeu.t")}
-        </h4>
+      <div className="space-y-4">
         <p className="muted text-sm leading-relaxed">{t("ledger.open.rejeu.b")}</p>
-        <p className="muted text-sm leading-relaxed">{t("ledger.open.rejeu.soon")}</p>
+        {/* Le rejeu lui-même : deux traces d'audit réelles, côte à côte. Le gate de
+            `L6` exige qu'il existe pour chaque ligne rejouable, si bien que cette
+            branche ne peut pas s'ouvrir sur du vide. */}
+        <ReplayPanel rowId={ligne.id} rejeu={rejeuDe(ligne.id)} />
         <Scenarios scenarios={scenarios} />
       </div>
     );

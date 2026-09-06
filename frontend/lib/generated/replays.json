@@ -1,0 +1,339 @@
+{
+  "commit": "09d8e08",
+  "genere_le": "2026-09-06 13:01 UTC",
+  "rejeux": {
+    "M-02": {
+      "avec_garde": {
+        "chainee": true,
+        "entrees": [
+          {
+            "action_class": "read",
+            "args_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "decision": "allow",
+            "error": null,
+            "judge_used": false,
+            "policy_rule_id": "mock.fetch",
+            "tool_name": "mock.fetch"
+          },
+          {
+            "action_class": null,
+            "args_hash": null,
+            "decision": "taint_marked",
+            "error": "injected_instructions",
+            "judge_used": false,
+            "policy_rule_id": null,
+            "tool_name": "mock.fetch"
+          },
+          {
+            "action_class": null,
+            "args_hash": null,
+            "decision": "tainted_action",
+            "error": "injected_instructions+adresse_email",
+            "judge_used": false,
+            "policy_rule_id": null,
+            "tool_name": "mock.send"
+          }
+        ],
+        "test": "tests/test_taint_gate.py::test_a_french_injection_gates_the_risky_action"
+      },
+      "divergence": 1,
+      "facette": "taint",
+      "ingress": "mcp",
+      "outils": [
+        "mock.fetch",
+        "mock.send"
+      ],
+      "sans_garde": {
+        "chainee": true,
+        "entrees": [
+          {
+            "action_class": "read",
+            "args_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "decision": "allow",
+            "error": null,
+            "judge_used": false,
+            "policy_rule_id": "mock.fetch",
+            "tool_name": "mock.fetch"
+          },
+          {
+            "action_class": "external_send",
+            "args_hash": "4371f6e6a94aa9904eef01c9d0d37cccaf16bc2fe734408b9e58fd3cbffa6977",
+            "decision": "allow",
+            "error": null,
+            "judge_used": false,
+            "policy_rule_id": "mock.send",
+            "tool_name": "mock.send"
+          }
+        ],
+        "test": "tests/test_taint_gate.py::test_taint_policy_off_is_a_no_op"
+      }
+    },
+    "M-06": {
+      "avec_garde": {
+        "chainee": true,
+        "entrees": [
+          {
+            "action_class": "irreversible",
+            "args_hash": "52913c0bfddb09c5bade16dc2ca2838a65d2766bf2c74ed4ff81702aff43e8c1",
+            "decision": "hitl_pending",
+            "error": null,
+            "judge_used": false,
+            "policy_rule_id": "mock.echo",
+            "tool_name": "mock.echo"
+          }
+        ],
+        "test": "tests/test_coverage_gate.py::test_a_destructive_executor_invocation_is_held"
+      },
+      "divergence": 0,
+      "facette": "chaine",
+      "ingress": "mcp",
+      "outils": [
+        "mock.echo"
+      ],
+      "sans_garde": {
+        "chainee": true,
+        "entrees": [
+          {
+            "action_class": "read",
+            "args_hash": "52913c0bfddb09c5bade16dc2ca2838a65d2766bf2c74ed4ff81702aff43e8c1",
+            "decision": "allow",
+            "error": null,
+            "judge_used": false,
+            "policy_rule_id": "mock.echo",
+            "tool_name": "mock.echo"
+          }
+        ],
+        "test": "tests/test_coverage_gate.py::test_without_argument_classification_the_destructive_invocation_runs"
+      }
+    },
+    "M-07": {
+      "avec_garde": {
+        "chainee": true,
+        "entrees": [
+          {
+            "action_class": "external_send",
+            "args_hash": "5f4f2320f0f8b3538387cdb5ed03a05195b6fd51feccb05a13393e5c7c28f5c9",
+            "decision": "deny",
+            "error": null,
+            "judge_used": false,
+            "policy_rule_id": "mock.mail_send",
+            "tool_name": "mock.mail_send"
+          }
+        ],
+        "test": "tests/test_coverage_gate.py::test_send_outside_the_allowlist_is_denied_and_never_relayed"
+      },
+      "divergence": 0,
+      "facette": "emission",
+      "ingress": "mcp",
+      "outils": [
+        "mock.mail_send"
+      ],
+      "sans_garde": {
+        "chainee": true,
+        "entrees": [
+          {
+            "action_class": "external_send",
+            "args_hash": "5f4f2320f0f8b3538387cdb5ed03a05195b6fd51feccb05a13393e5c7c28f5c9",
+            "decision": "allow",
+            "error": null,
+            "judge_used": false,
+            "policy_rule_id": "mock.mail_send",
+            "tool_name": "mock.mail_send"
+          }
+        ],
+        "test": "tests/test_coverage_gate.py::test_without_the_allowlist_the_same_mail_leaves"
+      }
+    },
+    "M-08": {
+      "avec_garde": {
+        "chainee": true,
+        "entrees": [
+          {
+            "action_class": "irreversible",
+            "args_hash": "41dfd1467a96750ff24ac7b55de6eb30c5826cd82268005a37eb2f473f82e81b",
+            "decision": "hitl_pending",
+            "error": null,
+            "judge_used": false,
+            "policy_rule_id": "mock.delete_contact",
+            "tool_name": "mock.delete_contact"
+          },
+          {
+            "action_class": "irreversible",
+            "args_hash": "41dfd1467a96750ff24ac7b55de6eb30c5826cd82268005a37eb2f473f82e81b",
+            "decision": "hitl_approved",
+            "error": null,
+            "judge_used": false,
+            "policy_rule_id": "mock.delete_contact",
+            "tool_name": "mock.delete_contact"
+          }
+        ],
+        "test": "tests/test_coverage_gate.py::test_dual_approval_needs_two_distinct_humans_at_the_gateway"
+      },
+      "divergence": 0,
+      "facette": "approbation",
+      "ingress": "mcp",
+      "outils": [
+        "mock.delete_contact"
+      ],
+      "sans_garde": {
+        "chainee": true,
+        "entrees": [
+          {
+            "action_class": "irreversible",
+            "args_hash": "41dfd1467a96750ff24ac7b55de6eb30c5826cd82268005a37eb2f473f82e81b",
+            "decision": "allow",
+            "error": null,
+            "judge_used": false,
+            "policy_rule_id": "mock.delete_contact",
+            "tool_name": "mock.delete_contact"
+          }
+        ],
+        "test": "tests/test_coverage_gate.py::test_without_the_approval_gate_the_same_delete_executes"
+      }
+    },
+    "M-10": {
+      "avec_garde": {
+        "chainee": true,
+        "entrees": [
+          {
+            "action_class": "read",
+            "args_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "decision": "allow",
+            "error": null,
+            "judge_used": false,
+            "policy_rule_id": "mock.fetch",
+            "tool_name": "mock.fetch"
+          },
+          {
+            "action_class": null,
+            "args_hash": null,
+            "decision": "taint_marked",
+            "error": "injected_instructions",
+            "judge_used": false,
+            "policy_rule_id": null,
+            "tool_name": "mock.fetch"
+          },
+          {
+            "action_class": null,
+            "args_hash": null,
+            "decision": "tainted_action",
+            "error": "injected_instructions+url_sortante",
+            "judge_used": false,
+            "policy_rule_id": null,
+            "tool_name": "mock.fetch"
+          }
+        ],
+        "test": "tests/test_taint_gate.py::test_an_exfiltration_target_gates_an_otherwise_ungated_class"
+      },
+      "divergence": 1,
+      "facette": "post_taint",
+      "ingress": "mcp",
+      "outils": [
+        "mock.fetch"
+      ],
+      "sans_garde": {
+        "chainee": true,
+        "entrees": [
+          {
+            "action_class": "read",
+            "args_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "decision": "allow",
+            "error": null,
+            "judge_used": false,
+            "policy_rule_id": "mock.fetch",
+            "tool_name": "mock.fetch"
+          },
+          {
+            "action_class": "read",
+            "args_hash": "e1c85d549b3329a1084b54c0de050ce9e2369bcd7d542c072c791ca156f4223d",
+            "decision": "allow",
+            "error": null,
+            "judge_used": false,
+            "policy_rule_id": "mock.fetch",
+            "tool_name": "mock.fetch"
+          }
+        ],
+        "test": "tests/test_taint_gate.py::test_the_same_outbound_target_is_relayed_in_a_clean_session"
+      }
+    },
+    "M-11": {
+      "avec_garde": {
+        "chainee": true,
+        "entrees": [
+          {
+            "action_class": null,
+            "args_hash": null,
+            "decision": "tool_drift",
+            "error": null,
+            "judge_used": false,
+            "policy_rule_id": null,
+            "tool_name": "mock.echo"
+          }
+        ],
+        "test": "tests/test_integrity_gate.py::test_drifted_tool_is_quarantined"
+      },
+      "divergence": 0,
+      "facette": "outils_mcp",
+      "ingress": "mcp",
+      "outils": [
+        "mock.echo"
+      ],
+      "sans_garde": {
+        "chainee": true,
+        "entrees": [
+          {
+            "action_class": "read",
+            "args_hash": "e7b995efa755c5ff3b84d2188b58cb4ae916a59470eb3761df8a814f11763500",
+            "decision": "allow",
+            "error": null,
+            "judge_used": false,
+            "policy_rule_id": "mock.echo",
+            "tool_name": "mock.echo"
+          }
+        ],
+        "test": "tests/test_integrity_gate.py::test_without_screening_the_drifted_tool_is_relayed"
+      }
+    },
+    "M-12": {
+      "avec_garde": {
+        "chainee": true,
+        "entrees": [
+          {
+            "action_class": null,
+            "args_hash": null,
+            "decision": "rbac_denied",
+            "error": "client_not_allowed",
+            "judge_used": false,
+            "policy_rule_id": null,
+            "tool_name": "mock.secret"
+          }
+        ],
+        "test": "tests/test_rbac_gate.py::test_foreign_client_is_denied_and_audited"
+      },
+      "divergence": 0,
+      "facette": "rbac",
+      "ingress": "mcp",
+      "outils": [
+        "mock.secret"
+      ],
+      "sans_garde": {
+        "chainee": true,
+        "entrees": [
+          {
+            "action_class": "read",
+            "args_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "decision": "allow",
+            "error": null,
+            "judge_used": false,
+            "policy_rule_id": "mock.secret",
+            "tool_name": "mock.secret"
+          }
+        ],
+        "test": "tests/test_rbac_gate.py::test_without_the_client_allowlist_the_same_tool_is_relayed"
+      }
+    }
+  },
+  "sans_rejeu": {
+    "M-14": "Sur cette ligne, la preuve est une absence : l'argument secret n'atteint jamais le journal d'audit. Les deux exécutions autorisent donc l'appel, et ce qui les sépare est ce qui a été relayé, que le journal ne consigne pas. C'est voulu : ne rien consigner du contenu est précisément la propriété démontrée. Deux colonnes identiques ne montreraient rien."
+  }
+}

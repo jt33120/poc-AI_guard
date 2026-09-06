@@ -27,6 +27,7 @@ confronte chaque revendication à la carte générée, vit dans le lot `L4`.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -36,6 +37,12 @@ _RACINE = Path(__file__).resolve().parent.parent
 # `metadata`. Le contrôle de non-vacuité ci-dessous a signalé le déplacement en
 # passant au rouge, ce qui est précisément la raison pour laquelle il existe.
 _I18N = _RACINE / "frontend" / "lib" / "strings.ts"
+
+#: La copie visible ne vit plus seulement dans le dictionnaire : `L6` publie des
+#: phrases françaises **générées**, affichées telles quelles sur la page. La première
+#: version de l'une d'elles portait du gras Markdown, des accents graves et un tiret
+#: cadratin, et montrait les trois au lecteur — le garde ne la lisait pas.
+_REJEUX = _RACINE / "frontend" / "lib" / "generated" / "replays.json"
 
 
 def _chaines() -> list[tuple[str, str]]:
@@ -80,3 +87,42 @@ def test_no_latency_claim_is_published_in_the_copy() -> None:
         "la copie affirme une latence, que `perf/overhead.json` refuse de publier :\n"
         + "\n".join(f"  [{lang}] {t[:100]}" for lang, t in fautives[:10])
     )
+
+
+# --- La copie **générée**, visible elle aussi (`L6`) ----------------------------
+
+
+def _phrases_generees() -> list[str]:
+    """Les phrases que les artefacts générés affichent telles quelles."""
+    if not _REJEUX.exists():
+        return []
+    publie = json.loads(_REJEUX.read_text(encoding="utf-8"))
+    return list(publie.get("sans_rejeu", {}).values())
+
+
+def test_generated_copy_carries_no_em_dash_either() -> None:
+    """Le tic ne rentre pas non plus par la porte des artefacts.
+
+    Le garde du dictionnaire ne voyait pas ces phrases, et la première raison publiée
+    en portait un. Une règle qui ne couvre qu'une des deux portes de la copie ne tient
+    aucune des deux bien longtemps.
+    """
+    fautives = [p for p in _phrases_generees() if "—" in p]
+    assert not fautives, "tiret cadratin dans une phrase générée :\n" + "\n".join(fautives)
+
+
+def test_generated_copy_is_not_markdown() -> None:
+    """La page affiche ces phrases telles quelles : elle ne rend pas le Markdown.
+
+    Du gras `**ainsi**` ou un accent grave y arrivent en clair sous les yeux du
+    lecteur. Vérifié après l'avoir constaté à l'écran.
+    """
+    fautives = [p for p in _phrases_generees() if "**" in p or "`" in p]
+    assert not fautives, "balisage Markdown dans une phrase générée :\n" + "\n".join(fautives)
+
+
+def test_the_generated_copy_guard_reads_something() -> None:
+    """Non-vacuité, comme pour le dictionnaire : un garde qui ne lit rien passe toujours."""
+    phrases = _phrases_generees()
+    assert phrases, "aucune phrase générée trouvée — l'artefact a-t-il changé de forme ?"
+    assert all(len(p) > 80 for p in phrases)

@@ -20,6 +20,7 @@ from psycopg import sql
 
 from api.main import create_app
 from api.security import TokenVerifier
+from core import audit
 from core.config import Settings
 from tests import pgcluster
 
@@ -239,6 +240,87 @@ _SENS = frozenset({"bloque", "laisse_passer", "controle_negatif", "detecte", "ve
 _SCENARIOS_OUT = _REPO / "coverage" / ".scenarios.json"
 _scenarios_key = pytest.StashKey[list[dict[str, Any]]]()
 
+# --- La séquence d'audit de chaque scénario (`L6`) ------------------------------
+#
+# `AD-26` : une vidéo est l'enregistrement d'une exécution qui passe, jamais un
+# substitut. Le rejeu publié sur la page est donc **capturé ici**, pendant la suite,
+# et non rejoué, reconstitué ou animé à la main.
+#
+# Chaque test marqué reçoit une base neuve : son `audit_log` **est** sa séquence, il
+# n'y a rien à soustraire. Les colonnes retenues sont celles que le produit accepte
+# déjà de journaliser — métadonnées et empreintes, jamais d'arguments (`CLAUDE.md`
+# §4.10). Trois sont écartées, et pour des raisons différentes :
+#
+# * `latency_ms`, parce que `perf/overhead.json` refuse explicitement de publier une
+#   latence et qu'une page qui en afficherait une contredirait l'artefact du produit ;
+# * `tenant_id` et `user_id`, qui n'apprennent rien à un lecteur ;
+# * `ts`, parce que seul l'ordre compte et qu'une horloge de test n'est pas une
+#   information.
+_SEQUENCES_OUT = _REPO / "coverage" / ".sequences.json"
+
+#: Les colonnes publiables d'une entrée d'audit, dans l'ordre où on les lit.
+#:
+#: `entry_hash` et `prev_hash` n'en sont **pas**, et pour une raison de fond :
+#: `payload_v1` hache `ts`, `tenant_id`, `request_id` et `latency_ms`, tous variables
+#: d'une exécution à l'autre. Un artefact committé qui les porterait ne pourrait
+#: jamais passer un gate d'égalité, et une empreinte affichée sur une page que
+#: personne ne peut recalculer n'est de toute façon qu'une décoration.
+#:
+#: Ce qui est publié à leur place est **la propriété**, pas l'empreinte : la chaîne a
+#: été vérifiée par `core.audit.verify_chain`, le vrai vérificateur, sur les vraies
+#: données, au moment de la capture.
+#:
+#: `args_hash`, lui, reste : il ne dépend que des arguments, fixés par le scénario. Il
+#: est donc stable d'une exécution à l'autre, et il dit exactement ce que le produit
+#: revendique — on journalise une empreinte, jamais vos données (`CLAUDE.md` §4.10).
+_SEQUENCE_COLONNES = (
+    "tool_name",
+    "action_class",
+    "decision",
+    "policy_rule_id",
+    "judge_used",
+    "args_hash",
+    "error",
+)
+
+#: Rempli au démontage de chaque test marqué, relu par `pytest_sessionfinish`.
+_sequences: dict[str, dict[str, Any]] = {}
+
+
+@pytest.fixture(autouse=True)
+def _capture_audit_sequence(request: pytest.FixtureRequest) -> Iterator[None]:
+    """Capturer la trace d'audit d'un scénario de couverture, pour la rejouer.
+
+    Ne s'active que sur un test portant `@covers` **et** utilisant `db` : demander la
+    base à un test qui n'en veut pas lui en ferait payer la création.
+
+    `db` est demandé au montage et pas au démontage, pour que pytest l'enregistre
+    comme dépendance : notre finaliseur passe alors avant le sien, et la base existe
+    encore quand on la lit.
+    """
+    if not request.node.get_closest_marker("covers") or "db" not in request.fixturenames:
+        yield
+        return
+    handle = request.getfixturevalue("db")
+    yield
+    colonnes = ", ".join(_SEQUENCE_COLONNES)
+    try:
+        rows = handle.conn.execute(
+            f"select {colonnes} from audit_log order by id"  # noqa: S608 - liste fermée
+        ).fetchall()
+        # Le vrai vérificateur, sur les vraies données : il recalcule chaque charge et
+        # confronte le chaînage. Écrire « chaînée » sans l'avoir fait vérifier serait
+        # exactement la revendication non appuyée que tout ce dépôt refuse.
+        chaine = audit.verify_chain(handle.conn)
+    except psycopg.Error:
+        # Capture en échec doux : une séquence manquante ne doit pas faire rougir un
+        # test qui, lui, a prouvé ce qu'il devait. Le générateur la verra absente.
+        return
+    _sequences[request.node.nodeid] = {
+        "chainee": chaine.ok,
+        "entrees": [dict(zip(_SEQUENCE_COLONNES, r, strict=True)) for r in rows],
+    }
+
 
 def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
@@ -279,3 +361,7 @@ def pytest_sessionfinish(session: pytest.Session) -> None:
         return
     _SCENARIOS_OUT.parent.mkdir(parents=True, exist_ok=True)
     _SCENARIOS_OUT.write_text(json.dumps(scenarios, indent=2, sort_keys=True), encoding="utf-8")
+    # Écrit à part plutôt qu'ajouté à `.scenarios.json` : ce dernier est le contrat que
+    # `scripts/gen_coverage.py` lit, et lui ajouter un champ ferait porter à `CM-7` le
+    # risque d'une capture qui n'a rien à voir avec lui.
+    _SEQUENCES_OUT.write_text(json.dumps(_sequences, indent=2, sort_keys=True), encoding="utf-8")
