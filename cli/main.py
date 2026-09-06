@@ -600,6 +600,50 @@ def _check_hardening(settings: Settings) -> list[Check]:
     return checks
 
 
+def _check_forwarded_allow_ips() -> list[Check]:
+    """Le compartiment de limitation des routes publiques dépend de cette variable.
+
+    Les routes authentifiées comptent sur le jeton présenté (`api/ratelimit.py`) et se
+    passent de toute configuration. Les routes publiques — inscription, triage, relevé —
+    n'ont que l'adresse, et derrière un edge uvicorn ne la réécrit depuis
+    `X-Forwarded-For` que si le pair immédiat figure dans `FORWARDED_ALLOW_IPS`, dont le
+    défaut est `127.0.0.1`.
+
+    Non renseignée derrière un edge, ces routes partagent **un seul compartiment** : un
+    visiteur met la limite en 429 pour tous les autres. Réglée à `*`, c'est l'inverse et
+    c'est pire — le `X-Forwarded-For` de n'importe qui est cru, et il suffit d'en changer
+    à chaque requête pour n'être jamais limité.
+
+    Le contrôle nomme les deux, parce qu'une limite qu'on croit avoir est plus dangereuse
+    qu'une limite absente.
+    """
+    valeur = (os.environ.get("FORWARDED_ALLOW_IPS") or "").strip()
+    if not valeur:
+        return [
+            Check(
+                "WARN",
+                "ratelimit.forwarded",
+                "FORWARDED_ALLOW_IPS non renseignée : uvicorn ne fait confiance qu'à "
+                "127.0.0.1, donc derrière un edge les routes publiques partagent un "
+                "seul compartiment de limitation",
+                "réglez-la sur l'adresse de votre edge. Les routes authentifiées ne "
+                "sont pas concernées : elles comptent sur le jeton présenté.",
+            )
+        ]
+    if "*" in valeur:
+        return [
+            Check(
+                "FAIL",
+                "ratelimit.forwarded",
+                f"FORWARDED_ALLOW_IPS={valeur!r} fait confiance au X-Forwarded-For de "
+                "n'importe quel appelant : la limite des routes publiques se contourne "
+                "en changeant un en-tête",
+                "nommez l'adresse de votre edge plutôt que '*'.",
+            )
+        ]
+    return [Check("OK", "ratelimit.forwarded", f"edge de confiance déclaré ({valeur})")]
+
+
 def _check_ports() -> list[Check]:
     """`DEP-10` : nommer une collision de port comme un échec diagnosticable.
 
@@ -667,6 +711,7 @@ def cmd_doctor(settings: Settings, args: argparse.Namespace) -> int:
         *_check_database(settings),
         *_check_capabilities(settings),
         *_check_hardening(settings),
+        *_check_forwarded_allow_ips(),
         *_check_ports(),
     ]
     for check in checks:

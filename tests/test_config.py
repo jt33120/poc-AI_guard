@@ -28,6 +28,12 @@ _DEPLOYMENT_ENV_VARS: dict[str, str] = {
     "NEXT_PUBLIC_XSOM_API_URL": "baked into the console by `next build`",
     "XSOM_API_PORT": "docker-compose.yml — published control API port",
     "XSOM_DB_PORT": "docker-compose.yml — published database port",
+    "FORWARDED_ALLOW_IPS": (
+        "read by uvicorn itself — the peers whose X-Forwarded-For it trusts. It "
+        "decides whether the public routes rate-limit per visitor or share one "
+        "bucket; api/ratelimit.py explains why the authenticated routes do not "
+        "depend on it"
+    ),
 }
 
 #: Deployment variables that must stay COMMENTED OUT in ``.env.example``. A

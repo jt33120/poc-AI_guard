@@ -238,6 +238,15 @@ evidence self-hosting is not a downgrade of the isolation boundary.
       `verify_chain.py` on the restored database. A hash chain you have never
       restored is a chain you do not know you can restore — and the evidence plane
       is the thing self-hosting sells (`DEP-11`).
+- [ ] `FORWARDED_ALLOW_IPS` names your edge's address if the API sits behind one
+      (Railway, Render, Fly, an ingress, a CDN). uvicorn only rewrites the client
+      address from `X-Forwarded-For` when the immediate peer is in that list, whose
+      default is `127.0.0.1` — never an edge. Left unset, **every anonymous caller
+      shares one rate-limit bucket** on the public routes (signup, triage, threats),
+      so one visitor can 429 all the others with a trivial loop. Do **not** set it to
+      `*`: that trusts anyone's `X-Forwarded-For`, and changing the header on each
+      request then defeats the limit entirely. The authenticated routes are not
+      affected either way — they bucket on the presented token (`api/ratelimit.py`).
 - [ ] `ENV=prod DATABASE_URL=<your dsn> uv run python -m cli doctor` exits 0. It
       re-checks most of the boxes above from the deployment's own environment,
       and every non-OK line carries the fix.
