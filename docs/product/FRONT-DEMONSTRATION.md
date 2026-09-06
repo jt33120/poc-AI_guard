@@ -80,7 +80,14 @@ Six constats, tous vérifiés :
    plus tard.
 2. **Le proxy front relaie n'importe quelle méthode vers n'importe quel chemin** de
    l'API avec le jeton de session, sans allowlist. Le rôle du compte devient l'unique
-   contrôle de sécurité.
+   contrôle de sécurité. **Traité** : `frontend/lib/controlRoutes.ts` porte la table de
+   ce que la console demande — relevée sur les appels réels, pas devinée : elle contient
+   `v1/clients/assign`, qu'aucune supposition raisonnable n'aurait produit. Le reste est
+   refusé en 404, y compris une route que l'API sert parfaitement. Un test confronte la
+   table aux appels du code dans les deux sens (aucun appel non couvert, aucune règle
+   inutile), et trois tests de navigateur éprouvent le refus sur le vrai gestionnaire —
+   les gardes structurels lisent du TypeScript depuis Python et ne prouvent pas qu'il
+   refuse pour de vrai.
 3. **La rédaction des arguments d'approbation se fait par nom de clé, pas par valeur.**
    Ce qu'un visiteur tape dans un champ nommé `body` ou `to` est stocké tel quel et lu
    par tous les visiteurs suivants.
