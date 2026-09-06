@@ -87,10 +87,17 @@ Six constats, tous vérifiés :
 4. **`audit_log` est ineffaçable par construction** : deux triggers bloquent `UPDATE` et
    `DELETE` pour tout le monde, propriétaire compris. Ce qu'un visiteur écrit y reste
    pour toujours.
-5. **Le rate limit ne fait pas ce qu'on croit** : `get_remote_address` lit
-   `request.client.host` et jamais `X-Forwarded-For`, et l'image lance `uvicorn` sans
-   `--proxy-headers`. Derrière un edge, c'est **un compartiment unique partagé** — un
-   visiteur met la démo en 429 pour tous les autres avec une boucle triviale.
+5. **Le rate limit ne fait pas ce qu'on croit** : derrière un edge, c'est **un
+   compartiment unique partagé** — un visiteur met la démo en 429 pour tous les autres
+   avec une boucle triviale. ~~L'image lance `uvicorn` sans `--proxy-headers`.~~
+   **Corrigé après vérification** : `proxy_headers` vaut `True` par défaut dans
+   uvicorn 0.49, et uvicorn lit déjà `FORWARDED_ALLOW_IPS` depuis l'environnement. Ce
+   n'est pas le drapeau qui manque, c'est la liste de confiance, dont le défaut
+   `127.0.0.1` ne couvre jamais un edge. La conclusion tenait, le mécanisme non — et
+   c'est le mécanisme qui dicte le correctif. **Traité** : les routes authentifiées
+   comptent désormais sur le jeton présenté, immunes à toute configuration de
+   déploiement et infalsifiables par en-tête ; les routes publiques gardent l'adresse,
+   et `xsom doctor` refuse le silence comme l'élargissement à `*`.
 6. **La policy de démo exécute `shell.bash`** (`cat`, `ls`, `head`, `grep`) sans humain,
    et le gateway relaie vers des sous-processus. Une démo « vivante » sur ce tenant est
    une surface d'exécution.
