@@ -134,6 +134,58 @@ export const STR = {
     en: "Action governance for AI agents",
     fr: "Gouvernance des actions pour agents IA",
   },
+  // --- Mise en œuvre (L9) -----------------------------------------------------
+  //
+  // Trois voies, dans l'ordre décroissant de garantie. Les extraits ne sont pas
+  // rédigés ici : ils viennent de `lib/integration.ts`, partagé avec l'assistant
+  // d'intégration, pour qu'une page publique ne puisse pas apprendre autre chose que
+  // ce qu'un client reçoit réellement.
+  "mise.kicker": { en: "How it works", fr: "Comment ça marche" },
+  "mise.title": {
+    en: "Three ways in. They do not offer the same guarantee, and we say which.",
+    fr: "Trois voies d'entrée. Elles n'offrent pas la même garantie, et nous disons laquelle.",
+  },
+  "mise.lede": {
+    en: "Ordered by how much they can promise, strongest first. The difference is not a detail of integration: it decides whether a refused action can still happen.",
+    fr: "Classées par ce qu'elles peuvent promettre, la plus forte d'abord. La différence n'est pas un détail d'intégration : elle décide si une action refusée peut malgré tout avoir lieu.",
+  },
+  "mise.garantie": { en: "Guarantee", fr: "Garantie" },
+  "mise.livre": { en: "What you paste", fr: "Ce que vous collez" },
+
+  "mise.mcp.t": { en: "MCP gateway", fr: "Passerelle MCP" },
+  "mise.mcp.g": { en: "Binding: we execute, or we do not", fr: "Contraignante : nous exécutons, ou nous n'exécutons pas" },
+  "mise.mcp.b": {
+    en: "The gateway sits between your agent and its tool servers. A refused call never reaches the downstream, because the call goes through us. Nothing in the agent has to cooperate, which is why this is the only path we describe as binding.",
+    fr: "La passerelle s'intercale entre votre agent et ses serveurs d'outils. Un appel refusé n'atteint jamais l'aval, parce que l'appel passe par nous. Rien dans l'agent n'a à coopérer, et c'est pourquoi c'est la seule voie que nous qualifions de contraignante.",
+  },
+  "mise.mcp.note": {
+    en: "The stdio gateway reads two variables and no others. Any different name ships a snippet that cannot work, so what follows mirrors the runtime literally.",
+    fr: "La passerelle stdio ne lit que deux variables. Tout autre nom livre un extrait qui ne peut pas fonctionner, donc ce bloc reproduit le runtime à la lettre.",
+  },
+
+  "mise.http.t": { en: "POST /v1/authorize", fr: "POST /v1/authorize" },
+  "mise.http.g": { en: "Cooperative: your agent honours the verdict", fr: "Coopérative : votre agent honore le verdict" },
+  "mise.http.b": {
+    en: "One HTTP call before you execute a tool, in any language. We return a verdict; your code decides to obey it. That is a real difference from the gateway, and pretending otherwise would be the kind of claim this whole product exists to refuse. Use it when you own the agent's code.",
+    fr: "Un appel HTTP avant d'exécuter un outil, dans n'importe quel langage. Nous rendons un verdict ; votre code décide de l'honorer. C'est une vraie différence avec la passerelle, et prétendre le contraire serait exactement le genre d'affirmation que ce produit existe pour refuser. À employer quand vous maîtrisez le code de l'agent.",
+  },
+
+  "mise.proxy.t": { en: "LLM provider proxy", fr: "Proxy du fournisseur LLM" },
+  "mise.proxy.g": { en: "Binding on egress, zero code", fr: "Contraignante sur l'egress, sans code" },
+  "mise.proxy.b": {
+    en: "Point an SDK's base_url at xSOM. Every prompt and every tool call the model makes is inspected on the way out. Your provider key is forwarded and never stored. Nothing else in your stack changes.",
+    fr: "Pointez le base_url d'un SDK sur xSOM. Chaque prompt et chaque appel d'outil du modèle est inspecté en sortie. Votre clé fournisseur est relayée et jamais stockée. Rien d'autre ne change dans votre pile.",
+  },
+
+  "mise.jeton": {
+    en: "Replace the placeholder with the gateway token the console shows you once, at creation. Only its SHA-256 hash is stored.",
+    fr: "Remplacez le paramètre fictif par le jeton de passerelle que la console affiche une seule fois, à la création. Seule son empreinte SHA-256 est conservée.",
+  },
+  "mise.identique": {
+    en: "These are the same snippets the onboarding wizard hands you. A public page that taught something else would teach what does not work.",
+    fr: "Ce sont les extraits que l'assistant d'intégration vous remet. Une page publique qui enseignerait autre chose enseignerait ce qui ne marche pas.",
+  },
+
   // --- L'instantané de démonstration (L8) --------------------------------------
   //
   // Le bandeau dit ce que la page est : une lecture datée d'un tenant fabriqué, en

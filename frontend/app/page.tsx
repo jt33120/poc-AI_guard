@@ -125,6 +125,9 @@ export default function LandingPage() {
             <Link href="/executive-preview" className="btn btn-ghost">
               {t("land.exec.link")}
             </Link>
+            <Link href="/mise-en-oeuvre" className="btn btn-ghost">
+              {t("mise.kicker")}
+            </Link>
             <span className="muted ml-1 inline-flex items-center gap-1.5 text-sm">
               <ShieldMark className="h-4 w-4 text-brand-bright" />
               {t("land.hero.trust")}
