@@ -1,0 +1,13 @@
+{
+  "commit": "09d8e08",
+  "genere_le": "2026-09-06 13:01 UTC",
+  "faits": {
+    "lignes": 16,
+    "facettes": 25,
+    "rejouables": 8,
+    "profils": 6,
+    "bloquees_max": 8,
+    "notre_terrain_max": 13,
+    "ecarts": 17
+  }
+}

@@ -246,7 +246,7 @@ Ordonnés. Chacun est autonome, vérifiable, et livrable en PR séparée.
 | **L1** | **Fondations de marque** | Porter les jetons cuivre, les trois polices auto-hébergées, les rayons, les jetons contextuels clair/sombre. | Tout le visuel en dépend. |
 | **L2** | **Socle des pages publiques** | Sortir du `"use client"` global pour retrouver `metadata`, OG et `<html lang>`. ~~Routes de langue.~~ | **Fait, sauf les routes de langue** — voir §5 ter. Le français est indexable, l'anglais ne l'est pas. |
 | **L3** | **Exposer la carte au front** | ~~Un endpoint ou un artefact committé~~ **les deux** : l'artefact pour le statique, la route pour le profil-dépendant. | **Fait** — voir §5 quater. |
-| **L4** | **Le gate marketing** | `gen_marketing.py --check`, en CI. | **Avant** d'écrire la page, pas après. |
+| **L4** | **Le gate marketing** | `gen_marketing.py --check`, en CI. | **Fait, et avant la page** — voir §5 quinquies. |
 | **L5** | **Le relevé des menaces** | La section, le sélecteur de profil, les trois contenus d'ouverture. | Le cœur. |
 | **L6** | **Le rejeu** | Étendre le hook pytest qui écrit déjà `.scenarios.json` pour capturer la séquence d'audit ; un générateur ; un lecteur. Les 8 lignes. | Les « vidéos ». Dépend de L5 pour son emplacement. |
 | **L7** | **Pour qui** | La section, adossée au moteur de triage. | |
@@ -342,6 +342,45 @@ comportement voulu : une route publique nouvelle ne passe pas la CI sans qu'on r
 **Le chiffre qui a coûté la réunion, figé.** Un test tient l'écart `P1a` : 2 lignes
 bloquées, 3 facettes bloquées — et il échoue aussi le jour où les deux coïncideraient,
 parce qu'il ne prouverait alors plus rien.
+
+---
+
+## 5 quinquies. Ce que `L4` a livré
+
+`scripts/gen_marketing.py --check`, en CI, écrit **avant** la page. L'ordre n'est pas
+un détail : écrit après, le gate aurait été taillé pour laisser passer ce qui était
+déjà là.
+
+**La règle propre à la page :** un chiffre de couverture ne s'écrit pas, il s'interpole.
+Toute chaîne mêlant un mot de couverture et un nombre doit passer par un
+`{placeholder}` alimenté par `frontend/lib/generated/marketing-facts.json`, généré
+depuis la carte et le moteur. Sept faits publiés : `lignes` (16), `facettes` (25),
+`rejouables` (8), `profils` (6), `bloquees_max` (8), `notre_terrain_max` (13),
+`ecarts` (17). Le fait « lignes » et le fait « facettes » portent deux noms différents,
+si bien qu'une page ne peut plus attraper l'un pour l'autre par inadvertance — c'est le
+§1.3 fermé à la source des chiffres eux-mêmes.
+
+**`FR-175` est étendu à la copie**, avec le même motif recopié : deux expressions
+régulières qui divergeraient jugeraient deux surfaces selon deux règles.
+
+**Cinq contournements fermés, chacun vérifié rouge :** le chiffre nu, le chiffre en
+toutes lettres, le chiffre écrit dans le balisage plutôt que dans le dictionnaire, le
+verbe attribué à une ligne non `Bloqué`, et le placeholder mal orthographié — qui
+n'échoue pas à l'exécution, il affiche ses accolades sur la page.
+
+**Un faux positif corrigé, et il compte autant que le reste.** La première version
+refusait « une liste de menaces IA » et « un contrôle des opérations réelles » : en
+français, `un` et `une` sont d'abord des articles. Dix faux positifs sur dix. `un`,
+`une` et `one` sont donc hors de la liste des nombres écrits, et un test de
+non-régression le tient — un gate à ce taux-là est débranché dans la semaine, et un
+gate débranché ne protège rien. Le trou consenti est étroit : « nous bloquons une
+menace » n'est une phrase que personne n'écrit.
+
+**Ce que le gate ne voit pas, dit d'avance :** un nombre interpolé depuis du code n'est
+pas jugé, et c'est le but — il vient de `/api/threats`, donc du moteur ; une phrase qui
+affirme une couverture sans aucun mot de couverture n'est pas vue ; le verbe sans ligne
+nommée est de la prose générique, comptée (30 occurrences) plutôt que refusée, comme
+`FR-175` le fait déjà.
 
 ---
 
