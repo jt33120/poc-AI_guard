@@ -45,7 +45,7 @@ def test_no_em_dash_survives_in_the_dictionary() -> None:
     fautives = [(lang, t) for lang, t in _chaines() if "—" in t]
     assert not fautives, (
         "tiret cadratin dans la copie du front — le point, le deux-points ou la virgule "
-        f"disent mieux ce qu'il portait :\n"
+        "disent mieux ce qu'il portait :\n"
         + "\n".join(f"  [{lang}] {t[:100]}" for lang, t in fautives[:10])
     )
 
