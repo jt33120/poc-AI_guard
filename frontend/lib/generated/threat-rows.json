@@ -1,0 +1,749 @@
+{
+  "commit": "09d8e08",
+  "genere_le": "2026-09-06 13:01 UTC",
+  "lignes": [
+    {
+      "id": "M-01",
+      "titre": "Injection de prompts directe",
+      "rejouable": false,
+      "profils": [
+        "P1a",
+        "P1b",
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "facettes": [
+        {
+          "cle": "attestation",
+          "libelle": "attestation de présence du garde",
+          "mode": "A",
+          "famille": "usage_ia",
+          "profils": [
+            "P1a",
+            "P1b",
+            "P2",
+            "P3",
+            "P4",
+            "P5"
+          ],
+          "ingress_prouve": [],
+          "ingress_non_asserte": [],
+          "scenarios": [],
+          "ecarts": [
+            "G-01"
+          ],
+          "raison": null
+        },
+        {
+          "cle": "garde_prompt",
+          "libelle": "garde-prompt",
+          "mode": "O",
+          "famille": "usage_ia",
+          "profils": [
+            "P1a",
+            "P1b",
+            "P2",
+            "P3",
+            "P4",
+            "P5"
+          ],
+          "ingress_prouve": [
+            "llm_proxy"
+          ],
+          "ingress_non_asserte": [],
+          "scenarios": [
+            "tests/test_prompt_guard.py::test_a_flagged_prompt_is_relayed_and_its_verdict_is_chained"
+          ],
+          "ecarts": [
+            "G-01"
+          ],
+          "raison": null
+        }
+      ]
+    },
+    {
+      "id": "M-02",
+      "titre": "Injection de prompts indirecte",
+      "rejouable": true,
+      "profils": [
+        "P2",
+        "P3"
+      ],
+      "facettes": [
+        {
+          "cle": "taint",
+          "libelle": "garde de taint sur les résultats d'outils",
+          "mode": "B",
+          "famille": "usage_ia",
+          "profils": [
+            "P2",
+            "P3"
+          ],
+          "ingress_prouve": [
+            "mcp"
+          ],
+          "ingress_non_asserte": [],
+          "scenarios": [
+            "tests/test_monotonicity_gate.py::test_a_denied_rule_stays_denied_in_a_tainted_session",
+            "tests/test_taint_gate.py::test_a_different_agent_is_not_tainted_by_its_neighbour",
+            "tests/test_taint_gate.py::test_a_french_injection_gates_the_risky_action",
+            "tests/test_taint_gate.py::test_a_reconnect_does_not_wash_the_taint_off",
+            "tests/test_taint_gate.py::test_clean_result_does_not_gate",
+            "tests/test_taint_gate.py::test_escalate_holds_the_risky_action",
+            "tests/test_taint_gate.py::test_taint_policy_off_is_a_no_op",
+            "tests/test_taint_gate.py::test_tainted_result_then_risky_action_is_denied"
+          ],
+          "ecarts": [
+            "G-02",
+            "G-03"
+          ],
+          "raison": null
+        }
+      ]
+    },
+    {
+      "id": "M-03",
+      "titre": "Empoisonnement de données",
+      "rejouable": false,
+      "profils": [
+        "P2",
+        "P5"
+      ],
+      "facettes": [
+        {
+          "cle": "provenance",
+          "libelle": "déclaration de provenance des jeux de données",
+          "mode": "A",
+          "famille": "usage_ia",
+          "profils": [
+            "P2",
+            "P5"
+          ],
+          "ingress_prouve": [],
+          "ingress_non_asserte": [],
+          "scenarios": [],
+          "ecarts": [
+            "G-04"
+          ],
+          "raison": null
+        }
+      ]
+    },
+    {
+      "id": "M-04",
+      "titre": "Vol de modèle / extraction",
+      "rejouable": false,
+      "profils": [
+        "P4",
+        "P5"
+      ],
+      "facettes": [
+        {
+          "cle": "telemetrie",
+          "libelle": "télémétrie de volume et de motif",
+          "mode": "X",
+          "famille": "fournisseur",
+          "profils": [
+            "P4",
+            "P5"
+          ],
+          "ingress_prouve": [],
+          "ingress_non_asserte": [],
+          "scenarios": [],
+          "ecarts": [
+            "G-05"
+          ],
+          "raison": "La télémétrie de volume existe (`usage_events`) mais elle est cadrée équité et coût,  jamais anti-extraction : aucun seuil, aucun verdict, aucune entrée chaînée.  `FR-187`, profil P4, hors de ce lot."
+        }
+      ]
+    },
+    {
+      "id": "M-05",
+      "titre": "Attaques par évasion (adversarial)",
+      "rejouable": false,
+      "profils": [
+        "P5"
+      ],
+      "facettes": [
+        {
+          "cle": "robustesse",
+          "libelle": "robustesse du modèle",
+          "mode": "X",
+          "famille": "fournisseur",
+          "profils": [
+            "P5"
+          ],
+          "ingress_prouve": [],
+          "ingress_non_asserte": [],
+          "scenarios": [],
+          "ecarts": [],
+          "raison": "Robustesse adversariale du modèle : c'est le travail de l'éditeur qui l'entraîne, pas de la passerelle qui l'appelle."
+        }
+      ]
+    },
+    {
+      "id": "M-06",
+      "titre": "Piratage d'agents autonomes",
+      "rejouable": true,
+      "profils": [
+        "P3"
+      ],
+      "facettes": [
+        {
+          "cle": "chaine",
+          "libelle": "chaîne de contrôle complète, plancher irréversible",
+          "mode": "B",
+          "famille": "usage_ia",
+          "profils": [
+            "P3"
+          ],
+          "ingress_prouve": [
+            "mcp"
+          ],
+          "ingress_non_asserte": [],
+          "scenarios": [
+            "tests/test_coverage_gate.py::test_a_destructive_executor_invocation_is_held",
+            "tests/test_coverage_gate.py::test_a_harmless_executor_invocation_still_runs",
+            "tests/test_coverage_gate.py::test_without_argument_classification_the_destructive_invocation_runs",
+            "tests/test_hitl_gate.py::test_approval_service_down_fails_closed",
+            "tests/test_hitl_gate.py::test_auto_tool_still_relays",
+            "tests/test_hitl_gate.py::test_denied_is_never_relayed",
+            "tests/test_hitl_gate.py::test_expired_is_never_relayed",
+            "tests/test_hitl_gate.py::test_irreversible_held_then_approved_relays_once",
+            "tests/test_monotonicity_gate.py::test_an_unknown_tool_stays_denied_in_a_tainted_session",
+            "tests/test_policy_gate.py::test_auto_tool_is_relayed",
+            "tests/test_policy_gate.py::test_irreversible_tool_is_held_not_relayed",
+            "tests/test_policy_gate.py::test_unknown_tool_is_denied"
+          ],
+          "ecarts": [
+            "G-06"
+          ],
+          "raison": null
+        }
+      ]
+    },
+    {
+      "id": "M-07",
+      "titre": "Phishing hyper-personnalisé",
+      "rejouable": true,
+      "profils": [
+        "P1a",
+        "P1b",
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "facettes": [
+        {
+          "cle": "emission",
+          "libelle": "l'agent comme émetteur — envoi hors allowlist",
+          "mode": "B",
+          "famille": "usage_ia",
+          "profils": [
+            "P3"
+          ],
+          "ingress_prouve": [
+            "mcp"
+          ],
+          "ingress_non_asserte": [],
+          "scenarios": [
+            "tests/test_coverage_gate.py::test_send_inside_the_allowlist_still_goes_through",
+            "tests/test_coverage_gate.py::test_send_outside_the_allowlist_is_denied_and_never_relayed",
+            "tests/test_coverage_gate.py::test_without_the_allowlist_the_same_mail_leaves"
+          ],
+          "ecarts": [],
+          "raison": null
+        },
+        {
+          "cle": "reception",
+          "libelle": "réception — passerelle mail",
+          "mode": "X",
+          "famille": "cyber_classique",
+          "profils": [
+            "P1a",
+            "P1b",
+            "P2",
+            "P3",
+            "P4",
+            "P5"
+          ],
+          "ingress_prouve": [],
+          "ingress_non_asserte": [],
+          "scenarios": [],
+          "ecarts": [],
+          "raison": "Réception du phishing : passerelle de messagerie et EDR du client. Nous couvrons l'agent comme *émetteur*, pas comme destinataire."
+        }
+      ]
+    },
+    {
+      "id": "M-08",
+      "titre": "Usurpation par deepfake",
+      "rejouable": true,
+      "profils": [
+        "P1a",
+        "P1b",
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "facettes": [
+        {
+          "cle": "approbation",
+          "libelle": "intégrité de l'approbation — séparation des devoirs",
+          "mode": "B",
+          "famille": "usage_ia",
+          "profils": [
+            "P3"
+          ],
+          "ingress_prouve": [
+            "mcp"
+          ],
+          "ingress_non_asserte": [],
+          "scenarios": [
+            "tests/test_coverage_gate.py::test_dual_approval_needs_two_distinct_humans_at_the_gateway",
+            "tests/test_coverage_gate.py::test_dual_approval_needs_two_distinct_humans_at_the_gateway",
+            "tests/test_coverage_gate.py::test_without_the_approval_gate_the_same_delete_executes"
+          ],
+          "ecarts": [
+            "G-07"
+          ],
+          "raison": null
+        },
+        {
+          "cle": "media",
+          "libelle": "détection du média truqué",
+          "mode": "X",
+          "famille": "cyber_classique",
+          "profils": [
+            "P1a",
+            "P1b",
+            "P2",
+            "P3",
+            "P4",
+            "P5"
+          ],
+          "ingress_prouve": [],
+          "ingress_non_asserte": [],
+          "scenarios": [],
+          "ecarts": [],
+          "raison": "Détection de média synthétique : ni notre métier ni notre point d'interposition. Nous couvrons l'intégrité de l'approbation, pas l'authenticité du média."
+        }
+      ]
+    },
+    {
+      "id": "M-09",
+      "titre": "Malwares polymorphes",
+      "rejouable": false,
+      "profils": [
+        "P1a",
+        "P1b",
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "facettes": [
+        {
+          "cle": "endpoint",
+          "libelle": "plan endpoint (EDR/XDR)",
+          "mode": "X",
+          "famille": "cyber_classique",
+          "profils": [
+            "P1a",
+            "P1b",
+            "P2",
+            "P3",
+            "P4",
+            "P5"
+          ],
+          "ingress_prouve": [],
+          "ingress_non_asserte": [],
+          "scenarios": [],
+          "ecarts": [],
+          "raison": "Plan endpoint et poste de travail : SOC du client. Une passerelle d'actions ne voit pas le poste."
+        }
+      ]
+    },
+    {
+      "id": "M-10",
+      "titre": "Exfiltration de données / PI via LLM",
+      "rejouable": true,
+      "profils": [
+        "P1a",
+        "P1b",
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "facettes": [
+        {
+          "cle": "decouverte",
+          "libelle": "inventaire déclaré du Shadow AI non supervisé",
+          "mode": "A",
+          "famille": "usage_ia",
+          "profils": [
+            "P1a",
+            "P1b",
+            "P2",
+            "P3",
+            "P4",
+            "P5"
+          ],
+          "ingress_prouve": [],
+          "ingress_non_asserte": [],
+          "scenarios": [],
+          "ecarts": [
+            "G-09"
+          ],
+          "raison": null
+        },
+        {
+          "cle": "egress",
+          "libelle": "DLP d'egress sur le chemin supervisé",
+          "mode": "B",
+          "famille": "usage_ia",
+          "profils": [
+            "P1a",
+            "P1b",
+            "P2",
+            "P3",
+            "P4",
+            "P5"
+          ],
+          "ingress_prouve": [
+            "llm_proxy"
+          ],
+          "ingress_non_asserte": [],
+          "scenarios": [
+            "tests/test_llm_proxy.py::test_dlp_blocks_secret_before_forwarding",
+            "tests/test_llm_proxy.py::test_dlp_disabled_lets_secret_through",
+            "tests/test_llm_proxy.py::test_dlp_flags_pii_but_forwards_unchanged"
+          ],
+          "ecarts": [
+            "G-08",
+            "G-22"
+          ],
+          "raison": null
+        },
+        {
+          "cle": "post_taint",
+          "libelle": "cible d'exfiltration dans les arguments d'une action post-taint",
+          "mode": "B",
+          "famille": "usage_ia",
+          "profils": [
+            "P1a",
+            "P1b",
+            "P2",
+            "P3",
+            "P4",
+            "P5"
+          ],
+          "ingress_prouve": [
+            "mcp"
+          ],
+          "ingress_non_asserte": [],
+          "scenarios": [
+            "tests/test_taint_gate.py::test_a_post_taint_read_without_an_outbound_target_still_runs",
+            "tests/test_taint_gate.py::test_an_exfiltration_target_gates_an_otherwise_ungated_class",
+            "tests/test_taint_gate.py::test_the_same_outbound_target_is_relayed_in_a_clean_session"
+          ],
+          "ecarts": [
+            "G-08"
+          ],
+          "raison": null
+        }
+      ]
+    },
+    {
+      "id": "M-11",
+      "titre": "Supply chain (modèles / bibliothèques)",
+      "rejouable": true,
+      "profils": [
+        "P2",
+        "P3",
+        "P4"
+      ],
+      "facettes": [
+        {
+          "cle": "bibliotheques",
+          "libelle": "SBOM et audit de dépendances en CI",
+          "mode": "A",
+          "famille": "usage_ia",
+          "profils": [
+            "P2",
+            "P3",
+            "P4"
+          ],
+          "ingress_prouve": [],
+          "ingress_non_asserte": [],
+          "scenarios": [],
+          "ecarts": [],
+          "raison": null
+        },
+        {
+          "cle": "modeles_ml",
+          "libelle": "analyse d'artefacts de modèles",
+          "mode": "X",
+          "famille": "usage_ia",
+          "profils": [
+            "P4"
+          ],
+          "ingress_prouve": [],
+          "ingress_non_asserte": [],
+          "scenarios": [],
+          "ecarts": [
+            "G-10"
+          ],
+          "raison": "Aucun scanner d'artefacts n'est piloté et aucun de ses verdicts n'est chaîné.  `FR-188`, profil P4, hors de ce lot."
+        },
+        {
+          "cle": "outils_mcp",
+          "libelle": "empreinte et quarantaine des outils MCP",
+          "mode": "B",
+          "famille": "usage_ia",
+          "profils": [
+            "P3"
+          ],
+          "ingress_prouve": [
+            "mcp"
+          ],
+          "ingress_non_asserte": [],
+          "scenarios": [
+            "tests/test_integrity_gate.py::test_clean_tool_is_auto_approved_and_relayed",
+            "tests/test_integrity_gate.py::test_drifted_tool_is_quarantined",
+            "tests/test_integrity_gate.py::test_new_tool_quarantined_when_auto_approve_off",
+            "tests/test_integrity_gate.py::test_poisoned_tool_is_quarantined_and_uncallable",
+            "tests/test_integrity_gate.py::test_without_screening_the_drifted_tool_is_relayed"
+          ],
+          "ecarts": [],
+          "raison": null
+        }
+      ]
+    },
+    {
+      "id": "M-12",
+      "titre": "Privilèges excessifs (excessive agency)",
+      "rejouable": true,
+      "profils": [
+        "P3"
+      ],
+      "facettes": [
+        {
+          "cle": "rbac",
+          "libelle": "RBAC par outil, garde du député confus",
+          "mode": "B",
+          "famille": "usage_ia",
+          "profils": [
+            "P3"
+          ],
+          "ingress_prouve": [
+            "mcp"
+          ],
+          "ingress_non_asserte": [],
+          "scenarios": [
+            "tests/test_rbac_gate.py::test_allowed_client_may_call",
+            "tests/test_rbac_gate.py::test_foreign_client_is_denied_and_audited",
+            "tests/test_rbac_gate.py::test_missing_client_is_denied",
+            "tests/test_rbac_gate.py::test_without_the_client_allowlist_the_same_tool_is_relayed"
+          ],
+          "ecarts": [
+            "G-11",
+            "G-24"
+          ],
+          "raison": null
+        }
+      ]
+    },
+    {
+      "id": "M-13",
+      "titre": "Traitement non sécurisé des sorties",
+      "rejouable": false,
+      "profils": [
+        "P3"
+      ],
+      "facettes": [
+        {
+          "cle": "charge_executable",
+          "libelle": "détection de charge exécutable dans les résultats",
+          "mode": "D",
+          "famille": "usage_ia",
+          "profils": [
+            "P3"
+          ],
+          "ingress_prouve": [
+            "mcp"
+          ],
+          "ingress_non_asserte": [],
+          "scenarios": [
+            "tests/test_taint_gate.py::test_a_result_carrying_an_ordinary_web_page_does_not_gate",
+            "tests/test_taint_gate.py::test_an_executable_payload_in_a_result_gates_the_next_risky_action",
+            "tests/test_taint_gate.py::test_the_detection_is_written_to_the_chain_and_names_its_agent"
+          ],
+          "ecarts": [
+            "G-12"
+          ],
+          "raison": null
+        }
+      ]
+    },
+    {
+      "id": "M-14",
+      "titre": "Fuite du system prompt & secrets",
+      "rejouable": true,
+      "profils": [
+        "P1a",
+        "P1b",
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "facettes": [
+        {
+          "cle": "prompt",
+          "libelle": "détection de régurgitation **verbatim** du prompt système sur l'egress",
+          "mode": "D",
+          "famille": "usage_ia",
+          "profils": [
+            "P1a",
+            "P1b",
+            "P2",
+            "P3",
+            "P4",
+            "P5"
+          ],
+          "ingress_prouve": [
+            "llm_proxy"
+          ],
+          "ingress_non_asserte": [],
+          "scenarios": [
+            "tests/test_prompt_leak.py::test_a_leak_is_chained_attributed_and_the_response_still_goes_through"
+          ],
+          "ecarts": [
+            "G-13"
+          ],
+          "raison": null
+        },
+        {
+          "cle": "secrets",
+          "libelle": "coffre ; aucun secret inline, aucun secret journalisé",
+          "mode": "B",
+          "famille": "usage_ia",
+          "profils": [
+            "P1a",
+            "P1b",
+            "P2",
+            "P3",
+            "P4",
+            "P5"
+          ],
+          "ingress_prouve": [
+            "http",
+            "mcp"
+          ],
+          "ingress_non_asserte": [],
+          "scenarios": [
+            "tests/test_coverage_gate.py::test_a_secret_argument_never_reaches_the_audit_log_over_http",
+            "tests/test_coverage_gate.py::test_a_secret_argument_never_reaches_the_audit_log_over_http",
+            "tests/test_coverage_gate.py::test_a_secret_argument_never_reaches_the_audit_log_over_mcp",
+            "tests/test_coverage_gate.py::test_a_secret_argument_never_reaches_the_audit_log_over_mcp",
+            "tests/test_coverage_gate.py::test_the_secret_reaches_the_verdict_path_and_is_absent_only_from_the_log",
+            "tests/test_coverage_gate.py::test_the_secret_really_travelled_and_is_absent_only_from_the_log"
+          ],
+          "ecarts": [
+            "G-13"
+          ],
+          "raison": null
+        }
+      ]
+    },
+    {
+      "id": "M-15",
+      "titre": "Validation aveugle de code (Copilot)",
+      "rejouable": false,
+      "profils": [
+        "P1a",
+        "P1b"
+      ],
+      "facettes": [
+        {
+          "cle": "ci",
+          "libelle": "audit de dépendances et de secrets en CI",
+          "mode": "A",
+          "famille": "usage_ia",
+          "profils": [
+            "P1a",
+            "P1b"
+          ],
+          "ingress_prouve": [],
+          "ingress_non_asserte": [],
+          "scenarios": [],
+          "ecarts": [],
+          "raison": null
+        },
+        {
+          "cle": "sast",
+          "libelle": "ingestion de verdicts SAST/DAST",
+          "mode": "O",
+          "famille": "usage_ia",
+          "profils": [
+            "P1a",
+            "P1b"
+          ],
+          "ingress_prouve": [
+            "http"
+          ],
+          "ingress_non_asserte": [],
+          "scenarios": [
+            "tests/test_verdicts.py::test_a_third_party_verdict_enters_a_chain"
+          ],
+          "ecarts": [
+            "G-14"
+          ],
+          "raison": null
+        }
+      ]
+    },
+    {
+      "id": "M-16",
+      "titre": "Décision fondée sur une hallucination",
+      "rejouable": false,
+      "profils": [
+        "P1a",
+        "P1b",
+        "P2",
+        "P3",
+        "P4",
+        "P5"
+      ],
+      "facettes": [
+        {
+          "cle": "revue_humaine",
+          "libelle": "attestation « décision critique sous revue humaine »",
+          "mode": "A",
+          "famille": "usage_ia",
+          "profils": [
+            "P1a",
+            "P1b",
+            "P2",
+            "P3",
+            "P4",
+            "P5"
+          ],
+          "ingress_prouve": [],
+          "ingress_non_asserte": [],
+          "scenarios": [],
+          "ecarts": [
+            "G-15"
+          ],
+          "raison": null
+        }
+      ]
+    }
+  ]
+}

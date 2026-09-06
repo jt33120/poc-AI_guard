@@ -245,7 +245,7 @@ Ordonnés. Chacun est autonome, vérifiable, et livrable en PR séparée.
 | **L0** | **Assainissement** | Retirer les quatre chiffres non adossés du hero, à commencer par le « < 1 s ». Retirer les 88 tirets. | Une faute de doctrine est en ligne maintenant. Rien ne se construit par-dessus. |
 | **L1** | **Fondations de marque** | Porter les jetons cuivre, les trois polices auto-hébergées, les rayons, les jetons contextuels clair/sombre. | Tout le visuel en dépend. |
 | **L2** | **Socle des pages publiques** | Sortir du `"use client"` global pour retrouver `metadata`, OG et `<html lang>`. ~~Routes de langue.~~ | **Fait, sauf les routes de langue** — voir §5 ter. Le français est indexable, l'anglais ne l'est pas. |
-| **L3** | **Exposer la carte au front** | Un endpoint ou un artefact committé qui sert `coverage/map.json` et le triage, par l'unité correcte. | Le socle de données du relevé. |
+| **L3** | **Exposer la carte au front** | ~~Un endpoint ou un artefact committé~~ **les deux** : l'artefact pour le statique, la route pour le profil-dépendant. | **Fait** — voir §5 quater. |
 | **L4** | **Le gate marketing** | `gen_marketing.py --check`, en CI. | **Avant** d'écrire la page, pas après. |
 | **L5** | **Le relevé des menaces** | La section, le sélecteur de profil, les trois contenus d'ouverture. | Le cœur. |
 | **L6** | **Le rejeu** | Étendre le hook pytest qui écrit déjà `.scenarios.json` pour capturer la séquence d'audit ; un générateur ; un lecteur. Les 8 lignes. | Les « vidéos ». Dépend de L5 pour son emplacement. |
@@ -306,6 +306,42 @@ qu'un visiteur anonyme payait un aller-retour réseau pour rien. Mesure faite en
 pointant `NEXT_PUBLIC_SUPABASE_URL` sur un serveur qui compte ses requêtes : **zéro
 appel** sur trois visites anonymes de `/`. Sans cookie d'authentification, `getUser()`
 court-circuite localement. Le défaut n'existe pas, et le correctif n'a pas été écrit.
+
+---
+
+## 5 quater. Ce que `L3` a livré
+
+Le socle de données du relevé, dans la bonne unité, et l'unité est tout le lot.
+
+**Le regroupement n'a qu'une implémentation.** `core/threat_map.py` convertit les 25
+facettes de `coverage/map.json` en 16 lignes de menace. `core/triage.py` le faisait en
+interne ; il s'appuie désormais dessus, vérifié sans effet de bord sur cinq
+combinaisons de profils. Le front n'en écrira pas une seconde version en TypeScript,
+ce que les six relecteurs avaient anticipé et que le §1.3 nomme.
+
+**La frontière entre le statique et le profil-dépendant est tenue par un test.**
+`frontend/lib/generated/threat-rows.json` (20 Ko, généré, gaté en CI) porte ce qui ne
+dépend d'aucun visiteur : les lignes, leurs facettes, le mode publié, les profils
+concernés, les scénarios, les écarts. Il ne porte **ni** applicabilité, **ni** plafond,
+**ni** propriétaire, **ni** compte — un test refuse ces six mots dans le fichier, parce
+qu'un artefact qui les porterait serait un second moteur endormi. Ces notions-là se
+demandent à `GET /v1/threats?profiles=`, servi par `core.triage`.
+
+**Les huit lignes rejouables tombent de la carte.** `rejouable` = « une facette y est
+publiée `Bloqué` », et `gen_coverage.py` n'accorde `Bloqué` qu'avec les deux moitiés de
+la preuve, le blocage **et** son contrôle négatif. Aucune liste n'est tenue à jour : le
+§1.1 annonçait 8 lignes sur 16, le générateur en trouve 8 — `M-02`, `M-06`, `M-07`,
+`M-08`, `M-10`, `M-11`, `M-12`, `M-14`. `L6` filmera celles-là et pas d'autres.
+
+**La route est publique, et le gel de surface l'a exigée par écrit.**
+`tests/test_public_surface.py` est passé au rouge à l'ajout de `GET /v1/threats`, en
+dev comme en production, jusqu'à ce que la route soit inscrite avec sa raison. C'est le
+comportement voulu : une route publique nouvelle ne passe pas la CI sans qu'on relise
+`FR-168` dans le diff qui l'ajoute.
+
+**Le chiffre qui a coûté la réunion, figé.** Un test tient l'écart `P1a` : 2 lignes
+bloquées, 3 facettes bloquées — et il échoue aussi le jour où les deux coïncideraient,
+parce qu'il ne prouverait alors plus rien.
 
 ---
 

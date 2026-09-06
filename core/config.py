@@ -73,6 +73,11 @@ class Settings(BaseSettings):
     signup_rate_limit: str = Field(default="10/hour", max_length=40)
     # Diagnostic public : ouvert et en écriture (il capture un lead), donc borné.
     triage_rate_limit: str = Field(default="20/hour", max_length=40)
+    # Relevé public des menaces : ouvert, mais en **lecture seule** d'un artefact déjà
+    # committé, sans base ni donnée personnelle. Il alimente un sélecteur de profils
+    # sur une page publique, donc plusieurs appels par visite sont normaux — d'où une
+    # borne bien plus large que le diagnostic, qui écrit.
+    threats_rate_limit: str = Field(default="120/minute", max_length=40)
 
     # --- Database (backend connection) — M1 ------------------------------
     # psycopg DSN. The backend connects as the DSN's own role and relies on table

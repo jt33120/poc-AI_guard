@@ -46,6 +46,11 @@ _PUBLIC = frozenset(
         ("GET", "/health/ready"),  # quatre booléens, cf. tests/test_health.py
         ("POST", "/v1/signup"),  # créer un compte suppose de ne pas en avoir
         ("POST", "/v1/triage"),  # le diagnostic public (`QO-7`)
+        # Le relevé des menaces (`L3`). Publique délibérément, et c'est la moitié de
+        # sa raison d'être : la faire passer par `/v1/triage` obligerait à donner son
+        # adresse pour lire une liste de menaces. En lecture seule d'un artefact déjà
+        # committé — aucune base, aucune donnée personnelle, aucune écriture.
+        ("GET", "/v1/threats"),
         # Les deux routes du proxy LLM s'authentifient **dans le handler**, par le
         # jeton porté dans le chemin : la dépendance FastAPI ne peut pas le faire,
         # le jeton n'étant pas un en-tête. Elles sont publiques au sens de ce garde
