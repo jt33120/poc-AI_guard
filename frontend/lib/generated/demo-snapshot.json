@@ -1,0 +1,898 @@
+{
+  "chainee": true,
+  "classes": {
+    "external_send": 6,
+    "irreversible": 8,
+    "read": 80,
+    "write": 15
+  },
+  "commit": "09d8e08",
+  "decisions": {
+    "allow": 93,
+    "deny": 3,
+    "expired": 1,
+    "hitl_approved": 3,
+    "hitl_denied": 1,
+    "hitl_pending": 3,
+    "monitor_hold": 5
+  },
+  "entrees": 109,
+  "genere_le": "2026-09-06 13:01 UTC",
+  "journal": [
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 10,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "write",
+      "decision": "allow",
+      "jours": 10,
+      "outil": "crm.update_mission",
+      "raison": null,
+      "regle": "crm.update_mission"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 9,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "write",
+      "decision": "allow",
+      "jours": 9,
+      "outil": "crm.update_mission",
+      "raison": null,
+      "regle": "crm.update_mission"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 9,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "write",
+      "decision": "allow",
+      "jours": 9,
+      "outil": "crm.update_mission",
+      "raison": null,
+      "regle": "crm.update_mission"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 9,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 9,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 9,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 9,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 9,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 9,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 9,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 9,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 9,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 9,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 9,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 9,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "external_send",
+      "decision": "hitl_pending",
+      "jours": 9,
+      "outil": "mail.send_proposal",
+      "raison": null,
+      "regle": "mail.send_proposal"
+    },
+    {
+      "classe": "external_send",
+      "decision": "hitl_approved",
+      "jours": 9,
+      "outil": "mail.send_proposal",
+      "raison": null,
+      "regle": "mail.send_proposal"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 8,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 8,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 8,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 8,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 8,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 8,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 8,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 8,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 8,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 8,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 8,
+      "outil": "shell.bash",
+      "raison": null,
+      "regle": "shell.bash"
+    },
+    {
+      "classe": "irreversible",
+      "decision": "hitl_pending",
+      "jours": 8,
+      "outil": "shell.bash",
+      "raison": null,
+      "regle": "shell.bash"
+    },
+    {
+      "classe": "irreversible",
+      "decision": "hitl_denied",
+      "jours": 8,
+      "outil": "shell.bash",
+      "raison": null,
+      "regle": "shell.bash"
+    },
+    {
+      "classe": "irreversible",
+      "decision": "monitor_hold",
+      "jours": 8,
+      "outil": "shell.bash",
+      "raison": null,
+      "regle": "shell.bash"
+    },
+    {
+      "classe": "write",
+      "decision": "monitor_hold",
+      "jours": 8,
+      "outil": "crm.update_mission",
+      "raison": null,
+      "regle": "crm.update_mission"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 8,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "irreversible",
+      "decision": "monitor_hold",
+      "jours": 7,
+      "outil": "shell.bash",
+      "raison": null,
+      "regle": "shell.bash"
+    },
+    {
+      "classe": "write",
+      "decision": "monitor_hold",
+      "jours": 7,
+      "outil": "crm.update_mission",
+      "raison": null,
+      "regle": "crm.update_mission"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 7,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 7,
+      "outil": "shell.bash",
+      "raison": null,
+      "regle": "shell.bash"
+    },
+    {
+      "classe": "irreversible",
+      "decision": "monitor_hold",
+      "jours": 7,
+      "outil": "shell.bash",
+      "raison": null,
+      "regle": "shell.bash"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 7,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 7,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 7,
+      "outil": "shell.bash",
+      "raison": null,
+      "regle": "shell.bash"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 7,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 7,
+      "outil": "shell.bash",
+      "raison": null,
+      "regle": "shell.bash"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 7,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 7,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 7,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "external_send",
+      "decision": "deny",
+      "jours": 7,
+      "outil": "mail.send_proposal",
+      "raison": null,
+      "regle": "mail.send_proposal"
+    },
+    {
+      "classe": "external_send",
+      "decision": "deny",
+      "jours": 6,
+      "outil": "mail.send_proposal",
+      "raison": null,
+      "regle": "mail.send_proposal"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 6,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "irreversible",
+      "decision": "hitl_pending",
+      "jours": 6,
+      "outil": "crm.delete_mission",
+      "raison": null,
+      "regle": "crm.delete_mission"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 5,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 5,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 5,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 5,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 5,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 5,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 5,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 5,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 5,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 5,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 5,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 5,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 5,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 5,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 5,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 5,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "irreversible",
+      "decision": "expired",
+      "jours": 5,
+      "outil": "crm.delete_mission",
+      "raison": null,
+      "regle": "crm.delete_mission"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 4,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "write",
+      "decision": "allow",
+      "jours": 4,
+      "outil": "crm.update_mission",
+      "raison": null,
+      "regle": "crm.update_mission"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 3,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "write",
+      "decision": "allow",
+      "jours": 3,
+      "outil": "crm.update_mission",
+      "raison": null,
+      "regle": "crm.update_mission"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 3,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "write",
+      "decision": "allow",
+      "jours": 3,
+      "outil": "crm.update_mission",
+      "raison": null,
+      "regle": "crm.update_mission"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 3,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "write",
+      "decision": "allow",
+      "jours": 3,
+      "outil": "crm.update_mission",
+      "raison": null,
+      "regle": "crm.update_mission"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 3,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "write",
+      "decision": "allow",
+      "jours": 3,
+      "outil": "crm.update_mission",
+      "raison": null,
+      "regle": "crm.update_mission"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 3,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "write",
+      "decision": "allow",
+      "jours": 3,
+      "outil": "crm.update_mission",
+      "raison": null,
+      "regle": "crm.update_mission"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 3,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 3,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 3,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "external_send",
+      "decision": "hitl_approved",
+      "jours": 3,
+      "outil": "mail.send_proposal",
+      "raison": null,
+      "regle": "mail.send_proposal"
+    },
+    {
+      "classe": "external_send",
+      "decision": "hitl_approved",
+      "jours": 2,
+      "outil": "mail.send_proposal",
+      "raison": null,
+      "regle": "mail.send_proposal"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 2,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "irreversible",
+      "decision": "deny",
+      "jours": 2,
+      "outil": "crm.delete_mission",
+      "raison": null,
+      "regle": "crm.delete_mission"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 1,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 1,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 1,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 1,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 1,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 1,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 1,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 1,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 1,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 1,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 1,
+      "outil": "crm.search_consultants",
+      "raison": null,
+      "regle": "crm.search_consultants"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 1,
+      "outil": "shell.bash",
+      "raison": null,
+      "regle": "shell.bash"
+    },
+    {
+      "classe": "write",
+      "decision": "allow",
+      "jours": 1,
+      "outil": "crm.update_mission",
+      "raison": null,
+      "regle": "crm.update_mission"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 0,
+      "outil": "shell.bash",
+      "raison": null,
+      "regle": "shell.bash"
+    },
+    {
+      "classe": "write",
+      "decision": "allow",
+      "jours": 0,
+      "outil": "crm.update_mission",
+      "raison": null,
+      "regle": "crm.update_mission"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 0,
+      "outil": "shell.bash",
+      "raison": null,
+      "regle": "shell.bash"
+    },
+    {
+      "classe": "write",
+      "decision": "allow",
+      "jours": 0,
+      "outil": "crm.update_mission",
+      "raison": null,
+      "regle": "crm.update_mission"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 0,
+      "outil": "shell.bash",
+      "raison": null,
+      "regle": "shell.bash"
+    },
+    {
+      "classe": "write",
+      "decision": "allow",
+      "jours": 0,
+      "outil": "crm.update_mission",
+      "raison": null,
+      "regle": "crm.update_mission"
+    },
+    {
+      "classe": "read",
+      "decision": "allow",
+      "jours": 0,
+      "outil": "shell.bash",
+      "raison": null,
+      "regle": "shell.bash"
+    }
+  ],
+  "jours_couverts": 11,
+  "outils": 5,
+  "tenant": "Meridian Conseil (démo)"
+}

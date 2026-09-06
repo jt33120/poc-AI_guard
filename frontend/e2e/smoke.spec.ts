@@ -412,3 +412,46 @@ test("le profil sur lequel nous perdons est publié sans qu'on ait à le cocher"
   await expect(section.getByText(/nous n'y bloquons rien/i)).toBeVisible();
   await expect(section.getByText(/aucune passerelle ne s'y intercale/i)).toBeVisible();
 });
+
+// --- L'instantané de démonstration (L8) ----------------------------------------
+//
+// Cette page affichait `governed: 8`, `allow: 124`, `review: 37`, `block: 9` — des
+// chiffres **écrits à la main**. Le tenant de démonstration réel en compte 5 gouvernés
+// et 93 autorisations : les chiffres inventés flattaient, comme le fait toujours un
+// chiffre inventé, sans qu'on l'ait décidé.
+
+test("l'aperçu public montre une lecture réelle, datée et signée", async ({ page }) => {
+  const reponse = await page.goto("/executive-preview");
+  const html = (await reponse?.text()) ?? "";
+
+  // Le bandeau de provenance : sans lui, un lecteur ne peut pas distinguer une lecture
+  // d'une maquette, et c'est précisément la distinction que ce produit vend.
+  await expect(page.getByText(/Instantané du tenant de démonstration/)).toBeVisible();
+  expect(html).toMatch(/commit [0-9a-f]{7}/);
+  await expect(page.getByText(/Chaîne d'audit vérifiée/)).toBeVisible();
+
+  // Et le journal, rendu par le serveur : un robot le voit, et un lecteur sans
+  // JavaScript aussi.
+  expect(html).toContain("crm.search_consultants");
+});
+
+test("les chiffres inventés ne peuvent pas revenir sur l'aperçu", async ({ page }) => {
+  await page.goto("/executive-preview");
+  const texte = await page.locator("body").innerText();
+
+  // Les quatre valeurs de l'échantillon retiré. Ce test ne vérifie pas une mise en
+  // page : il vérifie qu'on n'a pas réintroduit une affirmation sans preuve.
+  for (const invente of ["124", "37"]) {
+    expect(texte).not.toContain(invente);
+  }
+  // Et le « 100 % » de couverture, qui n'était pas démontrable : un taux demande un
+  // dénominateur, et une action non journalisée ne laisse aucune trace pour le fournir.
+  expect(texte).not.toContain("100%");
+});
+
+test("ce que l'instantané ne montre pas est dit, avec sa raison", async ({ page }) => {
+  await page.goto("/executive-preview");
+  // Pas de file d'approbation fabriquée : une demande en attente dans un instantané
+  // daté se lit comme une demande à laquelle personne n'a jamais répondu.
+  await expect(page.getByText(/Une file est vivante ou n'est pas/)).toBeVisible();
+});

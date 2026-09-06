@@ -6,7 +6,7 @@ COMPOSE ?= docker compose
 XSOM_API_PORT ?= 8000
 
 .PHONY: install frontend-install dev test verify demo lint fmt fmt-check typecheck audit \
-        coverage-gate coverage-map threat-rows marketing-facts replays migrations-manifest sovereignty-gate verify-frontend test-frontend seed-demo clean up down down-hard logs ps cli backup restore overhead overhead-gate
+        coverage-gate coverage-map threat-rows marketing-facts replays demo-snapshot migrations-manifest sovereignty-gate verify-frontend test-frontend seed-demo clean up down down-hard logs ps cli backup restore overhead overhead-gate
 
 install:           ## Install backend + frontend deps
 	$(UV) sync
@@ -82,6 +82,9 @@ marketing-facts:   ## Regenerate the publishable coverage facts (L4)
 
 replays:           ## Regenerate the audit replays from the last test run (L6)
 	$(UV) run python scripts/gen_replays.py
+
+demo-snapshot:     ## Regenerate the public demo snapshot from the last test run (L8)
+	$(UV) run python scripts/gen_demo.py
 
 migrations-manifest: ## Regenerate the shipped-migrations manifest (FR-167)
 	$(UV) run python -c "from core import migrate; migrate.MANIFEST.write_text(migrate.render_manifest(), encoding='utf-8')"

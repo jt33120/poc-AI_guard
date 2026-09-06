@@ -25,7 +25,14 @@ Ce que ce gate ne voit pas, dit plutôt que découvert plus tard :
   Aucune expression régulière ne distingue une prose honnête d'une exagération ;
 * le verbe « bloquer » **sans ligne nommée** est de la prose générique sur le mécanisme.
   `FR-175` fait déjà ce constat et compte les occurrences plutôt que de les refuser ;
-  ici aussi, le compte est affiché.
+  ici aussi, le compte est affiché ;
+* un chiffre et son mot de couverture **dans deux éléments différents** lui échappent.
+  `L8` en a trouvé un : une KPI dont la valeur `100%` était écrite en dur dans un objet
+  et dont le libellé « couverture d'audit » venait du dictionnaire, à deux nœuds de
+  distance. Élargir le motif jusqu'à les rapprocher signalerait tout nombre voisinant
+  un mot de couverture n'importe où dans un fichier, et un garde à ce taux-là est
+  débranché dans la semaine — le même arbitrage que pour `un` et `une`. Le trou est
+  donc déclaré ici plutôt que comblé de travers.
 
 Usage :
     uv run python scripts/gen_marketing.py           # écrit les faits
