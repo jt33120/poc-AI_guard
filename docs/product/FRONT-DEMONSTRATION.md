@@ -673,9 +673,22 @@ une pile vivante. C'est un lot en soi, avec sa propre chaîne de preuve.
 ## 6. Ce qui reste ouvert
 
 
-- **L'écriture sur `infra-xsom_website`.** Je n'y ai pas d'accès aujourd'hui. Si la
-  demande d'attachement échoue, la page d'entrée sera livrée comme un fichier prêt à
-  committer plutôt que poussée.
+- **La page d'entrée sur `infra-xsom_website` est livrée** — cette ligne disait que je
+  n'avais pas accès au dépôt ; c'est faux depuis qu'il est attaché. `/ai-guard.html` et
+  `/en/ai-guard.html` sont poussées en brouillon
+  ([`infra-xsom_website#8`](https://github.com/xsom-consulting/infra-xsom_website/pull/8)),
+  suivant les quatre étapes que le README du site documente pour ajouter une page.
+  **Non fusionnée délibérément** : ce dépôt publie sur `www.xsom.fr` dès la fusion sur
+  `main`, et mettre une page en ligne sur le site du cabinet est une décision éditoriale
+  qui revient à Julian, pas un lot à enchaîner.
+- **Le produit n'a pas d'URL publique**, ce que ce chantier a découvert en cherchant vers
+  quoi la page d'entrée pourrait pointer. Le déploiement Vercel `xsom-ai-guard` est
+  protégé par SSO (`x-robots-tag: noindex`, redirection vers `vercel.com/sso-api`), date
+  du 18 juin, et vient de la branche `claude/trusting-hopper-bguxin` dont le produit ne
+  correspond plus au dépôt : rien de `L0`→`L9` n'y est déployé. La page d'entrée appelle
+  donc à une démonstration sur rendez-vous, ce qui est de toute façon le mode d'accès
+  retenu. Déployer `main` reste à décider — c'est une mise en ligne publique, pas un
+  arbitrage de chantier.
 - **Les six correctifs de sécurité du §1.5** restent vrais même sans compte public
   partagé. Trois méritent d'être corrigés indépendamment de ce chantier : l'absence
   d'allowlist sur le proxy front, le rate limit inopérant derrière un edge, et la
