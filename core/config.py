@@ -17,10 +17,15 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 Env = Literal["dev", "staging", "prod"]
 
 #: Forme des revendications qu'un émetteur doit produire pour que ce déploiement
-#: sache lire ses jetons (`FR-195`). Vocabulaire **fermé** : une seule forme est
-#: servie aujourd'hui, et en nommer une inconnue arrête le démarrage plutôt que de
-#: laisser croire qu'elle est supportée.
-IssuerClaims = Literal["supabase_gotrue"]
+#: sache lire ses jetons (`FR-195`). Vocabulaire **fermé** : en nommer une inconnue
+#: arrête le démarrage plutôt que de laisser croire qu'elle est supportée.
+#:
+#: - ``supabase_gotrue`` : le jeton porte ``app_metadata.tenant_id`` et
+#:   ``app_metadata.role``, ce que lisent `api/security.py` et toute policy RLS.
+#: - ``oidc_groups`` : émetteur OIDC du client (`FR-196`). Le rôle se déduit des
+#:   groupes par ``ISSUER_GROUP_ROLES``, et le tenant vient de la revendication
+#:   nommée par ``ISSUER_TENANT_CLAIM``.
+IssuerClaims = Literal["supabase_gotrue", "oidc_groups"]
 
 
 class Settings(BaseSettings):
@@ -54,6 +59,12 @@ class Settings(BaseSettings):
     # déclarée, la sonde de readiness refuse de dire `issuer: true` : voir
     # ``issuer_serves_our_claims``.
     issuer_claims: IssuerClaims | None = Field(default=None)
+    # Fédération d'identité de la console (`FR-196`), lue seulement sous le profil
+    # ``oidc_groups``. La correspondance est déclarative et son vocabulaire de rôles
+    # est fermé : un rôle inconnu arrête le démarrage (`core/role_map.py`).
+    issuer_groups_claim: str = Field(default="groups", max_length=120)
+    issuer_group_roles: str | None = Field(default=None, max_length=2000)
+    issuer_tenant_claim: str = Field(default="app_metadata.tenant_id", max_length=120)
     supabase_jwt_audience: str = Field(default="authenticated", max_length=80)
     supabase_jwt_issuer: str | None = Field(default=None, max_length=400)
     # Service-role key for admin operations (self-serve signup). Backend ONLY,

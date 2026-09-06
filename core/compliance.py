@@ -24,7 +24,7 @@ from typing import Any
 
 import psycopg
 
-from core import audit, corpora, export, prompt_guard, shadow_ai, verdicts
+from core import audit, control_plane, corpora, export, prompt_guard, shadow_ai, verdicts
 from core import usage as usage_store
 from core.audit import EnforcementMode
 from core.monitor import NEVER_OBSERVED
@@ -353,6 +353,7 @@ EVIDENCE_SECTIONS: frozenset[str] = frozenset(
         "article_14_human_oversight.scope",
         "article_14_human_oversight.observation",
         "article_14_human_oversight.critical_decision_review",
+        "article_14_human_oversight.identity_federation",
         "article_26_deployer.decision_summary",
         "article_26_deployer.fria",
         "article_26_deployer.corpus_provenance",
@@ -418,6 +419,11 @@ def build_evidence_pack(
             # Elle vit sous l'article 14 parce que c'est l'article de la supervision,
             # et elle porte sa propre limite — ce qu'elle n'atteste pas.
             "critical_decision_review": critical_decision_review(conn),
+            # `FR-196` : les attributions de rôle déduites de l'IdP du client. Sous
+            # l'article 14 parce que « qui pouvait approuver, et depuis quand » est
+            # une question de supervision, pas une obligation d'exploitant. Publie
+            # des comptes et l'état de la chaîne, jamais un nom de groupe.
+            "identity_federation": control_plane.assignments_section(conn),
         },
         "article_26_deployer": {
             "decision_summary": base["summary"],

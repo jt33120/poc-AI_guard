@@ -16,15 +16,17 @@ Remettre les deux ensemble fait échouer `scripts/audit_sovereignty.py`.
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
+import psycopg
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import jwt
 from jose.exceptions import JWTError
 
-from core import db, read_tokens
+from core import control_plane, db, read_tokens, role_map
 from core.config import Settings
 from core.schemas import CurrentUser, Role
 
@@ -109,14 +111,101 @@ def build_verifier(settings: Settings) -> TokenVerifier:
     )
 
 
-def _user_from_claims(claims: dict[str, Any]) -> CurrentUser:
+@dataclass(frozen=True, slots=True)
+class Federation:
+    """La correspondance groupe→rôle d'un émetteur OIDC client (`FR-196`).
+
+    Construite une fois au démarrage : une correspondance malformée doit refuser de
+    démarrer, pas produire un 500 au premier login.
+    """
+
+    groups_claim: str
+    tenant_claim: str
+    group_roles: dict[str, Role]
+
+
+def build_federation(settings: Settings) -> Federation | None:
+    """La fédération déclarée, ou ``None`` si ce déploiement n'en a pas.
+
+    Rien n'est lu hors du profil ``oidc_groups`` : un déploiement Supabase existant ne
+    doit pas changer de comportement parce qu'une variable traîne dans son
+    environnement.
+    """
+    if settings.issuer_claims != "oidc_groups":
+        return None
+    return Federation(
+        groups_claim=settings.issuer_groups_claim,
+        tenant_claim=settings.issuer_tenant_claim,
+        group_roles=role_map.parse_group_roles(settings.issuer_group_roles),
+    )
+
+
+def _user_from_claims(claims: dict[str, Any], federation: Federation | None = None) -> CurrentUser:
+    """Le principal vérifié : sujet, tenant, rôle. Fail-closed sur chacun des trois.
+
+    ``app_metadata.role`` gagne quand il est présent — c'est la forme GoTrue, déjà
+    servie. La correspondance de groupes n'est consultée qu'à défaut, pour que la
+    fédération soit une porte de plus et non un changement de comportement.
+    """
     sub = claims.get("sub")
     if not sub:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
     app_metadata = claims.get("app_metadata") or {}
     role_raw = app_metadata.get("role")
-    role = Role(role_raw) if role_raw in _ROLE_VALUES else None
-    return CurrentUser(user_id=sub, tenant_id=app_metadata.get("tenant_id"), role=role)
+    if role_raw in _ROLE_VALUES:
+        return CurrentUser(
+            user_id=sub, tenant_id=app_metadata.get("tenant_id"), role=Role(role_raw)
+        )
+    if federation is None:
+        return CurrentUser(user_id=sub, tenant_id=app_metadata.get("tenant_id"), role=None)
+    groups = role_map.groups_in(claims, federation.groups_claim)
+    tenant = role_map.claim_at(claims, federation.tenant_claim)
+    return CurrentUser(
+        user_id=sub,
+        tenant_id=tenant if isinstance(tenant, str) else None,
+        role=role_map.role_for_groups(groups, federation.group_roles),
+    )
+
+
+def _record_federated_role(request: Request, user: CurrentUser, claims: dict[str, Any]) -> None:
+    """Écrire l'attribution de rôle déduite des groupes, si elle a changé.
+
+    `FR-196` exige que chaque attribution soit un événement de plan de contrôle.
+    Écrire à chaque requête noierait le journal sous ce qui ne s'est pas produit :
+    :func:`core.control_plane.record_assignment` ne grave que les changements.
+
+    **Ne concerne que le chemin fédéré.** Un ``app_metadata.role`` GoTrue a été
+    attribué par l'administrateur de l'IdP, pas déduit par nous ; il n'y a rien à
+    consigner, et le coût de la requête reste chez qui a choisi la fédération.
+
+    Un journal inaccessible refuse l'accès (503) plutôt que d'accorder un rôle sans
+    trace : une attribution non consignée est exactement le trou que ce FR ferme
+    (`CLAUDE.md` §4.4, §9). La console dépend de toute façon de la base.
+    """
+    federation: Federation | None = getattr(request.app.state, "federation", None)
+    if federation is None or user.role is None or not user.tenant_id:
+        return
+    url: str | None = request.app.state.database_url
+    if not url:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database not configured"
+        )
+    groups = role_map.groups_in(claims, federation.groups_claim)
+    try:
+        with db.connection(url) as conn:
+            control_plane.record_assignment(
+                conn,
+                tenant_id=user.tenant_id,
+                subject=user.user_id,
+                role=user.role,
+                groups=groups,
+            )
+            conn.commit()
+    except psycopg.Error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Control plane log unavailable",
+        ) from None
 
 
 _bearer = HTTPBearer(auto_error=False)
@@ -136,7 +225,9 @@ def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
         ) from None
-    return _user_from_claims(claims)
+    user = _user_from_claims(claims, getattr(request.app.state, "federation", None))
+    _record_federated_role(request, user, claims)
+    return user
 
 
 def get_ai_reader(
@@ -171,7 +262,9 @@ def get_ai_reader(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
         ) from None
-    return _user_from_claims(claims)
+    user = _user_from_claims(claims, getattr(request.app.state, "federation", None))
+    _record_federated_role(request, user, claims)
+    return user
 
 
 def require_role(*roles: Role) -> Callable[..., CurrentUser]:
