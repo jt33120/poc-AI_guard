@@ -106,7 +106,7 @@ class ArgumentRule(BaseModel):
     a policy that can compute is a policy nobody can review.
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     field: str = Field(min_length=1, max_length=100)
     action_class: ActionClass = Field(alias="class")
@@ -150,14 +150,14 @@ class ArgumentClass(BaseModel):
     author states the worst their tool can do instead of inheriting a guess.
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     rules: list[ArgumentRule] = Field(min_length=1)
     otherwise: ActionClass
 
 
 class ToolRule(BaseModel):
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    model_config = ConfigDict(extra="forbid", populate_by_name=True, frozen=True)
 
     name: str = Field(min_length=1, max_length=200)
     action_class: ActionClass | None = Field(default=None, alias="class")
@@ -203,7 +203,7 @@ class RiskBands(BaseModel):
     """Ascending score ceilings (1-100) that map a risk score to an approval tier:
     ``<auto`` → auto, ``<notify`` → notify, ``<hitl`` → human_in_the_loop, else deny."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     auto: int = Field(default=30, ge=1, le=100)
     notify: int = Field(default=60, ge=1, le=100)
@@ -217,7 +217,7 @@ class RiskBands(BaseModel):
 
 
 class PolicyDefaults(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     @model_validator(mode="before")
     @classmethod
@@ -265,7 +265,7 @@ class PolicyDefaults(BaseModel):
 
 
 class Policy(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     tools: list[ToolRule] = Field(default_factory=list)
     defaults: PolicyDefaults = Field(default_factory=PolicyDefaults)
