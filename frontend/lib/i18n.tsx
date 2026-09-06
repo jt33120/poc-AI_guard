@@ -17,8 +17,8 @@ export const STR = {
 
   "common.loading": { en: "Loading…", fr: "Chargement…" },
   "common.waking": {
-    en: "Waking the secure backend — the first load after a quiet period can take up to a minute.",
-    fr: "Réveil du serveur sécurisé — le premier chargement après une période d'inactivité peut prendre jusqu'à une minute.",
+    en: "Waking the secure backend: the first load after a quiet period can take up to a minute.",
+    fr: "Réveil du serveur sécurisé : le premier chargement après une période d'inactivité peut prendre jusqu'à une minute.",
   },
 
   // Public profile diagnostic (QO-7)
@@ -48,8 +48,8 @@ export const STR = {
   },
   "triage.p3": { en: "Tooled agents that act", fr: "Agents outillés qui agissent" },
   "triage.p3.hint": {
-    en: "The AI sends, writes, pays or deploys — it does not only answer.",
-    fr: "L'IA envoie, écrit, paie ou déploie — elle ne fait pas que répondre.",
+    en: "The AI sends, writes, pays or deploys. It does not only answer.",
+    fr: "L'IA envoie, écrit, paie ou déploie. Elle ne fait pas que répondre.",
   },
   "triage.p4": { en: "Self-hosted open weights", fr: "Poids ouverts auto-hébergés" },
   "triage.p4.hint": {
@@ -65,8 +65,8 @@ export const STR = {
   "triage.submit": { en: "See my diagnostic", fr: "Voir mon diagnostic" },
   "triage.busy": { en: "Computing…", fr: "Calcul en cours…" },
   "triage.needprofile": {
-    en: "Tick at least one — the diagnostic is the crossing of your usage with what we prove.",
-    fr: "Cochez-en au moins un — le diagnostic est le croisement de votre usage avec ce que nous prouvons.",
+    en: "Tick at least one: the diagnostic is the crossing of your usage with what we prove.",
+    fr: "Cochez-en au moins un : le diagnostic est le croisement de votre usage avec ce que nous prouvons.",
   },
   "triage.failed": { en: "The diagnostic could not be computed.", fr: "Le diagnostic n'a pas pu être calculé." },
   "triage.result.lines": { en: "threat lines", fr: "lignes de menace" },
@@ -99,23 +99,23 @@ export const STR = {
 
   "welcome.p1.title": { en: "Control what the agent does", fr: "Contrôler ce que l'agent fait" },
   "welcome.p1.body": {
-    en: "Not a prompt filter — a gate on real actions: sending emails, deleting records, deploying. Each call is allowed, held, or blocked by your policy.",
-    fr: "Pas un filtre de prompt — un contrôle sur les actions réelles : envoyer un email, supprimer un enregistrement, déployer. Chaque appel est autorisé, retenu ou bloqué selon votre politique.",
+    en: "Not a prompt filter, but a gate on real actions: sending emails, deleting records, deploying. Each call is allowed, held, or blocked by your policy.",
+    fr: "Pas un filtre de prompt, mais un contrôle sur les actions réelles : envoyer un email, supprimer un enregistrement, déployer. Chaque appel est autorisé, retenu ou bloqué selon votre politique.",
   },
   "welcome.p2.title": { en: "Human in the loop", fr: "L'humain dans la boucle" },
   "welcome.p2.body": {
-    en: "Irreversible actions pause for a human decision. Nothing critical happens without explicit approval — and you can require two approvers for the riskiest moves.",
-    fr: "Les actions irréversibles s'arrêtent pour une décision humaine. Rien de critique ne se produit sans validation explicite — et vous pouvez exiger deux validateurs pour les opérations les plus sensibles.",
+    en: "Irreversible actions pause for a human decision. Nothing critical happens without explicit approval, and you can require two approvers for the riskiest moves.",
+    fr: "Les actions irréversibles s'arrêtent pour une décision humaine. Rien de critique ne se produit sans validation explicite, et vous pouvez exiger deux validateurs pour les opérations les plus sensibles.",
   },
   "welcome.p3.title": { en: "Compliance-ready audit", fr: "Audit prêt pour la conformité" },
   "welcome.p3.body": {
-    en: "An immutable, hash-chained log of every decision and approval — your evidence for the EU AI Act and GDPR, exportable in one click.",
-    fr: "Un journal immuable et chaîné par hash de chaque décision et validation — votre preuve pour l'AI Act européen et le RGPD, exportable en un clic.",
+    en: "An immutable, hash-chained log of every decision and approval. Your evidence for the EU AI Act and GDPR, exportable in one click.",
+    fr: "Un journal immuable et chaîné par hash de chaque décision et validation. Votre preuve pour l'AI Act européen et le RGPD, exportable en un clic.",
   },
   "welcome.monitors.title": { en: "What it monitors", fr: "Ce qu'il surveille" },
   "welcome.monitors.body": {
-    en: "Every tool-call your agent makes — reads run automatically; sensitive sends and irreversible operations are gated and logged.",
-    fr: "Chaque appel d'outil de votre agent — les lectures passent automatiquement ; les envois sensibles et les opérations irréversibles sont contrôlés et journalisés.",
+    en: "Every tool-call your agent makes: reads run automatically; sensitive sends and irreversible operations are gated and logged.",
+    fr: "Chaque appel d'outil de votre agent : les lectures passent automatiquement ; les envois sensibles et les opérations irréversibles sont contrôlés et journalisés.",
   },
 
   // ── Public landing (pre-login marketing) ─────────────────────────────
@@ -126,12 +126,12 @@ export const STR = {
     fr: "Gouvernance des actions pour agents IA",
   },
   "land.hero.title": {
-    en: "Ship AI agents to production — without losing control.",
-    fr: "Déployez vos agents IA en production — sans perdre le contrôle.",
+    en: "Ship AI agents to production. Without losing control.",
+    fr: "Déployez vos agents IA en production. Sans perdre le contrôle.",
   },
   "land.hero.sub": {
-    en: "xSOM AI Guard sits between your agent and the tools it uses. Every action is checked against your policy, paused for human approval when it's irreversible, and written to a tamper-proof audit trail — so you get the productivity of autonomous agents with the control your business and regulators require.",
-    fr: "xSOM AI Guard s'intercale entre votre agent et les outils qu'il utilise. Chaque action est vérifiée selon votre politique, suspendue pour validation humaine si elle est irréversible, et inscrite dans un journal d'audit inviolable — la productivité des agents autonomes, avec le contrôle qu'exigent votre entreprise et vos régulateurs.",
+    en: "xSOM AI Guard sits between your agent and the tools it uses. Every action is checked against your policy, paused for human approval when it's irreversible, and written to a tamper-proof audit trail. You get the productivity of autonomous agents with the control your business and regulators require.",
+    fr: "xSOM AI Guard s'intercale entre votre agent et les outils qu'il utilise. Chaque action est vérifiée selon votre politique, suspendue pour validation humaine si elle est irréversible, et inscrite dans un journal d'audit inviolable. Vous obtenez la productivité des agents autonomes, avec le contrôle qu'exigent votre entreprise et vos régulateurs.",
   },
   "land.hero.cta": { en: "Open the console", fr: "Ouvrir la console" },
   "land.hero.cta2": { en: "See how it works", fr: "Voir comment ça marche" },
@@ -140,26 +140,6 @@ export const STR = {
     fr: "Conçu pour l'AI Act européen et le RGPD",
   },
 
-  "land.stat.1.v": { en: "100%", fr: "100%" },
-  "land.stat.1.l": {
-    en: "of irreversible actions held for human approval",
-    fr: "des actions irréversibles soumises à validation humaine",
-  },
-  "land.stat.2.v": { en: "0", fr: "0" },
-  "land.stat.2.l": {
-    en: "actions executed without a policy decision",
-    fr: "action exécutée sans décision de politique",
-  },
-  "land.stat.3.v": { en: "< 1s", fr: "< 1s" },
-  "land.stat.3.l": {
-    en: "deterministic decision on every tool-call",
-    fr: "décision déterministe à chaque appel d'outil",
-  },
-  "land.stat.4.v": { en: "2 clicks", fr: "2 clics" },
-  "land.stat.4.l": {
-    en: "to export AI Act & GDPR evidence",
-    fr: "pour exporter les preuves AI Act & RGPD",
-  },
 
   "land.problem.kicker": { en: "The problem", fr: "Le problème" },
   "land.problem.title": {
@@ -167,8 +147,8 @@ export const STR = {
     fr: "Les agents IA ne font pas que parler. Ils agissent.",
   },
   "land.problem.body": {
-    en: "They send emails, update records, move money, delete data, call internal APIs. A prompt filter can't stop a bad action — by the time the text is generated, the action is one tool-call away. You need a control point on what the agent does, not just on what it says.",
-    fr: "Ils envoient des emails, modifient des enregistrements, déplacent de l'argent, suppriment des données, appellent des API internes. Un filtre de prompt ne peut pas arrêter une mauvaise action — quand le texte est généré, l'action n'est qu'à un appel d'outil. Il faut un point de contrôle sur ce que l'agent fait, pas seulement sur ce qu'il dit.",
+    en: "They send emails, update records, move money, delete data, call internal APIs. A prompt filter can't stop a bad action: by the time the text is generated, the action is one tool-call away. You need a control point on what the agent does, not just on what it says.",
+    fr: "Ils envoient des emails, modifient des enregistrements, déplacent de l'argent, suppriment des données, appellent des API internes. Un filtre de prompt ne peut pas arrêter une mauvaise action : quand le texte est généré, l'action n'est qu'à un appel d'outil. Il faut un point de contrôle sur ce que l'agent fait, pas seulement sur ce qu'il dit.",
   },
 
   "land.how.kicker": { en: "How it works", fr: "Comment ça marche" },
@@ -193,8 +173,8 @@ export const STR = {
   },
   "land.how.s1.t": { en: "1 · Classify", fr: "1 · Classer" },
   "land.how.s1.b": {
-    en: "Every tool-call is classified — read, write, external send, or irreversible.",
-    fr: "Chaque appel d'outil est classé — lecture, écriture, envoi externe ou irréversible.",
+    en: "Every tool-call is classified: read, write, external send, or irreversible.",
+    fr: "Chaque appel d'outil est classé : lecture, écriture, envoi externe ou irréversible.",
   },
   "land.how.s2.t": { en: "2 · Decide", fr: "2 · Décider" },
   "land.how.s2.b": {
@@ -211,18 +191,18 @@ export const STR = {
   "land.feat.title": { en: "Everything you need to trust an agent", fr: "Tout pour faire confiance à un agent" },
   "land.feat.1.t": { en: "Control actions, not prompts", fr: "Contrôler les actions, pas les prompts" },
   "land.feat.1.b": {
-    en: "A gate on real operations — not a text filter. Allow, block, or pause any tool-call.",
-    fr: "Un contrôle des opérations réelles — pas un filtre de texte. Autoriser, bloquer ou suspendre chaque appel d'outil.",
+    en: "A gate on real operations, not a text filter. Allow, block, or pause any tool-call.",
+    fr: "Un contrôle des opérations réelles, pas un filtre de texte. Autoriser, bloquer ou suspendre chaque appel d'outil.",
   },
   "land.feat.2.t": { en: "Human in the loop", fr: "L'humain dans la boucle" },
   "land.feat.2.b": {
-    en: "Irreversible actions pause for explicit approval — with dual control for the riskiest moves.",
-    fr: "Les actions irréversibles s'arrêtent pour validation explicite — avec double validation pour les plus sensibles.",
+    en: "Irreversible actions pause for explicit approval, with dual control for the riskiest moves.",
+    fr: "Les actions irréversibles s'arrêtent pour validation explicite, avec double validation pour les plus sensibles.",
   },
   "land.feat.3.t": { en: "Tamper-proof audit", fr: "Audit inviolable" },
   "land.feat.3.b": {
-    en: "Every decision hash-chained and append-only. Prove what your agents did — and didn't do.",
-    fr: "Chaque décision chaînée par hash et append-only. Prouvez ce que vos agents ont fait — et n'ont pas fait.",
+    en: "Every decision hash-chained and append-only. Prove what your agents did, and what they didn't.",
+    fr: "Chaque décision chaînée par hash et append-only. Prouvez ce que vos agents ont fait, et ce qu'ils n'ont pas fait.",
   },
   "land.feat.4.t": { en: "Compliance, exported", fr: "Conformité, exportée" },
   "land.feat.4.b": {
@@ -259,8 +239,8 @@ export const STR = {
   },
   "land.who.2.t": { en: "Internal copilots", fr: "Copilotes internes" },
   "land.who.2.b": {
-    en: "Let employees' AI tools act on real systems — safely.",
-    fr: "Laissez les outils IA des employés agir sur les vrais systèmes — en toute sécurité.",
+    en: "Let employees' AI tools act on real systems, safely.",
+    fr: "Laissez les outils IA des employés agir sur les vrais systèmes, en toute sécurité.",
   },
   "land.who.3.t": { en: "Back-office automation", fr: "Automatisation back-office" },
   "land.who.3.b": {
@@ -269,8 +249,8 @@ export const STR = {
   },
 
   "land.cta.title": {
-    en: "Put your agents to work — under control.",
-    fr: "Mettez vos agents au travail — sous contrôle.",
+    en: "Put your agents to work, under control.",
+    fr: "Mettez vos agents au travail, sous contrôle.",
   },
   "land.cta.body": {
     en: "Explore the live console, or talk to us about your agents.",
@@ -337,8 +317,8 @@ export const STR = {
     fr: "Le catalogue des actions que votre agent peut effectuer, avec le type et la décision de politique pour chacune. Commencez ici pour voir ce qui est surveillé.",
   },
   "home.pages.approvals.b": {
-    en: "The human-in-the-loop queue. Each card shows a dry-run of an irreversible action — approve or deny. Some require two distinct approvers.",
-    fr: "La file de validation humaine. Chaque carte montre un dry-run d'une action irréversible — approuvez ou refusez. Certaines exigent deux validateurs distincts.",
+    en: "The human-in-the-loop queue. Each card shows a dry-run of an irreversible action: approve or deny. Some require two distinct approvers.",
+    fr: "La file de validation humaine. Chaque carte montre un dry-run d'une action irréversible : approuvez ou refusez. Certaines exigent deux validateurs distincts.",
   },
   "home.pages.audit.b": {
     en: "The immutable, hash-chained record of every decision. Read the chain and export compliance evidence in one click.",
@@ -352,14 +332,14 @@ export const STR = {
 
   "home.legend.title": { en: "Reading the badges", fr: "Lire les badges" },
   "home.legend.green": {
-    en: "Green — allowed automatically",
-    fr: "Vert — autorisé automatiquement",
+    en: "Green: allowed automatically",
+    fr: "Vert : autorisé automatiquement",
   },
   "home.legend.amber": {
-    en: "Amber — held for human approval",
-    fr: "Ambre — en attente de validation humaine",
+    en: "Amber: held for human approval",
+    fr: "Ambre : en attente de validation humaine",
   },
-  "home.legend.red": { en: "Red — blocked by policy", fr: "Rouge — bloqué par la politique" },
+  "home.legend.red": { en: "Red: blocked by policy", fr: "Rouge : bloqué par la politique" },
 
   "home.tech.title": { en: "Under the hood", fr: "Sous le capot" },
   "home.tech.body": {
@@ -372,8 +352,8 @@ export const STR = {
   "nav.costs": { en: "Costs", fr: "Coûts" },
   "exec.title": { en: "Executive summary", fr: "Synthèse exécutive" },
   "exec.subtitle": {
-    en: "How xSOM keeps your AI agents productive, safe, and compliant — at a glance.",
-    fr: "Comment xSOM garde vos agents IA productifs, sûrs et conformes — en un coup d'œil.",
+    en: "How xSOM keeps your AI agents productive, safe, and compliant, at a glance.",
+    fr: "Comment xSOM garde vos agents IA productifs, sûrs et conformes, en un coup d'œil.",
   },
   "exec.kpi.governed.l": { en: "Actions under governance", fr: "Actions sous gouvernance" },
   "exec.kpi.governed.s": {
@@ -398,8 +378,8 @@ export const STR = {
   "exec.means.title": { en: "What this means for you", fr: "Ce que cela signifie pour vous" },
   "exec.means.1.t": { en: "You stay in control", fr: "Vous gardez le contrôle" },
   "exec.means.1.b": {
-    en: "You decide what your AI can and can't do — enforced automatically on every action, not left to the model.",
-    fr: "Vous décidez ce que votre IA peut faire ou non — appliqué automatiquement à chaque action, sans dépendre du modèle.",
+    en: "You decide what your AI can and can't do. The rule is enforced on every action, not left to the model.",
+    fr: "Vous décidez ce que votre IA peut faire ou non. La règle s'applique à chaque action, sans dépendre du modèle.",
   },
   "exec.means.2.t": { en: "Nothing risky slips through", fr: "Rien de risqué ne passe" },
   "exec.means.2.b": {
@@ -408,8 +388,8 @@ export const STR = {
   },
   "exec.means.3.t": { en: "You can prove it", fr: "Vous pouvez le prouver" },
   "exec.means.3.b": {
-    en: "A complete, tamper-proof record of every decision — ready for auditors and regulators in one click.",
-    fr: "Un registre complet et inviolable de chaque décision — prêt pour auditeurs et régulateurs en un clic.",
+    en: "A complete, tamper-proof record of every decision, ready for auditors and regulators in one click.",
+    fr: "Un registre complet et inviolable de chaque décision, prêt pour auditeurs et régulateurs en un clic.",
   },
   "exec.chart.title": {
     en: "What happened to your agents' actions",
@@ -424,16 +404,16 @@ export const STR = {
   },
   "exec.comp.title": { en: "Compliance-ready", fr: "Prêt pour la conformité" },
   "exec.comp.body": {
-    en: "EU AI Act human-oversight and record-keeping, plus GDPR-friendly data handling — evidence you can export anytime.",
-    fr: "Supervision humaine et traçabilité de l'AI Act européen, plus un traitement des données conforme au RGPD — des preuves exportables à tout moment.",
+    en: "EU AI Act human-oversight and record-keeping, plus GDPR-friendly data handling. Evidence you can export anytime.",
+    fr: "Supervision humaine et traçabilité de l'AI Act européen, plus un traitement des données conforme au RGPD. Des preuves exportables à tout moment.",
   },
   "exec.bottom": {
-    en: "The bottom line: the productivity of autonomous AI — without the blind trust.",
-    fr: "En résumé : la productivité de l'IA autonome — sans la confiance aveugle.",
+    en: "The bottom line: the productivity of autonomous AI, without the blind trust.",
+    fr: "En résumé : la productivité de l'IA autonome, sans la confiance aveugle.",
   },
   "exec.preview.note": {
-    en: "Preview — illustrative sample data. Your live numbers appear once your agents are connected.",
-    fr: "Aperçu — données d'exemple illustratives. Vos chiffres réels s'affichent une fois vos agents connectés.",
+    en: "Preview: illustrative sample data. Your live numbers appear once your agents are connected.",
+    fr: "Aperçu : données d'exemple illustratives. Vos chiffres réels s'affichent une fois vos agents connectés.",
   },
   "land.exec.link": { en: "Executive snapshot", fr: "Synthèse pour dirigeants" },
 
@@ -441,8 +421,8 @@ export const STR = {
   "nav.onboard": { en: "Connect agent", fr: "Connecter un agent" },
   "onb.title": { en: "Connect an agent", fr: "Connecter un agent" },
   "onb.subtitle": {
-    en: "Put your agent under control in three steps — no YAML to write.",
-    fr: "Mettez votre agent sous contrôle en trois étapes — sans écrire de YAML.",
+    en: "Put your agent under control in three steps, with no YAML to write.",
+    fr: "Mettez votre agent sous contrôle en trois étapes, sans écrire de YAML.",
   },
   "onb.s1": { en: "Agent", fr: "Agent" },
   "onb.s2": { en: "Protection", fr: "Protection" },
@@ -475,8 +455,8 @@ export const STR = {
   "onb.tpl.mode.template": { en: "Use a template", fr: "Utiliser un modèle" },
   "onb.tpl.mode.ai": { en: "Describe it (AI)", fr: "Décrire (IA)" },
   "onb.ai.ready": {
-    en: "Policy drafted — continue to get your key.",
-    fr: "Politique générée — continuez pour obtenir votre clé.",
+    en: "Policy drafted. Continue to get your key.",
+    fr: "Politique générée. Continuez pour obtenir votre clé.",
   },
   "onb.generate": { en: "Generate key & apply", fr: "Générer la clé & appliquer" },
   "onb.generating": { en: "Setting up…", fr: "Configuration…" },
@@ -486,8 +466,8 @@ export const STR = {
   },
   "onb.key.title": { en: "Your agent's API key", fr: "La clé d'API de votre agent" },
   "onb.key.note": {
-    en: "Copy it now — it's shown only once.",
-    fr: "Copiez-la maintenant — affichée une seule fois.",
+    en: "Copy it now: it is shown only once.",
+    fr: "Copiez-la maintenant : elle n'est affichée qu'une fois.",
   },
   "onb.snippet.title": { en: "Drop this into your agent", fr: "Ajoutez ceci à votre agent" },
   "onb.snippet.note": {
@@ -517,7 +497,7 @@ export const STR = {
   "login.securing": { en: "Securing your session", fr: "Sécurisation de votre session" },
   "login.failed": { en: "Sign in failed", fr: "Échec de la connexion" },
   "login.forgot": { en: "Forgot password?", fr: "Mot de passe oublié ?" },
-  "login.footer": { en: "Every agent action — authorized, gated, and logged.", fr: "Chaque action d'agent — autorisée, contrôlée et journalisée." },
+  "login.footer": { en: "Every agent action: authorized, gated, and logged.", fr: "Chaque action d'agent : autorisée, contrôlée et journalisée." },
 
   // Forgot / reset password
   "forgot.title": { en: "Reset your password", fr: "Réinitialiser le mot de passe" },
@@ -538,10 +518,10 @@ export const STR = {
   "reset.confirm": { en: "Confirm password", fr: "Confirmer le mot de passe" },
   "reset.submit": { en: "Update password", fr: "Mettre à jour" },
   "reset.saving": { en: "Updating…", fr: "Mise à jour…" },
-  "reset.success": { en: "Password updated — redirecting you to sign in…", fr: "Mot de passe mis à jour — redirection vers la connexion…" },
+  "reset.success": { en: "Password updated. Redirecting you to sign in…", fr: "Mot de passe mis à jour. Redirection vers la connexion…" },
   "reset.tooshort": { en: "Password must be at least 8 characters.", fr: "Le mot de passe doit comporter au moins 8 caractères." },
   "reset.mismatch": { en: "The two passwords don't match.", fr: "Les deux mots de passe ne correspondent pas." },
-  "reset.invalid": { en: "This reset link is invalid or has expired — request a new one.", fr: "Ce lien est invalide ou expiré — demandez-en un nouveau." },
+  "reset.invalid": { en: "This reset link is invalid or has expired. Request a new one.", fr: "Ce lien est invalide ou expiré. Demandez-en un nouveau." },
 
   // Inspector
   "inspector.title": { en: "Inspector", fr: "Inspecteur" },
@@ -549,7 +529,7 @@ export const STR = {
   "inspector.col.tool": { en: "Action", fr: "Action" },
   "inspector.col.class": { en: "Type", fr: "Type" },
   "inspector.col.decision": { en: "Policy", fr: "Politique" },
-  "inspector.empty": { en: "No actions defined yet — set them in the policy editor (Admin).", fr: "Aucune action définie — configurez-les dans l'éditeur de politique (Admin)." },
+  "inspector.empty": { en: "No actions defined yet. Set them in the policy editor (Admin).", fr: "Aucune action définie. Configurez-les dans l'éditeur de politique (Admin)." },
 
   // Approvals
   "approvals.title": { en: "Approval queue", fr: "File de validation" },
@@ -558,9 +538,9 @@ export const STR = {
   "approvals.count": { en: "approvals", fr: "validations" },
   "approvals.approve": { en: "Approve", fr: "Approuver" },
   "approvals.deny": { en: "Deny", fr: "Refuser" },
-  "approvals.approved": { en: "Approved — the agent may proceed.", fr: "Approuvée — l'agent peut continuer." },
-  "approvals.denied": { en: "Denied — the action is blocked.", fr: "Refusée — l'action est bloquée." },
-  "approvals.recorded": { en: "Your approval is recorded — a second, different approver is still required.", fr: "Votre validation est enregistrée — un second validateur distinct est requis." },
+  "approvals.approved": { en: "Approved: the agent may proceed.", fr: "Approuvée : l'agent peut continuer." },
+  "approvals.denied": { en: "Denied: the action is blocked.", fr: "Refusée : l'action est bloquée." },
+  "approvals.recorded": { en: "Your approval is recorded. A second, different approver is still required.", fr: "Votre validation est enregistrée. Un second validateur distinct est requis." },
   "approvals.deciding": { en: "Working…", fr: "Traitement…" },
   "approvals.status.pending": { en: "Pending", fr: "En attente" },
 
@@ -583,8 +563,8 @@ export const STR = {
   "admin.policy.invalid": { en: "Invalid policy:", fr: "Politique invalide :" },
   "admin.ai.title": { en: "Describe it, we'll write the policy", fr: "Décrivez-la, on écrit la politique" },
   "admin.ai.hint": {
-    en: "Plain words — e.g. “reads the CRM and emails candidates; never delete anything; deleting a database needs two approvers”.",
-    fr: "En langage courant — ex. « lit le CRM et envoie des emails aux candidats ; ne jamais supprimer ; supprimer une base demande deux validateurs ».",
+    en: "Plain words. For example: “reads the CRM and emails candidates; never delete anything; deleting a database needs two approvers”.",
+    fr: "En langage courant. Par exemple : « lit le CRM et envoie des emails aux candidats ; ne jamais supprimer ; supprimer une base demande deux validateurs ».",
   },
   "admin.ai.ph": {
     en: "Describe what your agent does and your rules…",
@@ -593,14 +573,14 @@ export const STR = {
   "admin.ai.generate": { en: "Generate with AI", fr: "Générer avec l'IA" },
   "admin.ai.generating": { en: "Generating…", fr: "Génération…" },
   "admin.ai.review": {
-    en: "Draft ready below — review it, then Save policy to apply.",
-    fr: "Brouillon prêt ci-dessous — vérifiez-le, puis Enregistrer pour appliquer.",
+    en: "Draft ready below. Review it, then Save policy to apply.",
+    fr: "Brouillon prêt ci-dessous. Vérifiez-le, puis Enregistrer pour appliquer.",
   },
   "admin.ai.unavailable": {
     en: "The AI assistant isn't configured yet (no Mistral key on the server).",
     fr: "L'assistant IA n'est pas encore configuré (pas de clé Mistral sur le serveur).",
   },
-  "admin.ai.error": { en: "Couldn't generate a policy — try rephrasing.", fr: "Génération impossible — reformulez." },
+  "admin.ai.error": { en: "Couldn't generate a policy. Try rephrasing.", fr: "Génération impossible. Reformulez." },
   "admin.servers.title": { en: "Downstream servers", fr: "Serveurs en aval" },
   "admin.servers.empty": { en: "No servers declared.", fr: "Aucun serveur déclaré." },
 
@@ -609,7 +589,7 @@ export const STR = {
   "keys.subtitle": { en: "Tokens for agents calling /v1/authorize. The secret is shown once at creation.", fr: "Jetons pour les agents appelant /v1/authorize. Le secret est affiché une seule fois à la création." },
   "keys.placeholder": { en: "Key name (e.g. uti-agent)", fr: "Nom de la clé (ex. uti-agent)" },
   "keys.generate": { en: "Generate", fr: "Générer" },
-  "keys.created": { en: "New key “{name}” — copy it now, it won't be shown again.", fr: "Nouvelle clé « {name} » — copiez-la maintenant, elle ne sera plus affichée." },
+  "keys.created": { en: "New key “{name}”. Copy it now, it won't be shown again.", fr: "Nouvelle clé « {name} ». Copiez-la maintenant, elle ne sera plus affichée." },
   "keys.active": { en: "active", fr: "active" },
   "keys.revoked": { en: "revoked", fr: "révoquée" },
   "keys.never": { en: "never used", fr: "jamais utilisée" },
@@ -620,13 +600,13 @@ export const STR = {
 
   // Action-class explanations (tooltips)
   "class.read": { en: "Read", fr: "Lecture" },
-  "class.read.desc": { en: "Reads data only — allowed automatically, no risk.", fr: "Lecture de données uniquement — autorisé automatiquement, sans risque." },
+  "class.read.desc": { en: "Reads data only: allowed automatically, no risk.", fr: "Lecture de données uniquement : autorisé automatiquement, sans risque." },
   "class.write": { en: "Write", fr: "Écriture" },
-  "class.write.desc": { en: "Changes data but is reversible — allowed automatically.", fr: "Modifie des données mais réversible — autorisé automatiquement." },
+  "class.write.desc": { en: "Changes data but is reversible: allowed automatically.", fr: "Modifie des données mais réversible : autorisé automatiquement." },
   "class.external_send": { en: "External send", fr: "Envoi externe" },
-  "class.external_send.desc": { en: "Sends something outside (email, message) — held for human approval.", fr: "Envoie quelque chose à l'extérieur (email, message) — retenu pour validation humaine." },
+  "class.external_send.desc": { en: "Sends something outside (email, message): held for human approval.", fr: "Envoie quelque chose à l'extérieur (email, message) : retenu pour validation humaine." },
   "class.irreversible": { en: "Irreversible", fr: "Irréversible" },
-  "class.irreversible.desc": { en: "Cannot be undone (delete, deploy) — held for human approval.", fr: "Ne peut être annulé (suppression, déploiement) — retenu pour validation humaine." },
+  "class.irreversible.desc": { en: "Cannot be undone (delete, deploy): held for human approval.", fr: "Ne peut être annulé (suppression, déploiement) : retenu pour validation humaine." },
   // Decisions
   "dec.allow": { en: "Allowed automatically.", fr: "Autorisé automatiquement." },
   "dec.deny": { en: "Blocked by policy.", fr: "Bloqué par la politique." },
@@ -655,8 +635,8 @@ export const STR = {
   // ── Costs / token monitoring ─────────────────────────────────────────────
   "costs.title": { en: "Token & cost monitoring", fr: "Suivi des tokens & des coûts" },
   "costs.subtitle": {
-    en: "Every completion your agents run through xSOM — token usage and estimated spend, by provider, model and agent. One pane across OpenAI, Anthropic, Mistral and OpenRouter.",
-    fr: "Chaque complétion que vos agents passent par xSOM — consommation de tokens et coût estimé, par provider, modèle et agent. Une seule vue pour OpenAI, Anthropic, Mistral et OpenRouter.",
+    en: "Every completion your agents run through xSOM: token usage and estimated spend, by provider, model and agent. One pane across OpenAI, Anthropic, Mistral and OpenRouter.",
+    fr: "Chaque complétion que vos agents passent par xSOM : consommation de tokens et coût estimé, par provider, modèle et agent. Une seule vue pour OpenAI, Anthropic, Mistral et OpenRouter.",
   },
   "costs.kpi.spend": { en: "Estimated spend", fr: "Coût estimé" },
   "costs.kpi.tokens": { en: "Total tokens", fr: "Tokens totaux" },
@@ -675,8 +655,8 @@ export const STR = {
   "costs.col.calls": { en: "Calls", fr: "Appels" },
   "costs.col.cost": { en: "Cost", fr: "Coût" },
   "costs.estimate.note": {
-    en: "Costs are estimates from public list prices, for monitoring — not billing.",
-    fr: "Les coûts sont estimés d'après les tarifs publics, à titre indicatif — pas une facturation.",
+    en: "Costs are estimates from public list prices, for monitoring, not billing.",
+    fr: "Les coûts sont estimés d'après les tarifs publics, à titre indicatif, pas une facturation.",
   },
   "costs.unknown_agent": { en: "Unattributed", fr: "Non attribué" },
 
@@ -737,9 +717,9 @@ export const STR = {
   "clients.website": { en: "Website URL", fr: "URL du site" },
   "clients.add": { en: "Add client", fr: "Ajouter" },
   "clients.archive": { en: "Archive", fr: "Archiver" },
-  "clients.none": { en: "No clients yet — add one above.", fr: "Aucun client — ajoutes-en un." },
+  "clients.none": { en: "No clients yet. Add one above.", fr: "Aucun client. Ajoutez-en un." },
   "clients.agents.title": { en: "Assign agents", fr: "Affecter les agents" },
-  "clients.unassigned": { en: "— unassigned —", fr: "— non affecté —" },
+  "clients.unassigned": { en: "unassigned", fr: "non affecté" },
   "clients.save": { en: "Save", fr: "Enregistrer" },
   "clients.empty.agents": {
     en: "No agents yet. Create one in Connect agent.",
@@ -749,8 +729,8 @@ export const STR = {
   // ── Self-serve signup ────────────────────────────────────────────────────
   "signup.title": { en: "Create your account", fr: "Créer votre compte" },
   "signup.subtitle": {
-    en: "Spin up a workspace in seconds — you'll be its admin.",
-    fr: "Créez un espace en quelques secondes — vous en serez l'admin.",
+    en: "Spin up a workspace in seconds. You'll be its admin.",
+    fr: "Créez un espace en quelques secondes. Vous en serez l'admin.",
   },
   "signup.org": { en: "Company / workspace name", fr: "Nom de l'entreprise / espace" },
   "signup.email": { en: "Work email", fr: "Email professionnel" },
@@ -771,7 +751,7 @@ export const STR = {
   "onb.project.none": { en: "No project", fr: "Aucun projet" },
   "onb.project.new": { en: "+ New project", fr: "+ Nouveau projet" },
   "onb.project.newph": { en: "New project name (e.g. Openclaw)", fr: "Nom du projet (ex. Openclaw)" },
-  "onb.url.title": { en: "Base URL — paste into any tool", fr: "Base URL — colle dans n'importe quel outil" },
+  "onb.url.title": { en: "Base URL, paste into any tool", fr: "Base URL, à coller dans n'importe quel outil" },
   "onb.url.note": {
     en: "The gateway token is in the URL: no header, no code. Set this as your agent's base_url and keep your own provider key.",
     fr: "Le token est dans l'URL : aucun header, aucun code. Mets-la comme base_url de ton agent et garde ta propre clé provider.",
@@ -785,13 +765,13 @@ export const STR = {
   // Egress data-loss guard (DLP)
   "dlp.title": { en: "Data-loss guard (egress)", fr: "Garde-fou de fuite (egress)" },
   "dlp.subtitle": {
-    en: "Scan outbound prompts before they reach the model: block secrets, flag or mask personal data. Metadata only — the value is never stored.",
-    fr: "Scanne les prompts sortants avant qu'ils n'atteignent le modèle : bloque les secrets, signale ou masque les données personnelles. Métadonnées seules — la valeur n'est jamais stockée.",
+    en: "Scan outbound prompts before they reach the model: block secrets, flag or mask personal data. Metadata only: the value is never stored.",
+    fr: "Scanne les prompts sortants avant qu'ils n'atteignent le modèle : bloque les secrets, signale ou masque les données personnelles. Métadonnées seules : la valeur n'est jamais stockée.",
   },
   "dlp.enabled": { en: "Enabled", fr: "Activé" },
   "dlp.platform.off": {
-    en: "DLP is off platform-wide — your settings are saved but stay dormant until an operator enables the feature.",
-    fr: "Le DLP est désactivé au niveau plateforme — vos réglages sont sauvegardés mais restent dormants jusqu'à activation par un opérateur.",
+    en: "DLP is off platform-wide. Your settings are saved but stay dormant until an operator enables the feature.",
+    fr: "Le DLP est désactivé au niveau plateforme. Vos réglages sont sauvegardés mais restent dormants jusqu'à activation par un opérateur.",
   },
   "dlp.cat.secret": { en: "Secrets (API keys, tokens)", fr: "Secrets (clés API, tokens)" },
   "dlp.cat.pii": { en: "Personal data (email, card, IBAN…)", fr: "Données personnelles (email, carte, IBAN…)" },
@@ -812,7 +792,7 @@ export const STR = {
   },
   "rtok.placeholder": { en: "Name (e.g. mip-rum)", fr: "Nom (ex. mip-rum)" },
   "rtok.generate": { en: "Generate", fr: "Générer" },
-  "rtok.created": { en: "Read token “{name}” created — copy it now:", fr: "Read token « {name} » créé — copie-le maintenant :" },
+  "rtok.created": { en: "Read token “{name}” created. Copy it now:", fr: "Read token « {name} » créé. Copie-le maintenant :" },
   "rtok.active": { en: "active", fr: "actif" },
   "rtok.revoked": { en: "revoked", fr: "révoqué" },
   "rtok.revoke": { en: "Revoke", fr: "Révoquer" },

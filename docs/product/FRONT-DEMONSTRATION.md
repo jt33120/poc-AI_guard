@@ -257,17 +257,35 @@ Ordonnés. Chacun est autonome, vérifiable, et livrable en PR séparée.
 
 ---
 
-## 5. Ce que je ne peux pas trancher
+## 5. Décisions prises
 
-1. **Le hero.** Ta phrase au point (`Déployez vos agents IA en production. Sans perdre le
-   contrôle.`) ou la plus spécifique (`Vos agents IA agissent. xSOM AI Guard décide si
-   l'action a lieu.`) ?
-2. **La démo.** Instantané + accès nominatif (recommandé), ou compte public partagé avec
-   le lot de durcissement `L11` en préalable ?
-3. **Les huit menaces sans rejeu.** On publie franchement ce qu'elles sont — ce que je
-   recommande — ou tu préfères qu'on ne montre que les huit qui en ont une ?
-4. **La portée du chantier.** Tout, ou on s'arrête après `L8` (la page publique complète,
-   sans `/mise-en-oeuvre`) ?
-5. **Le vitrine et le produit.** Cette page vit dans le POC, ou elle rejoint
-   `infra-xsom_website` ? Les deux sont défendables ; je n'ai pas d'accès en écriture
-   au second aujourd'hui.
+Tranchées par Julian le 2026-09-06 :
+
+| Question | Réponse |
+|---|---|
+| **Hero** | Sa phrase, coupée par un point : **« Déployez vos agents IA en production. Sans perdre le contrôle. »** |
+| **Démo** | **Instantané + accès nominatif.** Le compte public partagé est écarté ; le lot `L11` ne sera pas construit. |
+| **Portée** | **Tout, `L0` → `L9`.** |
+| **Emplacement** | **Les deux** : la page dans le POC, adossée aux artefacts générés ; plus une page d'entrée sur `infra-xsom_website` qui y renvoie. |
+| **Les 8 menaces sans rejeu** | Publiées franchement pour ce qu'elles sont — décidé par moi, faute de contre-indication : c'est la seule option cohérente avec le reste du dépôt. |
+
+### 5 bis. Ce que « les deux » implique
+
+La page vit dans le POC et reste adossée à `coverage/map.json` et au moteur de triage,
+donc le gate marketing tourne dans la même CI. Le vitrine reçoit une **page d'entrée**
+qui renvoie vers elle : elle ne duplique aucun chiffre, sans quoi il faudrait un second
+gate sur un dépôt où il ne pourrait pas s'exécuter.
+
+---
+
+## 6. Ce qui reste ouvert
+
+
+- **L'écriture sur `infra-xsom_website`.** Je n'y ai pas d'accès aujourd'hui. Si la
+  demande d'attachement échoue, la page d'entrée sera livrée comme un fichier prêt à
+  committer plutôt que poussée.
+- **Les six correctifs de sécurité du §1.5** restent vrais même sans compte public
+  partagé. Trois méritent d'être corrigés indépendamment de ce chantier : l'absence
+  d'allowlist sur le proxy front, le rate limit inopérant derrière un edge, et la
+  rédaction des arguments d'approbation par nom de clé. Ce sont des constats de
+  sécurité produit, pas des dépendances de la page — à traiter dans leur propre lot.
