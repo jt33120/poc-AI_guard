@@ -16,6 +16,17 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 Env = Literal["dev", "staging", "prod"]
 
+#: Forme des revendications qu'un émetteur doit produire pour que ce déploiement
+#: sache lire ses jetons (`FR-195`). Vocabulaire **fermé** : en nommer une inconnue
+#: arrête le démarrage plutôt que de laisser croire qu'elle est supportée.
+#:
+#: - ``supabase_gotrue`` : le jeton porte ``app_metadata.tenant_id`` et
+#:   ``app_metadata.role``, ce que lisent `api/security.py` et toute policy RLS.
+#: - ``oidc_groups`` : émetteur OIDC du client (`FR-196`). Le rôle se déduit des
+#:   groupes par ``ISSUER_GROUP_ROLES``, et le tenant vient de la revendication
+#:   nommée par ``ISSUER_TENANT_CLAIM``.
+IssuerClaims = Literal["supabase_gotrue", "oidc_groups"]
+
 
 class Settings(BaseSettings):
     """Validated runtime configuration."""
@@ -44,6 +55,16 @@ class Settings(BaseSettings):
     supabase_url: str | None = Field(default=None, max_length=300)
     # Explicit JWKS URL; if unset it is derived from supabase_url.
     supabase_jwks_url: str | None = Field(default=None, max_length=400)
+    # Déclaration de l'opérateur qui apporte son propre émetteur (`FR-195`). Non
+    # déclarée, la sonde de readiness refuse de dire `issuer: true` : voir
+    # ``issuer_serves_our_claims``.
+    issuer_claims: IssuerClaims | None = Field(default=None)
+    # Fédération d'identité de la console (`FR-196`), lue seulement sous le profil
+    # ``oidc_groups``. La correspondance est déclarative et son vocabulaire de rôles
+    # est fermé : un rôle inconnu arrête le démarrage (`core/role_map.py`).
+    issuer_groups_claim: str = Field(default="groups", max_length=120)
+    issuer_group_roles: str | None = Field(default=None, max_length=2000)
+    issuer_tenant_claim: str = Field(default="app_metadata.tenant_id", max_length=120)
     supabase_jwt_audience: str = Field(default="authenticated", max_length=80)
     supabase_jwt_issuer: str | None = Field(default=None, max_length=400)
     # Service-role key for admin operations (self-serve signup). Backend ONLY,
@@ -53,8 +74,9 @@ class Settings(BaseSettings):
     # Diagnostic public : ouvert et en écriture (il capture un lead), donc borné.
     triage_rate_limit: str = Field(default="20/hour", max_length=40)
 
-    # --- Database (backend / service_role connection) — M1 ---------------
-    # psycopg DSN. Backend writes use a role that bypasses RLS (service_role).
+    # --- Database (backend connection) — M1 ------------------------------
+    # psycopg DSN. The backend connects as the DSN's own role and relies on table
+    # ownership; it does NOT bypass RLS (see `core/db.py`, corrected under `FR-195`).
     database_url: str | None = Field(default=None, max_length=500)
 
     # --- LLM judge (M6) — LiteLLM -> Mistral, optional -------------------
@@ -127,6 +149,18 @@ class Settings(BaseSettings):
     sentry_dsn: str | None = None
     sentry_traces_sample_rate: float = Field(default=0.0, ge=0.0, le=1.0)
 
+    @field_validator("issuer_claims", mode="before")
+    @classmethod
+    def _blank_is_undeclared(cls, value: object) -> object:
+        """``ISSUER_CLAIMS=`` vide se lit « non déclaré », pas « valeur invalide ».
+
+        Le fichier livré déclare chaque clé, vide par défaut, et un test du dépôt
+        exige qu'il démarre un serveur (`test_shipped_env_example_boots_a_working_server`).
+        Le vide reste **non déclaré** — donc toujours fail-closed côté sonde ; seule
+        une valeur hors vocabulaire arrête le démarrage.
+        """
+        return None if value == "" else value
+
     @field_validator("cors_allow_origins", mode="before")
     @classmethod
     def _split_origins(cls, value: object) -> object:
@@ -170,6 +204,36 @@ class Settings(BaseSettings):
         if self.supabase_url:
             return f"{self.supabase_url.rstrip('/')}/auth/v1/.well-known/jwks.json"
         return None
+
+    @property
+    def issuer_serves_our_claims(self) -> bool:
+        """L'émetteur configuré produit-il les revendications que le produit lit ?
+
+        `FR-195`, et la réduction honnête du périmètre annoncé qu'il exige : xSOM
+        fédère les émetteurs **présentant des revendications compatibles**, et non
+        « n'importe quel fournisseur d'identité par configuration seule ».
+
+        Servir un jeu de clés ne prouve rien : `api/security.py` lit
+        ``app_metadata.tenant_id`` et ``app_metadata.role``, et toute policy RLS lit
+        la même chose. Un émetteur qui ne les produit pas résout parfaitement et
+        n'autorise jamais rien — ses jetons tombent en 403, ses requêtes rendent zéro
+        ligne. Sans cette garde, la sonde annonçait `issuer: true` sur exactement
+        cette configuration : un feu vert sur un déploiement qui ne peut pas
+        fonctionner (`CLAUDE.md` §4.4, §9 — préférer le fail-closed).
+
+        Deux chemins, et un seul demande une déclaration :
+
+        - JWKS **dérivé** de ``supabase_url`` : c'est GoTrue par construction, donc
+          la forme est connue sans que l'opérateur ait à l'affirmer.
+        - JWKS **surchargé** par ``supabase_jwks_url`` : l'opérateur apporte son
+          émetteur, et il déclare la forme de ses revendications. Non déclarée, elle
+          est tenue pour incompatible.
+        """
+        if not self.jwks_url:
+            return False
+        if self.supabase_jwks_url:
+            return self.issuer_claims is not None
+        return True
 
 
 @lru_cache

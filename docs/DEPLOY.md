@@ -175,13 +175,31 @@ to it once, as its owner, before the first migration.
 **There is no identity provider in this stack, so there is no console login.**
 Everything that authenticates with a *gateway token* works — the MCP gateway,
 `POST /v1/authorize`, the audit chain, migrations, health. Everything that
-authenticates a *human* with a JWT needs an external issuer: point `SUPABASE_URL`
-(or `SUPABASE_JWKS_URL`) at a Supabase project or any OIDC provider, and
-readiness reports `issuer: true`. The reasoning behind that gap is written out in
-full at the top of `docker-compose.yml`.
+authenticates a *human* with a JWT needs an external issuer — and not just any
+one. We federate issuers presenting **compatible claims**: `api/security.py` and
+every RLS policy read `app_metadata.tenant_id` and `app_metadata.role`, which is
+GoTrue's shape. Point `SUPABASE_URL` at a Supabase project and readiness reports
+`issuer: true`. To bring your own issuer, set `SUPABASE_JWKS_URL` **and**
+`ISSUER_CLAIMS=supabase_gotrue` — the second is you affirming it mints those
+claims. Leave it undeclared and readiness stays red deliberately: an issuer that
+merely serves a key set resolves fine and authorises nothing, so its tokens 403
+and its queries return zero rows. A green probe on that deployment would be a
+lie, which is the defect `FR-195` closed. The reasoning behind the gap itself is
+written out in full at the top of `docker-compose.yml`.
 
 Routine operation needs no database access:
-`python -m cli migrate | bootstrap | token | doctor`. `doctor` reports
+`python -m cli migrate | bootstrap | token | doctor`. On the Docker path that
+command has no invocable form on the host — it would reintroduce the Python 3.12 +
+uv prerequisite this path exists to remove, and it needs a `DATABASE_URL` that
+resolves to the `db` *container*. Run it inside the stack instead:
+
+```
+make cli ARGS="doctor"
+make cli ARGS="bootstrap --org Acme --email you@example.com"
+```
+
+(`DEP-2`, closed under `FR-195`: the instruction was prescribed here for a path on
+which nothing could execute it.) `doctor` reports
 configuration *presence*, never values, and exits non-zero only on a real
 failure — an unconfigured optional capability is a warning, because "off" is not
 "broken" (the judge being off means ambiguous tools escalate to a human, which is
@@ -215,6 +233,54 @@ evidence self-hosting is not a downgrade of the isolation boundary.
       `frontend/lib/supabaseServer.ts`).
 - [ ] `DATABASE_URL=<your dsn> uv run python scripts/verify_chain.py` reports an
       intact audit chain.
+- [ ] A **restore has been rehearsed**, not just a backup taken. `make backup` dumps
+      the evidence plane; `make restore FILE=...` puts it back and re-runs
+      `verify_chain.py` on the restored database. A hash chain you have never
+      restored is a chain you do not know you can restore — and the evidence plane
+      is the thing self-hosting sells (`DEP-11`).
 - [ ] `ENV=prod DATABASE_URL=<your dsn> uv run python -m cli doctor` exits 0. It
       re-checks most of the boxes above from the deployment's own environment,
       and every non-OK line carries the fix.
+
+---
+
+## Appendix — `FR-195`, the eleven deployment-reality fixes
+
+`PLAN-REVIEW.md` §"Deployment reality" raised eleven must-fix items (`DEP-1` …
+`DEP-11`) and `FR-195` claims they are treated. A claim like that is worth exactly
+as much as the table that lets you check it, so here it is — each item with what
+verifying it against the code actually found.
+
+Most of these were written against the **plan**, not the shipped tree. Verifying
+them one by one is the method rank 8 established, and it paid the same way here:
+several described a mechanism that was never built, while the real defect turned up
+in a premise nobody had questioned.
+
+| # | What it said | What verification found | Where it stands |
+|---|---|---|---|
+| `DEP-1` | The GoTrue `auth` service has no owning story, ACs or configuration design | The service does not exist in the shipped stack: it was reviewed and cut, and the three reasons are written at the top of `docker-compose.yml` | **Resolved by scope reduction.** The gap is honest and documented; readiness reports it |
+| `DEP-2` | Chicken-and-egg: `xsom init` cannot both run after `up --wait` and configure GoTrue's keys | No `xsom init` exists, and no GoTrue to key. But the *second* half was live: `python -m cli …` was prescribed for the Docker path with no invocable form there | **Fixed** — `make cli ARGS="…"` runs it inside the stack |
+| `DEP-3` | `/auth/v1` is a Kong artifact; bare GoTrue serves at the root | Moot with GoTrue cut. The JWKS site is overridable (`SUPABASE_JWKS_URL`) and proved at runtime by `/health/ready` | **Moot** |
+| `DEP-4` | The anon key and auth service key have no specified origin | Moot with GoTrue cut; `.env.example` names where the service-role key comes from, and its absence fails closed (503) | **Moot** |
+| `DEP-5` | `NEXT_PUBLIC_*` bakes the issuer URL into a CI-built console image | No console image is built, in CI or in compose; the console deploys separately | **Moot while no console image is built.** Reopens the day one is |
+| `DEP-6` | "Keycloak/Entra/Okta work by configuration alone" is false | **The live defect of this lot.** Three shipped documents promised "any OIDC provider", and readiness went green on one — while every RLS policy and `api/security.py` require GoTrue-shaped claims | **Fixed** — see below |
+| `DEP-7` | `xsom migrate --and-compat` cannot run against managed Postgres | No such flag exists; `deploy/auth_compat.sql` is applied outside the runner. But `core/db.py` still *claimed* the backend bypasses RLS, which is what would have made managed Postgres impossible | **Fixed** — the false claim is corrected; nothing needs `BYPASSRLS` |
+| `DEP-8` | Two competing bootstrap paths, neither producing a console credential | `xsom init` does not exist; `cli bootstrap` is the single path and says which half it could not create and why | **Moot** |
+| `DEP-9` | Build time, image distribution and CPU architecture unaddressed | Accurate: `make up` builds from source, no registry image, no declared platform. Tied to `SM-1`, now recalibrated (`AR-3`/`QO-6`) | **Open, declared.** No ten-minute promise rests on it any more |
+| `DEP-10` | Host port collisions unhandled | Parameterisation was already done and bound to loopback. The *diagnosis* half was not | **Fixed** — `cli doctor` names the busy port and the `.env` line that moves it |
+| `DEP-11` | No backup, restore or key-custody story for the evidence plane | Accurate: nothing in the repo mentioned `pg_dump` or restore | **Fixed** — `make backup` / `make restore`, and the checklist asks for a *rehearsed* restore. Key custody stays open: `FR-169`'s first half needs a checkpoint signer that does not exist yet, and simulating one would be worse than the gap |
+
+### `DEP-6` in detail — why a green probe was the bug
+
+`api/security.py` reads `app_metadata.tenant_id` and `app_metadata.role`; every RLS
+policy reads the same two claims. An issuer that mints anything else produces tokens
+that 403 and queries that return zero rows. Runtime was therefore already fail-closed
+— **the readiness probe was not.** It checked that the JWKS endpoint served a key set,
+which any OIDC provider does, and reported `issuer: true`.
+
+So an operator following the documentation reached a deployment that was green and
+dead. The fix is not a new field on `/health/ready` — that payload is booleans only
+by design, because it is unauthenticated and anything richer is disclosure. The fix
+is that `issuer` now means what an operator reads it to mean: an issuer that resolves
+**and** whose claims this deployment can serve. Bringing your own means declaring
+`ISSUER_CLAIMS`; the vocabulary is closed, and `FR-196` added the second member.

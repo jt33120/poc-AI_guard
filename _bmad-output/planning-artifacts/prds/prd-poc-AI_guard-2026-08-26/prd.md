@@ -249,6 +249,8 @@ Absorber les 34 correctifs n'est pas purement additif : trois contredisent la di
 **AR-3 — Périmètre de déploiement.** `EXH-5` découpe `v2.0-core = Epics 1-5`, ce qui repousse l'Epic 6 (arrêt d'urgence, dont dépend `M-06`) et l'Epic 7 (taint persisté, dont dépend `FR-154`). Par ailleurs, le modèle à dominante prestation (§2.1) réduit la valeur de `SM-1`.
 *Résolution proposée :* promouvoir dans la strate les seules stories des Epics 6 et 7 dont dépendent des lignes de couverture revendiquées, et re-calibrer l'Epic 1 sur « déployable par nous chez un client, et crédible pour un évaluateur » plutôt que sur une médiane de dix minutes.
 
+> **Tranchée — aucune story à promouvoir.** Vérifiées contre le code, deux des trois prémisses sont mortes : les 12 scénarios de `M-06/chaine` sont des gardes d'exécuteur et de HITL sur l'ingestion `mcp` et n'en touchent aucun d'arrêt (et l'arrêt est livré depuis le rang 8, `gateway/server.py::_stop_blocks`) ; le taint persisté de `FR-154` est livré (`supabase/migrations/0018_session_taint.sql` + `core/taint_store.py`). Ce que l'arbitrage redoutait — une revendication publiée reposant sur un epic repoussé — est désormais impossible par construction : `CM-7` fait échouer le build sur toute facette `Bloqué` sans scénario qui passe. Seule la troisième prémisse était vivante, et c'est la recalibration de `SM-1`, faite. Détail et preuves : `docs/product/DECOUPAGE.md` §7 bis.
+
 ---
 
 ## 8. Questions ouvertes

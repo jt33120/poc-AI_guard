@@ -17,6 +17,7 @@ import argparse
 import getpass
 import json
 import os
+import socket
 import sys
 import textwrap
 from collections.abc import Iterator, Sequence
@@ -599,6 +600,66 @@ def _check_hardening(settings: Settings) -> list[Check]:
     return checks
 
 
+def _check_ports() -> list[Check]:
+    """`DEP-10` : nommer une collision de port comme un échec diagnosticable.
+
+    C'est la cause unique la plus fréquente d'un premier lancement raté, et jusqu'ici
+    l'opérateur ne voyait que le message de Docker. Le paramétrage seul ne suffisait
+    pas : encore faut-il que le diagnostic dise *lequel* est pris et *quoi* écrire
+    dans le `.env` — c'est la seconde phrase du correctif que `DEP-10` demandait.
+
+    La sonde est un `bind` sur la boucle locale, pas une connexion : elle répond à la
+    question qui compte (« ce port est-il libre pour `docker compose up` ? ») sans
+    parler à quoi que ce soit.
+    """
+    checks: list[Check] = []
+    for variable, service, defaut in (
+        ("XSOM_API_PORT", "control API", 8000),
+        ("XSOM_DB_PORT", "database", 5432),
+    ):
+        brut = os.environ.get(variable, "")
+        try:
+            port = int(brut) if brut else defaut
+        except ValueError:
+            checks.append(
+                Check(
+                    "FAIL",
+                    f"ports.{variable.lower()}",
+                    f"{variable}={brut!r} is not a port number",
+                    f"set {variable} to an integer between 1 and 65535, or unset it "
+                    f"to use {defaut}.",
+                )
+            )
+            continue
+        if _port_is_free(port):
+            checks.append(
+                Check("OK", f"ports.{variable.lower()}", f"{port} is free for the {service}")
+            )
+        else:
+            checks.append(
+                Check(
+                    "FAIL",
+                    f"ports.{variable.lower()}",
+                    f"port {port} is already in use, so the {service} cannot start",
+                    f"another process holds 127.0.0.1:{port}. Put {variable}=<free port> "
+                    f"in your .env — never edit docker-compose.yml — then re-run "
+                    f"`make up`.",
+                )
+            )
+    return checks
+
+
+def _port_is_free(port: int) -> bool:
+    """Vrai si `docker compose` pourrait publier ce port sur la boucle locale."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sonde:
+        sonde.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            sonde.bind(("127.0.0.1", port))
+        except OSError:
+            return False
+    return True
+
+
 def cmd_doctor(settings: Settings, args: argparse.Namespace) -> int:
     """Diagnose the deployment; exit non-zero when something is actually broken."""
     del args  # doctor takes no options: it must be safe to run with no thought
@@ -606,6 +667,7 @@ def cmd_doctor(settings: Settings, args: argparse.Namespace) -> int:
         *_check_database(settings),
         *_check_capabilities(settings),
         *_check_hardening(settings),
+        *_check_ports(),
     ]
     for check in checks:
         print(f"[{check.level:<4}] {check.code}: {check.message}")

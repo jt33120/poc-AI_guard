@@ -315,7 +315,7 @@ Périmètre net : **≈ 50 items distincts**, pas 55.
 |---|---|---|
 | **Référentiels** | `EXH-7` : ne livrer que le mapping EU AI Act, et différer ISO 42001 / NIST / SOC 2 / RGPD — « une correspondance qu'un auditeur rejette est pire que pas de correspondance », elle exige la revue d'un assesseur en exercice. | `G-16` ajoute **quatre familles** : OWASP LLM Top 10 + MITRE ATLAS, NIS2, DORA, ANSSI/SecNumCloud. |
 | **Proxy LLM** | `EXH-6` : le rétrograder de chemin d'ingestion à simple sonde de télémétrie non bloquante, et le sortir du périmètre d'unification de `FR-1`. | C'est **là que tourne la DLP d'egress**, donc la couverture `Bloqué` de **M-10** (exfiltration / Shadow AI) — l'une des huit lignes bloquées natives. |
-| **Découpage de release** | `PLAN-REVIEW.md:18-29` : v2.0-core = Epics 1-5 ; les Epics 6-13 partent en v2.1/v2.2. | **M-06** dépend de l'Epic 6 (arrêt d'urgence) et **G-03** de l'Epic 7 (plan agent, taint persisté). Deux lignes de couverture revendiquées reposent sur des epics repoussés. |
+| **Découpage de release** | `PLAN-REVIEW.md:18-29` : v2.0-core = Epics 1-5 ; les Epics 6-13 partent en v2.1/v2.2. | ~~**M-06** dépend de l'Epic 6 (arrêt d'urgence) et **G-03** de l'Epic 7 (plan agent, taint persisté).~~ — **conflit dissous** (`AR-3`, tranchée : `DECOUPAGE.md` §7 bis). Aucune des deux dépendances n'existait : les 12 scénarios de `M-06/chaine` ne touchent aucun arrêt, et l'arrêt comme le taint persisté sont livrés (`gateway/server.py::_stop_blocks`, `0018_session_taint.sql`). Ce que ce conflit redoutait est désormais impossible par construction — `CM-7` fait échouer le build sur toute facette `Bloqué` sans scénario qui passe. |
 
 **Lecture.** Le conflit sur les référentiels est le plus simple à trancher : `EXH-7` vise les référentiels de *management* (ISO 42001, SOC 2), dont la correspondance engage un jugement d'auditeur. OWASP LLM Top 10 et MITRE ATLAS sont des taxonomies *techniques* — s'y aligner est descriptif, pas assertif, et ne présente pas le même risque. NIS2, DORA et ANSSI retombent en revanche dans la catégorie que la revue met en garde.
 
@@ -357,6 +357,18 @@ Ces trois arbitrages conditionnent le périmètre des `FR-153+` et doivent être
   `coverage/rows.yaml` et sont publiés dans la carte générée ; une ligne `Orchestré`
   sans substitut nommé est déclassée en `Hors périmètre` au parse du registre
   (`FR-178`).
-- **QO-4** — La strate se démontre-t-elle sur les Epics 1-5 (v2.0-core) uniquement, ou suppose-t-elle des epics post-core (6-13) que `PLAN-REVIEW.md:18-29` a repoussés ? M-08 dépend de l'Epic 4 et M-06 de l'Epic 6.
-- **QO-6** — *Conséquence de QO-5, à arbitrer.* La PRD v2 est bâtie autour de sa phrase de test de périmètre : « un inconnu s'auto-héberge en dix minutes ». Si la majorité des clients passe par une prestation, `SM-1` (médiane ≤ 10 min pour un inconnu) est une métrique de crédibilité, pas le métier. Cela ne condamne pas l'Epic 1 (26 stories) — le déploiement doit fonctionner, pour nous chez le client comme pour un évaluateur — mais cela change ce que « terminé » y signifie, et donc combien de ces 26 stories la strate doit porter.
+- ~~**QO-4**~~ — **tranchée avec `AR-3`** (`DECOUPAGE.md` §7 bis). La question
+  supposait que `M-06` dépende de l'Epic 6 et `M-08` de l'Epic 4 ; aucune des deux
+  dépendances ne s'est vérifiée dans le code. La strate se démontre bien sur ce qui
+  est livré, et ce n'est plus une affirmation à tenir : la carte est **générée**
+  depuis les scénarios qui passent, et `CM-7` fait échouer le build sur toute
+  facette `Bloqué` qu'aucun scénario n'appuie. Une revendication reposant sur un
+  epic repoussé ne peut plus être publiée.
+- ~~**QO-6**~~ — **tranchée** (`DECOUPAGE.md` §7 bis). `SM-1` est une **métrique de
+  crédibilité**, pas le métier : la dominante est la prestation (`QO-5`), et le
+  déploiement en autonomie est la preuve de substance. « Terminé » pour l'Epic 1 se
+  lit désormais *« déployable par nous chez un client, et crédible pour un
+  évaluateur »*. L'exigence ne bouge pas — le déploiement doit fonctionner — c'est
+  la mesure qui change. Les documents de plan qui portaient encore la médiane de dix
+  minutes le disent maintenant.
 - **QO-7 — Partiellement résolue, sans préjuger.** Le moteur (`core/profiles.py` + `core/triage.py`) est ce que les deux réponses appellent ; seule la surface diffère. `xsom triage` sert le livrable de mission aujourd'hui, sans rien fermer : un questionnaire de console appellerait le même `diagnose()`. La question qui reste est commerciale — faut-il exposer le diagnostic en autonomie pour générer des leads — et elle ne bloque plus aucun code.

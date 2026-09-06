@@ -25,9 +25,16 @@
 #
 #   So: everything that authenticates with a GATEWAY TOKEN works here — the MCP
 #   gateway, POST /v1/authorize, the audit chain, migrations, /health. Everything
-#   that authenticates a HUMAN with a JWT needs an external issuer: point
-#   SUPABASE_URL (or SUPABASE_JWKS_URL) at a Supabase project or any OIDC
-#   provider in your .env, and readiness will report `issuer: true`.
+#   that authenticates a HUMAN with a JWT needs an external issuer — but not just
+#   any one. We federate issuers whose tokens carry the claims this product reads:
+#   `app_metadata.tenant_id` and `app_metadata.role`, which api/security.py and
+#   every RLS policy key on. That is GoTrue's shape. Point SUPABASE_URL at a
+#   Supabase project and readiness reports `issuer: true`. Bringing your own
+#   issuer means SUPABASE_JWKS_URL *plus* ISSUER_CLAIMS=supabase_gotrue, which is
+#   you affirming it mints those claims; undeclared, readiness stays red on
+#   purpose. An issuer that only serves a key set resolves perfectly and
+#   authorises nothing — its tokens 403 and its queries return no rows — so a
+#   green probe there would be a lie (FR-195).
 #
 #   The console (frontend/) is not built here either; it deploys separately.
 #

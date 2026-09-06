@@ -39,7 +39,7 @@ from api.policy import router as policy_router
 from api.promotion import router as promotion_router
 from api.ratelimit import limiter
 from api.read_tokens import router as read_tokens_router
-from api.security import build_verifier, get_current_user
+from api.security import build_federation, build_verifier, get_current_user
 from api.servers import router as servers_router
 from api.shadow_ai import router as shadow_ai_router
 from api.signup import router as signup_router
@@ -102,6 +102,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Shared state read by dependencies (settings, verifier, DB url, limiter).
     app.state.settings = settings
     app.state.verifier = build_verifier(settings)
+    # `FR-196` : construite au démarrage, pour qu'une correspondance groupe→rôle
+    # malformée refuse de démarrer au lieu de 500 au premier login.
+    app.state.federation = build_federation(settings)
     app.state.auth_admin = build_auth_admin(settings)
     app.state.database_url = settings.database_url
     app.state.limiter = limiter

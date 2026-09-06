@@ -102,7 +102,7 @@ affirmations du produit qui ne sont pas vraies.
 | **7** | Couverture P2 | `FR-184`, `185`, `186` — **clos** | Rang 1 | Le terrain dit P2 avant P3. `G-04`, `G-08`, `G-12` et `G-22` fermés |
 | **8** | Reste de l'intégrité | `FR-163`, `165`→`168`, `170`, `171` — **clos** | Rang 2 | Deux défauts **vivants** trouvés en vérifiant : `FR-170` (le garde de taint relâchait le verdict) et `FR-167` (une image tronquée démarrait verte). Voir §5 bis |
 | **9** | Couverture P4 et au-delà | `FR-187`→`194` | Rang 7 | Suit la base installée Mistral |
-| **10** | Déployabilité, positionnement | `FR-195`→`197` | `AR-3` | `FR-197` est de la rédaction : parallélisable dès maintenant |
+| **10** | Déployabilité, positionnement | `FR-195`→`197` | ~~`AR-3`~~ — **tranchée** (§7 bis) : aucune story à promouvoir | La promesse publiée de déploiement rendue vraie. `FR-195` a trouvé un défaut vivant : la sonde de readiness verdissait un émetteur dont aucun jeton n'autorise rien |
 
 **Ce qui tombe si nous sommes en retard :** les rangs 9 et 10 d'abord, puis 8. **Les
 rangs 1 à 5 sont le démonstrateur** ; en retirer un revient à ne pas livrer la strate.
@@ -192,11 +192,41 @@ n'est pas un lot à planifier : c'est une règle qui s'applique à chaque lot.
 | `QO-7` — le diagnostic de profil est-il un livrable de mission ou une fonction de la console ? | La forme du rang 3, pas son démarrage | **Commerciale.** Les deux réponses produisent des architectures différentes ; trancher techniquement serait deviner |
 | `QO-9` — quel domaine pour le tenant synthétique ? | Rang 5 | Narrative. `AD-31` fixe déjà la forme (semence committée, déterministe, sans PII) |
 | `AR-1` — NIS2 / DORA / ANSSI | Rien du rang 1-5 | Différée en attente d'un évaluateur en exercice. La table de correspondance déclarative rend l'ajout peu coûteux |
-| `AR-3` — périmètre de déploiement | Rang 10 | Arbitrage de release |
 
 **Tranchées depuis :** `QO-3` (critère de souveraineté = dépendance opérationnelle),
 `QO-8` / `AR-2` (le proxy LLM est séparable, `M-10` garde son `Bloqué`), amplitude
-d'extraction (`AD-37`).
+d'extraction (`AD-37`), et `AR-3` / `QO-6` ci-dessous.
+
+### 7 bis. `AR-3` — périmètre de déploiement. **Tranchée.**
+
+`AR-3` demandait de promouvoir dans la strate les stories des Epics 6 et 7 dont
+dépendent des lignes de couverture revendiquées, et de re-calibrer l'Epic 1.
+**Deux de ses trois prémisses sont mortes au contact du code.** Vérifiées une par
+une, comme le rang 8 l'a imposé pour tout constat hérité :
+
+| Prémisse d'`AR-3` | Verdict | Preuve |
+|---|---|---|
+| L'Epic 6 (arrêt d'urgence) est repoussé, et `M-06` en dépend | **Fausse** | Les 12 scénarios de `M-06/chaine` sont des gardes d'exécuteur et de HITL sur l'ingestion `mcp` ; aucun ne touche un arrêt. Et l'arrêt existe depuis le rang 8 : `gateway/server.py::_stop_blocks`, décision `agent_stopped` |
+| L'Epic 7 (taint persisté) est repoussé, et `FR-154` en dépend | **Résolue** | `supabase/migrations/0018_session_taint.sql` + `core/taint_store.py`, câblés et testés |
+| `SM-1` (médiane ≤ 10 min) est traité en objectif métier | **Vraie, et seule vivante** | La requalification est écrite dans la PRD de strate, mais la promesse des dix minutes vit encore, non annotée, dans cinq documents |
+
+**Décision : aucune story à promouvoir.** Le périmètre de déploiement de la strate
+se ferme tel quel. Ce qu'`AR-3` redoutait — une revendication publiée reposant sur
+du code non livré — ne peut plus se produire par construction : `CM-7` fait échouer
+le build sur toute facette `Bloqué` sans scénario qui passe. L'arbitrage n'avait pas
+besoin d'être tranché *avant* le rang 10 ; il avait besoin d'être **vérifié**, et la
+vérification l'a vidé de ses deux tiers.
+
+Reste donc la seule moitié vivante, et c'est ce que le rang 10 livre : rendre vraie
+la **promesse publiée** de déploiement (`FR-195`) et finir la requalification de
+`SM-1`.
+
+**`QO-6` est tranchée avec elle**, puisque c'est la même question lue depuis
+`THREAT-COVERAGE.md` : `SM-1` est une **métrique de crédibilité**, pas le métier. La
+définition de « terminé » de l'Epic 1 devient *« déployable par nous chez un client,
+et crédible pour un évaluateur »* — et non une médiane de dix minutes tenue par un
+inconnu. L'Epic 1 n'est pas condamné : le déploiement doit fonctionner. C'est la
+mesure qui change, pas l'exigence.
 
 ---
 

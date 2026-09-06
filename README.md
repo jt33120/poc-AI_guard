@@ -73,15 +73,29 @@ curl localhost:8000/health/ready
 `api` waits for the one-shot `migrate` service to *complete*, so the stack cannot
 report healthy on an unmigrated database. There is no identity provider in this
 stack and therefore no console login — gateway-token paths (MCP, `/v1/authorize`,
-audit) all work; point `SUPABASE_URL` at an issuer to unlock human login. The
-reasoning is written out at the top of `docker-compose.yml`.
+audit) all work. Human login needs an issuer whose tokens carry the claims this
+product reads (`app_metadata.tenant_id`, `app_metadata.role` — GoTrue's shape):
+point `SUPABASE_URL` at a Supabase project, or bring your own with
+`SUPABASE_JWKS_URL` **and** `ISSUER_CLAIMS=supabase_gotrue`. Not every OIDC
+provider qualifies, and readiness says so rather than going green on a
+deployment that cannot authorise anything (`FR-195`). The reasoning is written
+out at the top of `docker-compose.yml`.
 
-Operate it without ever opening a SQL console:
+Operate it without ever opening a SQL console. From a checkout:
 
 ```bash
 uv run python -m cli migrate --dry-run   # what would change
 uv run python -m cli bootstrap --org …   # tenant + admin + first gateway token
-uv run python -m cli doctor              # config, schema, capabilities — each gap with its fix
+uv run python -m cli doctor              # config, schema, ports, capabilities — each gap with its fix
+```
+
+From the Docker stack, where there is no Python on the host and `DATABASE_URL`
+resolves to a container, run the same commands inside it:
+
+```bash
+make cli ARGS="doctor"
+make backup                              # dump the evidence plane
+make restore FILE=backup/xsom-….sql.gz   # put it back, then re-verify the chain
 ```
 
 To point it at a real database and a real agent, see
@@ -122,6 +136,8 @@ Console (`frontend/.env.local`): `NEXT_PUBLIC_SUPABASE_URL`,
 | `make up` / `make down` | Bring the self-hosted compose stack up / down (the volume survives `down`). |
 | `make down-hard` | `down --volumes` — **destroys the database, and with it the audit chain**. |
 | `make logs` / `make ps` | Follow the stack's logs / list its services. |
+| `make cli ARGS="…"` | Run the CLI **inside** the stack — no Python needed on the host. |
+| `make backup` / `make restore` | Dump the evidence plane, and put it back; restore re-verifies the hash chain. |
 
 ## Layout
 

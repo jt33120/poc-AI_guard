@@ -1,8 +1,16 @@
 """PostgreSQL access helpers (Supabase is Postgres under the hood).
 
-The backend connects with a role that bypasses RLS (service_role) for writes
-and cross-tenant lookups (e.g. resolving a gateway token before the tenant is
-known). Per-request, tenant-scoped reads set the role/JWT claims so RLS applies.
+The backend connects as the DSN's own role and relies on **table ownership** for
+writes and cross-tenant lookups (e.g. resolving a gateway token before the tenant
+is known). Per-request, tenant-scoped reads set the role/JWT claims so RLS applies.
+
+This docstring used to say the backend connects with a role that bypasses RLS
+(`service_role`). It never did. `deploy/auth_compat.sql` is explicit about it —
+"Nothing in xSOM connects or switches to service_role" — and nothing here issues a
+`set role`. The distinction is load-bearing for deployment: `BYPASSRLS` needs a real
+superuser, which RDS, Cloud SQL and Azure Flexible Server do not hand out, so a
+product that genuinely required it could not run on managed Postgres at all
+(`DEP-7`). It does not require it. Corrected under `FR-195`.
 """
 
 from __future__ import annotations
