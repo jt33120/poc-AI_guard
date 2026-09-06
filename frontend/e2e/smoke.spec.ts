@@ -500,3 +500,38 @@ test("aucun jeton de la page publique ne peut se lire comme un vrai", async ({ p
   expect(texte).toContain("<votre-jeton-de-passerelle>");
   expect(texte).not.toMatch(/\b(sk|xsg)[-_](live|test|proj)[-_][A-Za-z0-9]{6,}/);
 });
+
+// Le favicon. Trois contrôles que les gardes Python de `tests/test_brand_mark.py` ne
+// peuvent pas atteindre, et il a fallu les trois : la route se sert, la balise est
+// posée, et le navigateur sait **décoder** le fichier.
+//
+// La première version se servait en 200 avec le bon type MIME et passait tous les
+// gardes de structure — et ne s'affichait nulle part : le commentaire du SVG citait les
+// jetons de couleur sous leur forme CSS, avec leur préfixe de deux tirets, séquence
+// interdite dans un commentaire XML. Seul un rendu réel l'a montré.
+
+test("le favicon est servi, déclaré, et décodable par le navigateur", async ({ page }) => {
+  const reponse = await page.goto("/icon.svg");
+  expect(reponse?.status()).toBe(200);
+  expect(reponse?.headers()["content-type"]).toContain("image/svg+xml");
+
+  await page.goto("/");
+  // Next pose la balise lui-même à partir de `app/icon.svg` ; son absence signifie que
+  // le navigateur retomberait sur `/favicon.ico`, qui n'existe pas.
+  const href = await page.locator('link[rel="icon"]').first().getAttribute("href");
+  expect(href).toContain("/icon.svg");
+
+  // `naturalWidth > 0` est ce qui sépare « le fichier arrive » de « le navigateur sait
+  // le lire ». Un SVG mal formé passe le premier et échoue le second, en silence.
+  const decode = await page.evaluate(
+    (src) =>
+      new Promise<boolean>((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(img.naturalWidth > 0);
+        img.onerror = () => resolve(false);
+        img.src = src;
+      }),
+    href as string,
+  );
+  expect(decode).toBe(true);
+});

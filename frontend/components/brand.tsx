@@ -1,9 +1,11 @@
 // Shared brand bits: the shield mark, the wordmark, and status badges.
 
+import { MARK_CHECK, MARK_SHIELD, MARK_VIEWBOX } from "@/lib/mark";
+
 export function ShieldMark({ className = "h-4 w-4" }: { className?: string }) {
   return (
     <svg
-      viewBox="0 0 24 24"
+      viewBox={MARK_VIEWBOX}
       className={className}
       fill="none"
       stroke="currentColor"
@@ -12,8 +14,8 @@ export function ShieldMark({ className = "h-4 w-4" }: { className?: string }) {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" />
-      <path d="M9 12l2 2 4-4" />
+      <path d={MARK_SHIELD} />
+      <path d={MARK_CHECK} />
     </svg>
   );
 }

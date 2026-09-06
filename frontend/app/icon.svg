@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32">
+  <!--
+    Le favicon. Next le sert sur /icon.svg et pose lui-meme la balise link rel=icon.
+
+    Fond opaque, et non transparent : un favicon transparent disparait sur la barre
+    d'onglets claire de la moitie des navigateurs. Le fond est le jeton ink-900, celui
+    du produit ; le trace est copper-sheen, dont le jeton declare 9,63:1 avec ink-950,
+    soit le plus lisible des cuivres a 16 px ou il ne reste plus grand-chose.
+
+    Les deux traces sont copies de lib/mark.ts, que ShieldMark emploie aussi. Un fichier
+    statique ne peut rien importer, donc c'est bien une copie ; ce qui l'empeche de
+    deriver est tests/test_brand_mark.py, qui compare les deux caractere par caractere.
+
+    Ce commentaire est sans accents ni double tiret : un SVG est du XML, ou la sequence
+    de deux tirets est interdite dans un commentaire. La premiere version citait les
+    jetons sous leur forme CSS, avec leur prefixe de deux tirets, et rendait le fichier
+    mal forme : il se servait en 200, passait les tests de structure, et aucun
+    navigateur ne pouvait l'afficher.
+  -->
+  <rect width="24" height="24" rx="5" fill="#0a1628"/>
+  <g transform="translate(2.4 2.4) scale(0.8)"
+     fill="none" stroke="#f7a077" stroke-width="2.2"
+     stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/>
+    <path d="M9 12l2 2 4-4"/>
+  </g>
+</svg>
