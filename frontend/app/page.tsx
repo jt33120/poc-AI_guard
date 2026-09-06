@@ -1,6 +1,8 @@
 import Link from "next/link";
 
 import { ShieldMark } from "@/components/brand";
+import { Audience } from "@/components/Audience";
+import { ProfilProvider } from "@/components/ProfilContext";
 import { ThreatLedger } from "@/components/ThreatLedger";
 import { LanguageToggle } from "@/lib/i18n";
 import { serverT } from "@/lib/lang";
@@ -132,10 +134,16 @@ export default function LandingPage() {
 
       </section>
 
-      {/* Le relevé des menaces (L5). Îlot client : il porte le sélecteur de profil et
-          l'ouverture des rangées. Ses seize lignes sont rendues côté serveur depuis
-          l'artefact généré, donc un robot les voit sans exécuter de JavaScript. */}
-      <ThreatLedger />
+      {/* Le relevé (L5) et « Pour qui » (L7) répondent à deux questions à partir du
+          **même** choix de profils : ce qui vous concerne, et ce qui le deviendrait.
+          Un seul sélecteur, donc un seul état, et un seul appel au moteur — deux
+          sélecteurs poseraient au visiteur une question à laquelle il a répondu.
+          Les seize lignes restent rendues côté serveur : un robot les voit sans
+          exécuter de JavaScript. */}
+      <ProfilProvider>
+        <ThreatLedger />
+        <Audience />
+      </ProfilProvider>
 
       {/* Problem */}
       <section className="mx-auto max-w-6xl px-6 py-12">

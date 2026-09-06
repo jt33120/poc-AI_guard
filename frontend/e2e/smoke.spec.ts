@@ -355,3 +355,60 @@ test("une ligne sans rejeu publie sa raison plutôt qu'un cadre vide", async ({ 
     page.locator("#menaces").getByText("Le même appel, joué deux fois"),
   ).toHaveCount(0);
 });
+
+// --- « Pour qui » (L7) ---------------------------------------------------------
+//
+// Ce que cette section ajoute au relevé : non pas ce qui concerne le visiteur, mais
+// ce qui le **concernerait**, et à quelle condition.
+//
+// Note de méthode, apprise deux fois : `innerText` applique `text-transform`, donc
+// toute assertion sur un texte porté par une classe `uppercase` doit être insensible
+// à la casse. Deux vérifications manuelles ont échoué sur ce point avant que les
+// tests ne soient écrits.
+
+test("un seul sélecteur de profil pilote les deux sections", async ({ page }) => {
+  await page.route("**/api/threats**", async (route) => {
+    await route.fulfill({
+      json: {
+        profiles: ["P1a"],
+        cap: null,
+        counts: { lines: 16, applicable: 8, ours: 5, blocked: 2 },
+        statement: "Énoncé du moteur.",
+        rows: [
+          {
+            id: "M-06",
+            titre: "Piratage d'agents autonomes",
+            applicable: false,
+            blocked: false,
+            owner: "le client — notre terrain",
+            facets: [],
+            activates_at: ["P3"],
+          },
+        ],
+      },
+    });
+  });
+
+  await page.goto("/");
+  // Un seul bouton `P1a` sur toute la page : deux sélecteurs poseraient au visiteur
+  // une question à laquelle il a déjà répondu, avec deux réponses possibles.
+  await expect(page.getByRole("button", { name: /P1a/ })).toHaveCount(1);
+  await page.getByRole("button", { name: /P1a/ }).click();
+
+  // Et la bascule apparaît dans « Pour qui », alimentée par le même appel.
+  const section = page.locator("#pour-qui");
+  await expect(section.getByText("Piratage d'agents autonomes")).toBeVisible();
+  await expect(section.getByText(/P3/)).toBeVisible();
+});
+
+test("le profil sur lequel nous perdons est publié sans qu'on ait à le cocher", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  // Rien de coché : l'affirmation la plus crédible de la page doit déjà être là.
+  // La cacher derrière une case la réserverait à ceux qui ont deviné.
+  const section = page.locator("#pour-qui");
+  await expect(section.getByText(/nous n'y bloquons rien/i)).toBeVisible();
+  await expect(section.getByText(/aucune passerelle ne s'y intercale/i)).toBeVisible();
+});

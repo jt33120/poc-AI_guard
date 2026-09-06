@@ -24,24 +24,14 @@
  * disant qu'il n'est pas positionné. Une liste vide se lirait « aucune menace ».
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 
 import { useT, type StrKey } from "@/lib/i18n";
 import { FAITS_PUBLIES } from "@/lib/facts";
+import { PROFILS, useProfils } from "@/components/ProfilContext";
 import { ReplayPanel } from "@/components/ReplayPanel";
 import { rejeuDe } from "@/lib/replays";
-import { RELEVE, fetchReleveProfil, type LigneMenace, type ReleveProfil } from "@/lib/threats";
-
-//: Les profils, dans l'ordre de la chaîne de valeur. Les libellés réutilisent les clés
-//: du diagnostic public : deux libellés pour le même profil finiraient par diverger.
-const PROFILS: { id: string; label: StrKey; hint: StrKey }[] = [
-  { id: "P1a", label: "triage.p1a", hint: "triage.p1a.hint" },
-  { id: "P1b", label: "triage.p1b", hint: "triage.p1b.hint" },
-  { id: "P2", label: "triage.p2", hint: "triage.p2.hint" },
-  { id: "P3", label: "triage.p3", hint: "triage.p3.hint" },
-  { id: "P4", label: "triage.p4", hint: "triage.p4.hint" },
-  { id: "P5", label: "triage.p5", hint: "triage.p5.hint" },
-];
+import { RELEVE, type LigneMenace, type ReleveProfil } from "@/lib/threats";
 
 const MODE_LABEL: Record<string, StrKey> = {
   B: "ledger.mode.B",
@@ -323,46 +313,8 @@ function Scenarios({ scenarios }: { scenarios: string[] }) {
 
 export function ThreatLedger() {
   const { t } = useT();
-  const [choisis, setChoisis] = useState<string[]>([]);
-  const [positionne, setPositionne] = useState<ReleveProfil | undefined>();
-  const [occupe, setOccupe] = useState(false);
-  const [echoue, setEchoue] = useState(false);
+  const { choisis, basculer: basculerProfil, positionne, occupe, echoue } = useProfils();
   const [ouverte, setOuverte] = useState<string | null>(null);
-
-  const basculerProfil = useCallback((id: string) => {
-    setChoisis((actuels) =>
-      actuels.includes(id) ? actuels.filter((p) => p !== id) : [...actuels, id],
-    );
-  }, []);
-
-  useEffect(() => {
-    if (choisis.length === 0) {
-      setPositionne(undefined);
-      setEchoue(false);
-      return;
-    }
-    let annule = false;
-    setOccupe(true);
-    setEchoue(false);
-    fetchReleveProfil(choisis)
-      .then((r) => {
-        if (!annule) setPositionne(r);
-      })
-      .catch(() => {
-        // Fail-soft à l'affichage, jamais fail-open sur la revendication : on retire
-        // le positionnement plutôt que d'en garder un périmé, et on le dit.
-        if (!annule) {
-          setPositionne(undefined);
-          setEchoue(true);
-        }
-      })
-      .finally(() => {
-        if (!annule) setOccupe(false);
-      });
-    return () => {
-      annule = true;
-    };
-  }, [choisis]);
 
   return (
     <section id="menaces" className="mx-auto max-w-5xl scroll-mt-20 px-6 py-16">

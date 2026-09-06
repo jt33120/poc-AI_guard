@@ -134,6 +134,62 @@ export const STR = {
     en: "Action governance for AI agents",
     fr: "Gouvernance des actions pour agents IA",
   },
+  // --- Pour qui (L7) ----------------------------------------------------------
+  //
+  // Pas une liste de secteurs, pas de logos. Le visiteur lit son propre relevé, et
+  // surtout ce qui **deviendrait** le sien. Aucun chiffre écrit ici : le gate de `L4`
+  // les refuse, et ceux qui comptent viennent du moteur.
+  "pourqui.kicker": { en: "Who this is for", fr: "Pour qui" },
+  "pourqui.title": {
+    en: "And, just as plainly, who it is not for.",
+    fr: "Et, tout aussi clairement, pour qui ce n'est pas.",
+  },
+  "pourqui.lede": {
+    en: "The market sells you all the threat rows because it can. Several of them belong to the outfit that trains your model, or to the SOC you already pay. Saying so out loud is not a concession, it is the reason you can believe the rest.",
+    fr: "Le marché vous vend toutes les lignes de menace parce qu'il le peut. Plusieurs appartiennent à l'éditeur qui entraîne votre modèle, ou au SOC que vous payez déjà. Le dire à voix haute n'est pas une concession, c'est ce qui rend le reste croyable.",
+  },
+
+  "pourqui.tri.t": { en: "The founding sort", fr: "Le tri fondateur" },
+  "pourqui.tri.b": {
+    en: "Attacks aimed at a model publisher are not the ones aimed at a large company that uses AI. The matrix blends the one into the other without saying so, because everyone gains from selling the whole list.",
+    fr: "Les attaques qui visent un éditeur de modèle ne sont pas celles qui visent un grand compte qui utilise l'IA. La matrice mélange les unes aux autres sans le dire, parce que tout le monde gagne à vendre la liste entière.",
+  },
+
+  "pourqui.profils.t": { en: "Where you sit", fr: "Où vous vous situez" },
+  "pourqui.profils.b": {
+    en: "Each profile adds to the ones before it. Tick yours: the ledger above recomputes, and so does what follows.",
+    fr: "Chaque profil s'ajoute aux précédents. Cochez le vôtre : le relevé ci-dessus se recalcule, et ce qui suit aussi.",
+  },
+  "pourqui.plafond": {
+    en: "We block nothing here, and we publish it",
+    fr: "Nous n'y bloquons rien, et nous le publions",
+  },
+  "pourqui.plafond.vous": { en: "this is your case", fr: "c'est votre cas" },
+  "pourqui.plafond.b": {
+    en: "Inside a SaaS-embedded assistant, the actions run within the suite and no gateway comes between them. Detection and log attestation are reachable; refusing an action is not. A vendor claiming to supervise that through a proxy has either not understood the product or is counting on you not to ask.",
+    fr: "Dans une IA embarquée d'une suite SaaS, les actions s'exécutent à l'intérieur de la suite et aucune passerelle ne s'y intercale. La détection et l'attestation de journal sont atteignables ; refuser une action ne l'est pas. Un éditeur qui prétend superviser cela par un proxy n'a pas compris le produit, ou compte sur le fait que vous ne poserez pas la question.",
+  },
+  "pourqui.coeur": { en: "Our ground", fr: "Notre terrain" },
+  "pourqui.coeur.b": {
+    en: "Tooled agents that act: send, write, pay, deploy. Mandatory enforcement, a human on the irreversible, recomputable proof.",
+    fr: "Les agents outillés qui agissent : envoyer, écrire, payer, déployer. Contrôle obligatoire, un humain sur l'irréversible, preuve recalculable.",
+  },
+
+  "pourqui.bascules.t": { en: "What would become yours, and when", fr: "Ce qui deviendrait la vôtre, et quand" },
+  "pourqui.bascules.b": {
+    en: "These rows are not yours today. Each one names the condition that would make it yours. It is a date in your roadmap, not a scenario we invented.",
+    fr: "Ces lignes ne sont pas les vôtres aujourd'hui. Chacune nomme la condition qui les ferait basculer. C'est une date de votre feuille de route, pas un scénario que nous avons inventé.",
+  },
+  "pourqui.bascules.vide": {
+    en: "Tick a profile above and this list fills itself from the engine.",
+    fr: "Cochez un profil ci-dessus et cette liste se remplit depuis le moteur.",
+  },
+  "pourqui.bascules.aucune": {
+    en: "Nothing left to switch on: every row already concerns you.",
+    fr: "Plus rien à faire basculer : toutes les lignes vous concernent déjà.",
+  },
+  "pourqui.bascules.le": { en: "becomes yours with", fr: "bascule avec" },
+
   // --- Le rejeu (L6) ----------------------------------------------------------
   //
   // Aucun chiffre de couverture ici : le gate de `L4` refuserait « nous bloquons N

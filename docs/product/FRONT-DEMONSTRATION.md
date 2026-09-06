@@ -256,7 +256,7 @@ Ordonnés. Chacun est autonome, vérifiable, et livrable en PR séparée.
 | **L4** | **Le gate marketing** | `gen_marketing.py --check`, en CI. | **Fait, et avant la page** — voir §5 quinquies. |
 | **L5** | **Le relevé des menaces** | La section, le sélecteur de profil, ~~les trois~~ **les quatre** contenus d'ouverture. | **Fait** — voir §5 sexies. |
 | **L6** | **Le rejeu** | Le hook de capture, le générateur, le lecteur. ~~Les 8 lignes.~~ **7 rejeux + 1 raison publiée.** | **Fait** — voir §5 septies. |
-| **L7** | **Pour qui** | La section, adossée au moteur de triage. | |
+| **L7** | **Pour qui** | La section, adossée au moteur de triage : **les bascules**, et le profil sur lequel nous perdons. | **Fait** — voir §5 octies. |
 | **L8** | **La démo, porte 1** | L'instantané généré, les quatre écrans, le bandeau. | |
 | **L9** | **`/mise-en-oeuvre`** | Les trois voies, la capture de `make demo`. | |
 | **L10** | **Porte 2, l'accès nominatif** | Formulaire, compte réel, révocation. | Optionnel — voir §5. |
@@ -508,6 +508,48 @@ qu'aucun gate d'égalité ne pourrait les tenir. À leur place, la **propriété
 Aucune table de traduction des décisions n'est écrite. Le vocabulaire est ouvert, et une
 correspondance figée côté page afficherait un jour un refus en gris. Le générateur
 calcule le **point de divergence** : dérivé, il ne se périme pas.
+
+---
+
+## 5 octies. Ce que `L7` a livré
+
+`L5` donnait déjà au visiteur son sous-ensemble de menaces. La question du lot était
+donc : que peut ajouter « Pour qui » sans se répéter ?
+
+La réponse était dans le moteur, inexploitée — **`activates_at`**. `L5` dit ce qui vous
+concerne ; `L7` dit ce qui le **deviendrait**, et à quelle condition. Un visiteur `P1a`
+lit huit lignes concrètes, chacune avec sa bascule : « Piratage d'agents autonomes →
+bascule avec P3, agents outillés qui agissent ». C'est une date dans une feuille de
+route, pas une plaquette — et c'est ce qui fait qu'un grand compte se reconnaît, bien
+mieux qu'une liste de secteurs ou un mur de logos.
+
+**Deux corrections nées de la relecture du rendu contre son propre titre.**
+
+La section s'intitule « et, tout aussi clairement, pour qui ce n'est pas », mais
+l'affirmation correspondante n'apparaissait que si le visiteur cochait `P1b`.
+L'affirmation la plus crédible de la page était donc réservée à ceux qui avaient déjà
+deviné. Elle est désormais **toujours affichée**, et se souligne quand elle devient le
+cas du lecteur.
+
+Un **seul** sélecteur pilote les deux sections. L'état est remonté dans un contexte
+partagé, avec un seul appel au moteur. Deux sélecteurs auraient posé au visiteur une
+question à laquelle il a déjà répondu, avec deux réponses possiblement divergentes : le
+défaut que ce chantier combat depuis `L3`.
+
+**Ce que les gardes tiennent.** Les profils que la page propose sont exactement ceux de
+`core.profiles.Profile` — vérifié rouge en en retirant un, parce que le cas discret et
+coûteux est celui du profil *tacite*, pas du profil de trop. Et le plafond publié est
+celui que `FR-174` calcule : une liste écrite côté page contournerait le mécanisme qui
+existe pour nous rendre incapables de dire que nous supervisons une IA embarquée SaaS.
+
+**Le gate de `L4` a mordu une troisième fois** sur ma propre copie (« les deux
+populations », dans une phrase contenant « matrice »). C'est précisément pourquoi il a
+été écrit avant la page.
+
+**Une erreur de méthode, commise deux fois avant d'être nommée** : `innerText` applique
+`text-transform`, si bien que deux vérifications manuelles sur du texte en classe
+`uppercase` ont conclu à tort que la page ne l'affichait pas. Les tests le disent
+désormais, et sont insensibles à la casse.
 
 ---
 
