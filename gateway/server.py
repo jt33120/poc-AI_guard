@@ -314,7 +314,10 @@ class PolicyBackend:
         if ctx is None:  # pragma: no cover - guaranteed non-None by _integrity_on
             return list(tools)
         exposed: list[types.Tool] = []
-        quarantined: dict[str, tuple[integrity.ToolStatus, str | None]] = {}
+        # Clé : le nom **public**, celui que l'agent emploiera et que `_integrity_blocks`
+        # consulte. Valeur : le statut, la raison, et le nom **canonique** pour l'audit.
+        # Les deux sont nécessaires et ne se déduisent pas l'un de l'autre.
+        quarantined: dict[str, tuple[integrity.ToolStatus, str | None, str]] = {}
         with db.connection(ctx.database_url) as conn:
             stored = integrity.get_fingerprints(conn, ctx.tenant_id)
             for tool in tools:
@@ -334,11 +337,20 @@ class PolicyBackend:
                 if status is integrity.ToolStatus.ok:
                     exposed.append(tool)
                 else:
-                    quarantined[tool.name] = (status, poison)
+                    # Le nom canonique, formé comme partout ailleurs (`server.outil`),
+                    # avec le même repli sur le nom nu quand la résolution échoue.
+                    canonique = f"{server}.{tool.name}" if resolved else tool.name
+                    quarantined[tool.name] = (status, poison, canonique)
             conn.commit()
         self._quarantined = set(quarantined)
-        for tool_name, (status, reason) in quarantined.items():
-            self._audit_gate(tool_name, _INTEGRITY_DECISION[status], reason)
+        # Le nom **canonique**, comme les quatre autres gardes. Ce site-ci journalisait
+        # le nom nu : le même outil apparaissait donc dans `audit_log` sous « echo » à
+        # la mise en quarantaine et sous « mock.echo » partout ailleurs, si bien qu'un
+        # export filtré par nom d'outil manquait les mises en quarantaine. Trouvé en
+        # appariant les deux colonnes du rejeu (`L6`), qui affichaient deux noms pour
+        # le même appel.
+        for _public, (status, reason, canonique) in quarantined.items():
+            self._audit_gate(canonique, _INTEGRITY_DECISION[status], reason)
         return exposed
 
     def _stop_blocks(self, outcome: PolicyOutcome) -> str | None:
