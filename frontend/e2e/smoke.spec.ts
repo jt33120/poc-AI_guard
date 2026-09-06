@@ -455,3 +455,48 @@ test("ce que l'instantané ne montre pas est dit, avec sa raison", async ({ page
   // daté se lit comme une demande à laquelle personne n'a jamais répondu.
   await expect(page.getByText(/Une file est vivante ou n'est pas/)).toBeVisible();
 });
+
+// `/mise-en-oeuvre` (`L9`). Les gardes Python de `tests/test_integration_snippets.py`
+// prouvent que les extraits n'ont **qu'une** définition, partagée avec l'assistant
+// d'intégration. Ce qu'ils ne peuvent pas atteindre : que cette définition ait
+// réellement produit du texte, et que ce texte soit arrivé dans la page. Un composant
+// serveur qui échoue, ou un `<pre>` qui rendrait `[object Object]`, passerait chacun
+// d'eux au vert. La leçon de `L5`, `L7` et `L8` s'est répétée trois fois : regarder la
+// page rendue trouve ce que les types, les tests et le build ne trouvent pas.
+
+test("la page d'intégration livre un extrait MCP réellement rendu", async ({ page }) => {
+  const reponse = await page.goto("/mise-en-oeuvre");
+  const html = (await reponse?.text()) ?? "";
+
+  // Rendu par le serveur : un lecteur sans JavaScript, et un robot, voient l'extrait.
+  expect(html).toContain("XSOM_TENANT_TOKEN");
+  expect(html).toContain("xsom-ai-guard");
+  // Le signe qu'une fonction a bien tourné plutôt qu'un objet collé tel quel.
+  expect(html).not.toContain("[object Object]");
+});
+
+test("les trois voies apparaissent dans l'ordre décroissant de garantie", async ({ page }) => {
+  await page.goto("/mise-en-oeuvre");
+  // L'ordre du DOM, et non celui du fichier source : c'est celui que le lecteur subit.
+  const titres = await page.locator("h2").allInnerTexts();
+  const rangs = ["Passerelle MCP", "/v1/authorize", "Proxy du fournisseur LLM"].map((t) =>
+    titres.findIndex((titre) => titre.includes(t)),
+  );
+  expect(rangs.every((r) => r >= 0)).toBe(true);
+  expect(rangs).toEqual([...rangs].sort((a, b) => a - b));
+
+  // Et la distinction qui justifie l'ordre est écrite, pas seulement implicite : sans
+  // elle, trois voies se lisent comme trois goûts.
+  await expect(page.getByText(/nous exécutons, ou nous n'exécutons pas/)).toBeVisible();
+  await expect(page.getByText(/votre agent honore le verdict/)).toBeVisible();
+});
+
+test("aucun jeton de la page publique ne peut se lire comme un vrai", async ({ page }) => {
+  await page.goto("/mise-en-oeuvre");
+  const texte = await page.locator("body").innerText();
+
+  // Un paramètre qui ressemble à un secret finit collé tel quel, et le premier appel
+  // échoue sans que personne comprenne pourquoi. Il doit se voir comme un modèle.
+  expect(texte).toContain("<votre-jeton-de-passerelle>");
+  expect(texte).not.toMatch(/\b(sk|xsg)[-_](live|test|proj)[-_][A-Za-z0-9]{6,}/);
+});

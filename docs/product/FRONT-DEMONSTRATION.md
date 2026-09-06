@@ -603,6 +603,73 @@ taux-là est débranché dans la semaine, exactement l'arbitrage déjà tranché
 
 ---
 
+## 5 decies. Ce que `L9` a livré, et le garde qui passait au vert à tort
+
+Le §2.6 posait que la page « n'invente rien : elle **extrait** de `README.md` et
+`docs/DEPLOY.md`, qui restent la source ». **La prémisse était fausse**, et la
+vérification l'a montrée avant la première ligne : les trois extraits d'interposition ne
+sont dans aucun des deux. `DEPLOY.md` §6 dit d'ailleurs où ils sont — *« l'assistant
+d'intégration imprime alors un extrait pour votre stack, avec l'URL de base de ce
+déploiement et les noms de variables que le runtime lit réellement »*. La source, c'est
+l'assistant.
+
+D'où le parti pris : **partager, et non recopier**. `frontend/lib/integration.ts` porte
+désormais l'unique définition de `mcpConfig`, `snippet`, `proxyBase`, `STACKS` et
+`OPENAI_STYLE` ; l'assistant d'intégration et la page publique l'importent tous les deux.
+Une page publique qui divergerait de ce qu'on remet au client ne serait pas seulement
+inexacte : elle **apprendrait à faire ce qui ne marche pas**. Le commentaire du bloc MCP
+le disait déjà pour une autre raison — la passerelle stdio ne lit que `XSOM_TENANT_TOKEN`
+et `DATABASE_URL`, et en émettre une troisième livre un extrait inopérant que le lecteur
+ne peut pas distinguer d'un bon avant son premier appel.
+
+### L'ordre des trois voies **est** le propos
+
+La passerelle exécute ou n'exécute pas. `/v1/authorize` rend un verdict que l'agent
+décide d'honorer. Les présenter comme trois goûts équivalents serait exactement le genre
+d'affirmation que ce produit existe pour refuser — la différence n'est pas un détail
+d'intégration, elle décide si une action refusée peut malgré tout avoir lieu. La garantie
+est donc écrite sous chaque titre, et deux tests tiennent l'ordre : l'un sur la source,
+l'autre sur le DOM rendu, qui est celui que le lecteur subit.
+
+### Le garde qui passait au vert sur une page qui importait d'ailleurs
+
+`tests/test_integration_snippets.py` est passé au vert du premier coup, ce qui ne prouve
+rien. Les cinq gardes ont donc été cassés un par un pour vérifier qu'ils mordent — et
+**l'un d'eux ne mordait pas**. Il cherchait la sous-chaîne `@/lib/integration` dans le
+fichier ; `@/lib/integration-copie` la contient. Une page qui importait ses extraits d'un
+module *différent* satisfaisait le garde censé interdire exactement cela.
+
+Un test qui cherche une sous-chaîne teste **l'orthographe, pas la propriété**. Il lit
+maintenant la liaison : tout producteur qu'une surface *emploie* doit venir du module
+partagé, avec le spécificateur exact. La reprise a aussi étendu la portée à `STACKS` et
+`OPENAI_STYLE` — une copie divergente d'une table nomme la mauvaise variable
+d'environnement tout aussi sûrement qu'une copie divergente du code qui la met en forme.
+
+Une hypothèse voisine, elle, était fausse : le commentaire du fichier mentionne
+`lib/integration.ts`, et j'ai cru que cette prose seule suffirait à satisfaire le garde.
+Non — la prose n'écrit pas le préfixe `@/`. Une faiblesse, pas deux.
+
+### Ce que les tests de navigateur ajoutent, et que les gardes structurels ne peuvent pas
+
+Les gardes Python prouvent qu'il n'existe **qu'une** définition. Ils ne peuvent pas
+prouver qu'elle a produit du texte, ni que ce texte est arrivé dans la page : un
+composant serveur qui échoue, ou un `<pre>` rendant `[object Object]`, les passerait tous
+au vert. Trois tests Playwright ferment cela sur la page servie — l'extrait MCP
+réellement rendu côté serveur, l'ordre des voies dans le DOM, et l'absence de tout jeton
+qui pourrait se lire comme un vrai. La leçon de `L5`, `L7` et `L8` s'est répétée trois
+fois : regarder la page rendue trouve ce que les types, les tests et le build ne trouvent
+pas.
+
+### La capture animée de `make demo` n'est pas livrée
+
+Le §2.6 la demandait en ouverture de page. Elle n'est pas dans ce lot, et c'est déclaré
+plutôt que passé sous silence. Suivant `AD-26`, tenu depuis `L6`, une telle capture doit
+être **l'enregistrement d'une exécution réellement passante**, jamais une animation
+fabriquée à sa ressemblance — ce qui suppose de faire tourner `scripts/demo.py` contre
+une pile vivante. C'est un lot en soi, avec sa propre chaîne de preuve.
+
+---
+
 ## 6. Ce qui reste ouvert
 
 
