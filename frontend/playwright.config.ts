@@ -22,5 +22,20 @@ export default defineConfig({
       NEXT_PUBLIC_SUPABASE_ANON_KEY: "e2e-anon-key",
     },
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    {
+      name: "chromium",
+      use: {
+        ...devices["Desktop Chrome"],
+        // Échappatoire pour un poste dont le Chromium préinstallé ne correspond pas
+        // à la révision qu'attend la version de `@playwright/test` du dépôt. Sans
+        // elle, la suite ne démarre pas et il faut télécharger un navigateur.
+        // Non renseignée, le comportement est celui d'avant : Playwright prend le
+        // sien. La CI ne la définit pas.
+        ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
+          ? { launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE } }
+          : {}),
+      },
+    },
+  ],
 });

@@ -1,19 +1,24 @@
-"use client";
-
 import Link from "next/link";
 
 import { ShieldMark } from "@/components/brand";
 import { ExecutiveSummary } from "@/components/ExecutiveSummary";
-import { LanguageToggle, useT } from "@/lib/i18n";
+import { LanguageToggle } from "@/lib/i18n";
+import { pageMetadata, serverT } from "@/lib/lang";
 
-const DEMO_MAILTO = "mailto:julian.talou@xsom.fr?subject=xSOM%20AI%20Guard%20—%20demo";
+export function generateMetadata() {
+  return pageMetadata("exec.title", { descriptionKey: "exec.subtitle" });
+}
+
+const DEMO_MAILTO = "mailto:julian.talou@xsom.fr?subject=xSOM%20AI%20Guard%20%3A%20demo";
 
 // Public, prospect-facing preview of the executive summary — representative
 // sample figures, no auth and no live data.
 const SAMPLE = { governed: 8, counts: { allow: 124, review: 37, block: 9 } };
 
+// Composant serveur : la page ne fait qu'afficher. `<ExecutiveSummary />` reste un
+// îlot client, parce que la console l'emploie aussi et l'y veut interactif.
 export default function ExecutivePreviewPage() {
-  const { t } = useT();
+  const { t } = serverT();
   return (
     <main className="relative">
       <header className="sticky top-0 z-30 border-b border-white/10 bg-navy/70 backdrop-blur-xl">

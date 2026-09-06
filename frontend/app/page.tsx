@@ -1,11 +1,11 @@
-"use client";
-
 import Link from "next/link";
 
 import { ShieldMark } from "@/components/brand";
-import { LanguageToggle, type StrKey, useT } from "@/lib/i18n";
+import { LanguageToggle } from "@/lib/i18n";
+import { serverT } from "@/lib/lang";
+import type { StrKey } from "@/lib/strings";
 
-const DEMO_MAILTO = "mailto:julian.talou@xsom.fr?subject=xSOM%20AI%20Guard%20—%20demo";
+const DEMO_MAILTO = "mailto:julian.talou@xsom.fr?subject=xSOM%20AI%20Guard%20%3A%20demo";
 
 const STEPS: [StrKey, StrKey][] = [
   ["land.how.s1.t", "land.how.s1.b"],
@@ -71,8 +71,13 @@ function FlowArrow() {
   );
 }
 
+// Composant **serveur**. La page n'avait aucune interactivité en propre : elle
+// portait `"use client"` uniquement parce que `useT` était un hook. La traduction
+// venant désormais du serveur, la page peut redevenir ce qu'elle est, et le layout
+// racine peut enfin exporter `metadata` et l'Open Graph. Le seul îlot client qui
+// reste est `<LanguageToggle />`, qui écoute un clic.
 export default function LandingPage() {
-  const { t } = useT();
+  const { t } = serverT();
   return (
     <main className="relative">
       {/* Top bar */}
