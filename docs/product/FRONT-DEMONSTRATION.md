@@ -257,7 +257,7 @@ Ordonnés. Chacun est autonome, vérifiable, et livrable en PR séparée.
 | **L5** | **Le relevé des menaces** | La section, le sélecteur de profil, ~~les trois~~ **les quatre** contenus d'ouverture. | **Fait** — voir §5 sexies. |
 | **L6** | **Le rejeu** | Le hook de capture, le générateur, le lecteur. ~~Les 8 lignes.~~ **7 rejeux + 1 raison publiée.** | **Fait** — voir §5 septies. |
 | **L7** | **Pour qui** | La section, adossée au moteur de triage : **les bascules**, et le profil sur lequel nous perdons. | **Fait** — voir §5 octies. |
-| **L8** | **La démo, porte 1** | L'instantané généré, les quatre écrans, le bandeau. | |
+| **L8** | **La démo, porte 1** | L'instantané généré, ~~les quatre écrans~~ **les deux que la fixture alimente**, le bandeau. | **Fait** — voir §5 nonies. |
 | **L9** | **`/mise-en-oeuvre`** | Les trois voies, la capture de `make demo`. | |
 | **L10** | **Porte 2, l'accès nominatif** | Formulaire, compte réel, révocation. | Optionnel — voir §5. |
 | **L11** | *(conditionnel)* **Durcir pour un compte public** | Les six correctifs du §1.5. | Seulement si tu tranches en faveur du compte partagé. |
@@ -550,6 +550,56 @@ populations », dans une phrase contenant « matrice »). C'est précisément po
 `text-transform`, si bien que deux vérifications manuelles sur du texte en classe
 `uppercase` ont conclu à tort que la page ne l'affichait pas. Les tests le disent
 désormais, et sont insensibles à la casse.
+
+---
+
+## 5 nonies. Ce que `L8` a livré, et les deux affirmations sans preuve qu'il a retirées
+
+`/executive-preview` affichait **des chiffres écrits à la main** : `governed: 8`,
+`allow: 124`, `review: 37`, `block: 9`. Le tenant de démonstration réel en compte **5**
+gouvernés et **93** autorisations. Les chiffres inventés **flattaient** — c'est ce que
+fait toujours un chiffre inventé, sans que personne l'ait décidé, et c'est ce qui le
+rend dangereux sur une page publique bien plus que son inexactitude.
+
+Ils viennent désormais d'une **lecture réelle** : `tests/test_demo_snapshot.py` sème
+`demo/seed.yaml` dans une base neuve pendant la suite, vérifie la chaîne d'audit, puis
+relit — 109 entrées sur 11 jours, 5 outils gouvernés. La fixture est committée,
+relisible, entièrement fabriquée, et un garde de CI vérifie avec les détecteurs du
+produit qu'elle ne porte aucune forme de PII réelle (`AD-31`) : publier ce qu'elle
+produit est sûr **par construction**, et vérifiable en lisant un diff.
+
+Le bandeau dit ce que la page est : instantané daté, signé par un commit, lecture seule,
+fixture fabriquée, chaîne vérifiée à la capture.
+
+**La seconde affirmation retirée : le « 100 % de couverture d'audit ».** Écrit en dur, et
+le commentaire du code le trahissait sans le vouloir — une « réassurance ». Il n'est pas
+démontrable : un taux demande un dénominateur, et une action non journalisée ne laisse
+par définition aucune trace pour le fournir. Remplacé par ce qui se prouve — le nombre
+d'entrées enregistrées, et le fait que leur chaîne se vérifie. Faute des deux, la KPI ne
+s'affiche plus du tout : une case vide vaut mieux qu'un chiffre que rien n'appuie.
+
+### Deux écrans, pas quatre, et la raison est dans le sujet
+
+Le §2.5 en annonçait quatre. Mesure faite, la fixture n'en alimente que deux honnêtement.
+`usage_events` est vide, donc aucune dépense. L'inspecteur montrerait les mêmes appels
+que l'explorateur. Et surtout la table `approvals` est vide — la fixture n'écrit aucune
+demande.
+
+**Il ne faut pas en fabriquer.** Dans un instantané figé et daté, une approbation « en
+attente » se lit comme une demande à laquelle personne n'a jamais répondu, soit l'inverse
+du mécanisme qu'on veut montrer. Une file d'approbation est vivante ou n'est pas. La
+synthèse dirigeant et l'explorateur d'audit, eux, sont *nativement* de forme instantané :
+ce sont des lectures d'un état à une date. La page publie donc les deux, et dit ce qui
+manque avec sa raison.
+
+### Une limite du gate de `L4`, déclarée plutôt que comblée de travers
+
+Le « 100 % » a échappé au gate parce que **le chiffre et le mot de couverture vivaient
+dans deux éléments différents** : la valeur en dur dans un objet, le libellé venant du
+dictionnaire, à deux nœuds de distance. Élargir le motif pour les rapprocher signalerait
+tout nombre voisinant un mot de couverture n'importe où dans un fichier — un garde à ce
+taux-là est débranché dans la semaine, exactement l'arbitrage déjà tranché pour `un` et
+`une`. Le trou est donc écrit dans le gate, à côté des trois autres qu'il déclare.
 
 ---
 

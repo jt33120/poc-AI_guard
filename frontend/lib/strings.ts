@@ -134,6 +134,33 @@ export const STR = {
     en: "Action governance for AI agents",
     fr: "Gouvernance des actions pour agents IA",
   },
+  // --- L'instantané de démonstration (L8) --------------------------------------
+  //
+  // Le bandeau dit ce que la page est : une lecture datée d'un tenant fabriqué, en
+  // lecture seule. Aucun chiffre écrit ici — ils viennent tous de l'instantané.
+  "demo.bandeau": {
+    en: "Snapshot of the demonstration tenant, read on {date}, commit {commit}. Read-only, fabricated fixture, no customer data.",
+    fr: "Instantané du tenant de démonstration, relu le {date}, commit {commit}. Lecture seule, fixture fabriquée, aucune donnée client.",
+  },
+  "demo.bandeau.chaine": { en: "Audit chain verified at capture", fr: "Chaîne d'audit vérifiée à la capture" },
+  "demo.titre": { en: "What the console shows", fr: "Ce que la console montre" },
+  "demo.lede": {
+    en: "Not a mock-up and not a video: the figures below are read back from a seeded tenant whose fixture is committed and reviewable. What you see is what that tenant contains.",
+    fr: "Ni maquette ni vidéo : les chiffres ci-dessous sont relus depuis un tenant semé dont la fixture est committée et relisible. Ce que vous voyez est ce que ce tenant contient.",
+  },
+  "demo.journal.t": { en: "The audit ledger", fr: "Le journal d'audit" },
+  "demo.journal.b": {
+    en: "Every governed action, in order, with the rule that decided it. Argument contents are never written: the product logs metadata and fingerprints.",
+    fr: "Chaque action gouvernée, dans l'ordre, avec la règle qui l'a décidée. Le contenu des arguments n'est jamais écrit : le produit journalise des métadonnées et des empreintes.",
+  },
+  "demo.journal.jours": { en: "days ago", fr: "j" },
+  "demo.journal.reste": { en: "and {n} more entries in the snapshot", fr: "et {n} autres entrées dans l'instantané" },
+  "demo.portee": { en: "What is not here, and why", fr: "Ce qui n'y est pas, et pourquoi" },
+  "demo.portee.b": {
+    en: "No approval queue and no spend. The fixture writes neither, and a frozen queue would be worse than none: a request left pending in a dated snapshot reads as one nobody ever answered, which is the opposite of the mechanism. A queue is live or it is nothing.",
+    fr: "Pas de file d'approbation, pas de dépense. La fixture n'en écrit aucune, et une file figée serait pire que pas de file : une demande en attente dans un instantané daté se lit comme une demande à laquelle personne n'a jamais répondu, soit l'inverse du mécanisme. Une file est vivante ou n'est pas.",
+  },
+
   // --- Pour qui (L7) ----------------------------------------------------------
   //
   // Pas une liste de secteurs, pas de logos. Le visiteur lit son propre relevé, et
@@ -586,11 +613,6 @@ export const STR = {
     en: "Off-policy actions stopped cold.",
     fr: "Actions hors politique arrêtées net.",
   },
-  "exec.kpi.coverage.l": { en: "Audit coverage", fr: "Couverture d'audit" },
-  "exec.kpi.coverage.s": {
-    en: "Every decision recorded, tamper-proof.",
-    fr: "Chaque décision enregistrée, inviolable.",
-  },
   "exec.means.title": { en: "What this means for you", fr: "Ce que cela signifie pour vous" },
   "exec.means.1.t": { en: "You stay in control", fr: "Vous gardez le contrôle" },
   "exec.means.1.b": {
@@ -627,9 +649,14 @@ export const STR = {
     en: "The bottom line: the productivity of autonomous AI, without the blind trust.",
     fr: "En résumé : la productivité de l'IA autonome, sans la confiance aveugle.",
   },
+  "exec.kpi.entrees.l": { en: "Decisions on record", fr: "Décisions enregistrées" },
+  "exec.kpi.entrees.s": {
+    en: "Every one of them chained, and the chain was verified.",
+    fr: "Toutes chaînées, et la chaîne a été vérifiée.",
+  },
   "exec.preview.note": {
-    en: "Preview: illustrative sample data. Your live numbers appear once your agents are connected.",
-    fr: "Aperçu : données d'exemple illustratives. Vos chiffres réels s'affichent une fois vos agents connectés.",
+    en: "Public preview: the demonstration tenant, not yours. Your own figures appear once your agents are connected.",
+    fr: "Aperçu public : le tenant de démonstration, pas le vôtre. Vos propres chiffres s'affichent une fois vos agents connectés.",
   },
   "land.exec.link": { en: "Executive snapshot", fr: "Synthèse pour dirigeants" },
 

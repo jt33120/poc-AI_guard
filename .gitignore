@@ -58,3 +58,4 @@ frontend/playwright-report/
 # Sauvegardes du plan de preuve (`make backup`) — jamais commitées.
 backup/
 /coverage/.sequences.json
+/coverage/.demo_snapshot.json

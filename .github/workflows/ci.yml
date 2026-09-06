@@ -56,6 +56,9 @@ jobs:
       - name: Every replayable row has its recorded sequence (L6)
         run: uv run python scripts/gen_replays.py --check
 
+      - name: The public demo snapshot is a real reading (L8)
+        run: uv run python scripts/gen_demo.py --check
+
       - name: Per-call cost registry is unchanged (EXH-9)
         run: uv run python scripts/measure_overhead.py --check
 

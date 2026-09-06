@@ -23,18 +23,36 @@ export function ExecutiveSummary({
   governed,
   counts,
   spendUsd,
+  entrees,
 }: {
   governed: number;
   counts: ExecCounts;
   spendUsd?: number;
+  /**
+   * Le nombre d'entrées réellement journalisées, quand on le connaît.
+   *
+   * Il remplace le « 100 % » de la quatrième KPI sur la surface publique. Ce
+   * « 100 % » était **écrit en dur**, et le commentaire qui l'accompagnait le disait
+   * sans le vouloir : une « réassurance », pas une mesure. Il n'est d'ailleurs pas
+   * démontrable — un taux de couverture demande un dénominateur, et une action non
+   * journalisée ne laisse par définition aucune trace pour le fournir.
+   *
+   * Ce qui **est** démontrable, c'est le nombre d'entrées écrites et le fait que leur
+   * chaîne se vérifie. C'est moins flatteur et c'est vrai, ce qui est exactement le
+   * parti pris de cette page.
+   */
+  entrees?: number;
 }) {
   const { t } = useT();
   const total = counts.allow + counts.review + counts.block;
   const pct = (n: number) => (total ? `${(n / total) * 100}%` : "0%");
 
-  // When live spend is available (authenticated view), surface it as the 4th
-  // KPI — it speaks to both execs (governance) and builders (cost). The public
-  // preview has no spend and keeps the "100% coverage" reassurance.
+  // Quand la dépense réelle est disponible (vue authentifiée), elle occupe la
+  // quatrième KPI : elle parle au dirigeant comme au constructeur.
+  //
+  // Sinon on montre **le nombre d'entrées journalisées**, quand on le connaît, plutôt
+  // qu'un « 100 % » écrit en dur. Faute des deux, la KPI n'est pas affichée : une
+  // case vide vaut mieux qu'un chiffre que rien n'appuie.
   const lastKpi =
     spendUsd !== undefined
       ? {
@@ -43,18 +61,20 @@ export function ExecutiveSummary({
           sub: "exec.kpi.cost.s" as StrKey,
           tone: "text-emerald-300",
         }
-      : {
-          value: "100%",
-          label: "exec.kpi.coverage.l" as StrKey,
-          sub: "exec.kpi.coverage.s" as StrKey,
-          tone: "text-emerald-300",
-        };
+      : entrees !== undefined
+        ? {
+            value: entrees,
+            label: "exec.kpi.entrees.l" as StrKey,
+            sub: "exec.kpi.entrees.s" as StrKey,
+            tone: "text-emerald-300",
+          }
+        : null;
 
   const KPIS: { value: string | number; label: StrKey; sub: StrKey; tone: string }[] = [
     { value: governed, label: "exec.kpi.governed.l", sub: "exec.kpi.governed.s", tone: "text-brand-bright" },
     { value: counts.review, label: "exec.kpi.review.l", sub: "exec.kpi.review.s", tone: "text-amber-300" },
     { value: counts.block, label: "exec.kpi.blocked.l", sub: "exec.kpi.blocked.s", tone: "text-red-300" },
-    lastKpi,
+    ...(lastKpi ? [lastKpi] : []),
   ];
 
   return (

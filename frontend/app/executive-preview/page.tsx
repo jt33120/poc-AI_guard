@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import { ShieldMark } from "@/components/brand";
 import { ExecutiveSummary } from "@/components/ExecutiveSummary";
+import { JournalDemo } from "@/components/JournalDemo";
+import { INSTANTANE, seaux } from "@/lib/demo";
 import { LanguageToggle } from "@/lib/i18n";
 import { pageMetadata, serverT } from "@/lib/lang";
 
@@ -11,9 +13,11 @@ export function generateMetadata() {
 
 const DEMO_MAILTO = "mailto:julian.talou@xsom.fr?subject=xSOM%20AI%20Guard%20%3A%20demo";
 
-// Public, prospect-facing preview of the executive summary — representative
-// sample figures, no auth and no live data.
-const SAMPLE = { governed: 8, counts: { allow: 124, review: 37, block: 9 } };
+// Les chiffres viennent de l'instantané **relu** du tenant de démonstration, pas
+// d'un échantillon. Ils étaient écrits à la main jusqu'à `L8` — `governed: 8`,
+// `allow: 124` — là où le tenant réel en compte 5 et 93. Un chiffre inventé flatte,
+// toujours, sans qu'on l'ait décidé : c'est ce qui le rend dangereux sur une page
+// publique, pas son inexactitude.
 
 // Composant serveur : la page ne fait qu'afficher. `<ExecutiveSummary />` reste un
 // îlot client, parce que la console l'emploie aussi et l'y veut interactif.
@@ -50,9 +54,23 @@ export default function ExecutivePreviewPage() {
           <p className="mt-3 inline-flex rounded-pill border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs font-medium text-amber-300">
             {t("exec.preview.note")}
           </p>
+          {/* Le bandeau de provenance : ce que la page est, daté et signé par un
+              commit. Sans lui, un lecteur ne peut pas distinguer une lecture d'une
+              maquette — et c'est précisément la distinction que ce produit vend. */}
+          <p className="muted mt-3 max-w-3xl font-mono text-[11px] leading-relaxed">
+            {t("demo.bandeau", { date: INSTANTANE.genere_le, commit: INSTANTANE.commit })}
+            {INSTANTANE.chainee && ` ✓ ${t("demo.bandeau.chaine")}`}
+          </p>
+          <p className="muted mt-3 max-w-2xl text-sm leading-relaxed">{t("demo.lede")}</p>
         </header>
 
-        <ExecutiveSummary governed={SAMPLE.governed} counts={SAMPLE.counts} />
+        <ExecutiveSummary
+          governed={INSTANTANE.outils}
+          counts={seaux(INSTANTANE.decisions)}
+          entrees={INSTANTANE.entrees}
+        />
+
+        <JournalDemo />
 
         <div className="card flex flex-col items-center gap-4 p-8 text-center">
           <p className="muted max-w-xl">{t("land.cta.body")}</p>
