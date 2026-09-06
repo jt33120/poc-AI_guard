@@ -74,8 +74,9 @@ class Settings(BaseSettings):
     # Diagnostic public : ouvert et en écriture (il capture un lead), donc borné.
     triage_rate_limit: str = Field(default="20/hour", max_length=40)
 
-    # --- Database (backend / service_role connection) — M1 ---------------
-    # psycopg DSN. Backend writes use a role that bypasses RLS (service_role).
+    # --- Database (backend connection) — M1 ------------------------------
+    # psycopg DSN. The backend connects as the DSN's own role and relies on table
+    # ownership; it does NOT bypass RLS (see `core/db.py`, corrected under `FR-195`).
     database_url: str | None = Field(default=None, max_length=500)
 
     # --- LLM judge (M6) — LiteLLM -> Mistral, optional -------------------

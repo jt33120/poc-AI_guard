@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -539,3 +540,60 @@ def test_triage_positions_a_client_and_refuses_to_invent_a_map(
     assert "bloquons 1" in out
     # The line that is not theirs is named, not dropped.
     assert "M-05" in out and "l'éditeur du modèle" in out
+
+
+# --- `DEP-10` / `FR-195` — une collision de port est un échec diagnosticable -------
+
+
+def test_a_free_port_is_reported_ok() -> None:
+    """La moitié passante : une sonde qui échoue toujours ne diagnostique rien."""
+    from cli.main import _check_ports
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as pris:
+        pris.bind(("127.0.0.1", 0))
+        libre = pris.getsockname()[1]
+    # Le socket est refermé : ce port est de nouveau libre.
+    os.environ["XSOM_API_PORT"] = str(libre)
+    try:
+        api = next(c for c in _check_ports() if c.code == "ports.xsom_api_port")
+        assert api.level == "OK"
+    finally:
+        del os.environ["XSOM_API_PORT"]
+
+
+def test_a_taken_port_is_named_with_its_remediation() -> None:
+    """`DEP-10` demandait deux choses, et le paramétrage n'en couvrait qu'une.
+
+    La cause unique la plus fréquente d'un premier lancement raté ne doit pas
+    n'apparaître que dans le message de Docker : `doctor` doit dire *lequel* est pris
+    et *quoi* écrire dans le `.env`.
+    """
+    from cli.main import _check_ports
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as occupe:
+        occupe.bind(("127.0.0.1", 0))
+        occupe.listen(1)
+        port = occupe.getsockname()[1]
+        os.environ["XSOM_API_PORT"] = str(port)
+        try:
+            api = next(c for c in _check_ports() if c.code == "ports.xsom_api_port")
+        finally:
+            del os.environ["XSOM_API_PORT"]
+
+    assert api.level == "FAIL"
+    assert str(port) in api.message
+    assert api.fix is not None and "XSOM_API_PORT" in api.fix
+    assert "never edit docker-compose.yml" in api.fix
+
+
+def test_a_non_numeric_port_is_refused_rather_than_ignored() -> None:
+    """Ignorer la valeur ferait diagnostiquer un port que l'opérateur n'utilise pas."""
+    from cli.main import _check_ports
+
+    os.environ["XSOM_DB_PORT"] = "cinq-mille"
+    try:
+        db_check = next(c for c in _check_ports() if c.code == "ports.xsom_db_port")
+    finally:
+        del os.environ["XSOM_DB_PORT"]
+    assert db_check.level == "FAIL"
+    assert "not a port number" in db_check.message

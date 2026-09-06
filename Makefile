@@ -6,7 +6,7 @@ COMPOSE ?= docker compose
 XSOM_API_PORT ?= 8000
 
 .PHONY: install frontend-install dev test verify demo lint fmt fmt-check typecheck audit \
-        coverage-gate coverage-map migrations-manifest sovereignty-gate verify-frontend test-frontend seed-demo clean up down down-hard logs ps
+        coverage-gate coverage-map migrations-manifest sovereignty-gate verify-frontend test-frontend seed-demo clean up down down-hard logs ps cli backup restore
 
 install:           ## Install backend + frontend deps
 	$(UV) sync
@@ -90,6 +90,22 @@ up:                ## Build and start the control plane, waiting until it is hea
 	@echo ">> control API   http://127.0.0.1:$(XSOM_API_PORT)/health/ready"
 	@echo ">> port taken?   XSOM_API_PORT=18000 make up   ('make ps' shows the real mapping)"
 	@echo ">> console login needs an external JWKS issuer (SUPABASE_URL in .env)"
+
+cli:               ## Run the CLI inside the stack: make cli ARGS="bootstrap --org Acme"
+	$(COMPOSE) run --rm --no-deps -e DATABASE_URL migrate python -m cli $(ARGS)
+
+backup:            ## Dump the evidence plane to backup/xsom-<date>.sql.gz
+	@mkdir -p backup
+	$(COMPOSE) exec -T db pg_dump -U xsom -d xsom --clean --if-exists \
+	  | gzip > backup/xsom-$$(date -u +%Y%m%dT%H%M%SZ).sql.gz
+	@echo ">> written: $$(ls -t backup/xsom-*.sql.gz | head -1)"
+	@echo ">> restore: make restore FILE=<that file>   then re-verify the chain"
+
+restore:           ## Restore a dump, then re-verify the hash chain: make restore FILE=...
+	@test -n "$(FILE)" || (echo "usage: make restore FILE=backup/xsom-....sql.gz" && exit 1)
+	gzip -dc "$(FILE)" | $(COMPOSE) exec -T db psql -U xsom -d xsom -v ON_ERROR_STOP=1
+	@echo ">> restored; verifying the chain survived the round trip"
+	$(COMPOSE) run --rm --no-deps -e DATABASE_URL migrate python scripts/verify_chain.py
 
 down:              ## Stop the stack; the database volume (audit chain) survives
 	$(COMPOSE) down

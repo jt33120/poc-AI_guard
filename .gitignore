@@ -53,3 +53,6 @@ frontend/playwright-report/
 # génération produit — une garde vaut mieux qu'une absence de fichier.
 /coverage/.scenarios.json
 /coverage/COVERAGE-MAP.md
+
+# Sauvegardes du plan de preuve (`make backup`) — jamais commitées.
+backup/
