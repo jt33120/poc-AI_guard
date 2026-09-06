@@ -171,7 +171,11 @@ test("un visiteur sans cookie reçoit le français, et le document le déclare",
 
 test("basculer en anglais tient au rechargement", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "EN" }).click();
+  // `exact` : sans lui, le nom accessible est cherché en sous-chaîne insensible à la
+  // casse, et le relevé des menaces a introduit douze boutons qui contiennent « en »
+  // (« Empoisonnement », « Agents », « entraînons »). Le sélecteur était juste tant que
+  // la page était courte, ce qui est la définition d'un sélecteur fragile.
+  await page.getByRole("button", { name: "EN", exact: true }).click();
   await expect(page.getByText("Ship AI agents to production.")).toBeVisible();
 
   // Le rechargement est le point : la préférence tient dans un cookie que le serveur
@@ -195,4 +199,118 @@ test("les écrans d'authentification et la console refusent l'indexation", async
   // retirerait le site des résultats sans que rien ne le signale.
   await page.goto("/");
   await expect(page.locator('head meta[name="robots"]')).toHaveCount(0);
+});
+
+// --- Le relevé des menaces (L5) ------------------------------------------------
+//
+// Trois propriétés, et la deuxième est celle qui protège la réunion.
+//
+// Le relevé est **rendu par le serveur** : un prospect qui n'exécute pas de
+// JavaScript, et un robot d'indexation, voient les seize lignes.
+//
+// La page est un **afficheur, pas une calculatrice**. Les comptes viennent du moteur.
+// Pour le prouver plutôt que l'affirmer, le mock ci-dessous renvoie des nombres que la
+// page ne pourrait pas retrouver seule : si elle recalculait, elle afficherait autre
+// chose. C'est la seule façon de distinguer « elle relaie » de « elle recalcule et
+// tombe juste ».
+//
+// Sans le moteur, elle **ne se vide pas**. Une liste vide se lit « aucune menace ».
+
+const RELEVE_P1A = {
+  profiles: ["P1a"],
+  cap: null as string | null,
+  // Volontairement invraisemblables : aucune arithmétique locale ne produirait ça.
+  counts: { lines: 16, applicable: 7, ours: 4, blocked: 1 },
+  statement: "Énoncé rendu par le moteur, et pas recomposé par la page.",
+  rows: [
+    {
+      id: "M-07",
+      titre: "Phishing hyper-personnalisé",
+      applicable: true,
+      blocked: false,
+      owner: "le SOC du client (cyber classique)",
+      // Seule la facette « réception » s'applique à P1a. La facette « émission », qui
+      // porte les scénarios et le chemin MCP, appartient à un client sous agents.
+      facets: [{ cle: "reception", libelle: "réception — passerelle mail", mode: "X" }],
+      activates_at: [] as string[],
+    },
+  ],
+};
+
+test("le relevé des seize lignes est rendu par le serveur, sans JavaScript", async ({
+  page,
+}) => {
+  const reponse = await page.goto("/");
+  const html = (await reponse?.text()) ?? "";
+
+  for (const id of ["M-01", "M-08", "M-16"]) {
+    expect(html).toContain(id);
+  }
+  // Le titre porte le compte de lignes **interpolé** depuis les faits générés : s'il
+  // était écrit à la main, `gen_marketing.py --check` le refuserait en CI.
+  expect(html).toContain("lignes de menace");
+  expect(html).toContain("Injection de prompts indirecte");
+
+  // Et l'estampille de provenance : un relevé qui ne dit pas de quelle carte il vient
+  // ne peut être confronté à rien.
+  expect(html).toMatch(/commit [0-9a-f]{7}/);
+});
+
+test("la page relaie les comptes du moteur au lieu de les recalculer", async ({ page }) => {
+  await page.route("**/api/threats**", async (route) => {
+    await route.fulfill({ json: RELEVE_P1A });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: /P1a/ }).click();
+
+  // L'énoncé du moteur, mot pour mot. Une page qui le recomposerait écrirait le sien.
+  await expect(page.getByText(RELEVE_P1A.statement)).toBeVisible();
+});
+
+test("une ligne positionnée ne mêle pas la preuve d'une facette qu'on n'a pas", async ({
+  page,
+}) => {
+  await page.route("**/api/threats**", async (route) => {
+    await route.fulfill({ json: RELEVE_P1A });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: /P1a/ }).click();
+
+  // `M-07` est applicable à `P1a` par sa seule facette « réception », qui ne porte ni
+  // scénario ni chemin d'entrée. Afficher malgré tout « Prouvé sur Passerelle MCP »
+  // montrerait la preuve de la facette « émission », que ce visiteur n'a pas : deux
+  // affirmations contradictoires sur la même ligne, et la seconde flatterait.
+  const rangee = page
+    .locator("#menaces div")
+    .filter({ hasText: "Phishing hyper-personnalisé" })
+    .last();
+  await expect(rangee).toContainText("aucun chemin d'entrée asserté");
+  await expect(rangee).not.toContainText("Passerelle MCP");
+});
+
+test("sans le moteur, le relevé se montre sans se prétendre positionné", async ({ page }) => {
+  await page.route("**/api/threats**", async (route) => {
+    await route.fulfill({ status: 503, json: { detail: "Relevé momentanément indisponible" } });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: /P3/ }).click();
+
+  // Il le dit, et les seize lignes restent là. Se vider se lirait « aucune menace »,
+  // qui est la plus mauvaise des réponses fausses.
+  await expect(page.getByText(/n'ont pas pu être recalculés|could not be recomputed/)).toBeVisible();
+  await expect(page.getByText("Injection de prompts indirecte")).toBeVisible();
+});
+
+test("ouvrir une ligne hors périmètre affiche la raison publiée dans la carte", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /Vol de modèle/ }).click();
+
+  // La raison vient de `coverage/map.json`, pas d'une rédaction de la page : `FR-144`
+  // exige qu'une ligne non couverte soit publiée **avec sa raison**.
+  await expect(page.getByText(/usage_events/)).toBeVisible();
 });

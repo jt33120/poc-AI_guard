@@ -33,7 +33,14 @@ from pathlib import Path
 from core.profiles import Family, Profile, capped_mode, ceiling
 from core.threat_map import MapUnavailable, PublishedRow, published_rows
 
-__all__ = ["Diagnostic", "MapUnavailable", "ThreatLine", "diagnose", "parse_profiles"]
+__all__ = [
+    "Diagnostic",
+    "LineFacet",
+    "MapUnavailable",
+    "ThreatLine",
+    "diagnose",
+    "parse_profiles",
+]
 
 _MODE_LABEL = {
     "B": "Bloqué",
@@ -46,6 +53,23 @@ _MODE_LABEL = {
 
 
 @dataclass(frozen=True, slots=True)
+class LineFacet:
+    """Une facette telle qu'elle se présente à *ce* client : libellé, mode plafonné.
+
+    La **clé** voyage avec, et ce n'est pas décoratif : c'est le seul identifiant
+    stable qui permette de relier ce que le moteur juge applicable à ce que l'artefact
+    publie comme preuve. Sans elle, une page qui veut afficher la densité de preuve
+    d'une ligne positionnée compte les scénarios de facettes que le client n'a pas — et
+    affiche alors des barres de preuve à côté d'un « Hors périmètre », sur la même
+    ligne, ce qui se contredit à l'œil nu.
+    """
+
+    cle: str
+    libelle: str
+    mode: str
+
+
+@dataclass(frozen=True, slots=True)
 class ThreatLine:
     """One threat row as it stands for this client."""
 
@@ -54,13 +78,13 @@ class ThreatLine:
     applicable: bool
     family: Family
     #: published mode per facet, already capped by the profile ceiling
-    facets: tuple[tuple[str, str], ...]
+    facets: tuple[LineFacet, ...]
     #: the profiles that would make this line the client's, if it is not yet
     activates_at: tuple[Profile, ...] = ()
 
     @property
     def blocked(self) -> bool:
-        return any(mode == "B" for _, mode in self.facets)
+        return any(f.mode == "B" for f in self.facets)
 
     @property
     def owner(self) -> str:
@@ -181,6 +205,8 @@ def _position(row: PublishedRow, held: frozenset[Profile], cap: str | None) -> T
         activates_at=tuple(sorted(row.profils - held, key=lambda p: p.value)),
         # `non asserté` en queue : c'est une absence de revendication, et la lire au
         # milieu des modes prouvés la ferait passer pour l'un d'eux.
-        facets=tuple((f.libelle, capped_mode(f.mode, cap)) for f in mine if f.mode != "NA")
-        + tuple((f.libelle, "NA") for f in mine if f.mode == "NA"),
+        facets=tuple(
+            LineFacet(f.cle, f.libelle, capped_mode(f.mode, cap)) for f in mine if f.mode != "NA"
+        )
+        + tuple(LineFacet(f.cle, f.libelle, "NA") for f in mine if f.mode == "NA"),
     )

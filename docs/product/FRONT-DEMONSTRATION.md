@@ -162,8 +162,8 @@ entre crochets (`[ B ]` Bloqué, `[ D ]`, `[ O ]`, `[ A ]`, `[ X ]`), chemin d'i
 et la densité de preuve rendue en barres mono plutôt qu'en chiffre — un relevé se lit
 d'un coup d'œil, un chiffre se lit ligne à ligne.
 
-**Au clic**, la rangée s'ouvre. Trois contenus possibles, selon ce que la ligne a
-réellement :
+**Au clic**, la rangée s'ouvre. **Quatre** contenus possibles, selon ce que la ligne a
+réellement — trois étaient prévus, la mesure en a imposé un quatrième :
 
 - **Les 8 lignes à preuve complète** → le **rejeu** : le même appel d'outil joué deux
   fois, garde retiré à gauche, garde actif à droite, animé depuis la trace d'audit
@@ -171,9 +171,16 @@ réellement :
   l'écran.
 - **Les 3 lignes à scénario mince** → ce que le scénario prouve, et ce qu'il ne prouve
   pas, dit en une phrase.
-- **Les 5 lignes sans matière** → la raison publiée dans la carte : *qui porte cette
-  ligne, et pourquoi ce n'est pas nous.* Dit franchement, c'est un argument commercial
-  plus fort qu'une vidéo de plus.
+- **Les 3 lignes qui publient une raison** (`M-04`, `M-05`, `M-09`, toutes `Hors
+  périmètre`) → la raison publiée dans la carte : *qui porte cette ligne, et pourquoi
+  ce n'est pas nous.* Dit franchement, c'est un argument commercial plus fort qu'une
+  vidéo de plus.
+- **Les 2 lignes `Attesté` sans matière** (`M-03`, `M-16`) → ce qu'`Attesté` revendique,
+  et ce qu'il ne revendique pas. **Ce quatrième cas n'était pas prévu** : ce paragraphe
+  annonçait cinq lignes « sans matière » sous la raison publiée, et la mesure en donne
+  trois. `M-03` et `M-16` n'ont ni scénario ni raison ; les ranger avec les autres
+  aurait affiché un cadre vide ou une raison inventée. Corrigé en `L5`, dérivé par
+  `core.threat_map.PublishedRow.ouverture`, tenu par un test.
 
 En tête de section, un **sélecteur de profil** (P1a … P5) qui recalcule en direct, par
 le moteur `core/triage.py`, ce qui s'applique au visiteur.
@@ -247,7 +254,7 @@ Ordonnés. Chacun est autonome, vérifiable, et livrable en PR séparée.
 | **L2** | **Socle des pages publiques** | Sortir du `"use client"` global pour retrouver `metadata`, OG et `<html lang>`. ~~Routes de langue.~~ | **Fait, sauf les routes de langue** — voir §5 ter. Le français est indexable, l'anglais ne l'est pas. |
 | **L3** | **Exposer la carte au front** | ~~Un endpoint ou un artefact committé~~ **les deux** : l'artefact pour le statique, la route pour le profil-dépendant. | **Fait** — voir §5 quater. |
 | **L4** | **Le gate marketing** | `gen_marketing.py --check`, en CI. | **Fait, et avant la page** — voir §5 quinquies. |
-| **L5** | **Le relevé des menaces** | La section, le sélecteur de profil, les trois contenus d'ouverture. | Le cœur. |
+| **L5** | **Le relevé des menaces** | La section, le sélecteur de profil, ~~les trois~~ **les quatre** contenus d'ouverture. | **Fait** — voir §5 sexies. |
 | **L6** | **Le rejeu** | Étendre le hook pytest qui écrit déjà `.scenarios.json` pour capturer la séquence d'audit ; un générateur ; un lecteur. Les 8 lignes. | Les « vidéos ». Dépend de L5 pour son emplacement. |
 | **L7** | **Pour qui** | La section, adossée au moteur de triage. | |
 | **L8** | **La démo, porte 1** | L'instantané généré, les quatre écrans, le bandeau. | |
@@ -381,6 +388,64 @@ pas jugé, et c'est le but — il vient de `/api/threats`, donc du moteur ; une 
 affirme une couverture sans aucun mot de couverture n'est pas vue ; le verbe sans ligne
 nommée est de la prose générique, comptée (30 occurrences) plutôt que refusée, comme
 `FR-175` le fait déjà.
+
+---
+
+## 5 sexies. Ce que `L5` a livré, et les deux contradictions trouvées à l'écran
+
+Le relevé pleine largeur est en ligne sous le héros : seize rangées séparées d'un filet,
+`M-01`…`M-16` en mono cuivre dans une gouttière fixe, titre en Saira, mode publié entre
+crochets, chemin d'entrée, densité de preuve en barres. Sélecteur de profil en tête,
+recalculé par `core.triage`. Aucune grille de cartes, aucune ombre douce.
+
+**Le titre lui-même passe par le gate.** « {lignes} lignes de menace » : écrire
+« seize » aurait été refusé par `L4` au même titre que « 16 ». Le gate a d'ailleurs
+mordu sur ma propre copie dès la première rédaction, sur « les **deux** moitiés de la
+preuve » — un numéral que rien ne dérive. Reformulé en « la preuve entière », et la
+phrase y gagne.
+
+**Rendu par le serveur.** Les seize lignes sont dans le HTML de la première réponse : un
+robot les voit sans exécuter de JavaScript. Seuls le sélecteur et l'ouverture des
+rangées sont un îlot client.
+
+### Deux contradictions que seul le rendu a montrées
+
+Les types passaient, les tests passaient, le build passait. Il a fallu regarder la page.
+
+**Première.** Avec `P1a`, `M-07` affichait « [ X ] Hors périmètre » **et** trois barres
+de preuve, **et** « Prouvé sur Passerelle MCP ». Les trois scénarios et le chemin MCP
+appartiennent à la facette « émission », qui est celle d'un client sous agents outillés.
+Le visiteur `P1a` n'a que la facette « réception », qui ne prouve rien. La page montrait
+donc une preuve qui n'était pas la sienne, à côté d'un mode qui disait le contraire —
+l'erreur d'unité du §1.3, un cran plus bas. Corrigé en faisant voyager la **clé de
+facette** depuis le moteur (`core.triage.LineFacet`), seule jointure stable vers
+l'artefact ; le libellé n'en est pas une.
+
+**Seconde, introduite par le correctif de la première.** Une ligne non applicable ne
+retient aucune facette, si bien que filtrer sur cet ensemble vide vidait le chemin
+d'entrée tout en laissant le mode publié : `M-02` affichait « [ B ] Bloqué » à côté
+d'« aucun chemin d'entrée asserté ». La règle est désormais explicite : **soit la vue du
+visiteur, soit la vue publiée, jamais un mélange des deux.**
+
+Une fois les deux corrigées, la page se vérifie à l'œil : sur `P1a`, huit rangées
+lumineuses, dont deux `[ B ]` — ce que dit exactement l'énoncé du moteur au-dessus.
+
+### Ce que les tests tiennent
+
+Cinq tests Playwright, dont un qui distingue « la page relaie » de « la page recalcule
+et tombe juste » : le mock renvoie des comptes invraisemblables, et le test exige que la
+page les affiche. Un autre coupe le moteur et vérifie que le relevé **ne se vide pas**.
+
+Quatre gardes Python : les quatre ouvertures couvrent les seize lignes sans trou, chacune
+a réellement ce qu'elle promet de montrer, l'artefact porte la classification pour que la
+page ne classe pas, et la clé de facette permet la jointure.
+
+### Une régression causée, et attrapée
+
+`getByRole("button", { name: "EN" })` cherche le nom accessible en sous-chaîne : le
+relevé a introduit douze boutons contenant « en » (« Empoisonnement », « Agents »,
+« entraînons »). Le sélecteur était juste tant que la page était courte, ce qui est la
+définition d'un sélecteur fragile. `exact: true`.
 
 ---
 

@@ -6,6 +6,7 @@
       "id": "M-01",
       "titre": "Injection de prompts directe",
       "rejouable": false,
+      "ouverture": "scenario",
       "profils": [
         "P1a",
         "P1b",
@@ -67,6 +68,7 @@
       "id": "M-02",
       "titre": "Injection de prompts indirecte",
       "rejouable": true,
+      "ouverture": "rejeu",
       "profils": [
         "P2",
         "P3"
@@ -107,6 +109,7 @@
       "id": "M-03",
       "titre": "Empoisonnement de données",
       "rejouable": false,
+      "ouverture": "attestation",
       "profils": [
         "P2",
         "P5"
@@ -135,6 +138,7 @@
       "id": "M-04",
       "titre": "Vol de modèle / extraction",
       "rejouable": false,
+      "ouverture": "raison",
       "profils": [
         "P4",
         "P5"
@@ -163,6 +167,7 @@
       "id": "M-05",
       "titre": "Attaques par évasion (adversarial)",
       "rejouable": false,
+      "ouverture": "raison",
       "profils": [
         "P5"
       ],
@@ -187,6 +192,7 @@
       "id": "M-06",
       "titre": "Piratage d'agents autonomes",
       "rejouable": true,
+      "ouverture": "rejeu",
       "profils": [
         "P3"
       ],
@@ -228,6 +234,7 @@
       "id": "M-07",
       "titre": "Phishing hyper-personnalisé",
       "rejouable": true,
+      "ouverture": "rejeu",
       "profils": [
         "P1a",
         "P1b",
@@ -282,6 +289,7 @@
       "id": "M-08",
       "titre": "Usurpation par deepfake",
       "rejouable": true,
+      "ouverture": "rejeu",
       "profils": [
         "P1a",
         "P1b",
@@ -338,6 +346,7 @@
       "id": "M-09",
       "titre": "Malwares polymorphes",
       "rejouable": false,
+      "ouverture": "raison",
       "profils": [
         "P1a",
         "P1b",
@@ -372,6 +381,7 @@
       "id": "M-10",
       "titre": "Exfiltration de données / PI via LLM",
       "rejouable": true,
+      "ouverture": "rejeu",
       "profils": [
         "P1a",
         "P1b",
@@ -463,6 +473,7 @@
       "id": "M-11",
       "titre": "Supply chain (modèles / bibliothèques)",
       "rejouable": true,
+      "ouverture": "rejeu",
       "profils": [
         "P2",
         "P3",
@@ -529,6 +540,7 @@
       "id": "M-12",
       "titre": "Privilèges excessifs (excessive agency)",
       "rejouable": true,
+      "ouverture": "rejeu",
       "profils": [
         "P3"
       ],
@@ -563,6 +575,7 @@
       "id": "M-13",
       "titre": "Traitement non sécurisé des sorties",
       "rejouable": false,
+      "ouverture": "scenario",
       "profils": [
         "P3"
       ],
@@ -595,6 +608,7 @@
       "id": "M-14",
       "titre": "Fuite du system prompt & secrets",
       "rejouable": true,
+      "ouverture": "rejeu",
       "profils": [
         "P1a",
         "P1b",
@@ -666,6 +680,7 @@
       "id": "M-15",
       "titre": "Validation aveugle de code (Copilot)",
       "rejouable": false,
+      "ouverture": "scenario",
       "profils": [
         "P1a",
         "P1b"
@@ -713,6 +728,7 @@
       "id": "M-16",
       "titre": "Décision fondée sur une hallucination",
       "rejouable": false,
+      "ouverture": "attestation",
       "profils": [
         "P1a",
         "P1b",

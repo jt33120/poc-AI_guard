@@ -125,7 +125,7 @@ def test_a_copilot_only_client_is_never_told_we_block(tmp_path: Path) -> None:
     assert report.blocked == ()
     assert "bloquons 0" in report.statement()
     assert "aucune frontière d'outils" in report.statement()
-    assert all(mode != "B" for line in report.lines for _, mode in line.facets)
+    assert all(f.mode != "B" for line in report.lines for f in line.facets)
 
     # And the same map, for a client who does run agents, still says what it proves.
     agents = diagnose(path, frozenset({Profile.p1b, Profile.p3}))

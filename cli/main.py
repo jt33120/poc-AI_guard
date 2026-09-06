@@ -714,8 +714,8 @@ def cmd_triage(settings: Settings, args: argparse.Namespace) -> int:
         # reception belongs to your mail gateway" is a more useful sentence than a
         # row of `Hors périmètre` with no explanation of whose scope it is in.
         print(f"  {line.id}  {line.titre}  —  {line.owner}")
-        for lib, mode in line.facets:
-            print(f"        {lib} : {_MODE_LABEL[mode]}")
+        for facette in line.facets:
+            print(f"        {facette.libelle} : {_MODE_LABEL[facette.mode]}")
 
     if report.not_applicable:
         print("\nCe qui ne vous concerne pas, et qui le porte")

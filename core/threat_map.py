@@ -101,6 +101,37 @@ class PublishedRow:
         """
         return self.bloquee
 
+    @property
+    def ouverture(self) -> str:
+        """Ce que la rangée a de quoi montrer quand un lecteur l'ouvre.
+
+        Dérivé, dans cet ordre, parce que c'est l'ordre de force de la preuve :
+
+        * `rejeu` — une facette publiée `Bloqué`, donc le blocage **et** son contrôle
+          négatif. C'est la seule forme qui met une séquence à l'écran ;
+        * `scenario` — des scénarios passants, mais rien de bloqué : on dit ce qu'ils
+          prouvent, et ce qu'ils ne prouvent pas ;
+        * `raison` — pas de scénario, mais la carte publie **pourquoi** la ligne n'est
+          pas couverte, ce que `FR-144` exige. Dit franchement, qui porte la ligne est
+          un argument plus fort qu'une preuve de plus ;
+        * `attestation` — ni scénario ni raison. La ligne est `Attesté` : nous
+          affirmons la présence d'un contrôle, nous ne prétendons pas l'exercer.
+
+        Le quatrième cas n'était pas prévu. Le plan du chantier annonçait trois
+        contenus et rangeait cinq lignes sous « la raison publiée dans la carte » ;
+        mesure faite, **trois** des cinq portent une raison (`M-04`, `M-05`, `M-09`,
+        toutes en `Hors périmètre`). `M-03` et `M-16` sont `Attesté` sans scénario ni
+        raison, et les faire passer pour l'un des trois autres aurait affiché une
+        chaîne vide ou une raison inventée.
+        """
+        if self.rejouable:
+            return "rejeu"
+        if any(f.scenarios for f in self.facettes):
+            return "scenario"
+        if any(f.raison for f in self.facettes):
+            return "raison"
+        return "attestation"
+
 
 def _facet(raw: dict[str, Any]) -> PublishedFacet:
     return PublishedFacet(

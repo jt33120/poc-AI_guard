@@ -47,7 +47,9 @@ def test_a_row_is_not_a_facet_and_p1a_is_where_it_shows() -> None:
     rapport = diagnose(_CARTE, frozenset({Profile.p1a}))
 
     lignes_bloquees = len(rapport.blocked)
-    facettes_bloquees = sum(1 for ligne in rapport.applicable for _, m in ligne.facets if m == "B")
+    facettes_bloquees = sum(
+        1 for ligne in rapport.applicable for f in ligne.facets if f.mode == "B"
+    )
 
     assert lignes_bloquees == 2, (
         f"le moteur dit {lignes_bloquees} lignes bloquées sur P1a. Si la carte a "
@@ -194,3 +196,67 @@ def test_the_artefact_carries_nothing_that_depends_on_a_visitor() -> None:
     interdits = ["applicable", "owner", "plafond", "cap", "statement", "blocked"]
     presents = [mot for mot in interdits if f'"{mot}"' in texte]
     assert not presents, f"l'artefact statique porte du profil-dépendant : {presents}"
+
+
+# --- Les quatre ouvertures (`L5`) ----------------------------------------------
+
+
+def test_every_row_has_exactly_one_opening_and_it_is_derived() -> None:
+    """Les quatre contenus couvrent les seize lignes, sans trou ni chevauchement.
+
+    Le plan du chantier en annonçait **trois** et rangeait cinq lignes sous « la raison
+    publiée dans la carte ». Mesure faite, trois des cinq portent une raison ; `M-03` et
+    `M-16` sont `Attesté` sans scénario ni raison. Les faire passer pour l'un des trois
+    autres aurait affiché une chaîne vide, ou une raison inventée à leur place.
+    """
+    lignes = published_rows(_CARTE)
+    par_ouverture: dict[str, list[str]] = {}
+    for ligne in lignes:
+        par_ouverture.setdefault(ligne.ouverture, []).append(ligne.id)
+
+    assert set(par_ouverture) == {"rejeu", "scenario", "raison", "attestation"}
+    assert sum(len(v) for v in par_ouverture.values()) == len(lignes) == 16
+    assert len(par_ouverture["rejeu"]) == 8
+    assert len(par_ouverture["scenario"]) == 3
+    assert len(par_ouverture["raison"]) == 3
+    assert len(par_ouverture["attestation"]) == 2
+
+
+def test_each_opening_actually_has_what_it_promises_to_show() -> None:
+    """Une classification qui promet un contenu absent afficherait un cadre vide."""
+    for ligne in published_rows(_CARTE):
+        scenarios = [s for f in ligne.facettes for s in f.scenarios]
+        raisons = [f.raison for f in ligne.facettes if f.raison]
+        if ligne.ouverture == "rejeu":
+            assert ligne.bloquee and scenarios, f"{ligne.id} promet un rejeu sans preuve"
+        elif ligne.ouverture == "scenario":
+            assert scenarios and not ligne.bloquee, f"{ligne.id} promet des scénarios sans en avoir"
+        elif ligne.ouverture == "raison":
+            assert raisons and not scenarios, f"{ligne.id} promet une raison sans en avoir"
+        else:
+            assert not scenarios and not raisons, f"{ligne.id} a de la matière et ne la montre pas"
+
+
+def test_the_front_artefact_carries_the_opening_so_the_page_does_not_classify() -> None:
+    """La classification est dérivée dans `core`, pas refaite en TypeScript."""
+    publie = json.loads(_ARTEFACT.read_text(encoding="utf-8"))["lignes"]
+    du_moteur = {ligne.id: ligne.ouverture for ligne in published_rows(_CARTE)}
+    assert {ligne["id"]: ligne["ouverture"] for ligne in publie} == du_moteur
+
+
+def test_the_engine_carries_the_facet_key_so_proof_can_be_joined() -> None:
+    """Sans la clé, une page positionnée montre la preuve d'une facette qu'on n'a pas.
+
+    Sur `P1a`, `M-07` n'est applicable que par sa facette « réception », qui ne porte ni
+    scénario ni chemin d'entrée. La facette « émission », elle, porte trois scénarios et
+    le chemin MCP — mais elle appartient à un client sous agents outillés. Relier les
+    deux demande un identifiant stable ; le libellé n'en est pas un.
+    """
+    rapport = diagnose(_CARTE, frozenset({Profile.p1a}))
+    m07 = next(ligne for ligne in rapport.lines if ligne.id == "M-07")
+    assert [f.cle for f in m07.facets] == ["reception"]
+
+    m07_publie = next(ligne for ligne in published_rows(_CARTE) if ligne.id == "M-07")
+    artefact = {f.cle: f for f in m07_publie.facettes}
+    assert artefact["reception"].scenarios == ()
+    assert artefact["emission"].scenarios, "la facette émission doit bien porter la preuve"

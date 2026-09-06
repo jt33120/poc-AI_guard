@@ -45,6 +45,9 @@ def _row(row: PublishedRow) -> dict[str, Any]:
         # y est publiée `Bloqué`, ce que `gen_coverage.py` n'accorde qu'avec les deux
         # moitiés de la preuve — le blocage **et** son contrôle négatif.
         "rejouable": row.rejouable,
+        # Ce que la rangée a de quoi montrer quand on l'ouvre. Dérivé dans `core`, et
+        # pas côté page : c'est une classification, pas un affichage.
+        "ouverture": row.ouverture,
         "profils": sorted(p.value for p in row.profils),
         "facettes": [
             {

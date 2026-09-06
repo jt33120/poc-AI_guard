@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { ShieldMark } from "@/components/brand";
+import { ThreatLedger } from "@/components/ThreatLedger";
 import { LanguageToggle } from "@/lib/i18n";
 import { serverT } from "@/lib/lang";
 import type { StrKey } from "@/lib/strings";
@@ -130,6 +131,11 @@ export default function LandingPage() {
         </div>
 
       </section>
+
+      {/* Le relevé des menaces (L5). Îlot client : il porte le sélecteur de profil et
+          l'ouverture des rangées. Ses seize lignes sont rendues côté serveur depuis
+          l'artefact généré, donc un robot les voit sans exécuter de JavaScript. */}
+      <ThreatLedger />
 
       {/* Problem */}
       <section className="mx-auto max-w-6xl px-6 py-12">
