@@ -159,7 +159,11 @@ def test_no_group_name_is_ever_stored(db: DBHandle) -> None:
     """Les noms de groupes disent l'organigramme du client (`CLAUDE.md` §4.10)."""
     tid = _tenant(db)
     control_plane.record_assignment(
-        db.conn, tenant_id=tid, subject=_SUB, role=Role.admin, groups=["direction-fusions-acquisitions"]
+        db.conn,
+        tenant_id=tid,
+        subject=_SUB,
+        role=Role.admin,
+        groups=["direction-fusions-acquisitions"],
     )
     lignes = db.conn.execute("select * from control_plane_events").fetchall()
     assert "direction-fusions-acquisitions" not in str(lignes)
@@ -174,7 +178,10 @@ def test_the_log_is_append_only(db: DBHandle) -> None:
         db.conn, tenant_id=tid, subject=_SUB, role=Role.admin, groups=["a"]
     )
     db.conn.commit()
-    for sql in ("update control_plane_events set role = 'viewer'", "delete from control_plane_events"):
+    for sql in (
+        "update control_plane_events set role = 'viewer'",
+        "delete from control_plane_events",
+    ):
         with pytest.raises(psycopg.errors.RaiseException):
             db.conn.execute(sql)
         db.conn.rollback()
