@@ -1,0 +1,37 @@
+{
+  "unite": "par appel d'outil",
+  "chemins": {
+    "http.autorise": {
+      "designe": "`POST /v1/authorize` (coopératif) — verdict d'autorisation, audité",
+      "connexions_postgres": 3,
+      "allers_retours_sql": 6
+    },
+    "http.refuse": {
+      "designe": "`POST /v1/authorize` — verdict de refus, audité",
+      "connexions_postgres": 3,
+      "allers_retours_sql": 6
+    },
+    "mcp.autorise": {
+      "designe": "passerelle MCP (obligatoire) — appel autorisé, relayé, audité",
+      "connexions_postgres": 1,
+      "allers_retours_sql": 3
+    },
+    "mcp.premiere_attente": {
+      "designe": "passerelle MCP — irréversible mis en attente pour la **première** fois (une reprise d'approbation coûte moins)",
+      "connexions_postgres": 2,
+      "allers_retours_sql": 5
+    },
+    "mcp.refuse": {
+      "designe": "passerelle MCP — appel refusé par la policy, jamais relayé",
+      "connexions_postgres": 1,
+      "allers_retours_sql": 3
+    }
+  },
+  "non_mesure": [
+    "intégrité des outils (`integrity_enabled`, éteinte par défaut) — ajoute 1 connexion",
+    "bandes de risque (`risk_bands`, non définies par défaut) — ajoute 1 connexion",
+    "taint d'injection indirecte (`taint_policy: off` par défaut) — ajoute 1 à 2 connexions",
+    "le relais vers l'outil aval, qui n'est pas notre coût : le client le paie avec ou sans nous"
+  ],
+  "ce_que_ce_chiffre_n_est_pas": "Ce n'est pas une latence, et il n'y a pas de p95 publié ici. Le cluster de mesure tourne fsync=off et un exécuteur CI partagé n'a pas de p95 reproductible : un tel nombre dirait plus que ce qu'il prouve. Ce registre dit combien d'allers-retours la chaîne de gardes exige ; multipliez-les par la latence d'établissement de connexion de VOTRE base pour obtenir le surcoût chez vous. Il n'y a pas de pool : `core/db.py` ouvre une connexion neuve par opération."
+}

@@ -6,7 +6,7 @@ COMPOSE ?= docker compose
 XSOM_API_PORT ?= 8000
 
 .PHONY: install frontend-install dev test verify demo lint fmt fmt-check typecheck audit \
-        coverage-gate coverage-map migrations-manifest sovereignty-gate verify-frontend test-frontend seed-demo clean up down down-hard logs ps cli backup restore
+        coverage-gate coverage-map migrations-manifest sovereignty-gate verify-frontend test-frontend seed-demo clean up down down-hard logs ps cli backup restore overhead overhead-gate
 
 install:           ## Install backend + frontend deps
 	$(UV) sync
@@ -54,7 +54,7 @@ sovereignty-gate:  ## AD-25/SM-15: nothing on the decision path can reach the ne
 
 # verify = ruff + mypy + tests + audit_security (+ eslint/tsc when frontend exists).
 # CLAUDE.md §8. Frontend checks are skipped cleanly until M7 scaffolds frontend/.
-verify: lint fmt-check typecheck test audit sovereignty-gate coverage-gate verify-frontend
+verify: lint fmt-check typecheck test audit sovereignty-gate coverage-gate overhead-gate verify-frontend
 	@echo ">> verify: OK"
 
 seed-demo:         ## Load the committed demonstration tenant (FR-182/183)
@@ -62,6 +62,12 @@ seed-demo:         ## Load the committed demonstration tenant (FR-182/183)
 
 coverage-gate:     ## CM-7: every `Bloqué` claim is backed by a passing scenario
 	$(UV) run python scripts/gen_coverage.py --check
+
+overhead:          ## Regenerate the published per-call cost registry (EXH-9)
+	uv run python scripts/measure_overhead.py
+
+overhead-gate:     ## EXH-9: the per-call cost registry matches what the suite measured
+	uv run python scripts/measure_overhead.py --check
 
 coverage-map:      ## Regenerate the published coverage map (AD-30)
 	$(UV) run python scripts/gen_coverage.py
