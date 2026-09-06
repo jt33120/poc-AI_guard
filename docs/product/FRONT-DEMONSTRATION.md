@@ -90,7 +90,18 @@ Six constats, tous vérifiés :
    refuse pour de vrai.
 3. **La rédaction des arguments d'approbation se fait par nom de clé, pas par valeur.**
    Ce qu'un visiteur tape dans un champ nommé `body` ou `to` est stocké tel quel et lu
-   par tous les visiteurs suivants.
+   par tous les visiteurs suivants. **Déjà traité par `G-22`, et il ne faut pas aller
+   plus loin.** `G-22` a identifié le même défaut et l'a fermé aux **deux frontières
+   sortantes** : le juge LLM (`core/judge.py`, un tiers) et la notification par courriel
+   (`core/notify.py`, qui sort par SMTP). La troisième consommation garde délibérément
+   le contenu — le dry-run que **l'humain approuve**, lu par un opérateur du tenant,
+   dans le périmètre. *On ne peut pas approuver ce qu'on ne voit pas* : masquer là
+   rendrait le HITL décoratif, et approuver un virement sans en voir le bénéficiaire
+   n'est pas approuver.
+
+   Le « lu par tous les visiteurs suivants » du constat visait le **compte public
+   partagé**, où les visiteurs suivants sont des inconnus. Ce compte a été écarté (§5) :
+   la prémisse est tombée avec lui, et l'asymétrie de `G-22` est le bon état.
 4. **`audit_log` est ineffaçable par construction** : deux triggers bloquent `UPDATE` et
    `DELETE` pour tout le monde, propriétaire compris. Ce qu'un visiteur écrit y reste
    pour toujours.
