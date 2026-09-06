@@ -15,6 +15,7 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 from psycopg import sql
+from pydantic import ValidationError
 
 from api import health
 from api.main import create_app
@@ -141,3 +142,90 @@ def test_ready_is_memoised(monkeypatch: pytest.MonkeyPatch) -> None:
     for _ in range(3):
         assert client.get("/health/ready").status_code == 200
     assert calls == 1
+
+
+# --- `FR-195` — un émetteur qui résout n'est pas un émetteur qu'on sait lire ------
+
+
+class _KeySet:
+    """Une réponse JWKS parfaitement valide. Tout le piège est là : elle existe."""
+
+    status_code = 200
+
+    def raise_for_status(self) -> None:
+        return None
+
+    def json(self) -> dict[str, Any]:
+        return {"keys": [{"kid": "k1", "kty": "RSA"}]}
+
+
+def test_a_foreign_issuer_that_resolves_is_not_declared_ready(
+    migrated_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Le défaut que `FR-195` ferme : un feu vert sur ce qui ne peut pas marcher.
+
+    `docker-compose.yml` et `docs/DEPLOY.md` disaient de pointer `SUPABASE_JWKS_URL`
+    sur « n'importe quel fournisseur OIDC », et la sonde annonçait `issuer: true`
+    parce que le point de terminaison servait un jeu de clés. Mais `api/security.py`
+    lit `app_metadata.tenant_id` et `app_metadata.role`, et toute policy RLS lit la
+    même chose : les jetons d'un tel émetteur tombent en 403 et ses requêtes rendent
+    zéro ligne. L'opérateur avait un déploiement vert et mort.
+    """
+    monkeypatch.setattr(health.httpx, "get", lambda *a, **k: _KeySet())
+    response = _client(
+        database_url=migrated_url,
+        supabase_jwks_url="https://idp.example.test/.well-known/jwks.json",
+    ).get("/health/ready")
+    assert response.status_code == 503
+    assert response.json()["issuer"] is False
+    assert response.json()["database"] is True  # la base va bien : c'est bien l'émetteur
+
+
+def test_a_declared_compatible_issuer_is_ready(
+    migrated_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """La moitié passante. Une garde qui refuse tout ne discrimine rien.
+
+    L'opérateur qui déclare la forme de ses revendications retrouve son feu vert :
+    la garde exige une déclaration, elle n'interdit pas d'apporter son émetteur.
+    """
+    monkeypatch.setattr(health.httpx, "get", lambda *a, **k: _KeySet())
+    payload = (
+        _client(
+            database_url=migrated_url,
+            supabase_jwks_url="https://idp.example.test/.well-known/jwks.json",
+            issuer_claims="supabase_gotrue",
+        )
+        .get("/health/ready")
+        .json()
+    )
+    assert payload["issuer"] is True
+    assert payload["ok"] is True
+
+
+def test_the_derived_supabase_issuer_needs_no_declaration(
+    migrated_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Un JWKS dérivé de `SUPABASE_URL` est GoTrue par construction.
+
+    Rien à déclarer : demander à l'opérateur d'affirmer ce que le code vient de
+    construire lui-même serait une case à cocher, pas une garde.
+    """
+    monkeypatch.setattr(health.httpx, "get", lambda *a, **k: _KeySet())
+    payload = (
+        _client(database_url=migrated_url, supabase_url="https://projet.supabase.co")
+        .get("/health/ready")
+        .json()
+    )
+    assert payload["issuer"] is True
+
+
+def test_an_unknown_claims_shape_stops_the_boot() -> None:
+    """Le vocabulaire est fermé : « compatible » ne se déclare pas en champ libre.
+
+    Un champ libre laisserait écrire `keycloak` et repartir avec un feu vert. Le
+    refus au démarrage force l'opérateur à voir que la forme n'est pas servie —
+    même raisonnement que le vocabulaire de `FR-178`.
+    """
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, issuer_claims="keycloak")

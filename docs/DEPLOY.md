@@ -175,10 +175,17 @@ to it once, as its owner, before the first migration.
 **There is no identity provider in this stack, so there is no console login.**
 Everything that authenticates with a *gateway token* works — the MCP gateway,
 `POST /v1/authorize`, the audit chain, migrations, health. Everything that
-authenticates a *human* with a JWT needs an external issuer: point `SUPABASE_URL`
-(or `SUPABASE_JWKS_URL`) at a Supabase project or any OIDC provider, and
-readiness reports `issuer: true`. The reasoning behind that gap is written out in
-full at the top of `docker-compose.yml`.
+authenticates a *human* with a JWT needs an external issuer — and not just any
+one. We federate issuers presenting **compatible claims**: `api/security.py` and
+every RLS policy read `app_metadata.tenant_id` and `app_metadata.role`, which is
+GoTrue's shape. Point `SUPABASE_URL` at a Supabase project and readiness reports
+`issuer: true`. To bring your own issuer, set `SUPABASE_JWKS_URL` **and**
+`ISSUER_CLAIMS=supabase_gotrue` — the second is you affirming it mints those
+claims. Leave it undeclared and readiness stays red deliberately: an issuer that
+merely serves a key set resolves fine and authorises nothing, so its tokens 403
+and its queries return zero rows. A green probe on that deployment would be a
+lie, which is the defect `FR-195` closed. The reasoning behind the gap itself is
+written out in full at the top of `docker-compose.yml`.
 
 Routine operation needs no database access:
 `python -m cli migrate | bootstrap | token | doctor`. `doctor` reports

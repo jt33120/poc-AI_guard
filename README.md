@@ -73,8 +73,13 @@ curl localhost:8000/health/ready
 `api` waits for the one-shot `migrate` service to *complete*, so the stack cannot
 report healthy on an unmigrated database. There is no identity provider in this
 stack and therefore no console login — gateway-token paths (MCP, `/v1/authorize`,
-audit) all work; point `SUPABASE_URL` at an issuer to unlock human login. The
-reasoning is written out at the top of `docker-compose.yml`.
+audit) all work. Human login needs an issuer whose tokens carry the claims this
+product reads (`app_metadata.tenant_id`, `app_metadata.role` — GoTrue's shape):
+point `SUPABASE_URL` at a Supabase project, or bring your own with
+`SUPABASE_JWKS_URL` **and** `ISSUER_CLAIMS=supabase_gotrue`. Not every OIDC
+provider qualifies, and readiness says so rather than going green on a
+deployment that cannot authorise anything (`FR-195`). The reasoning is written
+out at the top of `docker-compose.yml`.
 
 Operate it without ever opening a SQL console:
 

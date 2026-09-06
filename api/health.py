@@ -83,7 +83,11 @@ def _issuer_resolves(url: str | None) -> bool:
 def evaluate(settings: Settings) -> Readiness:
     """Run every gate and decide the single boolean a probe keys on."""
     database, schema_current = _database_gates(settings.database_url)
-    issuer = _issuer_resolves(settings.jwks_url)
+    # Deux conditions, pas une. Que le JWKS résolve dit seulement qu'un émetteur
+    # répond ; qu'il serve *nos* revendications dit qu'un jeton pourra autoriser
+    # quelque chose. Un émetteur étranger satisfaisait la première et jamais la
+    # seconde, et la sonde le déclarait vert (`FR-195`).
+    issuer = _issuer_resolves(settings.jwks_url) and settings.issuer_serves_our_claims
     # A configured issuer that does not resolve is fatal: no token can be
     # verified, so every authenticated route is dead. An issuer that is not
     # configured at all is only fatal in prod — the control-plane-only stack
