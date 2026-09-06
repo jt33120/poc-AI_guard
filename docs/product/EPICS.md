@@ -477,7 +477,7 @@ time (and, once Story 13.8 lands, published alongside `docs/COVERAGE.md`).
 
 | # | Epic | Goal in one line | Stories | Depends on |
 |---|---|---|---|---|
-| 1 | **Ultra-Easy Deployment** | `git clone` → a blocked irreversible action in ten minutes, zero SQL, zero SaaS accounts. | 26 | — |
+| 1 | **Ultra-Easy Deployment** | `git clone` → a blocked irreversible action, zero SQL, zero SaaS accounts. *(La médiane de dix minutes est recalibrée en métrique de crédibilité — `AR-3` / `QO-6`.)* | 26 | — |
 | 2 | **Self-Explaining Decisions** | Every audit entry answers *why*, *by which guard*, *in which mode*, without interpretation. | 10 | 1 |
 | 3 | **Independent Verification** | An auditor recomputes our chain on their laptop and checks it against an anchor we do not control. | 9 | 2 |
 | 4 | **Supervising the Supervisors** | Every administrative change and every human decision is chained, attributed and effective. | 16 | 2 |
@@ -502,6 +502,15 @@ seen the product reaches a demonstrably blocked irreversible action in **≤ 10 
 with **0 hand-written SQL statements** and **0 SaaS accounts** (SM-1, UJ-1). This epic ends with a
 CI gate (Story 1.24) that every later epic must keep green — deployability stops being a claim and
 becomes a build gate.
+
+> **`AR-3` / `QO-6` — recalibré.** La médiane de dix minutes tenue par un
+> inconnu est désormais une **métrique de crédibilité**, pas un objectif métier :
+> la dominante est la prestation (`QO-5`), et le déploiement en autonomie est la
+> preuve de substance. « Terminé » pour cet epic se lit *« déployable par nous
+> chez un client, et crédible pour un évaluateur »*. L'exigence ne bouge pas — le
+> déploiement doit fonctionner — c'est la mesure qui change. Voir
+> `DECOUPAGE.md` §7 bis.
+
 
 **Why first.** It is the user's stated priority #1, it is the cheapest gap to close (roughly 70% of
 the bootstrap already exists in `core/signup.py` and is merely unreachable), and it unblocks

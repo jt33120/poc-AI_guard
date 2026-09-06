@@ -159,7 +159,7 @@ Stated once, precisely, because §2 is organised around removing them:
 
 ### 2.A Deployment plane — "ultra facile de déploiement"
 
-Delivers PRD Group C (FR-85 … FR-112) and SM-1 (≤ 10 min, 0 SQL, 0 SaaS accounts).
+Delivers PRD Group C (FR-85 … FR-112) and SM-1 (0 SQL, 0 SaaS accounts). *`SM-1`'s ≤ 10 min median is recalibrated to a credibility metric — `AR-3` / `QO-6`, see `DECOUPAGE.md` §7 bis.*
 
 #### 2.A.1 Compose topology
 
