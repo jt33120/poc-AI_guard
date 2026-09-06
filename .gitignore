@@ -52,6 +52,7 @@ frontend/playwright-report/
 # `gen_coverage.py --check`, qui échoue si la carte commitée diffère de ce que la
 # génération produit — une garde vaut mieux qu'une absence de fichier.
 /coverage/.scenarios.json
+/perf/.counts.json
 /coverage/COVERAGE-MAP.md
 
 # Sauvegardes du plan de preuve (`make backup`) — jamais commitées.

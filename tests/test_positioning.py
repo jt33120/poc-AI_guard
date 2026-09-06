@@ -98,21 +98,42 @@ def test_every_named_alternative_family_carries_both_columns() -> None:
         assert cellules[2], f"aucun « ce qu'elle ne fait pas » sur : {cellules[0]}"
 
 
-def test_the_unmeasured_latency_figure_stays_unpublished() -> None:
-    """La règle qui a produit tout le reste : ne pas publier ce qu'on ne mesure pas.
+def test_the_published_cost_table_matches_the_measured_registry() -> None:
+    """Le chiffre de surcoût est une lecture de `perf/overhead.json`, pas une phrase.
 
-    Tant qu'aucun instrument ne produit de surcoût p95 en CI, le document doit dire
-    qu'il ne le publie pas. Le jour où le banc existe, ce test rougit — et c'est le
-    signal d'aller écrire le chiffre, pas de supprimer le test.
+    Ce test remplace celui qui tenait l'abstention tant qu'aucun banc n'existait. Le
+    banc existe maintenant, donc l'obligation change de nature : il ne s'agit plus de
+    déclarer l'écart, mais d'empêcher le chiffre publié de vieillir en silence. Même
+    règle que le tableau du §1, pour la même raison.
     """
     doc = _DOC.read_text(encoding="utf-8")
-    mesure_existe = any(
-        (_RACINE / chemin).exists()
-        for chemin in ("scripts/measure_overhead.py", "tests/test_overhead.py")
+    registre = json.loads((_RACINE / "perf" / "overhead.json").read_text(encoding="utf-8"))
+
+    libelles = {
+        "MCP — appel autorisé": "mcp.autorise",
+        "MCP — appel refusé": "mcp.refuse",
+        "MCP — première mise en attente": "mcp.premiere_attente",
+        r"`POST /v1/authorize` — autorisé": "http.autorise",
+        r"`POST /v1/authorize` — refusé": "http.refuse",
+    }
+    for libelle, cle in libelles.items():
+        ligne = re.search(rf"^\|\s*{re.escape(libelle)}\s*\|([^|]*)\|([^|]*)\|", doc, re.MULTILINE)
+        assert ligne is not None, f"ligne absente du tableau de coût : {libelle}"
+        attendu = registre["chemins"][cle]
+        assert int(ligne.group(1).strip()) == attendu["connexions_postgres"], libelle
+        assert int(ligne.group(2).strip()) == attendu["allers_retours_sql"], libelle
+
+
+def test_no_latency_figure_is_published() -> None:
+    """La règle qui a produit tout le reste : ne pas dire plus que ce qu'on prouve.
+
+    Le registre est en entiers parce qu'un p95 mesuré sur un exécuteur partagé avec
+    `fsync=off` n'est pas un engagement. Le document doit continuer à le dire — le
+    jour où quelqu'un y écrit une milliseconde, c'est cette phrase qui doit tomber
+    d'abord, consciemment.
+    """
+    doc = _DOC.read_text(encoding="utf-8")
+    assert "n'en publie pas" in doc, (
+        "le §5 doit continuer à dire pourquoi il ne publie pas de latence"
     )
-    if mesure_existe:  # pragma: no cover - le jour où le banc arrive
-        return
-    assert "aucun chiffre de surcoût n'est annoncé ici" in doc.lower(), (
-        "sans banc de mesure, le positionnement doit déclarer l'écart plutôt que "
-        "de laisser croire qu'il n'existe pas"
-    )
+    assert "fsync=off" in doc, "la raison doit rester lisible, pas seulement l'abstention"

@@ -99,24 +99,54 @@ positionnement qui ne l'écrirait pas serait démenti au premier appel technique
 
 ---
 
-## 5. Le chiffre qui manque encore
+## 5. Ce que la passerelle coûte par appel
 
-`EXH-9` a une seconde moitié que le reste de ce document ne traite pas :
+`EXH-9` a une seconde moitié :
 
 > *« An inline gateway with no published p95 overhead number will be rejected on that
 > basis alone. »*
 
-C'est exact, et c'est aujourd'hui **non tenu**. `CM-3` et `OP-8` écrivent « une marge
-petite et budgétée » sans chiffre, et `core/db.py` ouvre encore une connexion par
-opération. Aucun test ne mesure la latence ajoutée par la chaîne de gardes.
+Le constat est juste. La réponse évidente serait un p95 en millisecondes, et ce
+document n'en publie pas — délibérément. Un chiffre de latence n'engage que si les
+conditions qui l'ont produit ressemblent à celles du lecteur : notre cluster de mesure
+tourne `fsync=off`, et un exécuteur CI partagé n'a pas de p95 reproductible. Le
+publier en l'appelant « notre surcoût » dirait plus que ce qu'il prouve.
 
-Le dépôt n'a pas le droit de publier un chiffre qu'il ne mesure pas — c'est la règle
-qui a produit la carte générée, le gate `CM-7` et l'audit de souveraineté, et c'est
-elle qui vient de retirer un mensonge de la sonde de readiness (`FR-195`). Donc :
-**aucun chiffre de surcoût n'est annoncé ici tant qu'un instrument ne le produit pas
-en CI.** C'est un écart ouvert, pas un oubli — et la forme du correctif est connue :
-un banc qui mesure le surcoût de la chaîne sur le chemin de décision, un chiffre
-publié, et un gate qui rougit quand il dérive.
+Ce qui est publié, généré par `scripts/measure_overhead.py` depuis ce que la suite
+mesure, et gaté en CI :
+
+| Chemin | Connexions PostgreSQL | Allers-retours SQL |
+|---|---|---|
+| MCP — appel autorisé | 1 | 3 |
+| MCP — appel refusé | 1 | 3 |
+| MCP — première mise en attente | 2 | 5 |
+| `POST /v1/authorize` — autorisé | 3 | 6 |
+| `POST /v1/authorize` — refusé | 3 | 6 |
+
+**Comment lire ce tableau.** Il n'y a pas de pool : `core/db.py` ouvre une connexion
+neuve par opération. Multipliez donc ces entiers par la latence d'établissement de
+*votre* base pour obtenir le surcoût chez vous — c'est un chiffre que vous connaissez
+et que nous ne pouvons pas connaître à votre place. Trois gardes sont éteintes par
+défaut (intégrité, bandes de risque, taint) et ajoutent une à deux connexions chacune
+quand on les active ; `perf/overhead.json` les nomme.
+
+**Ce que le tableau dit sur nous.** Le chemin coopératif coûte **trois fois** les
+connexions du chemin obligatoire, parce qu'il ré-authentifie le jeton et relit la
+policy à chaque requête là où MCP tient une session. C'est le prix de la
+non-obligation, et il va dans le même sens que le §1 : l'étage MCP n'est pas seulement
+le plus contraignant, il est aussi le moins cher.
+
+**Ce que chercher ce chiffre a trouvé.** Le premier constat n'a pas été une latence à
+publier mais un défaut à corriger : `/v1/authorize` et le proxy LLM ré-analysaient le
+document de policy à chaque requête — ~288 µs contre 1,3 µs pour la décision que ce
+parse sert, soit **230 fois**. Corrigé par mémoïsation, et le gate d'entiers ci-dessus
+existe pour que la prochaine régression de ce genre soit vue au build suivant plutôt
+qu'en clientèle.
+
+Reste ouvert : les figures de **capacité** qu'`EXH-9` demande aussi (appels par seconde
+soutenus, pic de connexions simultanées). Elles dépendent d'un profil de charge que
+nous n'avons pas encore, et les inventer serait retomber dans ce que ce paragraphe
+refuse.
 
 ---
 
