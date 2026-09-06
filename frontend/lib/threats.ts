@@ -44,6 +44,12 @@ export interface LigneMenace {
   titre: string;
   /** La ligne porte-t-elle de quoi être **montrée** plutôt qu'affirmée. */
   rejouable: boolean;
+  /**
+   * Ce que la rangée a de quoi montrer quand on l'ouvre : `rejeu`, `scenario`,
+   * `raison` ou `attestation`. Dérivé par `core.threat_map`, jamais choisi ici — c'est
+   * une classification de la preuve, pas une préférence d'affichage.
+   */
+  ouverture: string;
   profils: string[];
   facettes: Facette[];
 }
@@ -73,7 +79,13 @@ export interface ReleveProfil {
     applicable: boolean;
     blocked: boolean;
     owner: string;
-    facets: { libelle: string; mode: string }[];
+    /**
+     * Les facettes **applicables** à ces profils, mode déjà plafonné. La `cle` est la
+     * jointure vers l'artefact : sans elle, une page ne peut pas savoir quelle preuve
+     * appartient à quelle facette, et affiche celle d'une facette que le visiteur n'a
+     * pas.
+     */
+    facets: { cle: string; libelle: string; mode: string }[];
     activates_at: string[];
   }[];
 }

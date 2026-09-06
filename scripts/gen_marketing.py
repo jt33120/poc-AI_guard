@@ -63,7 +63,10 @@ _PAGES: tuple[str, ...] = ("frontend/app/**/*.tsx", "frontend/components/**/*.ts
 #: Les variables d'exécution que le dictionnaire interpole déjà, hors couverture.
 #: Une allowlist plutôt qu'une heuristique : un `{placeholder}` inconnu laisse ses
 #: accolades sur la page, ce qu'aucun test de rendu n'attrape aujourd'hui.
-_RUNTIME_VARS = frozenset({"date", "n", "name", "v"})
+#: `date` et `commit` estampillent la provenance d'un artefact généré — ce ne sont pas
+#: des comptes de couverture, et un relevé qui ne dit pas de quelle carte il vient ne
+#: peut être confronté à rien.
+_RUNTIME_VARS = frozenset({"commit", "date", "n", "name", "v"})
 
 _CHAINE = re.compile(r'\b(en|fr): "((?:[^"\\]|\\.)*)"')
 _PLACEHOLDER = re.compile(r"\{(\w+)\}")

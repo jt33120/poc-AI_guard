@@ -134,6 +134,112 @@ export const STR = {
     en: "Action governance for AI agents",
     fr: "Gouvernance des actions pour agents IA",
   },
+  // --- Le relevé des menaces (L5) ---------------------------------------------
+  //
+  // Aucun chiffre n'est écrit ici : `scripts/gen_marketing.py --check` le refuse, et
+  // « seize lignes » serait refusé au même titre que « 16 lignes ». Tout passe par les
+  // faits générés depuis la carte.
+  "ledger.kicker": { en: "The ledger", fr: "Le relevé" },
+  "ledger.title": {
+    en: "{lignes} threat rows. What we hold, and what we do not.",
+    fr: "{lignes} lignes de menace. Ce que nous tenons, et ce que nous ne tenons pas.",
+  },
+  "ledger.lede": {
+    en: "The market hands you a list and sells you all of it. This one is generated from the test suite: each row carries its coverage mode, the ingress path it was proven on, and the scenario that proves it. Where we prove nothing, it says so.",
+    fr: "Le marché vous tend une liste et vous la vend en entier. Celle-ci est générée depuis la suite de tests : chaque ligne porte son mode de couverture, le chemin d'entrée sur lequel elle est prouvée, et le scénario qui la prouve. Là où nous ne prouvons rien, elle le dit.",
+  },
+  "ledger.profil.title": { en: "How do you use AI?", fr: "Comment utilisez-vous l'IA ?" },
+  "ledger.profil.hint": {
+    en: "Tick your situation. The counts are recomputed by the same engine the product uses.",
+    fr: "Cochez votre situation. Les comptes sont recalculés par le moteur que le produit utilise.",
+  },
+  "ledger.profil.none": {
+    en: "Nothing ticked: every row is shown, none is claimed to be yours.",
+    fr: "Rien de coché : toutes les lignes sont montrées, aucune n'est présentée comme la vôtre.",
+  },
+  "ledger.profil.busy": { en: "Recomputing…", fr: "Recalcul…" },
+  "ledger.profil.failed": {
+    en: "The counts could not be recomputed. The rows below are the published ledger, unpositioned.",
+    fr: "Les comptes n'ont pas pu être recalculés. Les lignes ci-dessous sont le relevé publié, non positionné.",
+  },
+
+  // Les cinq modes. `Bloqué` est le seul qui autorise le verbe « bloquer » (FR-175).
+  "ledger.mode.B": { en: "Blocked", fr: "Bloqué" },
+  "ledger.mode.D": { en: "Detected", fr: "Détecté" },
+  "ledger.mode.O": { en: "Orchestrated", fr: "Orchestré" },
+  "ledger.mode.A": { en: "Attested", fr: "Attesté" },
+  "ledger.mode.X": { en: "Out of scope", fr: "Hors périmètre" },
+  "ledger.mode.NA": { en: "Not asserted", fr: "Non asserté" },
+  "ledger.mode.B.def": {
+    en: "We refuse the action ourselves. A passing scenario blocks it, and another lets a legitimate call through.",
+    fr: "Nous refusons l'action nous-mêmes. Un scénario passant la bloque, un autre laisse passer un appel légitime.",
+  },
+  "ledger.mode.D.def": {
+    en: "We see it and we log it. We do not stop it.",
+    fr: "Nous la voyons et nous la journalisons. Nous ne l'arrêtons pas.",
+  },
+  "ledger.mode.O.def": {
+    en: "We drive a third-party control that does it, and we name that control.",
+    fr: "Nous pilotons un contrôle tiers qui le fait, et nous nommons ce contrôle.",
+  },
+  "ledger.mode.A.def": {
+    en: "We attest that a control is in place. We do not claim to exercise it.",
+    fr: "Nous attestons qu'un contrôle est en place. Nous ne prétendons pas l'exercer.",
+  },
+  "ledger.mode.X.def": {
+    en: "Not ours. The row says who carries it.",
+    fr: "Pas à nous. La ligne dit qui la porte.",
+  },
+
+  // Les chemins d'entrée. Une revendication vraie sur MCP n'est pas vraie partout
+  // (AD-28) : le chemin voyage avec elle.
+  "ledger.ingress.mcp": { en: "MCP gateway", fr: "Passerelle MCP" },
+  "ledger.ingress.http": { en: "POST /v1/authorize", fr: "POST /v1/authorize" },
+  "ledger.ingress.llm_proxy": { en: "LLM proxy", fr: "Proxy LLM" },
+  "ledger.ingress.label": { en: "Proven on", fr: "Prouvé sur" },
+  "ledger.ingress.none": { en: "no ingress path asserted", fr: "aucun chemin d'entrée asserté" },
+
+  // Les quatre ouvertures. Elles ne sont pas un choix de rédaction : `core.threat_map`
+  // les dérive de ce que la ligne a réellement.
+  "ledger.open.rejeu.t": { en: "Watch it blocked", fr: "Voir le blocage" },
+  "ledger.open.rejeu.b": {
+    en: "This row carries the proof whole: a scenario where the call is refused, and another where a legitimate call goes through. The replay plays them side by side, from the real audit trail.",
+    fr: "Cette ligne porte la preuve entière : un scénario où l'appel est refusé, et un autre où un appel légitime passe. Le rejeu les joue côte à côte, depuis la trace d'audit réelle.",
+  },
+  "ledger.open.rejeu.soon": {
+    en: "The replay is being assembled from the audit trail. Until then, the scenarios below are its source, and you can run them yourself.",
+    fr: "Le rejeu est en cours d'assemblage depuis la trace d'audit. En attendant, les scénarios ci-dessous en sont la source, et vous pouvez les exécuter vous-même.",
+  },
+  "ledger.open.scenario.t": { en: "What the scenarios prove", fr: "Ce que les scénarios prouvent" },
+  "ledger.open.scenario.b": {
+    en: "Scenarios pass on this row, but none of them refuses the action. Showing a replay here would show a screen where nothing happens, which a crash would produce identically.",
+    fr: "Des scénarios passent sur cette ligne, mais aucun ne refuse l'action. Un rejeu montrerait ici un écran où rien ne se passe, ce qu'un plantage produirait à l'identique.",
+  },
+  "ledger.open.raison.t": { en: "Why this one is not ours", fr: "Pourquoi celle-ci n'est pas à nous" },
+  "ledger.open.attestation.t": { en: "What we attest", fr: "Ce que nous attestons" },
+  "ledger.open.attestation.b": {
+    en: "No scenario, and no published reason. We attest that the control exists and that its use is recorded. We do not claim to enforce it, and saying so is the point of the ledger.",
+    fr: "Aucun scénario, aucune raison publiée. Nous attestons que le contrôle existe et que son usage est journalisé. Nous ne prétendons pas l'imposer, et le dire est la raison d'être du relevé.",
+  },
+  "ledger.open.scenarios": { en: "Scenarios that prove it", fr: "Les scénarios qui la prouvent" },
+  "ledger.open.gaps": { en: "Named gaps", fr: "Écarts nommés" },
+  "ledger.open.facets": { en: "Facets of this row", fr: "Les facettes de cette ligne" },
+
+  "ledger.owner.mine": { en: "Yours, and our ground", fr: "La vôtre, et notre terrain" },
+  "ledger.owner.not": { en: "Not yours today", fr: "Pas la vôtre aujourd'hui" },
+  "ledger.activates": { en: "Becomes yours with", fr: "Le devient avec" },
+  "ledger.applicable": { en: "concerns you", fr: "vous concerne" },
+  "ledger.expand": { en: "Open this row", fr: "Ouvrir cette ligne" },
+  "ledger.collapse": { en: "Close this row", fr: "Fermer cette ligne" },
+  "ledger.stamp": {
+    en: "Ledger generated from the passing test suite on {date}, commit {commit}. Nothing here is written by hand.",
+    fr: "Relevé généré depuis la suite de tests passante le {date}, commit {commit}. Rien ici n'est écrit à la main.",
+  },
+  "ledger.cap": {
+    en: "Your usage is capped: inside a SaaS-embedded assistant there is no tool boundary to interpose on. We block nothing in that perimeter, and we say so before you find out.",
+    fr: "Votre usage est plafonné : dans une IA embarquée d'une suite SaaS, il n'y a aucune frontière d'outils où nous interposer. Nous ne bloquons rien de ce périmètre, et nous le disons avant que vous ne le découvriez.",
+  },
+
   // Le `<title>` et la `<meta description>`, distincts du titre affiché. Le héros fait
   // 58 caractères et le sous-titre 350 : repris tels quels, un moteur de recherche
   // tronque les deux. Ces deux clés-ci sont taillées pour la place réellement offerte.

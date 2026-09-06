@@ -84,7 +84,11 @@ def read_threats(
                 "applicable": line.applicable,
                 "blocked": line.blocked,
                 "owner": line.owner,
-                "facets": [{"libelle": libelle, "mode": mode} for libelle, mode in line.facets],
+                # La clé accompagne le libellé : c'est la jointure qui permet à la page de
+                # ne compter la preuve que sur les facettes réellement applicables.
+                "facets": [
+                    {"cle": f.cle, "libelle": f.libelle, "mode": f.mode} for f in line.facets
+                ],
                 "activates_at": [p.value for p in line.activates_at],
             }
             for line in report.lines
