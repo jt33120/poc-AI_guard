@@ -134,6 +134,45 @@ export const STR = {
     en: "Action governance for AI agents",
     fr: "Gouvernance des actions pour agents IA",
   },
+  // --- Le rejeu (L6) ----------------------------------------------------------
+  //
+  // Aucun chiffre de couverture ici : le gate de `L4` refuserait « nous bloquons N
+  // lignes » au même titre écrit en lettres. Ce que ces chaînes décrivent, c'est une
+  // séquence, pas un compte.
+  "rejeu.titre": { en: "The same call, played twice", fr: "Le même appel, joué deux fois" },
+  "rejeu.lede": {
+    en: "Not an animation. Both columns are audit trails captured while the test suite ran: one with the guard removed, one with it in place. The tools called are identical. The difference is us.",
+    fr: "Pas une animation. Les deux colonnes sont des traces d'audit capturées pendant l'exécution de la suite de tests : l'une garde retiré, l'autre garde en place. Les outils appelés sont les mêmes. La différence, c'est nous.",
+  },
+  "rejeu.sans": { en: "Guard removed", fr: "Garde retiré" },
+  "rejeu.avec": { en: "Guard in place", fr: "Garde en place" },
+  "rejeu.sans.b": { en: "The action reaches its target.", fr: "L'action atteint sa cible." },
+  "rejeu.avec.b": { en: "The action is refused.", fr: "L'action est refusée." },
+  "rejeu.divergence": {
+    en: "From here on, the two runs stop being the same.",
+    fr: "À partir d'ici, les deux exécutions cessent d'être la même.",
+  },
+  "rejeu.chainee": { en: "Audit chain verified", fr: "Chaîne d'audit vérifiée" },
+  "rejeu.chainee.non": { en: "Audit chain not verified", fr: "Chaîne d'audit non vérifiée" },
+  "rejeu.source": {
+    en: "Captured during the test run named below, not re-enacted.",
+    fr: "Capturé pendant l'exécution du test nommé ci-dessous, non rejoué.",
+  },
+  "rejeu.outils": { en: "Tools called", fr: "Outils appelés" },
+  "rejeu.col.outil": { en: "Tool", fr: "Outil" },
+  "rejeu.col.classe": { en: "Class", fr: "Classe" },
+  "rejeu.col.decision": { en: "Decision", fr: "Décision" },
+  "rejeu.col.empreinte": { en: "Args fingerprint", fr: "Empreinte des arguments" },
+  "rejeu.empreinte.aucune": { en: "none", fr: "aucune" },
+  "rejeu.empreinte.note": {
+    en: "A fingerprint, never your arguments. That is what the product writes, and it is what you see here.",
+    fr: "Une empreinte, jamais vos arguments. C'est ce que le produit écrit, et c'est ce que vous voyez ici.",
+  },
+  "rejeu.absent": {
+    en: "No recorded sequence for this row yet.",
+    fr: "Pas encore de séquence enregistrée pour cette ligne.",
+  },
+
   // --- Le relevé des menaces (L5) ---------------------------------------------
   //
   // Aucun chiffre n'est écrit ici : `scripts/gen_marketing.py --check` le refuse, et
@@ -201,14 +240,9 @@ export const STR = {
 
   // Les quatre ouvertures. Elles ne sont pas un choix de rédaction : `core.threat_map`
   // les dérive de ce que la ligne a réellement.
-  "ledger.open.rejeu.t": { en: "Watch it blocked", fr: "Voir le blocage" },
   "ledger.open.rejeu.b": {
     en: "This row carries the proof whole: a scenario where the call is refused, and another where a legitimate call goes through. The replay plays them side by side, from the real audit trail.",
     fr: "Cette ligne porte la preuve entière : un scénario où l'appel est refusé, et un autre où un appel légitime passe. Le rejeu les joue côte à côte, depuis la trace d'audit réelle.",
-  },
-  "ledger.open.rejeu.soon": {
-    en: "The replay is being assembled from the audit trail. Until then, the scenarios below are its source, and you can run them yourself.",
-    fr: "Le rejeu est en cours d'assemblage depuis la trace d'audit. En attendant, les scénarios ci-dessous en sont la source, et vous pouvez les exécuter vous-même.",
   },
   "ledger.open.scenario.t": { en: "What the scenarios prove", fr: "Ce que les scénarios prouvent" },
   "ledger.open.scenario.b": {
