@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { config } from "@/lib/config";
+import { routeAllowed } from "@/lib/controlRoutes";
 import { getSession } from "@/lib/session";
 
 interface RouteContext {
@@ -12,6 +13,16 @@ async function forward(request: NextRequest, path: string[]): Promise<NextRespon
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
+  }
+  // Le proxy attache le jeton de la session : sans liste blanche il relaierait
+  // n'importe quelle méthode vers n'importe quel chemin, et le rôle du compte serait
+  // l'unique contrôle de sécurité. La table dit ce que la console fait ; le reste est
+  // refusé, y compris une route que l'API sert parfaitement (§4.4, fail-closed).
+  //
+  // 404 plutôt que 403 : ce proxy ne route pas ce chemin. Répondre « interdit »
+  // apprendrait à un appelant quelles routes existent derrière.
+  if (!routeAllowed(request.method, path)) {
+    return NextResponse.json({ detail: "Not found" }, { status: 404 });
   }
   const target = `${config.controlApiUrl}/${path.join("/")}${request.nextUrl.search}`;
   const init: RequestInit = {

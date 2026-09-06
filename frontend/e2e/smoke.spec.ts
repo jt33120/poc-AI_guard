@@ -535,3 +535,53 @@ test("le favicon est servi, déclaré, et décodable par le navigateur", async (
   );
   expect(decode).toBe(true);
 });
+
+// La liste blanche du proxy de contrôle, éprouvée sur le vrai gestionnaire de route.
+//
+// `tests/test_control_proxy.py` confronte la table aux appels réels de la console, mais
+// il lit du TypeScript depuis Python : il ne prouve pas que le proxy refuse pour de
+// vrai. Le lot du favicon a montré ce que vaut un vert structurel — le fichier se
+// servait en 200 et aucun navigateur ne pouvait le lire.
+//
+// Ces requêtes ne passent par aucun mock : elles atteignent le gestionnaire, avec une
+// session, et c'est lui qui répond.
+
+test("le proxy refuse un chemin que la console n'appelle jamais", async ({ context }) => {
+  await authed(context);
+  // `/v1/compliance/export` existe dans l'API et n'est appelé par aucun écran. C'est
+  // exactement l'écart que la liste blanche ferme : sans elle, une session `viewer`
+  // l'atteignait avec le jeton attaché par le proxy.
+  const refuse = await context.request.get("/api/control/v1/compliance/export");
+  expect(refuse.status()).toBe(404);
+  expect(await refuse.json()).toEqual({ detail: "Not found" });
+
+  // Et la méthode compte autant que le chemin : `v1/policy` est lu et écrit par la
+  // console, jamais supprimé.
+  const mauvaiseMethode = await context.request.delete("/api/control/v1/policy");
+  expect(mauvaiseMethode.status()).toBe(404);
+});
+
+test("le proxy laisse passer un chemin que la console appelle", async ({ context }) => {
+  await authed(context);
+  // Sans API en amont la requête échoue plus loin — le point n'est pas qu'elle
+  // réussisse, c'est qu'elle ne soit pas arrêtée par la liste blanche. Un test qui ne
+  // vérifierait que les refus passerait au vert sur une liste qui refuse tout.
+  const passe = await context.request.get("/api/control/v1/policy");
+  expect(passe.status()).not.toBe(404);
+});
+
+test("une remontée de chemin ne sort pas de la liste blanche", async ({ context }) => {
+  await authed(context);
+  // Mesuré plutôt que supposé : Next **résout** la remontée avant que le gestionnaire
+  // ne voie les segments. `/v1/clients/%2e%2e/policy` lui arrive donc comme
+  // `v1/policy` — un chemin déjà autorisé, et la requête passe (500 faute d'API en
+  // amont). Ce n'est pas une faille : la remontée n'a rien donné de plus.
+  //
+  // La propriété qui compte est donc celle-ci : on ne remonte pas jusqu'à un chemin que
+  // la table n'accorde pas. Le contrôle de forme des segments dans `controlRoutes.ts`
+  // reste la ceinture — il refuse un `..` si jamais il en arrivait un.
+  const evasion = await context.request.get(
+    "/api/control/v1/clients/%2e%2e/%2e%2e/openapi.json",
+  );
+  expect(evasion.status()).toBe(404);
+});
