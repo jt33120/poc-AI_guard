@@ -641,9 +641,7 @@ def _check_forwarded_allow_ips() -> list[Check]:
                 "nommez l'adresse de votre edge plutôt que '*'.",
             )
         ]
-    return [
-        Check("OK", "ratelimit.forwarded", f"edge de confiance déclaré ({valeur})")
-    ]
+    return [Check("OK", "ratelimit.forwarded", f"edge de confiance déclaré ({valeur})")]
 
 
 def _check_ports() -> list[Check]:
