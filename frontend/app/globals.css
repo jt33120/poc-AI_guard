@@ -2,44 +2,175 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ==========================================================================
+   Jetons de design — portés depuis `xsom.fr` (assets/css/tokens.css).
+
+   Source unique de vérité pour les couleurs. Aucune valeur brute ne doit
+   apparaître ailleurs : `tailwind.config.ts` ne fait que les référencer.
+
+   Les bornes du cuivre ne sont pas choisies à l'œil. Ce sont les teintes les plus
+   extrêmes qui conservent 4.5:1 avec le texte posé dessus, et le fichier source en
+   tient le journal — deux de ses paliers d'opacité y sont documentés comme des
+   corrections, avec la valeur fautive citée à côté. Reprendre des opacités « à
+   l'œil » (white/40, white/50) réintroduirait exactement ce qui a déjà été jugé non
+   conforme.
+   ========================================================================== */
+
 :root {
   color-scheme: dark;
+
+  /* ---- Encres (fonds sombres) ---------------------------------------- */
+  --ink-950: #050b14;
+  --ink-900: #0a1628;
+  --ink-800: #0f2038;
+  --ink-700: #16304f;
+  --ink-600: #1e3d63;
+
+  /* ---- Accent signature : le cuivre ----------------------------------
+     Un métal, pas une couleur. Un aplat le fait lire comme de l'orange ; il lui
+     faut un reflet, un corps et une ombre. */
+  --copper: #e2603a; /* corps, teinte pivot — 4.62:1 sur ink-900 */
+  --copper-sheen: #f7a077; /* reflet — 9.63:1 avec ink-950 */
+  --copper-shade: #ca5330; /* ombre — 4.50:1 avec ink-950, plancher */
+  --copper-bright: #f5793f;
+  --copper-deep: #b84a28; /* texte sur fond clair — 4.75:1 */
+  --copper-wash: rgba(226, 96, 58, 0.1);
+  --copper-line: rgba(226, 96, 58, 0.38);
+  --copper-glow: rgba(226, 96, 58, 0.22);
+
+  /* Surface métallique. Ce qui fait lire « métal » n'est pas un fondu doux mais
+     une rupture : sur une surface bombée, la lumière casse net à la ligne
+     médiane. D'où l'écart franc entre 47 % et 53 %. Le reflet diagonal
+     par-dessus simule la source lumineuse. */
+  --copper-metal:
+    linear-gradient(102deg, transparent 22%, rgba(255, 234, 216, 0.26) 42%, transparent 62%),
+    linear-gradient(
+      180deg,
+      #f9ae88 0%,
+      #f08355 34%,
+      #e86a41 47%,
+      #d4562f 53%,
+      var(--copper-shade) 100%
+    );
+
+  --copper-metal-hot:
+    linear-gradient(102deg, transparent 18%, rgba(255, 244, 232, 0.4) 40%, transparent 66%),
+    linear-gradient(180deg, #ffc2a0 0%, #fa9264 34%, #f2764c 47%, #e05f36 53%, #d05531 100%);
+
+  /* Relief : liseré lumineux en haut, sombre en bas. Sur 1 px, donc jamais sous
+     le texte — le contraste n'en dépend pas. */
+  --copper-relief:
+    inset 0 1px 0 rgba(255, 226, 205, 0.58), inset 0 -1px 0 rgba(92, 28, 12, 0.38);
+
+  /* ---- Surfaces claires ------------------------------------------------ */
+  --paper: #ffffff;
+  --paper-warm: #f6f3f0;
+  --paper-dim: #e8e2dc;
+
+  /* ---- Texte — contextuels, réécrits par `.section--light` -------------
+     Les paliers sont repris tels quels. .48 et non .38 : .38 ne donnait que
+     3.57:1 sur ink-900, sous le seuil AA, alors que ce jeton porte du texte
+     lisible. */
+  --text-hi: rgba(255, 255, 255, 0.95);
+  --text-mid: rgba(255, 255, 255, 0.72);
+  --text-low: rgba(255, 255, 255, 0.52);
+  --text-faint: rgba(255, 255, 255, 0.48);
+
+  /* ---- Surfaces et bordures — contextuelles ---------------------------- */
+  --surface: rgba(255, 255, 255, 0.035);
+  --surface-up: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-mid: rgba(255, 255, 255, 0.14);
+
+  /* Le cuivre quand il porte du texte : --copper sur sombre (4.62:1),
+     --copper-deep sur clair (5.9:1). */
+  --copper-text: var(--copper);
+
+  --title-ink: #eef2f8; /* 15.8:1 sur ink-900 */
+
+  /* ---- Sémantique ------------------------------------------------------ */
+  --danger: #ff6b6b;
+  --success: #4ade80;
+
+  /* ---- Fond de page ---------------------------------------------------- */
+  --canvas: var(--ink-900);
+}
+
+/* La section claire réécrit le bloc contextuel d'un coup. C'est la pièce
+   d'architecture que le modèle de thème de Tailwind ne sait pas exprimer : sans
+   elle, chaque composant porterait deux jeux de classes écrits à la main. */
+.section--light {
+  --canvas: var(--paper-warm);
+  --text-hi: var(--ink-900);
+  --text-mid: rgba(15, 32, 56, 0.78);
+  --text-low: rgba(15, 32, 56, 0.7);
+  --text-faint: rgba(15, 32, 56, 0.66);
+  --surface: rgba(15, 32, 56, 0.03);
+  --surface-up: rgba(15, 32, 56, 0.055);
+  --border: rgba(15, 32, 56, 0.12);
+  --border-mid: rgba(15, 32, 56, 0.2);
+  --copper-text: var(--copper-deep);
+  --title-ink: var(--ink-900);
+
+  background: var(--canvas);
+  color: var(--text-mid);
 }
 
 @layer base {
   body {
-    @apply bg-navy text-white antialiased;
-    /* Soft brand glow on the navy canvas, matching the xSOM site mood. */
-    background-image:
-      radial-gradient(900px circle at 12% -10%, rgba(37, 99, 235, 0.18), transparent 45%),
-      radial-gradient(700px circle at 100% 0%, rgba(191, 197, 206, 0.06), transparent 42%);
-    background-attachment: fixed;
+    background: var(--canvas);
+    @apply text-white antialiased;
   }
   h1,
   h2,
   h3 {
-    @apply font-bold tracking-tight;
+    @apply font-display font-bold;
+    color: var(--title-ink);
+    letter-spacing: -0.01em;
   }
   ::selection {
-    @apply bg-brand/30 text-white;
+    background: var(--copper-glow);
+    @apply text-white;
   }
 }
 
 @layer components {
+  /* Le relevé plutôt que la carte flottante : un filet, pas une ombre portée. */
   .card {
-    @apply rounded-2xl border border-white/10 bg-white/[0.035] shadow-card backdrop-blur-sm;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    @apply rounded-lg;
   }
 
   .btn {
-    @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-pill border
-           border-transparent px-5 py-2 text-sm font-semibold transition-all duration-300
+    @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded border
+           border-transparent px-5 py-2 text-sm font-semibold transition-all duration-200
            disabled:cursor-not-allowed disabled:opacity-50;
   }
+
+  /* Le cuivre métallique, jamais un aplat. Sans les deux couches et la rupture
+     médiane, le bouton redevient un rectangle orange. */
   .btn-primary {
-    @apply border-brand bg-brand text-white shadow-glow hover:bg-brand-bright;
+    background-image: var(--copper-metal);
+    box-shadow: var(--copper-relief), 0 6px 18px -10px var(--copper-glow);
+    @apply text-white;
   }
+  .btn-primary:hover {
+    background-image: var(--copper-metal-hot);
+  }
+  .btn-primary:active {
+    background-image: linear-gradient(176deg, var(--copper-shade) 0%, var(--copper) 100%);
+    box-shadow: inset 0 2px 4px rgba(92, 28, 12, 0.45);
+  }
+
   .btn-ghost {
-    @apply border-white/15 bg-white/[0.04] text-white/80 hover:bg-white/[0.09] hover:text-white;
+    border-color: var(--border-mid);
+    background: var(--surface-up);
+    color: var(--text-mid);
+  }
+  .btn-ghost:hover {
+    color: var(--text-hi);
+    border-color: var(--copper-line);
   }
   .btn-success {
     @apply bg-emerald-500/90 text-white hover:bg-emerald-400;
@@ -49,23 +180,36 @@
   }
 
   .input {
-    @apply w-full rounded-xl border border-white/10 bg-navy-mid/60 px-3.5 py-2.5 text-sm
-           text-white placeholder-white/30 outline-none transition
-           focus:border-brand/70 focus:ring-2 focus:ring-brand/25;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    @apply w-full rounded px-3.5 py-2.5 text-sm text-white outline-none transition;
+  }
+  .input::placeholder {
+    color: var(--text-faint);
+  }
+  .input:focus {
+    border-color: var(--copper-line);
+    box-shadow: 0 0 0 2px var(--copper-wash);
   }
 
+  /* Toute étiquette est en mono : c'est le troisième rôle typographique, et il
+     porte l'identité autant que les deux autres. */
   .label {
-    @apply text-xs font-medium uppercase tracking-wider text-white/45;
+    color: var(--text-faint);
+    @apply font-mono text-[0.7rem] uppercase tracking-[0.14em];
   }
   .muted {
-    @apply text-white/55;
+    color: var(--text-mid);
   }
 
+  /* Pas de pilule : le registre est technique, les angles sont quasi droits. */
   .badge {
-    @apply inline-flex items-center gap-1.5 rounded-pill border px-2.5 py-0.5 text-xs font-medium;
+    @apply inline-flex items-center gap-1.5 rounded-sm border px-2 py-0.5 font-mono text-xs;
   }
   .badge-neutral {
-    @apply border-white/15 bg-white/5 text-white/70;
+    border-color: var(--border-mid);
+    background: var(--surface-up);
+    color: var(--text-mid);
   }
   .badge-green {
     @apply border-emerald-400/30 bg-emerald-400/10 text-emerald-300;
@@ -77,20 +221,27 @@
     @apply border-amber-400/30 bg-amber-400/10 text-amber-300;
   }
   .badge-blue {
-    @apply border-brand/40 bg-brand/15 text-brand-bright;
+    border-color: var(--copper-line);
+    background: var(--copper-wash);
+    color: var(--copper-text);
   }
 
+  /* Chiffres tabulaires : dans un relevé, les colonnes tombent d'aplomb. */
   .data-table {
     @apply w-full border-collapse text-sm;
+    font-variant-numeric: tabular-nums;
   }
   .data-table thead th {
-    @apply border-b border-white/10 px-3 py-2.5 text-left text-xs font-semibold uppercase
-           tracking-wider text-white/45;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-faint);
+    @apply px-3 py-2.5 text-left font-mono text-[0.7rem] uppercase tracking-[0.14em];
   }
   .data-table tbody td {
-    @apply border-b border-white/[0.06] px-3 py-2.5 text-white/85;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-hi);
+    @apply px-3 py-2.5;
   }
   .data-table tbody tr:hover {
-    @apply bg-white/[0.025];
+    background: var(--surface);
   }
 }
