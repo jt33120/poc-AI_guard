@@ -6,7 +6,7 @@ COMPOSE ?= docker compose
 XSOM_API_PORT ?= 8000
 
 .PHONY: install frontend-install dev test verify demo lint fmt fmt-check typecheck audit \
-        coverage-gate coverage-map migrations-manifest sovereignty-gate verify-frontend test-frontend seed-demo clean up down down-hard logs ps cli backup restore overhead overhead-gate
+        coverage-gate coverage-map threat-rows migrations-manifest sovereignty-gate verify-frontend test-frontend seed-demo clean up down down-hard logs ps cli backup restore overhead overhead-gate
 
 install:           ## Install backend + frontend deps
 	$(UV) sync
@@ -71,6 +71,10 @@ overhead-gate:     ## EXH-9: the per-call cost registry matches what the suite m
 
 coverage-map:      ## Regenerate the published coverage map (AD-30)
 	$(UV) run python scripts/gen_coverage.py
+	@$(MAKE) threat-rows
+
+threat-rows:       ## Regenerate the front's threat rows from the map (L3)
+	$(UV) run python scripts/gen_threat_rows.py
 
 migrations-manifest: ## Regenerate the shipped-migrations manifest (FR-167)
 	$(UV) run python -c "from core import migrate; migrate.MANIFEST.write_text(migrate.render_manifest(), encoding='utf-8')"

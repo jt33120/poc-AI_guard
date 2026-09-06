@@ -38,3 +38,8 @@ def signup_rate_limit() -> str:
 def triage_rate_limit() -> str:
     """Dynamic limit string for the public profile-diagnostic endpoint."""
     return get_settings().triage_rate_limit
+
+
+def threats_rate_limit() -> str:
+    """Dynamic limit string for the public threat-rows endpoint."""
+    return get_settings().threats_rate_limit

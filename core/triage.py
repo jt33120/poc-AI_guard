@@ -26,14 +26,14 @@ prouver n'est pas un client à qui on peut tout promettre (`CLAUDE.md` §9).
 
 from __future__ import annotations
 
-import json
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
 from core.profiles import Family, Profile, capped_mode, ceiling
+from core.threat_map import MapUnavailable, PublishedRow, published_rows
 
-__all__ = ["Diagnostic", "ThreatLine", "diagnose", "parse_profiles"]
+__all__ = ["Diagnostic", "MapUnavailable", "ThreatLine", "diagnose", "parse_profiles"]
 
 _MODE_LABEL = {
     "B": "Bloqué",
@@ -43,10 +43,6 @@ _MODE_LABEL = {
     "X": "Hors périmètre",
     "NA": "non asserté",
 }
-
-
-class MapUnavailable(RuntimeError):
-    """The published map is missing or unreadable, so nothing may be claimed."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,49 +151,36 @@ def parse_profiles(raw: str) -> frozenset[Profile]:
 
 
 def diagnose(published_map: Path, held: frozenset[Profile]) -> Diagnostic:
-    """Position a client and derive their applicable subset from the published map."""
-    if not published_map.exists():
-        raise MapUnavailable(
-            f"{published_map} absent — lancez `uv run pytest && uv run python "
-            "scripts/gen_coverage.py`. Sans carte publiée, rien n'est prouvé, donc "
-            "rien ne peut être annoncé."
-        )
-    facets = json.loads(published_map.read_text(encoding="utf-8"))["facettes"]
+    """Position a client against the published map, in the **row** unit.
+
+    Le regroupement en lignes vit dans `core.threat_map` : la conversion facettes →
+    lignes est l'endroit exact où l'on se trompe d'unité, et elle n'a droit qu'à une
+    implémentation. Ici on ne fait que ce qui dépend du client : ce qui le concerne,
+    ce que son plafond rabat, et à qui revient le reste.
+    """
+    rows = published_rows(published_map)
     cap = ceiling(held)
-    held_values = {p.value for p in held}
+    lines = [_position(row, held, cap) for row in rows]
+    return Diagnostic(profiles=held, cap=cap, lines=tuple(lines))
 
-    by_row: dict[str, list[dict[str, str]]] = {}
-    for facet in facets:
-        by_row.setdefault(facet["menace"], []).append(facet)
 
-    lines = []
-    for row_id, row_facets in by_row.items():
-        mine = [f for f in row_facets if held_values & set(f["profils"])]
-        # A row's family is the one its *applicable* facets carry: of phishing we keep
-        # the agent-as-sender facet, so a client running agents is told it is theirs,
-        # and one who is not is told it belongs to their mail gateway.
-        relevant = mine or row_facets
-        families = [Family(f["famille"]) for f in relevant]
-        family = (
-            Family.usage_ia if Family.usage_ia in families else max(families, key=families.count)
-        )
-        activates = sorted(
-            {Profile(v) for f in row_facets for v in f["profils"]} - held,
-            key=lambda p: p.value,
-        )
-        lines.append(
-            ThreatLine(
-                id=row_id,
-                titre=row_facets[0]["titre"],
-                applicable=bool(mine),
-                family=family,
-                activates_at=tuple(activates),
-                facets=tuple(
-                    (f["libelle"], capped_mode(f["mode_publie"], cap))
-                    for f in sorted(mine, key=lambda f: f["facette"])
-                    if f["mode_publie"] != "NA"
-                )
-                + tuple((f["libelle"], "NA") for f in mine if f["mode_publie"] == "NA"),
-            )
-        )
-    return Diagnostic(profiles=held, cap=cap, lines=tuple(sorted(lines, key=lambda x: x.id)))
+def _position(row: PublishedRow, held: frozenset[Profile], cap: str | None) -> ThreatLine:
+    """Ce qu'une ligne publiée devient pour *ce* client."""
+    mine = [f for f in row.facettes if f.profils & held]
+    # A row's family is the one its *applicable* facets carry: of phishing we keep
+    # the agent-as-sender facet, so a client running agents is told it is theirs,
+    # and one who is not is told it belongs to their mail gateway.
+    relevant = mine or list(row.facettes)
+    families = [f.famille for f in relevant]
+    family = Family.usage_ia if Family.usage_ia in families else max(families, key=families.count)
+    return ThreatLine(
+        id=row.id,
+        titre=row.titre,
+        applicable=bool(mine),
+        family=family,
+        activates_at=tuple(sorted(row.profils - held, key=lambda p: p.value)),
+        # `non asserté` en queue : c'est une absence de revendication, et la lire au
+        # milieu des modes prouvés la ferait passer pour l'un d'eux.
+        facets=tuple((f.libelle, capped_mode(f.mode, cap)) for f in mine if f.mode != "NA")
+        + tuple((f.libelle, "NA") for f in mine if f.mode == "NA"),
+    )
