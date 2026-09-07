@@ -89,11 +89,17 @@ container host works). Healthcheck: `GET /health`.
 | `MISTRAL_API_KEY` | _(optional)_ | LLM judge + compliance narratives. Absent ⇒ judge off and ambiguous tools escalate to a human (fail-closed). |
 | `SMTP_*` / `APPROVAL_NOTIFY_TO` | _(optional)_ | HITL approval emails. Absent ⇒ reviewers watch the queue in the console. |
 | `SENTRY_DSN` | _(optional)_ | Error reporting. |
+| `FORWARDED_ALLOW_IPS` | _(your edge's address)_ — on Railway, `100.64.0.0/10` | Only needed behind an edge, and only for the public routes. uvicorn rewrites the client address from `X-Forwarded-For` only when the immediate peer is in this list, whose default is `127.0.0.1` — never an edge. See the security checklist for what unset and `*` each cost. |
 
 Everything else has a working default; `.env.example` documents each one and what
 leaving it empty turns off.
 
 `PORT` is injected by the platform — do not set it.
+
+> The Railway value above is **read, not guessed**: the platform fronts the
+> container from its internal RFC 6598 range, and the peer address appears in the
+> deploy log. On another host, read yours the same way rather than copying this
+> one — `python -m cli doctor` then confirms it (`ratelimit.forwarded`).
 
 Verify: `curl https://<your-backend-host>/health` ⇒ `{"status":"ok"}`.
 
@@ -109,6 +115,53 @@ Next.js, auto-detected. **Root directory must be `frontend`.**
 | `NEXT_PUBLIC_XSOM_API_URL` | `https://<your-backend-host>` — the base URL the onboarding wizard writes into generated snippets. Defaults to the console's own origin, which is only correct when API and console share one. |
 
 Then set `CORS_ALLOW_ORIGINS` on the backend to that exact origin and redeploy it.
+
+### Both hosts build on push — and reconnecting resets the branch
+
+A repository transfer or rename means re-pointing each host's Git link. Two things
+about that are worth knowing before you wait on a build that will never start.
+
+**A settings change is not a trigger.** Both hosts build on *push*. Re-linking the
+repository, fixing the root directory or editing a variable triggers nothing by
+itself; if the branch has not moved since the last build, nothing will build.
+
+**Reconnecting does not preserve the deployed branch.** It resets it to whatever the
+platform picks, which is not necessarily `main`. Measured on 2026-09-07: reconnecting
+the backend's Git source pointed production at a stale feature branch, and the deploy
+that followed went red. Setting it back to `main` and redeploying went green — one
+wasted deployment, entirely from the reconnection.
+
+So after any transfer, on **each** host, in this order:
+
+1. Check which branch the host now deploys, before triggering anything.
+2. Then push a commit — that, and not a settings change, is what starts a build.
+3. Treat "Redeploy" with care: it rebuilds the commit the platform last saw. When the
+   last build is months old, that button ships months-old code, not the branch head.
+
+### A paused database closes two gates, and `/health` stays green
+
+Managed Postgres projects pause when idle. When the same project also serves auth
+— Supabase is both the database and the JWKS issuer — pausing it takes down
+`database` **and** `issuer` at once, while `GET /health` keeps answering `200`:
+liveness never touches either. That is `DEP-6` in the field, so read the gates,
+not the probe you happened to curl.
+
+Measured on 2026-09-07, waking the project from paused to `ACTIVE_HEALTHY`:
+
+| Gate | Paused | Awake |
+|---|---|---|
+| `database` | `false` | `true` |
+| `schema_current` | `false` | `false` |
+| `issuer` | `false` | `true` |
+
+`schema_current` is the one to read carefully: it is **not** independent. When the
+connection fails, `_database_gates` returns `(False, False)`, so a red
+`schema_current` next to a red `database` says nothing of its own. Only once the
+database answers does it become a real verdict — here it stayed red because the
+project had slept through every migration since, its schema still older than
+`0016_schema_migrations.sql`, the file that creates the ledger. A database with no
+`schema_migrations` table at all is the documented pre-ledger case: adopt its
+history once (§2) before applying the rest.
 
 ### 5. First tenant and admin — no SQL
 
