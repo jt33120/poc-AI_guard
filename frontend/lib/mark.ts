@@ -1,14 +1,14 @@
 /**
- * Le tracé de la marque, en un seul endroit.
+ * Le tracé du bouclier coché, en un seul endroit.
  *
- * Le bouclier apparaît à deux endroits qui ne peuvent pas se voir l'un l'autre :
- * `ShieldMark`, rendu par React dans la page, et `app/icon.svg`, servi comme favicon
- * — un fichier statique, qui ne peut donc rien importer. Deux dessins pour une même
- * marque finissent par diverger, et personne ne le remarque : l'onglet est le seul
- * endroit où l'on ne regarde jamais.
+ * C'est une **icône d'interface** — une puce, le signe « contrôlé » dans les schémas —
+ * et non la marque : le logo xSOM est servi depuis `public/xsom-mark.svg`, et l'onglet
+ * montre le même logo (`app/icon.svg`, variante cuivre, comme `xsom.fr`).
  *
- * Le fichier statique reste la copie ; `tests/test_brand_mark.py` interdit qu'elle
- * s'écarte de cette source.
+ * Ce module existe pour que `ShieldMark` n'ait pas à réécrire ses tracés là où il est
+ * rendu. `tests/test_brand_mark.py` tient les deux bouts : le composant importe cette
+ * source au lieu d'en recopier les valeurs, et le favicon ne les redessine pas — un
+ * bouclier dans l'onglet donnerait au produit une marque que le site n'a jamais eue.
  */
 
 /** Le repère dans lequel les deux tracés sont exprimés. */

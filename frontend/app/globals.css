@@ -574,7 +574,9 @@
   }
 
   /* Le filet reste, le mouvement part : un changement d'état instantané n'est pas
-     une animation. Règle absolue, aucune exception. */
+     une animation. Cette règle SURVIT à la ceinture générale du § 4 : celle-ci
+     ne raccourcit que des durées, elle laisserait donc le `translateY(-2px)`
+     s'appliquer d'un coup. Ici, le soulèvement n'a simplement pas lieu. */
   @media (prefers-reduced-motion: reduce) {
     .section .card,
     .section .card::before {
@@ -713,12 +715,96 @@ body::before {
    sur un style en ligne sans `!important`. C'est ce qui ramène la lumière au
    centre si le réglage système bascule en cours de session. */
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  /* La ceinture GÉNÉRALE, portée telle quelle de `base.css` (l. 330-341).
+     Elle manquait, et l'annonce « aucune exception » ci-dessus était donc
+     fausse : les deux règles qui suivaient ne couvraient que ce qu'on avait
+     écrit à la main. Tout le reste continuait de bouger — l'`animate-fade-up`
+     du héros (600 ms, translateY), les `animate-ping` / `animate-spin` /
+     `animate-bounce` du loader, ces trois-là en boucle INFINIE, et chaque
+     `transition` / `transition-colors` utilitaire de l'application.
+
+     Le sélecteur universel est la seule forme qui atteigne ce qu'on n'a pas
+     écrit soi-même : les animations émises par Tailwind depuis
+     `tailwind.config.ts` et les classes utilitaires posées au fil des
+     composants. C'est pourquoi la correction est ici et pas dans
+     `components/Loader.tsx` — corriger le loader laisserait le défaut entier
+     partout ailleurs.
+
+     Trois déclarations, chacune indispensable :
+     - `animation-duration` seul ne suffit PAS sur une boucle : un cycle de
+       0,01 ms répété à l'infini reste du mouvement. C'est
+       `animation-iteration-count: 1` qui l'arrête.
+     - On n'écrit pas `animation: none` : cela renverrait un élément animé en
+       `both` à son état de DÉPART — le héros resterait à `opacity: 0`,
+       c'est-à-dire invisible. Une durée quasi nulle le pose au contraire à son
+       état final, immédiatement.
+     - `transition-duration` plutôt que `transition: none` : les changements
+       d'état continuent d'avoir lieu, ils cessent seulement d'être joués. */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Les neutralisations spécifiques restent : la ceinture agit sur les DURÉES,
+     jamais sur les valeurs, et ces deux-là posent une valeur. */
   [data-sheen] {
     --title-sheen-pos: 50% !important;
   }
+  /* Sans cette règle, une `.reveal` resterait à `opacity: 0` jusqu'à ce que
+     l'IntersectionObserver la croise — c'est-à-dire invisible si le réglage
+     système bascule alors que `data-motion` est déjà posé. */
   [data-motion] .reveal {
     opacity: 1 !important;
     transform: none !important;
     transition: none !important;
+  }
+}
+
+/* ==========================================================================
+   Le filet cuivre — porté depuis `xsom.fr`
+   (`assets/css/base.css` l. 227-233, dégradé final de
+    `assets/css/components.css` l. 1196-1202).
+
+   Sa définition sur le site tient en une phrase : « le filet cuivre : ouvre
+   chaque section, REMPLACE les séparateurs gris ». Ce n'est donc pas un ornement
+   de plus, c'est le remplaçant du `border-t` neutre en tête de bloc — et les
+   sections qui ouvraient sur `border-t border-white/10` ouvraient sur exactement
+   ce que ce filet remplace.
+
+   Trois arrêts et non une teinte plate : un trait uniforme à côté de surfaces
+   métalliques trahit l'aplat. Le reflet (`--copper-sheen`) attaque, le corps
+   (`--copper`) suit, puis le trait s'éteint. `color-mix` réutilise les jetons au
+   lieu de recopier leurs composantes ; la déclaration au-dessus est le repli pour
+   un navigateur qui ne la connaît pas — c'est la forme d'origine de `base.css`,
+   avec le jeton `--copper-line`, et non une valeur choisie à l'œil.
+
+   Décoratif au sens de WCAG 1.4.11 : le filet n'identifie aucun état et ne porte
+   aucune information. `--copper-line` vaut 1.69:1 sur `--ink-900` ; c'est la
+   valeur du site et elle n'a pas à atteindre 3:1.
+
+   Écrit dans `@layer components` et non en fin de fichier hors couche : sans
+   quoi son `margin-block` l'emporterait sur les utilitaires `mt-*`/`mb-*` posés
+   au point d'usage, à spécificité égale et par ordre source.
+   ========================================================================== */
+@layer components {
+  .rule {
+    height: 1px;
+    border: 0;
+    margin-block: 1rem;
+    background: linear-gradient(90deg, var(--copper-line), transparent 65%);
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--copper-sheen) 55%, transparent) 0%,
+      color-mix(in srgb, var(--copper) 42%, transparent) 30%,
+      transparent 70%
+    );
   }
 }

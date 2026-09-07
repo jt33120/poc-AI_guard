@@ -116,9 +116,20 @@ function Densite({ scenarios }: { scenarios: number }) {
   if (scenarios === 0) return null;
   const plein = Math.min(scenarios, 5);
   return (
-    <span aria-hidden="true" className="font-mono text-[11px] tracking-[0.2em]">
+    <span aria-hidden="true" className="font-mono text-[length:var(--fs-label)] tracking-[0.2em]">
       <span className="text-brand-bright">{"|".repeat(plein)}</span>
-      <span className="text-white/15">{"|".repeat(5 - plein)}</span>
+      {/* Les creux restent volontairement au ras du seuil, sur `--border-mid`
+          (1.50:1 sur `--ink-900`) et non sur un jeton de texte. Ce sont des
+          **graduations, pas une valeur** : toute l'information de la jauge est
+          portée par les barres pleines, en `--copper-sheen` à 8.85:1, et le même
+          compte est publié en toutes lettres dans l'ouverture de la rangée. Un
+          lecteur qui ne voit pas les creux ne perd rien ; les monter à 4.5:1 les
+          mettrait à égalité visuelle avec les pleines et rendrait la jauge
+          illisible — précisément la « note de zéro » que le commentaire ci-dessus
+          refuse. `--border-mid` plutôt que `white/15` (1.55:1, valeur identique à
+          l'œil) parce qu'une opacité brute disparaît sous `.section--light`
+          (1.02:1) là où le jeton s'y réécrit et garde ses 1.50:1. */}
+      <span className="text-[color:var(--border-mid)]">{"|".repeat(5 - plein)}</span>
     </span>
   );
 }
@@ -127,9 +138,15 @@ function Mode({ mode }: { mode: string }) {
   const { t } = useT();
   const fort = mode === "B";
   return (
+    // `.label` porte la forme du troisième rôle typographique (mono, capitales,
+    // `--fs-label`, interlettrage .14em de la charte) au lieu de la recomposer à
+    // la main : `tracking-wider` valait .05em, soit un tiers de l'espacement du
+    // site. La couleur, elle, est surchargée : le mode est une colonne de données,
+    // pas une légende, et `--text-low` (5.58:1) lui donne la marge que
+    // `text-white/45` (4.48:1, sous le plancher) ne donnait pas.
     <span
-      className={`whitespace-nowrap font-mono text-[11px] uppercase tracking-wider ${
-        fort ? "text-brand-bright" : "text-white/45"
+      className={`label whitespace-nowrap ${
+        fort ? "text-brand-bright" : "text-[color:var(--text-low)]"
       }`}
     >
       [&nbsp;{mode}&nbsp;] {t(MODE_LABEL[mode] ?? "ledger.mode.NA")}
@@ -160,7 +177,7 @@ function Rangee({
 
   return (
     <div
-      className={`border-t border-white/10 transition-colors ${
+      className={`border-t border-[color:var(--border)] transition-colors ${
         // Une ligne qui ne concerne pas le visiteur est **estompée, jamais cachée** :
         // le relevé complet est l'argument, et masquer les six lignes qui ne sont pas
         // les siennes reviendrait à vendre les quinze du marché en silence.
@@ -171,21 +188,21 @@ function Rangee({
         type="button"
         onClick={basculer}
         aria-expanded={ouverte}
-        className="group grid w-full grid-cols-[3.5rem_1fr_auto] items-baseline gap-x-4 px-1 py-4 text-left hover:bg-white/[0.03] sm:grid-cols-[4rem_1fr_auto_auto] sm:gap-x-6"
+        className="group grid w-full grid-cols-[3.5rem_1fr_auto] items-baseline gap-x-4 px-1 py-4 text-left hover:bg-[color:var(--surface)] sm:grid-cols-[4rem_1fr_auto_auto] sm:gap-x-6"
       >
-        <span className="font-mono text-xs text-brand">{ligne.id}</span>
+        <span className="font-mono text-xs text-[color:var(--copper-text)]">{ligne.id}</span>
 
         <span className="min-w-0">
-          <span className="font-display text-base font-semibold leading-snug text-white sm:text-lg">
+          <span className="font-display text-base font-semibold leading-snug text-[color:var(--text-hi)] sm:text-lg">
             {ligne.titre}
           </span>
           {ingress.length > 0 && (
-            <span className="muted mt-1 block font-mono text-[11px]">
+            <span className="muted mt-1 block font-mono text-[length:var(--fs-label)]">
               {t("ledger.ingress.label")} {ingress.map((i) => t(INGRESS_LABEL[i] ?? "ledger.ingress.mcp")).join(" · ")}
             </span>
           )}
           {ingress.length === 0 && (
-            <span className="muted mt-1 block font-mono text-[11px]">
+            <span className="muted mt-1 block font-mono text-[length:var(--fs-label)]">
               {t("ledger.ingress.none")}
             </span>
           )}
@@ -207,7 +224,7 @@ function Rangee({
             <Ouverture ligne={ligne} scenarios={scenarios} retenues={retenues} />
 
             {positionne && (
-              <p className="font-mono text-[11px] uppercase tracking-wider text-white/50">
+              <p className="label text-[color:var(--text-low)]">
                 {applicable
                   ? t("ledger.owner.mine")
                   : `${t("ledger.owner.not")} · ${vue.owner ?? ""}`}
@@ -215,7 +232,7 @@ function Rangee({
             )}
 
             {ecarts.length > 0 && (
-              <p className="muted font-mono text-[11px]">
+              <p className="muted font-mono text-[length:var(--fs-label)]">
                 {t("ledger.open.gaps")} : {ecarts.join(" · ")}
               </p>
             )}
@@ -299,10 +316,14 @@ function Scenarios({ scenarios }: { scenarios: string[] }) {
   if (scenarios.length === 0) return null;
   return (
     <div>
-      <p className="label mb-1.5 text-white/40">{t("ledger.open.scenarios")}</p>
+      {/* `.label` seule : elle pose déjà `--text-faint` (4.93:1). `text-white/40`
+          l'écrasait à 3.80:1 sur du mono de 11.2 px en capitales espacées — le pire
+          cas typographique de la page, et l'exacte opacité que l'en-tête de
+          `globals.css` nomme comme déjà jugée non conforme. */}
+      <p className="label mb-1.5">{t("ledger.open.scenarios")}</p>
       <ul className="space-y-1">
         {scenarios.map((s) => (
-          <li key={s} className="muted break-all font-mono text-[11px] leading-relaxed">
+          <li key={s} className="muted break-all font-mono text-[length:var(--fs-label)] leading-relaxed">
             {s}
           </li>
         ))}
@@ -327,13 +348,26 @@ export function ThreatLedger() {
         </h2>
         <p className="lead mt-4">{t("ledger.lede")}</p>
 
-        {/* Le sélecteur de profil. */}
-        <div className="mt-10 border-y border-white/10 py-6">
-          <p className="label text-white/50">{t("ledger.profil.title")}</p>
+        {/* Le sélecteur de profil. Le filet cuivre ouvre le bloc : sur `xsom.fr`
+            (`base.css` l. 227) `.rule` **remplace** le séparateur gris, il ne s'y
+            ajoute pas. Le filet bas du `border-y` disparaît avec lui — le relevé
+            qui suit ouvre déjà sa première rangée sur un filet à lui, et deux
+            traits à huit pixels d'écart n'en disaient qu'un. */}
+        <hr className="rule mt-10" />
+        <div className="pb-6">
+          <p className="label">{t("ledger.profil.title")}</p>
           <p className="muted mt-1 text-sm">{t("ledger.profil.hint")}</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {PROFILS.map((p) => {
               const actif = choisis.includes(p.id);
+              // `border-brand/60` et `bg-brand/15` n'émettaient **aucune règle** :
+              // Tailwind ne sait pas appliquer un modificateur d'opacité à une
+              // couleur qu'il ne peut pas décomposer (`var(--copper)`), défaut déjà
+              // documenté pour `bg-navy/90` en tête de `globals.css`. La puce cochée
+              // retombait donc sur le `border-color: #e5e7eb` du preflight — un
+              // liseré gris clair à 14.64:1, ni cuivre ni discret, et sans lavis.
+              // `--copper-text` (5.15:1) et `--copper-wash` sont le couple que
+              // `.badge-blue` emploie déjà pour ce même rôle.
               return (
                 <button
                   key={p.id}
@@ -343,11 +377,11 @@ export function ThreatLedger() {
                   title={t(p.hint)}
                   className={`rounded-sm border px-3 py-1.5 text-left font-mono text-xs transition ${
                     actif
-                      ? "border-brand/60 bg-brand/15 text-brand-bright"
-                      : "border-white/15 text-white/60 hover:border-white/30 hover:text-white"
+                      ? "border-[color:var(--copper-text)] bg-[color:var(--copper-wash)] text-brand-bright"
+                      : "border-[color:var(--border-mid)] text-[color:var(--text-mid)] hover:border-[color:var(--copper-line)] hover:text-[color:var(--text-hi)]"
                   }`}
                 >
-                  <span className="text-brand">{p.id}</span> {t(p.label)}
+                  <span className="text-[color:var(--copper-text)]">{p.id}</span> {t(p.label)}
                 </button>
               );
             })}
@@ -363,7 +397,12 @@ export function ThreatLedger() {
           </p>
 
           {positionne?.cap && (
-            <p className="mt-3 max-w-2xl border-l-2 border-brand/50 pl-4 text-sm leading-relaxed text-white/70">
+            // Même défaut qu'au-dessus : `border-brand/50` n'émettait rien et le
+            // filet de l'encadré était gris (#e5e7eb). `border-left: 2px solid
+            // var(--copper)` est la forme de l'encadré sur `xsom.fr`
+            // (`components.css` l. 572 et 715) ; `--copper-text` en est la variante
+            // contextuelle, qui passe en `--copper-deep` sous `.section--light`.
+            <p className="muted mt-3 max-w-2xl border-l-2 border-[color:var(--copper-text)] pl-4 text-sm leading-relaxed">
               {t("ledger.cap")}
             </p>
           )}
@@ -380,10 +419,15 @@ export function ThreatLedger() {
               basculer={() => setOuverte(ouverte === ligne.id ? null : ligne.id)}
             />
           ))}
-          <div className="border-t border-white/10" />
+          {/* Ce trait-ci **n'est pas** un ouvre-section, et il ne prend donc pas le
+              filet cuivre : c'est le dix-septième filet d'une grille de seize
+              rangées, celui qui ferme la dernière. En cuivre, la dernière rangée
+              n'aurait pas le même bord bas que les quinze au-dessus, et un relevé
+              dont la dernière ligne se compose autrement n'est plus un relevé. */}
+          <div className="border-t border-[color:var(--border)]" />
         </div>
 
-        <p className="muted mt-6 font-mono text-[11px]">
+        <p className="muted mt-6 font-mono text-[length:var(--fs-label)]">
           {t("ledger.stamp", { date: RELEVE.genere_le, commit: RELEVE.commit })}
         </p>
       </div>

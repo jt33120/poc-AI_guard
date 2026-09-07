@@ -9,10 +9,11 @@
  *   marque : en-tête, pied de page, écrans d'authentification, chargeur.
  * - `ShieldMark` est une **icône d'interface** : un bouclier coché, qui veut dire
  *   « contrôlé ». Il sert de puce et de pictogramme dans les schémas, il n'a
- *   jamais été le logo. `tests/test_brand_mark.py` le verrouille sur `lib/mark.ts`
- *   et sur `app/icon.svg` ; l'y remplacer par le logo casserait ce garde, et le
- *   logo à trois flèches ne rentre de toute façon pas dans le contrat
- *   « exactement deux tracés » que le favicon doit tenir.
+ *   jamais été le logo — et le favicon ne le montre plus : `app/icon.svg` porte
+ *   désormais la variante cuivre du vrai logo. `tests/test_brand_mark.py` tient
+ *   la même propriété qu'avant (« la marque a un tracé, pas deux ») mais sur les
+ *   deux cibles qui sont réellement la marque : le favicon et `xsom-mark.svg`.
+ *   Il interdit maintenant explicitement `MARK_SHIELD` dans le favicon.
  *
  * Le logo est servi en `<img>` et non inline : il porte trois masques avec leurs
  * `id`, et deux copies inline dans la même page (en-tête et pied) produiraient des
