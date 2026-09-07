@@ -138,6 +138,31 @@ So after any transfer, on **each** host, in this order:
 3. Treat "Redeploy" with care: it rebuilds the commit the platform last saw. When the
    last build is months old, that button ships months-old code, not the branch head.
 
+### A paused database closes two gates, and `/health` stays green
+
+Managed Postgres projects pause when idle. When the same project also serves auth
+— Supabase is both the database and the JWKS issuer — pausing it takes down
+`database` **and** `issuer` at once, while `GET /health` keeps answering `200`:
+liveness never touches either. That is `DEP-6` in the field, so read the gates,
+not the probe you happened to curl.
+
+Measured on 2026-09-07, waking the project from paused to `ACTIVE_HEALTHY`:
+
+| Gate | Paused | Awake |
+|---|---|---|
+| `database` | `false` | `true` |
+| `schema_current` | `false` | `false` |
+| `issuer` | `false` | `true` |
+
+`schema_current` is the one to read carefully: it is **not** independent. When the
+connection fails, `_database_gates` returns `(False, False)`, so a red
+`schema_current` next to a red `database` says nothing of its own. Only once the
+database answers does it become a real verdict — here it stayed red because the
+project had slept through every migration since, its schema still older than
+`0016_schema_migrations.sql`, the file that creates the ledger. A database with no
+`schema_migrations` table at all is the documented pre-ledger case: adopt its
+history once (§2) before applying the rest.
+
 ### 5. First tenant and admin — no SQL
 
 `POST /v1/signup` provisions in one call: the auth user, the tenant, the admin
