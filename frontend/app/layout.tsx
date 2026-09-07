@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 
+import { Motion } from "@/components/Motion";
 import { LanguageProvider } from "@/lib/i18n";
 import { getLang, translate } from "@/lib/lang";
 import "./globals.css";
@@ -71,6 +72,14 @@ export function generateMetadata(): Metadata {
   };
 }
 
+// Décide, AVANT peinture, si le mouvement a lieu. Un `useEffect` s'exécute après le
+// premier rendu : on verrait les blocs apparaître, disparaître, puis se révéler.
+// C'est le SEUL endroit où la condition est écrite, `Motion.tsx` ne fait que lire le
+// marqueur. Littéral constant, aucune interpolation.
+const MOTION_BOOTSTRAP =
+  "if(!matchMedia('(prefers-reduced-motion: reduce)').matches&&'IntersectionObserver' in window)" +
+  "document.documentElement.setAttribute('data-motion','on')";
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   // `<html lang>` était écrit en dur à `fr` pendant que la page rendait l'anglais par
   // défaut : l'attribut contredisait le texte qu'il qualifiait. Un lecteur d'écran
@@ -78,8 +87,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   // ni dans un sens ni dans l'autre.
   const lang = getLang();
   return (
-    <html lang={lang} className={`${saira.variable} ${inter.variable} ${mono.variable}`}>
+    <html
+      lang={lang}
+      className={`${saira.variable} ${inter.variable} ${mono.variable}`}
+      // `data-motion` est posé sur `<html>` par le script ci-dessous, avant
+      // hydratation : React lit alors un attribut qu'il n'a pas rendu et avertit.
+      // L'attribut ne fait pas partie de l'arbre React, il ne sera jamais réconcilié,
+      // seul l'avertissement est à taire. Un marqueur en CLASSE aurait été détruit,
+      // lui, car `className` de `<html>` est rendu ici et donc géré par React.
+      suppressHydrationWarning
+    >
       <body className="min-h-screen font-sans antialiased">
+        <script dangerouslySetInnerHTML={{ __html: MOTION_BOOTSTRAP }} />
+        <Motion />
         <LanguageProvider initial={lang}>{children}</LanguageProvider>
       </body>
     </html>

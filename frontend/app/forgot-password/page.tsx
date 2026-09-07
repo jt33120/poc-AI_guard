@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { Logo, Wordmark } from "@/components/brand";
+import { Wordmark, XsomMark } from "@/components/brand";
 import { LanguageToggle, useT } from "@/lib/i18n";
 
 export default function ForgotPasswordPage() {
@@ -32,7 +32,7 @@ export default function ForgotPasswordPage() {
       <main className="flex min-h-screen items-center justify-center p-6">
         <div className="w-full max-w-sm animate-fade-up">
           <div className="mb-6 flex items-center gap-2.5">
-            <Logo size="h-9 w-9" />
+            <XsomMark className="h-9 w-9" />
             <Wordmark className="text-lg" />
           </div>
           <div className="card p-6">

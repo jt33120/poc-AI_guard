@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { Logo, Wordmark } from "@/components/brand";
+import { Wordmark, XsomMark } from "@/components/brand";
 import { LanguageToggle, type StrKey, useT } from "@/lib/i18n";
 
 const LINKS: { href: string; key: StrKey }[] = [
@@ -45,7 +45,7 @@ export function AppShell({
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-6">
             <Link href="/home" className="flex items-center gap-2.5" onClick={() => setOpen(false)}>
-              <Logo />
+              <XsomMark />
               <Wordmark className="text-[15px]" />
             </Link>
             <nav className="hidden items-center gap-1 md:flex">

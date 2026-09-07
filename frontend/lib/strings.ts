@@ -24,6 +24,14 @@ export const STR = {
   "nav.signout": { en: "Sign out", fr: "Déconnexion" },
   "nav.norole": { en: "no role", fr: "aucun rôle" },
 
+  // La baseline du bloc de marque. Elle diffère de celle de `xsom.fr`
+  // (« Conseil en systèmes d'information ») : ici l'objet est le produit, pas le
+  // cabinet.
+  "brand.tagline": {
+    en: "MCP gateway · action control",
+    fr: "Passerelle MCP · contrôle des actions",
+  },
+
   "common.loading": { en: "Loading…", fr: "Chargement…" },
   "common.waking": {
     en: "Waking the secure backend: the first load after a quiet period can take up to a minute.",
@@ -543,6 +551,7 @@ export const STR = {
     fr: "Contrôlez les étapes irréversibles des workflows autonomes.",
   },
 
+  "land.cta.kicker": { en: "Next step", fr: "Prochaine étape" },
   "land.cta.title": {
     en: "Put your agents to work, under control.",
     fr: "Mettez vos agents au travail, sous contrôle.",

@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { ShieldMark } from "@/components/brand";
+import { ShieldMark, Wordmark, XsomMark } from "@/components/brand";
 import { Audience } from "@/components/Audience";
 import { ProfilProvider } from "@/components/ProfilContext";
 import { ThreatLedger } from "@/components/ThreatLedger";
@@ -61,7 +61,7 @@ function FlowArrow() {
   return (
     <svg
       viewBox="0 0 24 24"
-      className="h-6 w-6 rotate-90 text-brand-bright md:rotate-0"
+      className="h-6 w-6 rotate-90 text-[color:var(--copper-text)] md:rotate-0"
       fill="none"
       stroke="currentColor"
       strokeWidth="2"
@@ -84,16 +84,24 @@ export default function LandingPage() {
   return (
     <main className="relative">
       {/* Top bar */}
-      <header className="sticky top-0 z-30 border-b border-white/10 bg-navy/70 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-          <div className="flex items-center gap-2.5">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-brand/15 text-brand-bright ring-1 ring-brand/30">
-              <ShieldMark className="h-5 w-5" />
+      {/* Le voile est porté par `.site-header` et non par un `bg-navy/xx` : Tailwind
+          n'émet aucune règle quand on demande une opacité sur une couleur qui vaut
+          `var(--ink-900)`, si bien que la barre était en réalité transparente. Le
+          défaut ne se voyait pas sur une page uniformément sombre ; deux sections
+          passent maintenant en bande claire, et le papier remontait au travers. */}
+      <header className="site-header sticky top-0 z-30 border-b border-white/10 backdrop-blur-xl">
+        <div className="wrap flex h-16 items-center justify-between">
+          <div className="brand">
+            <XsomMark />
+            <span>
+              {/* Le nom accessible reste « xSOM AI Guard » : la baseline est hors du
+                  h1, sinon elle entrerait dans le nom que `e2e/smoke.spec.ts`
+                  cherche. */}
+              <h1 className="brand__name">
+                xSOM <span className="brand__product">AI Guard</span>
+              </h1>
+              <span className="brand__tag">{t("brand.tagline")}</span>
             </span>
-            {/* Accessible name stays "xSOM AI Guard". */}
-            <h1 className="text-[15px] font-bold tracking-tight">
-              xSOM <span className="font-medium text-white/50">AI Guard</span>
-            </h1>
           </div>
           <div className="flex items-center gap-3">
             <LanguageToggle />
@@ -108,33 +116,38 @@ export default function LandingPage() {
       </header>
 
       {/* Hero */}
-      <section className="mx-auto max-w-6xl px-6 pb-12 pt-16 sm:pt-24">
-        <div className="animate-fade-up">
-          <span className="badge badge-blue">{t("land.hero.badge")}</span>
-          <p className="mt-6 max-w-4xl text-4xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-6xl">
-            {t("land.hero.title")}
-          </p>
-          <p className="muted mt-6 max-w-2xl text-lg leading-relaxed">{t("land.hero.sub")}</p>
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link href="/login" className="btn btn-primary">
-              {t("land.hero.cta")}
-            </Link>
-            <a href="#how" className="btn btn-ghost">
-              {t("land.hero.cta2")}
-            </a>
-            <Link href="/executive-preview" className="btn btn-ghost">
-              {t("land.exec.link")}
-            </Link>
-            <Link href="/mise-en-oeuvre" className="btn btn-ghost">
-              {t("mise.kicker")}
-            </Link>
-            <span className="muted ml-1 inline-flex items-center gap-1.5 text-sm">
-              <ShieldMark className="h-4 w-4 text-brand-bright" />
-              {t("land.hero.trust")}
-            </span>
+      <section className="page-head page-head--visual">
+        <div className="wrap page-head__inner">
+          <div className="animate-fade-up">
+            <p className="eyebrow" data-num="—">
+              {t("land.hero.badge")}
+            </p>
+            {/* Reste un `<p>` : le `<h1>` de la page est le mot-marque de l'en-tête,
+                et le promouvoir ici ajouterait un second titre de rang 1. */}
+            <p className="t-h1 mt-6 max-w-4xl" data-sheen>
+              {t("land.hero.title")}
+            </p>
+            <p className="lead mt-6">{t("land.hero.sub")}</p>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Link href="/login" className="btn btn-primary">
+                {t("land.hero.cta")}
+              </Link>
+              <a href="#how" className="btn btn-ghost">
+                {t("land.hero.cta2")}
+              </a>
+              <Link href="/executive-preview" className="btn btn-ghost">
+                {t("land.exec.link")}
+              </Link>
+              <Link href="/mise-en-oeuvre" className="btn btn-ghost">
+                {t("mise.kicker")}
+              </Link>
+              <span className="muted ml-1 inline-flex items-center gap-1.5 text-sm">
+                <ShieldMark className="h-4 w-4 text-brand-bright" />
+                {t("land.hero.trust")}
+              </span>
+            </div>
           </div>
         </div>
-
       </section>
 
       {/* Le relevé (L5) et « Pour qui » (L7) répondent à deux questions à partir du
@@ -142,110 +155,173 @@ export default function LandingPage() {
           Un seul sélecteur, donc un seul état, et un seul appel au moteur — deux
           sélecteurs poseraient au visiteur une question à laquelle il a répondu.
           Les seize lignes restent rendues côté serveur : un robot les voit sans
-          exécuter de JavaScript. */}
+          exécuter de JavaScript. Ils portent les numéros 01 et 02 de la page. */}
       <ProfilProvider>
         <ThreatLedger />
         <Audience />
       </ProfilProvider>
 
       {/* Problem */}
-      <section className="mx-auto max-w-6xl px-6 py-12">
-        <div className="card p-7 sm:p-10">
-          <span className="label text-brand-bright">{t("land.problem.kicker")}</span>
-          <h2 className="mt-2 max-w-3xl text-2xl font-bold sm:text-3xl">{t("land.problem.title")}</h2>
-          <p className="muted mt-4 max-w-3xl text-base leading-relaxed">{t("land.problem.body")}</p>
+      {/* Deux colonnes éditoriales, et plus de carte : une carte autour d'une section
+          entière est précisément la forme que le site refuse. */}
+      <section className="section">
+        <div className="wrap split">
+          <div>
+            <p className="eyebrow" data-num="03">
+              {t("land.problem.kicker")}
+            </p>
+            <h2 className="t-h2 mt-4" data-sheen>
+              {t("land.problem.title")}
+            </h2>
+          </div>
+          <div>
+            <p className="lead">{t("land.problem.body")}</p>
+          </div>
         </div>
       </section>
 
-      {/* How it works */}
-      <section id="how" className="mx-auto max-w-6xl scroll-mt-20 px-6 py-12">
-        <div className="text-center">
-          <span className="label text-brand-bright">{t("land.how.kicker")}</span>
-          <h2 className="mt-2 text-2xl font-bold sm:text-3xl">{t("land.how.title")}</h2>
-        </div>
+      {/* How it works — première bande claire. Calque de la section « Trois garanties,
+          dans cet ordre » d'`ai-guard.html` : même rôle (le mécanisme), même forme
+          (chapeau, titre, trois cartes). Toutes les teintes écrites en dur à
+          l'intérieur passent par les jetons contextuels, sinon le texte disparaîtrait
+          sur le papier. */}
+      <section id="how" className="section section--light scroll-mt-20">
+        <div className="wrap">
+          <div className="text-center">
+            <p className="eyebrow" data-num="04">
+              {t("land.how.kicker")}
+            </p>
+            <h2 className="t-h2 mt-2" data-sheen>
+              {t("land.how.title")}
+            </h2>
+          </div>
 
-        {/* Diagram: agent → guard → tools */}
-        <div className="mt-10 flex flex-col items-stretch justify-center gap-3 md:flex-row md:items-center">
-          <div className="card flex-1 p-5 text-center">
-            <div className="text-sm font-semibold text-white">{t("land.how.agent")}</div>
-            <div className="muted mt-1 text-xs leading-snug">{t("land.how.agent.sub")}</div>
-          </div>
-          <FlowArrow />
-          <div className="relative flex-1 rounded-2xl border border-brand/40 bg-brand/10 p-5 text-center shadow-glow">
-            <div className="mx-auto mb-2 grid h-9 w-9 place-items-center rounded-xl bg-brand/20 text-brand-bright ring-1 ring-brand/40">
-              <ShieldMark className="h-5 w-5" />
+          {/* Diagram: agent → guard → tools */}
+          <div className="mt-10 flex flex-col items-stretch justify-center gap-3 md:flex-row md:items-center">
+            <div className="card flex-1 p-5 text-center">
+              <div className="text-sm font-semibold text-[color:var(--text-hi)]">
+                {t("land.how.agent")}
+              </div>
+              <div className="muted mt-1 text-xs leading-snug">{t("land.how.agent.sub")}</div>
             </div>
-            <div className="text-sm font-bold text-white">{t("land.how.guard")}</div>
-            <div className="mt-1 text-xs font-medium text-brand-bright">{t("land.how.guard.sub")}</div>
+            <FlowArrow />
+            <div className="relative flex-1 rounded-2xl border border-[color:var(--copper-line)] bg-[color:var(--copper-wash)] p-5 text-center">
+              <div className="mx-auto mb-2 grid h-9 w-9 place-items-center rounded-xl bg-[color:var(--copper-wash)] text-[color:var(--copper-text)] ring-1 ring-[color:var(--copper-line)]">
+                <ShieldMark className="h-5 w-5" />
+              </div>
+              <div className="text-sm font-bold text-[color:var(--text-hi)]">
+                {t("land.how.guard")}
+              </div>
+              <div className="mt-1 text-xs font-medium text-[color:var(--copper-text)]">
+                {t("land.how.guard.sub")}
+              </div>
+            </div>
+            <FlowArrow />
+            <div className="card flex-1 p-5 text-center">
+              <div className="text-sm font-semibold text-[color:var(--text-hi)]">
+                {t("land.how.tools")}
+              </div>
+              <div className="muted mt-1 text-xs leading-snug">{t("land.how.tools.sub")}</div>
+            </div>
           </div>
-          <FlowArrow />
-          <div className="card flex-1 p-5 text-center">
-            <div className="text-sm font-semibold text-white">{t("land.how.tools")}</div>
-            <div className="muted mt-1 text-xs leading-snug">{t("land.how.tools.sub")}</div>
-          </div>
-        </div>
 
-        {/* 3 steps */}
-        <div className="mt-6 grid gap-4 sm:grid-cols-3">
-          {STEPS.map(([title, body]) => (
-            <div key={title} className="card p-5">
-              <h3 className="font-semibold text-brand-bright">{t(title)}</h3>
-              <p className="muted mt-1.5 text-sm leading-relaxed">{t(body)}</p>
-            </div>
-          ))}
+          {/* 3 steps */}
+          <div className="mt-6 grid gap-6 sm:grid-cols-3">
+            {STEPS.map(([title, body], i) => (
+              <div key={title} className="card reveal p-5" data-delay={String(i + 1)}>
+                <h3 className="t-h3">{t(title)}</h3>
+                <p className="muted mt-1.5 text-sm leading-relaxed">{t(body)}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* Features */}
-      <section className="mx-auto max-w-6xl px-6 py-12">
-        <div className="text-center">
-          <span className="label text-brand-bright">{t("land.feat.kicker")}</span>
-          <h2 className="mt-2 text-2xl font-bold sm:text-3xl">{t("land.feat.title")}</h2>
-        </div>
-        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map((f) => (
-            <div key={f.t} className="card p-6">
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand/15 text-brand-bright ring-1 ring-brand/30">
-                <FeatureIcon d={ICONS[f.icon]} />
+      <section className="section">
+        <div className="wrap">
+          <div className="text-center">
+            <p className="eyebrow" data-num="05">
+              {t("land.feat.kicker")}
+            </p>
+            <h2 className="t-h2 mt-2" data-sheen>
+              {t("land.feat.title")}
+            </h2>
+          </div>
+          {/* Le décalage repart de 1 au second rang : le CSS ne définit que cinq
+              paliers, et un rang qui démarre à 4 se révélerait après le suivant. */}
+          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {FEATURES.map((f, i) => (
+              <div key={f.t} className="card reveal p-6" data-delay={String((i % 3) + 1)}>
+                <div className="grid h-10 w-10 place-items-center rounded-xl bg-[color:var(--copper-wash)] text-brand-bright ring-1 ring-[color:var(--copper-line)]">
+                  <FeatureIcon d={ICONS[f.icon]} />
+                </div>
+                <h3 className="t-h3 mt-4">{t(f.t)}</h3>
+                <p className="muted mt-1.5 text-sm leading-relaxed">{t(f.b)}</p>
               </div>
-              <h3 className="mt-4 font-semibold">{t(f.t)}</h3>
-              <p className="muted mt-1.5 text-sm leading-relaxed">{t(f.b)}</p>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* Compliance */}
-      <section className="mx-auto max-w-6xl px-6 py-12">
-        <div className="rounded-2xl border border-brand/30 bg-gradient-to-br from-brand/15 to-transparent p-7 sm:p-10">
-          <span className="label text-brand-bright">{t("land.comp.kicker")}</span>
-          <h2 className="mt-2 max-w-2xl text-2xl font-bold sm:text-3xl">{t("land.comp.title")}</h2>
-          <p className="muted mt-4 max-w-3xl text-base leading-relaxed">{t("land.comp.body")}</p>
+      {/* Compliance — l'aparté, en bande resserrée. Le panneau en dégradé cuivre
+          disparaît : sur le site, le cuivre se concentre dans le seul bandeau final
+          plutôt que de se disperser en fonds de section. */}
+      <section className="section section--tight">
+        <div className="wrap split">
+          <div>
+            <p className="eyebrow" data-num="06">
+              {t("land.comp.kicker")}
+            </p>
+            <h2 className="t-h2 mt-4" data-sheen>
+              {t("land.comp.title")}
+            </h2>
+          </div>
+          <div>
+            <p className="lead">{t("land.comp.body")}</p>
+          </div>
         </div>
       </section>
 
-      {/* Who it's for */}
-      <section className="mx-auto max-w-6xl px-6 py-12">
-        <div className="text-center">
-          <span className="label text-brand-bright">{t("land.who.kicker")}</span>
-          <h2 className="mt-2 text-2xl font-bold sm:text-3xl">{t("land.who.title")}</h2>
-        </div>
-        <div className="mt-10 grid gap-4 sm:grid-cols-3">
-          {WHO.map(([title, body]) => (
-            <div key={title} className="card p-6">
-              <h3 className="font-semibold">{t(title)}</h3>
-              <p className="muted mt-1.5 text-sm leading-relaxed">{t(body)}</p>
-            </div>
-          ))}
+      {/* Who it's for — seconde bande claire. Section entièrement tokenisée
+          (`.card`, `h3`, `.muted`) : elle bascule sans une seule substitution. */}
+      <section className="section section--light">
+        <div className="wrap">
+          <div className="text-center">
+            <p className="eyebrow" data-num="07">
+              {t("land.who.kicker")}
+            </p>
+            <h2 className="t-h2 mt-2" data-sheen>
+              {t("land.who.title")}
+            </h2>
+          </div>
+          <div className="mt-10 grid gap-6 sm:grid-cols-3">
+            {WHO.map(([title, body], i) => (
+              <div key={title} className="card reveal p-6" data-delay={String(i + 1)}>
+                {/* Ces trois cartes sont les seules sans pastille d'icône : le numéro
+                    y tient le rôle de marqueur d'entrée. Un chiffre nu est invariant
+                    par langue, comme les `data-num` des chapeaux — il ne passe donc
+                    pas par le dictionnaire. */}
+                <span className="card__num">{`0${i + 1}`}</span>
+                <h3 className="t-h3">{t(title)}</h3>
+                <p className="muted mt-1.5 text-sm leading-relaxed">{t(body)}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* Final CTA */}
-      <section className="mx-auto max-w-6xl px-6 py-12">
-        <div className="card flex flex-col items-center gap-5 p-10 text-center">
-          <h2 className="max-w-2xl text-2xl font-bold sm:text-3xl">{t("land.cta.title")}</h2>
-          <p className="muted max-w-xl">{t("land.cta.body")}</p>
-          <div className="flex flex-wrap justify-center gap-3">
+      <section className="section cta-band">
+        <div className="wrap wrap--narrow cta-band__inner reveal">
+          <p className="eyebrow" data-num="→">
+            {t("land.cta.kicker")}
+          </p>
+          <h2 className="t-h2 mt-6" data-sheen>
+            {t("land.cta.title")}
+          </h2>
+          <p className="lead mx-auto mt-4">{t("land.cta.body")}</p>
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link href="/login" className="btn btn-primary">
               {t("land.hero.cta")}
             </Link>
@@ -258,14 +334,10 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t border-white/10">
-        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-6 py-8 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2.5">
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-brand/15 text-brand-bright ring-1 ring-brand/30">
-              <ShieldMark className="h-4 w-4" />
-            </span>
-            <span className="text-sm font-semibold">
-              xSOM <span className="font-medium text-white/50">AI Guard</span>
-            </span>
+        <div className="wrap flex flex-col gap-3 py-8 sm:flex-row sm:items-center sm:justify-between">
+          <div className="brand">
+            <XsomMark className="h-8 w-8" />
+            <Wordmark className="text-sm" />
           </div>
           <p className="muted text-xs">{t("land.footer.tech")}</p>
           <p className="muted text-xs">{t("land.footer.rights")}</p>
