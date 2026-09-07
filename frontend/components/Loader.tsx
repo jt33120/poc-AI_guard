@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { ShieldMark, Wordmark } from "@/components/brand";
+import { Wordmark, XsomMark } from "@/components/brand";
 
 // Branded full-screen loader — used while signing in and on route transitions.
 // `slowLabel` (if given) fades in after a few seconds to reassure during a cold start.
@@ -27,7 +27,7 @@ export function FullScreenLoader({
           <span className="absolute inset-0 animate-ping rounded-full border border-brand/40" />
           <span className="absolute inset-1 animate-spin rounded-full border-2 border-transparent border-t-brand-bright" />
           <span className="absolute inset-3 rounded-full bg-brand/10 blur-md" />
-          <ShieldMark className="relative h-8 w-8 text-brand-bright" />
+          <XsomMark className="relative h-10 w-10" />
         </div>
         <div className="text-center">
           <Wordmark className="text-base" />

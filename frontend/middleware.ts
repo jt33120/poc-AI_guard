@@ -60,6 +60,8 @@ export const config = {
   // `icon.svg` est exclu au même titre que `favicon.ico` : c'est la route que Next sert
   // réellement pour l'icône d'onglet, et sans cette exclusion chaque requête de favicon
   // construit un client Supabase et appelle `auth.getUser()` — pour une image, sur
-  // chaque chargement de page, y compris pour un visiteur non connecté.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg).*)"],
+  // chaque chargement de page, y compris pour un visiteur non connecté. `xsom-mark.svg`
+  // tombe sous la même règle : le logo est demandé sur chaque page, y compris par un
+  // visiteur non connecté.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|xsom-mark.svg).*)"],
 };

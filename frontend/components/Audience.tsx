@@ -68,7 +68,7 @@ function Bascules() {
 
   return (
     <div className="mt-10 border-t border-white/10 pt-8">
-      <h3 className="font-display text-lg font-bold sm:text-xl">{t("pourqui.bascules.t")}</h3>
+      <h3 className="t-h3">{t("pourqui.bascules.t")}</h3>
       <p className="muted mt-2 max-w-2xl text-sm leading-relaxed">{t("pourqui.bascules.b")}</p>
 
       {choisis.length === 0 && (
@@ -116,20 +116,24 @@ export function Audience() {
   const { t } = useT();
 
   return (
-    <section id="pour-qui" className="mx-auto max-w-5xl scroll-mt-20 px-6 py-16">
-      <span className="label text-brand-bright">{t("pourqui.kicker")}</span>
-      <h2 className="mt-2 max-w-3xl font-display text-2xl font-bold sm:text-4xl">
-        {t("pourqui.title")}
-      </h2>
-      <p className="muted mt-4 max-w-2xl text-base leading-relaxed">{t("pourqui.lede")}</p>
+    <section id="pour-qui" className="section scroll-mt-20">
+      <div className="wrap">
+        <p className="eyebrow" data-num="02">
+          {t("pourqui.kicker")}
+        </p>
+        <h2 className="t-h2 mt-2 max-w-3xl" data-sheen>
+          {t("pourqui.title")}
+        </h2>
+        <p className="lead mt-4">{t("pourqui.lede")}</p>
 
-      <div className="mt-10 border-t border-white/10 pt-8">
-        <h3 className="font-display text-lg font-bold sm:text-xl">{t("pourqui.tri.t")}</h3>
-        <p className="muted mt-2 max-w-2xl text-sm leading-relaxed">{t("pourqui.tri.b")}</p>
-        <Plafond />
+        <div className="mt-10 border-t border-white/10 pt-8">
+          <h3 className="t-h3">{t("pourqui.tri.t")}</h3>
+          <p className="muted mt-2 max-w-2xl text-sm leading-relaxed">{t("pourqui.tri.b")}</p>
+          <Plafond />
+        </div>
+
+        <Bascules />
       </div>
-
-      <Bascules />
     </section>
   );
 }

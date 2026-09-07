@@ -317,72 +317,76 @@ export function ThreatLedger() {
   const [ouverte, setOuverte] = useState<string | null>(null);
 
   return (
-    <section id="menaces" className="mx-auto max-w-5xl scroll-mt-20 px-6 py-16">
-      <span className="label text-brand-bright">{t("ledger.kicker")}</span>
-      <h2 className="mt-2 max-w-3xl font-display text-2xl font-bold sm:text-4xl">
-        {t("ledger.title", { lignes: FAITS_PUBLIES.faits.lignes })}
-      </h2>
-      <p className="muted mt-4 max-w-2xl text-base leading-relaxed">{t("ledger.lede")}</p>
+    <section id="menaces" className="section scroll-mt-20">
+      <div className="wrap">
+        <p className="eyebrow" data-num="01">
+          {t("ledger.kicker")}
+        </p>
+        <h2 className="t-h2 mt-2 max-w-3xl" data-sheen>
+          {t("ledger.title", { lignes: FAITS_PUBLIES.faits.lignes })}
+        </h2>
+        <p className="lead mt-4">{t("ledger.lede")}</p>
 
-      {/* Le sélecteur de profil. */}
-      <div className="mt-10 border-y border-white/10 py-6">
-        <p className="label text-white/50">{t("ledger.profil.title")}</p>
-        <p className="muted mt-1 text-sm">{t("ledger.profil.hint")}</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {PROFILS.map((p) => {
-            const actif = choisis.includes(p.id);
-            return (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => basculerProfil(p.id)}
-                aria-pressed={actif}
-                title={t(p.hint)}
-                className={`rounded-sm border px-3 py-1.5 text-left font-mono text-xs transition ${
-                  actif
-                    ? "border-brand/60 bg-brand/15 text-brand-bright"
-                    : "border-white/15 text-white/60 hover:border-white/30 hover:text-white"
-                }`}
-              >
-                <span className="text-brand">{p.id}</span> {t(p.label)}
-              </button>
-            );
-          })}
+        {/* Le sélecteur de profil. */}
+        <div className="mt-10 border-y border-white/10 py-6">
+          <p className="label text-white/50">{t("ledger.profil.title")}</p>
+          <p className="muted mt-1 text-sm">{t("ledger.profil.hint")}</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {PROFILS.map((p) => {
+              const actif = choisis.includes(p.id);
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => basculerProfil(p.id)}
+                  aria-pressed={actif}
+                  title={t(p.hint)}
+                  className={`rounded-sm border px-3 py-1.5 text-left font-mono text-xs transition ${
+                    actif
+                      ? "border-brand/60 bg-brand/15 text-brand-bright"
+                      : "border-white/15 text-white/60 hover:border-white/30 hover:text-white"
+                  }`}
+                >
+                  <span className="text-brand">{p.id}</span> {t(p.label)}
+                </button>
+              );
+            })}
+          </div>
+
+          <p className="muted mt-4 min-h-[1.5rem] text-sm" aria-live="polite">
+            {occupe && t("ledger.profil.busy")}
+            {!occupe && echoue && t("ledger.profil.failed")}
+            {!occupe && !echoue && !positionne && t("ledger.profil.none")}
+            {/* L'énoncé vient du moteur, mot pour mot. Le réécrire ici en ferait une
+                seconde rédaction du même compte. */}
+            {!occupe && !echoue && positionne?.statement}
+          </p>
+
+          {positionne?.cap && (
+            <p className="mt-3 max-w-2xl border-l-2 border-brand/50 pl-4 text-sm leading-relaxed text-white/70">
+              {t("ledger.cap")}
+            </p>
+          )}
         </div>
 
-        <p className="muted mt-4 min-h-[1.5rem] text-sm" aria-live="polite">
-          {occupe && t("ledger.profil.busy")}
-          {!occupe && echoue && t("ledger.profil.failed")}
-          {!occupe && !echoue && !positionne && t("ledger.profil.none")}
-          {/* L'énoncé vient du moteur, mot pour mot. Le réécrire ici en ferait une
-              seconde rédaction du même compte. */}
-          {!occupe && !echoue && positionne?.statement}
+        {/* Le relevé. */}
+        <div className="mt-2">
+          {RELEVE.lignes.map((ligne) => (
+            <Rangee
+              key={ligne.id}
+              ligne={ligne}
+              positionne={positionne}
+              ouverte={ouverte === ligne.id}
+              basculer={() => setOuverte(ouverte === ligne.id ? null : ligne.id)}
+            />
+          ))}
+          <div className="border-t border-white/10" />
+        </div>
+
+        <p className="muted mt-6 font-mono text-[11px]">
+          {t("ledger.stamp", { date: RELEVE.genere_le, commit: RELEVE.commit })}
         </p>
-
-        {positionne?.cap && (
-          <p className="mt-3 max-w-2xl border-l-2 border-brand/50 pl-4 text-sm leading-relaxed text-white/70">
-            {t("ledger.cap")}
-          </p>
-        )}
       </div>
-
-      {/* Le relevé. */}
-      <div className="mt-2">
-        {RELEVE.lignes.map((ligne) => (
-          <Rangee
-            key={ligne.id}
-            ligne={ligne}
-            positionne={positionne}
-            ouverte={ouverte === ligne.id}
-            basculer={() => setOuverte(ouverte === ligne.id ? null : ligne.id)}
-          />
-        ))}
-        <div className="border-t border-white/10" />
-      </div>
-
-      <p className="muted mt-6 font-mono text-[11px]">
-        {t("ledger.stamp", { date: RELEVE.genere_le, commit: RELEVE.commit })}
-      </p>
     </section>
   );
 }

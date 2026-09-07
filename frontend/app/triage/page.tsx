@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { Logo, Wordmark } from "@/components/brand";
+import { Wordmark, XsomMark } from "@/components/brand";
 import { LanguageToggle, useT } from "@/lib/i18n";
 
 /**
@@ -69,7 +69,7 @@ export default function TriagePage() {
       </div>
       <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-8 p-6">
         <div className="flex items-center gap-3">
-          <Logo size="h-8 w-8" />
+          <XsomMark className="h-8 w-8" />
           <Wordmark />
         </div>
 
