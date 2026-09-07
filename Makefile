@@ -101,6 +101,9 @@ verify-frontend:
 demo:              ## End-to-end break-then-control story
 	$(UV) run python scripts/demo.py
 
+record-demo:       ## Rejoue la demo et en tire la capture animee (AD-26)
+	$(UV) run python scripts/record_demo.py
+
 # ---------------------------------------------------------------------------
 # Self-hosted stack (docker-compose.yml): Postgres + migrations + control API.
 # No identity provider and no console — see the compose file's header for why.

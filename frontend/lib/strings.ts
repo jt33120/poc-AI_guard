@@ -149,6 +149,22 @@ export const STR = {
   // d'intégration, pour qu'une page publique ne puisse pas apprendre autre chose que
   // ce qu'un client reçoit réellement.
   "mise.kicker": { en: "How it works", fr: "Comment ça marche" },
+  // La capture d'ouverture. Le libellé dit ce qu'elle est — un enregistrement —
+  // parce qu'`AD-26` fait de cette distinction la propriété qui compte : une
+  // animation fabriquée à la ressemblance d'un succès dirait la même chose à
+  // l'écran sans rien prouver.
+  "mise.demo.t": {
+    en: "An actual run, not a mock-up",
+    fr: "Une exécution réelle, pas une maquette",
+  },
+  "mise.demo.b": {
+    en: "This is the recording of `make demo` exiting zero: the agent is held on an irreversible action, denied on a send outside the allowlist, allowed to read, and the audit chain verifies intact. The recorder refuses to emit anything if the run fails, so a broken control removes this capture instead of faking it.",
+    fr: "C'est l'enregistrement de `make demo` sortant en zéro : l'agent est tenu sur une action irréversible, refusé sur un envoi hors allowlist, autorisé à lire, et la chaîne d'audit se vérifie intacte. Le générateur refuse d'émettre quoi que ce soit si l'exécution échoue : un contrôle cassé retire cette capture au lieu de la simuler.",
+  },
+  "mise.demo.txt": {
+    en: "Read the full output as text",
+    fr: "Lire la sortie complète en texte",
+  },
   "mise.title": {
     en: "Three ways in. They do not offer the same guarantee, and we say which.",
     fr: "Trois voies d'entrée. Elles n'offrent pas la même garantie, et nous disons laquelle.",

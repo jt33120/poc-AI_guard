@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import Link from "next/link";
 
 import { ShieldMark } from "@/components/brand";
@@ -10,6 +13,22 @@ export function generateMetadata() {
 }
 
 const DEMO_MAILTO = "mailto:julian.talou@xsom.fr?subject=xSOM%20AI%20Guard%20%3A%20demo";
+
+/**
+ * La transcription de `make demo`, lue à la construction depuis l'artefact que
+ * `scripts/record_demo.py` produit en même temps que la capture animée.
+ *
+ * Lecture au build et non `fetch` au rendu : les deux fichiers sortent de la même
+ * exécution, et les séparer dans le temps laisserait la page afficher une capture
+ * d'un run et le texte d'un autre. L'absence du fichier fait échouer la
+ * construction, ce qui est le bon comportement — `AD-26` retire la capture quand
+ * la démonstration casse, et une page qui se construirait quand même annoncerait
+ * une preuve qu'elle n'a pas.
+ */
+const TRANSCRIPTION_DEMO = readFileSync(
+  join(process.cwd(), "public", "demo-replay.txt"),
+  "utf8",
+).trimEnd();
 
 /**
  * Les valeurs fictives des extraits publics.
@@ -112,6 +131,33 @@ export default function MiseEnOeuvrePage() {
           {t("mise.title")}
         </h1>
         <p className="muted mt-4 max-w-2xl text-base leading-relaxed">{t("mise.lede")}</p>
+
+        <figure className="card mt-12 p-6">
+          <figcaption>
+            <h2 className="t-h3">{t("mise.demo.t")}</h2>
+            <p className="lead mt-2 max-w-3xl">{t("mise.demo.b")}</p>
+          </figcaption>
+          {/* `<img>` et non un SVG inline : le fichier est servi une fois, mis en
+              cache, et reste isolé du document — ses règles d'animation ne peuvent
+              pas fuir dans la page, ni la page les écraser. Le SVG porte sa propre
+              neutralisation sous `prefers-reduced-motion`.
+              `next/image` ne peut pas optimiser un SVG (même motif que
+              `components/brand.tsx`) : la règle est levée ici aussi. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/demo-replay.svg"
+            alt={t("mise.demo.t")}
+            className="mt-6 w-full overflow-x-auto rounded"
+          />
+          <details className="mt-4">
+            <summary className="label cursor-pointer text-[color:var(--copper-text)]">
+              {t("mise.demo.txt")}
+            </summary>
+            <pre className="muted mt-3 overflow-x-auto font-mono text-xs leading-relaxed">
+              {TRANSCRIPTION_DEMO}
+            </pre>
+          </details>
+        </figure>
 
         <div className="mt-10">
           <Voie
