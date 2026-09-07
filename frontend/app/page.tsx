@@ -197,15 +197,26 @@ export default function LandingPage() {
           </div>
 
           {/* Diagram: agent → guard → tools */}
-          <div className="mt-10 flex flex-col items-stretch justify-center gap-3 md:flex-row md:items-center">
-            <div className="card flex-1 p-5 text-center">
+          <div className="mt-12 flex flex-col items-stretch justify-center gap-3 md:flex-row md:items-center">
+            <div className="card flex-1 p-6 text-center">
               <div className="text-sm font-semibold text-[color:var(--text-hi)]">
                 {t("land.how.agent")}
               </div>
               <div className="muted mt-1 text-xs leading-snug">{t("land.how.agent.sub")}</div>
             </div>
             <FlowArrow />
-            <div className="relative flex-1 rounded-2xl border border-[color:var(--copper-line)] bg-[color:var(--copper-wash)] p-5 text-center">
+            {/* Le nœud central se distingue par le PAPIER, pas par un lavis. Le
+                lavis empilé sous du cuivre était mesurable : `--copper-wash`
+                par-dessus `--paper-warm` donne rgb(244, 228.3, 221.8), sur
+                lequel `--copper-deep` (la valeur de `--copper-text` en bande
+                claire) ne tenait que 4.21:1 — sous le plancher 4.5:1 — et la
+                pastille, qui empilait un SECOND lavis, 3.80:1. Le site produit
+                exactement cet arbitrage : `.section--light .dg-node` (2 classes)
+                l'emporte sur `.dg-node--hot` (1 classe), si bien qu'en bande
+                claire le nœud chaud de son schéma perd son remplissage cuivre et
+                repasse en `var(--paper)`, ne gardant que le filet. Le blanc
+                remonte le sous-titre à 5.19:1 et la pastille à 4.62:1. */}
+            <div className="relative flex-1 rounded-2xl border border-[color:var(--copper-line)] bg-[color:var(--paper)] p-6 text-center">
               <div className="mx-auto mb-2 grid h-9 w-9 place-items-center rounded-xl bg-[color:var(--copper-wash)] text-[color:var(--copper-text)] ring-1 ring-[color:var(--copper-line)]">
                 <ShieldMark className="h-5 w-5" />
               </div>
@@ -217,7 +228,7 @@ export default function LandingPage() {
               </div>
             </div>
             <FlowArrow />
-            <div className="card flex-1 p-5 text-center">
+            <div className="card flex-1 p-6 text-center">
               <div className="text-sm font-semibold text-[color:var(--text-hi)]">
                 {t("land.how.tools")}
               </div>
@@ -228,7 +239,7 @@ export default function LandingPage() {
           {/* 3 steps */}
           <div className="mt-6 grid gap-6 sm:grid-cols-3">
             {STEPS.map(([title, body], i) => (
-              <div key={title} className="card reveal p-5" data-delay={String(i + 1)}>
+              <div key={title} className="card reveal p-6" data-delay={String(i + 1)}>
                 <h3 className="t-h3">{t(title)}</h3>
                 <p className="muted mt-1.5 text-sm leading-relaxed">{t(body)}</p>
               </div>
@@ -250,7 +261,7 @@ export default function LandingPage() {
           </div>
           {/* Le décalage repart de 1 au second rang : le CSS ne définit que cinq
               paliers, et un rang qui démarre à 4 se révélerait après le suivant. */}
-          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {FEATURES.map((f, i) => (
               <div key={f.t} className="card reveal p-6" data-delay={String((i % 3) + 1)}>
                 <div className="grid h-10 w-10 place-items-center rounded-xl bg-[color:var(--copper-wash)] text-brand-bright ring-1 ring-[color:var(--copper-line)]">
@@ -295,7 +306,7 @@ export default function LandingPage() {
               {t("land.who.title")}
             </h2>
           </div>
-          <div className="mt-10 grid gap-6 sm:grid-cols-3">
+          <div className="mt-12 grid gap-6 sm:grid-cols-3">
             {WHO.map(([title, body], i) => (
               <div key={title} className="card reveal p-6" data-delay={String(i + 1)}>
                 {/* Ces trois cartes sont les seules sans pastille d'icône : le numéro

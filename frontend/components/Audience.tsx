@@ -43,14 +43,34 @@ function Plafond() {
   // moment-là.
   const leur_cas = Boolean(positionne?.cap);
   return (
-    <div className={`mt-6 border-l-2 pl-4 ${leur_cas ? "border-brand" : "border-white/20"}`}>
-      <p
-        className={`font-mono text-[11px] uppercase tracking-wider ${
-          leur_cas ? "text-brand-bright" : "text-white/50"
-        }`}
-      >
+    // Le filet est **présent dans les deux états**, et c'est ce qui change.
+    // `border-white/20` valait 1.86:1 : le lecteur ne voyait pas qu'il y avait un
+    // filet, donc il n'avait rien à quoi comparer le filet cuivre. Sur
+    // `--text-faint` (4.93:1) le rail est toujours là et c'est sa **teinte** qui
+    // dit l'état, jamais sa présence.
+    //
+    // Les deux états ne peuvent pas se distinguer l'un de l'autre à 3:1 : sur
+    // `--ink-900`, un filet à 3:1 du fond a une luminance de .124, et l'autre
+    // devrait alors atteindre .471 — au-dessus de `--copper-sheen` (.463), la
+    // teinte la plus claire de la charte. La contrainte est géométrique, pas un
+    // choix. WCAG 1.4.11 demande d'ailleurs 3:1 contre les **couleurs
+    // adjacentes**, donc contre le fond : les deux états y satisfont (4.93:1 et
+    // 5.15:1), et l'état lui-même est en outre porté par du texte — la couleur du
+    // libellé et le suffixe « · votre cas » ci-dessous — ce qui satisfait 1.4.1
+    // sans dépendre de la teinte du filet.
+    <div
+      className={`mt-6 border-l-2 pl-4 ${
+        leur_cas ? "border-[color:var(--copper-text)]" : "border-[color:var(--text-faint)]"
+      }`}
+    >
+      <p className={`label ${leur_cas ? "text-brand-bright" : "text-[color:var(--text-low)]"}`}>
         {t("pourqui.plafond")}
-        {leur_cas && <span className="text-brand"> · {t("pourqui.plafond.vous")}</span>}
+        {leur_cas && (
+          <span className="text-[color:var(--copper-text)]">
+            {" · "}
+            {t("pourqui.plafond.vous")}
+          </span>
+        )}
       </p>
       <p className="muted mt-1.5 max-w-2xl text-sm leading-relaxed">{t("pourqui.plafond.b")}</p>
     </div>
@@ -67,7 +87,10 @@ function Bascules() {
   );
 
   return (
-    <div className="mt-10 border-t border-white/10 pt-8">
+    // Le filet cuivre ouvre le bloc à la place du `border-t` neutre : sur
+    // `xsom.fr` (`base.css` l. 227) `.rule` **remplace** les séparateurs gris.
+    <div className="mt-10">
+      <hr className="rule mb-8" />
       <h3 className="t-h3">{t("pourqui.bascules.t")}</h3>
       <p className="muted mt-2 max-w-2xl text-sm leading-relaxed">{t("pourqui.bascules.b")}</p>
 
@@ -83,14 +106,14 @@ function Bascules() {
           {bascules.map((r) => (
             <li
               key={r.id}
-              className="grid grid-cols-[3.5rem_1fr] gap-x-4 border-t border-white/10 py-3 sm:grid-cols-[4rem_1fr] sm:gap-x-6"
+              className="grid grid-cols-[3.5rem_1fr] gap-x-4 border-t border-[color:var(--border)] py-3 sm:grid-cols-[4rem_1fr] sm:gap-x-6"
             >
-              <span className="font-mono text-xs text-brand">{r.id}</span>
+              <span className="font-mono text-xs text-[color:var(--copper-text)]">{r.id}</span>
               <span className="min-w-0">
-                <span className="block font-display text-base font-semibold text-white">
+                <span className="block font-display text-base font-semibold text-[color:var(--text-hi)]">
                   {r.titre}
                 </span>
-                <span className="muted mt-1 block font-mono text-[11px]">
+                <span className="muted mt-1 block font-mono text-[length:var(--fs-label)]">
                   {t("pourqui.bascules.le")}{" "}
                   {/* Les profils déclencheurs viennent du moteur : c'est lui qui sait
                       quelle facette de quelle ligne concerne quel usage. */}
@@ -105,7 +128,10 @@ function Bascules() {
               </span>
             </li>
           ))}
-          <li className="border-t border-white/10" />
+          {/* Le filet qui ferme la dernière bascule appartient à la grille des
+              rangées, pas à l'ouverture d'un bloc : il reste donc sur `--border`
+              comme celles qui la précèdent, et non sur le filet cuivre. */}
+          <li className="border-t border-[color:var(--border)]" />
         </ul>
       )}
     </div>
@@ -126,7 +152,8 @@ export function Audience() {
         </h2>
         <p className="lead mt-4">{t("pourqui.lede")}</p>
 
-        <div className="mt-10 border-t border-white/10 pt-8">
+        <div className="mt-10">
+          <hr className="rule mb-8" />
           <h3 className="t-h3">{t("pourqui.tri.t")}</h3>
           <p className="muted mt-2 max-w-2xl text-sm leading-relaxed">{t("pourqui.tri.b")}</p>
           <Plafond />

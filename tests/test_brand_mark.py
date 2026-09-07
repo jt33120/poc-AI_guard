@@ -1,14 +1,24 @@
 """La marque a un tracé, pas deux.
 
-Le bouclier apparaît à deux endroits qui ne peuvent pas se voir l'un l'autre :
-`ShieldMark`, rendu par React dans la page, et `app/icon.svg`, servi comme favicon.
-Le second est un fichier statique — il ne peut rien importer, donc c'est une copie,
-et l'on ne peut pas fermer la possibilité de la divergence comme `L9` l'a fait pour
-les extraits d'intégration.
+Le logo xSOM apparaît à deux endroits qui ne peuvent pas se voir l'un l'autre :
+`public/xsom-mark.svg`, servi en `<img>` dans la page, et `app/icon.svg`, servi comme
+favicon. Ce sont deux fichiers statiques : aucun ne peut importer l'autre, donc le
+second est une copie, et l'on ne peut pas fermer la possibilité de la divergence comme
+`L9` l'a fait pour les extraits d'intégration.
 
-Ce qu'on peut faire, c'est l'interdire. Deux dessins pour une même marque finissent
-par diverger, et **l'onglet est le seul endroit où l'on ne regarde jamais** : la
-dérive y vivrait des mois sans que personne la voie.
+Ce qu'on peut faire, c'est l'interdire. Deux dessins pour une même marque finissent par
+diverger, et **l'onglet est le seul endroit où l'on ne regarde jamais** : la dérive y
+vivrait des mois sans que personne la voie.
+
+**Ce que ce garde comparait avant, et pourquoi ça a changé.** Il verrouillait le favicon
+sur `lib/mark.ts`, la source du bouclier coché. La propriété — l'onglet montre la
+marque, et une seule — était la bonne ; la cible ne l'était pas. `ShieldMark` est une
+icône d'interface, `components/brand.tsx` le dit noir sur blanc : « il n'a jamais été le
+logo ». Le garde exigeait donc que l'onglet montre un bouclier dessiné à la main, dans
+une boîte, pendant que `xsom.fr` sert son vrai logo en favicon (`index.html` l. 27,
+`assets/logo/cuivre.svg`). Deux onglets côte à côte ne montraient pas la même marque, et
+c'est le garde qui tenait le défaut en place. Il compare maintenant le favicon au logo
+que le produit sert déjà dans la page — même propriété, cible juste.
 """
 
 from __future__ import annotations
@@ -20,14 +30,45 @@ from pathlib import Path
 _RACINE = Path(__file__).resolve().parent.parent
 _SOURCE = _RACINE / "frontend" / "lib" / "mark.ts"
 _ICONE = _RACINE / "frontend" / "app" / "icon.svg"
+_LOGO = _RACINE / "frontend" / "public" / "xsom-mark.svg"
 _COMPOSANT = _RACINE / "frontend" / "components" / "brand.tsx"
 _MIDDLEWARE = _RACINE / "frontend" / "middleware.ts"
+
+_SVG = "{http://www.w3.org/2000/svg}"
+
+# Les deux bornes du dégradé cuivre, telles que le site les publie
+# (`assets/logo/README.md`, section Palette). Elles ne sont pas choisies ici.
+_CUIVRE = ("#d0905f", "#5e3216")
 
 
 def _constantes() -> dict[str, str]:
     """Les tracés déclarés par la source partagée."""
     texte = _SOURCE.read_text(encoding="utf-8")
     return dict(re.findall(r'export const (MARK_\w+) = "([^"]+)";', texte))
+
+
+def _sans_commentaires(chemin: Path) -> str:
+    """Le SVG amputé de ses commentaires.
+
+    Un commentaire citant le bon tracé pendant qu'un `d` en dessine un autre est
+    exactement le cas que ces gardes doivent attraper.
+    """
+    return re.sub(r"<!--.*?-->", "", chemin.read_text(encoding="utf-8"), flags=re.DOTALL)
+
+
+def _geometrie(chemin: Path) -> dict[str, list[str]]:
+    """Ce qui est réellement dessiné : le repère, les tracés, les polygones.
+
+    On compare la géométrie et non le fichier entier : le favicon est la variante
+    cuivre du logo, donc ses couleurs diffèrent de celles servies dans la page — c'est
+    voulu, et documenté dans les deux fichiers. Le dessin, lui, doit être le même.
+    """
+    svg = _sans_commentaires(chemin)
+    return {
+        "viewBox": re.findall(r'viewBox="([^"]+)"', svg),
+        "d": re.findall(r'\bd="([^"]+)"', svg),
+        "points": re.findall(r'\bpoints="([^"]+)"', svg),
+    }
 
 
 def test_the_shared_module_declares_the_paths_the_component_uses() -> None:
@@ -46,41 +87,72 @@ def test_the_shared_module_declares_the_paths_the_component_uses() -> None:
         )
 
 
-def test_the_favicon_carries_exactly_the_shared_paths() -> None:
-    """Le favicon copie la source **au caractère près**.
+def test_the_favicon_draws_exactly_the_logo_served_in_the_page() -> None:
+    """Le favicon copie le logo **au caractère près**.
 
-    Un fichier statique ne peut pas importer : la copie est inévitable. Ce test la rend
-    non divergente, ce qui est le seul contrôle disponible ici.
+    Deux fichiers statiques ne peuvent pas s'importer : la copie est inévitable. Ce
+    test la rend non divergente, ce qui est le seul contrôle disponible ici.
+    """
+    icone = _geometrie(_ICONE)
+    logo = _geometrie(_LOGO)
+
+    assert icone["viewBox"] == logo["viewBox"], (
+        f"le favicon est dans le repère {icone['viewBox']}, le logo dans "
+        f"{logo['viewBox']} — les mêmes coordonnées y dessinent autre chose"
+    )
+    assert icone["d"] == logo["d"], (
+        f"le favicon dessine {icone['d']}, le logo servi dans la page dessine "
+        f"{logo['d']}. Les deux marques ont divergé."
+    )
+    assert icone["points"] == logo["points"], (
+        f"les pointes des flèches divergent : favicon {icone['points']}, logo {logo['points']}"
+    )
+    assert icone["d"], "le favicon ne dessine plus rien"
+
+
+def test_the_favicon_is_the_brand_and_not_the_interface_icon() -> None:
+    """L'onglet montre le logo, pas le bouclier coché.
+
+    `ShieldMark` est un pictogramme d'interface — une puce, un signe « contrôlé » dans
+    les schémas. Le servir en favicon donnait au produit une marque que le site n'a
+    jamais eue, visible dans le seul endroit qu'on ne relit pas. Ce garde est ce qui
+    empêche le bouclier d'y revenir par mégarde.
     """
     noms = _constantes()
-    svg = _ICONE.read_text(encoding="utf-8")
-
-    # Les tracés réellement dessinés, et non ceux qui traînent dans le commentaire :
-    # un commentaire citant le bon tracé pendant qu'un `d` en dessine un autre est
-    # exactement le cas que ce test doit attraper.
-    sans_commentaires = re.sub(r"<!--.*?-->", "", svg, flags=re.DOTALL)
-    traces = re.findall(r'\bd="([^"]+)"', sans_commentaires)
-
-    assert traces == [noms["MARK_SHIELD"], noms["MARK_CHECK"]], (
-        f"le favicon dessine {traces}, la source déclare "
-        f"{[noms['MARK_SHIELD'], noms['MARK_CHECK']]}. Les deux marques ont divergé."
-    )
-    assert f'viewBox="{noms["MARK_VIEWBOX"]}"' in sans_commentaires, (
-        "le favicon n'est plus dans le repère où les tracés sont exprimés — les mêmes "
-        "coordonnées y dessineraient autre chose"
-    )
+    svg = _sans_commentaires(_ICONE)
+    for cle in ("MARK_SHIELD", "MARK_CHECK"):
+        assert noms[cle] not in svg, (
+            f"le favicon redessine {cle} : l'onglet remontrerait l'icône d'interface "
+            "à la place de la marque"
+        )
 
 
-def test_the_favicon_is_opaque() -> None:
-    """Un favicon transparent disparaît sur une barre d'onglets claire.
+def test_the_favicon_stands_alone_in_the_copper_variant() -> None:
+    """Pas de boîte, et la teinte qui tient sur les deux barres d'onglets.
 
-    C'est le genre de défaut qu'on ne voit pas sur sa propre machine, parce qu'on n'a
-    qu'un thème.
+    Un favicon transparent disparaît, oui — mais la parade du site n'est pas un fond
+    opaque, c'est la variante cuivre : la barre d'onglets suit le thème du système,
+    `moderne-dark` y perd sa flèche gris clair sur fond clair, `gradient` sa flèche
+    graphite sur fond sombre, et le cuivre a la luminance intermédiaire qui tient des
+    deux côtés — vérifié en rendu réel à 32 px (`assets/logo/README.md`). Le site ne
+    met jamais son signe dans une boîte, et le produit ne le fait plus non plus.
     """
-    svg = re.sub(r"<!--.*?-->", "", _ICONE.read_text(encoding="utf-8"), flags=re.DOTALL)
-    assert re.search(r'<rect[^>]*\bfill="#[0-9a-fA-F]{6}"', svg), (
-        "le favicon n'a pas de fond opaque"
-    )
+    racine = ET.parse(_ICONE).getroot()  # noqa: S314 - fichier du dépôt, cf. plus bas
+    for enfant in racine:
+        if enfant.tag == f"{_SVG}defs":
+            continue  # les `rect` des masques découpent le tracé, ils ne le cadrent pas
+        for noeud in enfant.iter():
+            assert noeud.tag != f"{_SVG}rect", (
+                "le favicon remet le signe dans une boîte — le site sert le sien "
+                "détouré, et la lisibilité vient de la teinte, pas d'un cadre"
+            )
+
+    svg = _sans_commentaires(_ICONE)
+    for borne in _CUIVRE:
+        assert borne in svg, (
+            f"la borne cuivre {borne} a disparu du favicon — c'est elle qui le fait "
+            "tenir sur une barre d'onglets claire comme sur une sombre"
+        )
 
 
 def test_the_icon_route_is_excluded_from_the_auth_middleware() -> None:
@@ -94,13 +166,13 @@ def test_the_icon_route_is_excluded_from_the_auth_middleware() -> None:
     Le garde lit le **nom réel du fichier** plutôt qu'une chaîne écrite ici : renommer
     l'icône sans corriger le matcher rétablirait le défaut en silence.
     """
-    nom = _ICONE.name
     matcher = _MIDDLEWARE.read_text(encoding="utf-8")
     ligne = next(ligne for ligne in matcher.splitlines() if "matcher:" in ligne)
-    assert nom in ligne, (
-        f"{nom} n'est pas exclu du matcher ({ligne.strip()}) — chaque requête d'icône "
-        "traverserait l'authentification"
-    )
+    for nom in (_ICONE.name, _LOGO.name):
+        assert nom in ligne, (
+            f"{nom} n'est pas exclu du matcher ({ligne.strip()}) — chaque requête "
+            "d'image traverserait l'authentification"
+        )
 
 
 def test_the_favicon_is_well_formed_xml() -> None:
