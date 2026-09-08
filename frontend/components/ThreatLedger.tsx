@@ -451,7 +451,7 @@ export function ThreatLedger() {
           {t("ledger.title")}
         </h2>
         <p className="lead mt-4 max-w-4xl">
-          {t("ledger.lede", { total: MENACES.length, lignes: FAITS_PUBLIES.faits.lignes })}
+          {t("ledger.lede", { lignes: FAITS_PUBLIES.faits.lignes })}
         </p>
 
         {/* La chaîne d'attaque : la légende des pastilles, montrée une seule fois.
