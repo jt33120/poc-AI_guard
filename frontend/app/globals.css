@@ -208,6 +208,42 @@
     @apply rounded-lg;
   }
 
+  /* En bande claire, la carte repose sur le papier et non sur `--surface`.
+     Les 3 % de `--surface` par-dessus `--paper-warm` composent #efedea, où
+     `--copper-deep` — que `tokens.css` documente pourtant comme « texte sur fond
+     clair » — rend 4.43:1 : sous le plancher, sur le `.card__num`. Sur `--paper`
+     le même jeton rend 5.19:1.
+
+     Le site tranche ce cas à l'identique : `.section--light .dg-node` y repasse le
+     nœud en `var(--paper)` plutôt que de garder son remplissage translucide. Une
+     surface translucide mange toujours la marge du cuivre ; en bande claire on la
+     retire au lieu d'éclaircir la teinte. */
+  .section--light .card {
+    background: var(--paper);
+  }
+
+  /* Une ligne du relevé qui ne concerne pas le visiteur : **estompée, jamais
+     cachée** — le relevé complet est l'argument.
+
+     L'estompage passait par `opacity-45` sur le conteneur. C'est le mauvais
+     mécanisme : l'opacité se multiplie sur TOUS les descendants, sans égard pour
+     ce qu'ils portent. Mesuré sur `--ink-900` : le titre de ligne tombait à
+     4.16:1 et `--text-low` à 2.10:1. Pour ramener ce dernier au plancher il
+     aurait fallu 0.87, c'est-à-dire ne plus estomper du tout — l'outil ne peut
+     pas faire ce qu'on lui demandait.
+
+     On redéfinit donc les jetons contextuels du bloc, exactement comme le fait
+     `.section--light` un peu plus haut : le contraste devient un choix au lieu
+     d'être un reste. */
+  .row--aside {
+    --text-hi: rgba(255, 255, 255, 0.72); /* 9.69:1, contre 16.38:1 à pleine encre */
+    --text-mid: rgba(255, 255, 255, 0.6); /* 7.05:1 */
+    /* `--text-low` (5.58:1) et `--text-faint` (4.93:1) ne bougent pas : ils sont
+       déjà au plancher, et les abaisser rendrait la ligne illisible sans la
+       rendre plus discrète. La hiérarchie se resserre, elle ne s'efface pas. */
+    --copper-text: var(--text-mid); /* l'accent cuivre se neutralise : c'est lui qui criait */
+  }
+
   .btn {
     @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded border
            border-transparent px-5 py-2 text-sm font-semibold transition-all duration-200
@@ -282,7 +318,13 @@
      la connaît pas, exactement comme le `@supports not` du site. */
   .site-header {
     background: var(--ink-900);
-    background: color-mix(in srgb, var(--ink-900) 90%, transparent);
+    /* 95 % et non 90 %. Le voile laisse remonter le fond : au-dessus d'une
+       `.section--light` il compose #222c3c à 90 %, et `--text-faint` — calibré
+       « sur navy » dans `tokens.css` — y tombe à 4.45:1, sous le plancher, sur
+       la baseline du bloc de marque. À 95 % le fond composite est #162232 et le
+       même jeton rend 4.75:1. Mesuré des deux côtés, pas estimé ; le flou reste
+       lisible, la translucidité aussi. */
+    background: color-mix(in srgb, var(--ink-900) 95%, transparent);
   }
 
   /* ---- Bloc de marque — porté depuis `xsom.fr` (components.css l. 46-70) --
