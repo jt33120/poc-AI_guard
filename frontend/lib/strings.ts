@@ -343,12 +343,12 @@ export const STR = {
     fr: "Les menaces, classées. Ce que nous tenons, et ce que nous ne tenons pas.",
   },
   "ledger.lede": {
-    en: "The market hands you a list and sells you all of it. Here are {total} threats, ranked by what they actually cost: how likely they are, times what cannot be undone afterwards. {lignes} of them carry a ledger number and are generated from the test suite, with their coverage mode, the ingress path they were proven on, and the scenario that proves it. The rest are not assessed yet, and the right-hand column says so.",
-    fr: "Le marché vous tend une liste et vous la vend en entier. Voici {total} menaces, classées par ce qu'elles coûtent vraiment : la probabilité qu'elles arrivent, multipliée par ce qu'on ne peut plus défaire ensuite. {lignes} d'entre elles portent un numéro de relevé et sont générées depuis la suite de tests, avec leur mode de couverture, le chemin d'entrée sur lequel elles sont prouvées, et le scénario qui le prouve. Les autres ne sont pas encore évaluées, et la colonne de droite le dit.",
+    en: "The market hands you a list and sells you all of it. This one is ranked by what a threat actually costs: how likely it is, times what cannot be undone afterwards. {lignes} rows carry a ledger number and are generated from the test suite, with their coverage mode, the ingress path they were proven on, and the scenario that proves it. The rest are not assessed yet, and the right-hand column says so.",
+    fr: "Le marché vous tend une liste et vous la vend en entier. Celle-ci est classée par ce qu'une menace coûte vraiment : la probabilité qu'elle arrive, multipliée par ce qu'on ne peut plus défaire ensuite. {lignes} rangées portent un numéro de relevé et sont générées depuis la suite de tests, avec leur mode de couverture, le chemin d'entrée sur lequel elles sont prouvées, et le scénario qui le prouve. Les autres ne sont pas encore évaluées, et la colonne de droite le dit.",
   },
   "ledger.chaine": {
-    en: "Five places an attack gets in. This gateway holds the fourth, the one where the agent acts. Each row below lights the point it enters at.",
-    fr: "Cinq endroits par où une attaque entre. Cette passerelle tient le quatrième, celui où l'agent agit. Chaque rangée ci-dessous allume le point par lequel elle entre.",
+    en: "The places an attack gets in. This gateway holds the stage where the agent acts. Each row below lights the point it enters at.",
+    fr: "Les endroits par où une attaque entre. Cette passerelle tient l'étape où l'agent agit. Chaque rangée ci-dessous allume le point par lequel elle entre.",
   },
   "ledger.horscarte": { en: "not assessed yet", fr: "pas encore évaluée" },
   "ledger.note": {
