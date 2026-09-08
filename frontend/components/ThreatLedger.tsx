@@ -181,7 +181,12 @@ function Rangee({
         // Une ligne qui ne concerne pas le visiteur est **estompée, jamais cachée** :
         // le relevé complet est l'argument, et masquer les six lignes qui ne sont pas
         // les siennes reviendrait à vendre les quinze du marché en silence.
-        positionne && !applicable ? "opacity-45" : ""
+        //
+        // `row--aside` et non `opacity-45` : l'opacité de conteneur se multiplie sur
+        // tous les descendants et faisait tomber le titre à 4.16:1. La classe
+        // redéfinit les jetons contextuels, ce qui estompe sans passer sous le
+        // plancher — voir son commentaire dans `globals.css`.
+        positionne && !applicable ? "row--aside" : ""
       }`}
     >
       <button

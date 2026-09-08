@@ -22,8 +22,8 @@ import { raisonSansRejeu, type EntreeAudit, type Execution, type Rejeu } from "@
 /** Une empreinte, montrée courte : elle prouve qu'on hache, pas qu'on stocke. */
 function Empreinte({ hash }: { hash: string | null }) {
   const { t } = useT();
-  if (!hash) return <span className="text-white/25">{t("rejeu.empreinte.aucune")}</span>;
-  return <span className="text-white/45">{hash.slice(0, 12)}…</span>;
+  if (!hash) return <span className="text-[color:var(--text-faint)]">{t("rejeu.empreinte.aucune")}</span>;
+  return <span className="text-[color:var(--text-low)]">{hash.slice(0, 12)}…</span>;
 }
 
 function Entree({
@@ -38,10 +38,10 @@ function Entree({
   return (
     <li
       className={`grid grid-cols-[1.5rem_1fr] gap-x-3 border-t border-white/[0.07] py-2.5 font-mono text-[11px] leading-relaxed ${
-        apresDivergence ? "text-white" : "text-white/55"
+        apresDivergence ? "text-white" : "text-[color:var(--text-mid)]"
       }`}
     >
-      <span className={apresDivergence ? "text-brand" : "text-white/25"}>{rang}</span>
+      <span className={apresDivergence ? "text-brand" : "text-[color:var(--text-faint)]"}>{rang}</span>
       <span className="min-w-0">
         <span className="block truncate">
           {/* La décision brute, telle que le journal la porte. La traduire donnerait
@@ -50,10 +50,10 @@ function Entree({
           <span className={apresDivergence ? "font-semibold text-brand-bright" : ""}>
             {entree.decision}
           </span>
-          {entree.tool_name && <span className="text-white/40"> · {entree.tool_name}</span>}
+          {entree.tool_name && <span className="text-[color:var(--text-low)]"> · {entree.tool_name}</span>}
         </span>
         {(entree.action_class || entree.error) && (
-          <span className="block truncate text-white/35">
+          <span className="block truncate text-[color:var(--text-low)]">
             {entree.action_class}
             {entree.action_class && entree.error && " · "}
             {entree.error}
@@ -83,11 +83,11 @@ function Colonne({
   const { t } = useT();
   return (
     <div
-      className={`min-w-0 border-t-2 pt-3 ${accent ? "border-brand" : "border-white/20"}`}
+      className={`min-w-0 border-t-2 pt-3 ${accent ? "border-brand" : "border-[color:var(--text-faint)]"}`}
     >
       <h5
         className={`font-mono text-[11px] uppercase tracking-wider ${
-          accent ? "text-brand-bright" : "text-white/50"
+          accent ? "text-brand-bright" : "text-[color:var(--text-low)]"
         }`}
       >
         {titre}
@@ -115,7 +115,7 @@ function Colonne({
       <p className="muted mt-3 font-mono text-[10px]">
         {execution.chainee ? `✓ ${t("rejeu.chainee")}` : `✗ ${t("rejeu.chainee.non")}`}
       </p>
-      <p className="muted mt-1 break-all font-mono text-[10px] text-white/30">{execution.test}</p>
+      <p className="muted mt-1 break-all font-mono text-[10px] text-[color:var(--text-faint)]">{execution.test}</p>
     </div>
   );
 }
