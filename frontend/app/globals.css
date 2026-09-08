@@ -157,6 +157,14 @@
      fait que s'ouvrir en grand écran. */
   --container: 72rem;
   --container-narrow: 47.5rem; /* 760px, la colonne du bandeau final */
+  /* La bande du relevé, et elle seule. 128px de plus que `--container`, ce qui
+     décale le bord des rangées de 64px vers l'extérieur par rapport au logo de
+     l'en-tête. Le désalignement est réel et il est assumé ici, parce que la
+     section est une bande pleine largeur : le fond clair borne le bloc à l'oeil
+     bien avant que la colonne ne le fasse, et vingt-trois rangées à quatre
+     colonnes ne tiennent pas lisiblement dans 72rem. Aucune autre section ne
+     prend ce jeton. */
+  --container-wide: 80rem;
   --gutter: clamp(1.5rem, 4vw, 2.5rem);
   --section-y: clamp(4.5rem, 9vw, 8rem);
   --section-y-tight: clamp(3rem, 6vw, 5rem);
@@ -515,6 +523,9 @@
   .wrap--narrow {
     max-width: var(--container-narrow);
   }
+  .wrap--wide {
+    max-width: var(--container-wide);
+  }
 
   /* Deux colonnes éditoriales : l'énoncé à gauche, la démonstration à droite.
      L'écart est un `clamp` que les utilitaires Tailwind ne savent pas dire sans
@@ -852,44 +863,44 @@ body::before {
 }
 
 /* ============================================================================
-   LE PAYSAGE DES MENACES (`L4`)
+   LE RELEVÉ DES MENACES (`L4` + `L5`, fusionnés)
 
-   Un relevé numéroté, et non une grille de cartes : vingt-trois rangées séparées
-   d'un filet, rang en mono cuivre dans une gouttière fixe. C'est la forme que le
-   site emploie déjà pour `ThreatLedger`, et c'est délibéré : les deux sections
-   parlent des mêmes objets, donc les faire diverger de forme les ferait lire
-   comme deux sujets.
+   Une seule section pour vingt-trois menaces, là où il y en avait deux qui
+   nommaient les mêmes objets. La séparation se lisait comme une répétition :
+   même titre de menace, deux mises en forme, vingt lignes d'écart.
 
-   **La pastille à cinq points est la seule illustration, et elle est réutilisée
-   vingt-trois fois.** La charte est bichrome ; distinguer cinq étapes par cinq
-   couleurs l'aurait rompue, et cinq pictogrammes auraient donné cinq dessins
-   génériques de plus. Un point allumé sur cinq dit la même chose sans ajouter de
-   teinte, et la chaîne montrée une fois en tête sert de légende. Le nom de
-   l'étape est écrit à côté en toutes lettres : le glyphe est donc redondant, et
-   c'est pour cela qu'il est `aria-hidden`.
+   Chaque rangée répond aux trois questions dans l'ordre où on les pose :
 
-   Contrastes, tous mesurés sur `--ink-900` : titre `--title-ink` 16.14:1, phrase
-   en clair `--text-mid` 9.69:1, rang `--copper-text` 5.15:1, rang critique et
-   étiquette `--copper-sheen` 8.85:1, étape `--text-low` 5.58:1, numéro de relevé
-   `--text-faint` 4.93:1. Les filets et les points sont décoratifs au sens de
-   WCAG 1.4.11 : ils n'identifient aucun état que le texte adjacent ne nomme pas.
+     [rang]  [schéma]        Titre                        [couverture]
+                             Ce que c'est, en une phrase   [densité de preuve]
+                             chemin d'entrée prouvé        [numéro de relevé]
 
-   Le cas serré est le nom de l'étape tenue, cuivre sur lavis cuivre : **4.69:1**,
-   soit 0,19 de marge. C'est la configuration qui avait échoué à 4.21:1 en bande
-   claire au lot précédent, et elle ne passe ici que parce que le fond est sombre.
-   Le jeton reste `--copper-text` et non `--copper-sheen`, pourtant plus confortable :
-   `--copper-text` bascule sur `--copper-deep` en bande claire, donc il suit si la
-   section change de bande un jour. `--copper-sheen` y tomberait à 1.9:1 sans que
-   rien ne le signale.
+   **Bande claire.** Le relevé est le morceau qu'on lit vraiment, pas qu'on
+   survole, et vingt-trois rangées de texte fin sur fond sombre fatiguent. Tous
+   les jetons employés ici sont contextuels : `.section--light` les réécrit, et
+   la section bascule sans une seule substitution de couleur au point d'usage.
+
+   Contrastes en bande claire, sur `--paper-warm` (#f6f3f0) : titre
+   `--title-ink` 16.40:1, phrase en clair `--text-mid` 7.59:1, étape
+   `--text-low` 5.83:1, numéro de relevé `--text-faint` 5.13:1, rang et mode
+   `--copper-text` (soit `--copper-deep`) 4.69:1.
+
+   **Un piège évité, et c'est le même qu'au lot précédent.** Le cuivre sur lavis
+   cuivre tombe à **4.21:1** en bande claire. L'étape tenue prend donc
+   `var(--paper)` et garde son seul liseré, exactement comme
+   `.section--light .card` et `.section--light .dg-node` le font déjà. Une
+   surface translucide mange toujours la marge du cuivre.
+
+   **`--copper-sheen` est banni de cette section.** Il vaut 8.85:1 sur sombre et
+   1.9:1 sur clair : parfait avant la bascule, illisible après, et rien ne
+   l'aurait signalé. Partout où il portait du texte, `--copper-text` le remplace.
    ========================================================================== */
 @layer components {
-  /* La chaîne d'attaque, montrée une fois en tête de section. */
+  /* --- La chaîne d'attaque, montrée une fois en tête : la légende ---------- */
   .chaine__voie {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 0.75rem;
-    align-items: start;
-    overflow-x: auto;
   }
 
   .chaine__etape {
@@ -899,15 +910,15 @@ body::before {
     align-items: center;
     text-align: center;
     padding: 0.75rem 0.5rem;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-mid);
     border-radius: 4px;
   }
 
-  /* L'étape que la passerelle tient. Le texte de la légende le dit aussi : le
-     cadre ne porte pas seul l'information. */
+  /* L'étape que la passerelle tient. Fond `--paper` et non `--copper-wash` :
+     voir l'en-tête, le lavis coûte 0.48 de contraste au cuivre. */
   .chaine__etape[data-tenu="true"] {
-    border-color: var(--copper-line);
-    background: var(--copper-wash);
+    border-color: var(--copper-text);
+    background: var(--paper);
   }
 
   .chaine__nom {
@@ -922,117 +933,142 @@ body::before {
     color: var(--copper-text);
   }
 
-  /* Le relevé lui-même. */
+  /* --- Le relevé ---------------------------------------------------------- */
   .paysage {
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: 1px solid var(--border);
   }
 
+  .menace-bloc {
+    border-bottom: 1px solid var(--border);
+    transition: background-color 0.2s;
+  }
+
+  .menace-bloc:hover {
+    background: var(--surface);
+  }
+
+  /* La grille est portée par le bouton : toute la rangée est la cible de clic,
+     et non un chevron de 16px que personne ne vise du premier coup. */
   .menace {
     display: grid;
+    width: 100%;
+    text-align: left;
     grid-template-columns: 2.75rem minmax(0, 1fr);
     gap: 0.25rem 1rem;
-    align-items: baseline;
-    padding: 1.15rem 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    align-items: start;
+    padding: 1.15rem 0.25rem;
   }
 
-  @media (min-width: 900px) {
+  /* Quatre colonnes réelles à partir de 1000px : c'est ce que la largeur
+     supplémentaire achète, et la seule raison de l'avoir prise. */
+  @media (min-width: 1000px) {
     .menace {
-      grid-template-columns: 2.75rem minmax(0, 1fr) 14rem;
-      column-gap: 1.5rem;
+      grid-template-columns: 2.75rem 8.5rem minmax(0, 1fr) 15rem;
+      column-gap: 1.75rem;
     }
   }
 
   .menace__rang {
     font-family: var(--font-mono), ui-monospace, monospace;
     font-size: 0.8125rem;
+    line-height: 1.7;
     color: var(--copper-text);
+  }
+
+  /* Le schéma : la chaîne en réduction, le point d'entrée allumé. Sous 1000px
+     il passe en ligne avec son libellé plutôt que de disparaître : c'est la
+     seule chose qui dise *où* la menace entre. */
+  .menace__schema {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-top: 0.35rem;
+  }
+
+  @media (min-width: 1000px) {
+    .menace__schema {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.4rem;
+    }
+  }
+
+  .menace__etape {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: var(--fs-label);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-low);
+    white-space: nowrap;
   }
 
   .menace__titre {
     font-family: var(--font-display), sans-serif;
     font-size: 1.0625rem;
     font-weight: 700;
-    line-height: 1.25;
+    line-height: 1.3;
     color: var(--title-ink);
+    text-align: left;
   }
 
-  /* Le haut du classement se lit d'abord. La graisse et le filet cuivre le
-     disent ; l'étiquette « critique » le dit en toutes lettres, parce qu'un
-     signal typographique seul ne se lit pas en lecteur d'écran. */
   .menace[data-critique="true"] .menace__titre {
     font-size: 1.1875rem;
   }
 
-  .menace[data-critique="true"] .menace__rang {
-    color: var(--copper-sheen);
-  }
-
   .menace__clair {
-    grid-column: 2;
-    margin-top: 0.35rem;
-    max-width: 62ch;
+    margin-top: 0.4rem;
+    max-width: 60ch;
     font-size: 0.875rem;
-    line-height: 1.65;
+    line-height: 1.6;
     color: var(--text-mid);
   }
 
-  .menace__meta {
-    grid-column: 2;
+  /* La colonne de droite : ce que le backend en tient. */
+  .menace__couverture {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem 0.9rem;
+    align-items: baseline;
+    gap: 0.35rem 0.9rem;
     margin-top: 0.6rem;
   }
 
-  @media (min-width: 900px) {
-    .menace__meta {
-      grid-column: 3;
-      grid-row: 1 / span 2;
-      justify-content: flex-end;
-      margin-top: 0;
+  @media (min-width: 1000px) {
+    .menace__couverture {
+      flex-direction: column;
+      align-items: flex-end;
+      text-align: right;
+      margin-top: 0.2rem;
     }
-  }
-
-  .menace__flag,
-  .menace__etape,
-  .menace__releve {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-family: var(--font-mono), ui-monospace, monospace;
-    font-size: var(--fs-label);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    white-space: nowrap;
   }
 
   .menace__flag {
     padding: 0.15rem 0.45rem;
-    border: 1px solid var(--copper-line);
+    border: 1px solid var(--copper-text);
     border-radius: 3px;
-    color: var(--copper-sheen);
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: var(--fs-label);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--copper-text);
+    white-space: nowrap;
   }
 
-  .menace__etape {
-    color: var(--text-low);
-  }
-
-  .menace__releve {
+  .menace__releve,
+  .menace__id {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: var(--fs-label);
     color: var(--text-faint);
-    text-transform: none;
   }
 
   /* La pastille : cinq points, celui de l'étape allumé. */
   .points {
-    width: 44px;
-    height: 8px;
+    width: 52px;
+    height: 10px;
     flex: none;
   }
 
   .points__voie {
-    stroke: var(--text-faint);
+    stroke: var(--border-mid);
   }
 
   .points__point {
@@ -1040,6 +1076,6 @@ body::before {
   }
 
   .points__point--on {
-    fill: var(--copper-sheen);
+    fill: var(--copper-text);
   }
 }

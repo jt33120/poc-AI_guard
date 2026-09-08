@@ -1,30 +1,34 @@
 """La section publique des menaces ne peut pas diverger de la carte de couverture.
 
-Deux sections de la page d'accueil parlent des mêmes objets, et elles ne disent pas
-la même chose :
+Une seule section (`components/ThreatLedger.tsx`) porte désormais deux choses qui
+ne se prouvent pas de la même façon, et c'est cette frontière que ce fichier tient :
 
-* le **relevé** (`ThreatLedger`, `L5`) publie ce que la passerelle bloque. Il est
-  généré depuis `coverage/map.json`, lui-même produit des scénarios qui passent, et
-  la CI refuse un écart entre revendiqué et prouvé ;
-* le **paysage** (`L4`, `lib/menaces.ts`) explique de quoi il s'agit, en clair, et
-  les classe par importance. Il ne revendique aucune couverture.
+* **ce qui est prouvé** vient de `coverage/map.json` par `lib/generated/threat-rows.json`,
+  généré depuis les scénarios qui passent et gaté en CI. Modes, chemins d'entrée,
+  scénarios, écarts : rien de tout cela n'est rédigé ;
+* **ce qui est expliqué et classé** vient de `lib/menaces.ts` et du dictionnaire.
+  Rang, étape d'entrée, phrase en clair : c'est éditorial, et cela ne revendique
+  aucune couverture.
 
-La frontière est facile à écrire et facile à perdre. Le risque n'est pas qu'une
-phrase soit fausse : c'est qu'une menace **disparaisse** du paysage sans que
-personne ne le voie, ou qu'elle y soit nommée autrement que sur la carte qui la
-prouve. Un lecteur qui compare les deux sections lirait alors deux produits.
+Le risque n'est pas qu'une phrase soit fausse : c'est qu'une menace **disparaisse**
+du classement sans que personne ne le voie, ou qu'elle y soit nommée autrement que
+sur la carte qui la prouve. La page afficherait alors une menace sous un nom que ses
+propres scénarios ne connaissent pas.
 
-Ce fichier tient donc trois choses :
+Ce fichier tient donc :
 
-1. le paysage est un **sur-ensemble** du relevé : les seize lignes y sont toutes ;
-2. leur titre français y est **mot pour mot** celui de l'artefact généré ;
+1. le classement est un **sur-ensemble** du relevé : les seize lignes y sont toutes ;
+2. leur titre français y est **mot pour mot** celui de l'artefact généré. Le titre
+   affiché passe par le dictionnaire, parce que l'artefact n'est qu'en français ;
+   ce contrôle est ce qui rend ce détour sûr ;
 3. le classement est complet : rangs de 1 à N, sans trou ni doublon, chacun avec sa
    phrase en clair dans les deux langues.
 
 Les sept menaces sans identifiant de relevé sont l'inverse du problème : elles
-existent dans le paysage et **pas** sur la carte, ce que la page dit explicitement.
-Le jour où l'une d'elles entre dans `coverage/rows.yaml`, il suffit de lui donner son
-identifiant ici, et le contrôle 2 se met à vérifier son titre.
+existent dans le classement et **pas** sur la carte, ce que la rangée dit en toutes
+lettres (« pas encore évaluée »). Le jour où l'une d'elles entre dans
+`coverage/rows.yaml`, il suffit de lui donner son identifiant ici, et le contrôle 2
+se met à vérifier son titre.
 """
 
 from __future__ import annotations
@@ -39,6 +43,7 @@ _MENACES = _FRONT / "lib" / "menaces.ts"
 _STRINGS = _FRONT / "lib" / "strings.ts"
 _ARTEFACT = _FRONT / "lib" / "generated" / "threat-rows.json"
 _PAGE = _FRONT / "app" / "page.tsx"
+_LEDGER = _FRONT / "components" / "ThreatLedger.tsx"
 
 #: Une entrée de `MENACES`. Le champ `releve` vaut `null` ou `"M-xx"`.
 _LIGNE = re.compile(
@@ -177,7 +182,12 @@ def test_every_stage_is_declared_and_labelled() -> None:
 
 
 def test_the_replaced_section_left_nothing_behind() -> None:
-    """La section remplacée emporte sa copie : sinon elle revient par un `t()` oublié."""
+    """Les sections remplacées emportent leur copie, sinon elle revient par un `t()` oublié.
+
+    Deux remplacements successifs sont passés par ici : les cartes de fonctionnalités
+    d'abord, puis le classement autonome, fondu dans le relevé. Chacun a laissé du
+    code mort la première fois.
+    """
     residus = re.findall(r"land\.feat\.[a-z0-9.]+", _STRINGS.read_text(encoding="utf-8"))
     assert not residus, (
         f"la copie des anciennes cartes de fonctionnalités survit dans le dictionnaire : "
@@ -185,6 +195,24 @@ def test_the_replaced_section_left_nothing_behind() -> None:
     )
     page = _PAGE.read_text(encoding="utf-8")
     assert "land.feat." not in page, "la page appelle encore la copie retirée"
+    assert "MENACES" not in page, (
+        "la page rend encore un classement à elle : le relevé le porte désormais, et "
+        "deux sections qui nomment les mêmes menaces se lisent comme une répétition"
+    )
+
+
+def test_the_ledger_is_the_one_place_the_ranking_is_rendered() -> None:
+    """Non-vacuité de la fusion : la section doit vraiment être dans le relevé.
+
+    Sans ce contrôle, supprimer la section de la page suffirait à faire passer le
+    test au-dessus, classement disparu compris.
+    """
+    ledger = _LEDGER.read_text(encoding="utf-8")
+    for attendu in ("MENACES", "cleTitre", "cleClair", "cleEtape", "ledger.horscarte"):
+        assert attendu in ledger, (
+            f"`{attendu}` absent de `components/ThreatLedger.tsx` : le relevé ne rend "
+            "plus le classement fusionné"
+        )
 
 
 def test_the_guard_reads_files_that_are_really_there() -> None:
