@@ -339,12 +339,21 @@ export const STR = {
   // faits générés depuis la carte.
   "ledger.kicker": { en: "The ledger", fr: "Le relevé" },
   "ledger.title": {
-    en: "{lignes} threat rows. What we hold, and what we do not.",
-    fr: "{lignes} lignes de menace. Ce que nous tenons, et ce que nous ne tenons pas.",
+    en: "The threats, ranked. What we hold, and what we do not.",
+    fr: "Les menaces, classées. Ce que nous tenons, et ce que nous ne tenons pas.",
   },
   "ledger.lede": {
-    en: "The market hands you a list and sells you all of it. This one is generated from the test suite: each row carries its coverage mode, the ingress path it was proven on, and the scenario that proves it. Where we prove nothing, it says so.",
-    fr: "Le marché vous tend une liste et vous la vend en entier. Celle-ci est générée depuis la suite de tests : chaque ligne porte son mode de couverture, le chemin d'entrée sur lequel elle est prouvée, et le scénario qui la prouve. Là où nous ne prouvons rien, elle le dit.",
+    en: "The market hands you a list and sells you all of it. Here are {total} threats, ranked by what they actually cost: how likely they are, times what cannot be undone afterwards. {lignes} of them carry a ledger number and are generated from the test suite, with their coverage mode, the ingress path they were proven on, and the scenario that proves it. The rest are not assessed yet, and the right-hand column says so.",
+    fr: "Le marché vous tend une liste et vous la vend en entier. Voici {total} menaces, classées par ce qu'elles coûtent vraiment : la probabilité qu'elles arrivent, multipliée par ce qu'on ne peut plus défaire ensuite. {lignes} d'entre elles portent un numéro de relevé et sont générées depuis la suite de tests, avec leur mode de couverture, le chemin d'entrée sur lequel elles sont prouvées, et le scénario qui le prouve. Les autres ne sont pas encore évaluées, et la colonne de droite le dit.",
+  },
+  "ledger.chaine": {
+    en: "Five places an attack gets in. This gateway holds the fourth, the one where the agent acts. Each row below lights the point it enters at.",
+    fr: "Cinq endroits par où une attaque entre. Cette passerelle tient le quatrième, celui où l'agent agit. Chaque rangée ci-dessous allume le point par lequel elle entre.",
+  },
+  "ledger.horscarte": { en: "not assessed yet", fr: "pas encore évaluée" },
+  "ledger.note": {
+    en: "A row without a ledger number is not an oversight: the coverage map only accepts a claim proven by a passing scenario, so listing one without proof would be the very assertion this product refuses to make.",
+    fr: "Une rangée sans numéro de relevé n'est pas un oubli : la carte de couverture n'admet une revendication que prouvée par un scénario qui passe, et en inscrire une sans preuve serait exactement l'affirmation que ce produit refuse de faire.",
   },
   "ledger.profil.title": { en: "How do you use AI?", fr: "Comment utilisez-vous l'IA ?" },
   "ledger.profil.hint": {

@@ -32,6 +32,15 @@ import { PROFILS, useProfils } from "@/components/ProfilContext";
 import { ReplayPanel } from "@/components/ReplayPanel";
 import { rejeuDe } from "@/lib/replays";
 import { RELEVE, type LigneMenace, type ReleveProfil } from "@/lib/threats";
+import {
+  cleClair,
+  cleEtape,
+  cleTitre,
+  ETAPES,
+  MENACES,
+  type Etape,
+  type Menace,
+} from "@/lib/menaces";
 
 const MODE_LABEL: Record<string, StrKey> = {
   B: "ledger.mode.B",
@@ -117,7 +126,7 @@ function Densite({ scenarios }: { scenarios: number }) {
   const plein = Math.min(scenarios, 5);
   return (
     <span aria-hidden="true" className="font-mono text-[length:var(--fs-label)] tracking-[0.2em]">
-      <span className="text-brand-bright">{"|".repeat(plein)}</span>
+      <span className="text-[color:var(--copper-text)]">{"|".repeat(plein)}</span>
       {/* Les creux restent volontairement au ras du seuil, sur `--border-mid`
           (1.50:1 sur `--ink-900`) et non sur un jeton de texte. Ce sont des
           **graduations, pas une valeur** : toute l'information de la jauge est
@@ -134,6 +143,49 @@ function Densite({ scenarios }: { scenarios: number }) {
   );
 }
 
+/**
+ * Les cinq points de la chaîne, celui de l'étape allumé.
+ *
+ * `aria-hidden` : le nom de l'étape est écrit en toutes lettres juste à côté, donc
+ * le glyphe répète et n'informe pas. Un lecteur d'écran qui l'annoncerait ferait
+ * entendre deux fois la même chose.
+ */
+function Points({ actif }: { actif: number }) {
+  return (
+    <svg viewBox="0 0 52 10" className="points" aria-hidden="true">
+      <line className="points__voie" x1="5" y1="5" x2="47" y2="5" strokeWidth="1" />
+      {ETAPES.map((etape, i) => (
+        <circle
+          key={etape}
+          className={i === actif ? "points__point points__point--on" : "points__point"}
+          cx={5 + i * 10.5}
+          cy="5"
+          r={i === actif ? 3.6 : 2}
+        />
+      ))}
+    </svg>
+  );
+}
+
+/**
+ * Le schéma d'une rangée : où la menace entre dans la chaîne, et si elle est du
+ * haut du classement.
+ *
+ * L'étiquette « critique » est écrite en toutes lettres et non seulement portée par
+ * la graisse du titre : un signal typographique n'est pas annoncé par un lecteur
+ * d'écran, et le haut du classement est précisément ce qu'il ne faut pas rater.
+ */
+function Schema({ etape, critique }: { etape: Etape; critique: boolean }) {
+  const { t } = useT();
+  return (
+    <div className="menace__schema">
+      {critique && <span className="menace__flag">{t("land.menace.critique")}</span>}
+      <Points actif={ETAPES.indexOf(etape)} />
+      <span className="menace__etape">{t(cleEtape(etape))}</span>
+    </div>
+  );
+}
+
 function Mode({ mode }: { mode: string }) {
   const { t } = useT();
   const fort = mode === "B";
@@ -146,7 +198,7 @@ function Mode({ mode }: { mode: string }) {
     // `text-white/45` (4.48:1, sous le plancher) ne donnait pas.
     <span
       className={`label whitespace-nowrap ${
-        fort ? "text-brand-bright" : "text-[color:var(--text-low)]"
+        fort ? "text-[color:var(--copper-text)]" : "text-[color:var(--text-low)]"
       }`}
     >
       [&nbsp;{mode}&nbsp;] {t(MODE_LABEL[mode] ?? "ledger.mode.NA")}
@@ -156,11 +208,13 @@ function Mode({ mode }: { mode: string }) {
 
 function Rangee({
   ligne,
+  menace,
   positionne,
   ouverte,
   basculer,
 }: {
   ligne: LigneMenace;
+  menace: Menace;
   positionne?: ReleveProfil;
   ouverte: boolean;
   basculer: () => void;
@@ -177,7 +231,7 @@ function Rangee({
 
   return (
     <div
-      className={`border-t border-[color:var(--border)] transition-colors ${
+      className={`menace-bloc ${
         // Une ligne qui ne concerne pas le visiteur est **estompée, jamais cachée** :
         // le relevé complet est l'argument, et masquer les six lignes qui ne sont pas
         // les siennes reviendrait à vendre les quinze du marché en silence.
@@ -185,7 +239,7 @@ function Rangee({
         // `row--aside` et non `opacity-45` : l'opacité de conteneur se multiplie sur
         // tous les descendants et faisait tomber le titre à 4.16:1. La classe
         // redéfinit les jetons contextuels, ce qui estompe sans passer sous le
-        // plancher — voir son commentaire dans `globals.css`.
+        // plancher.
         positionne && !applicable ? "row--aside" : ""
       }`}
     >
@@ -193,36 +247,45 @@ function Rangee({
         type="button"
         onClick={basculer}
         aria-expanded={ouverte}
-        className="group grid w-full grid-cols-[3.5rem_1fr_auto] items-baseline gap-x-4 px-1 py-4 text-left hover:bg-[color:var(--surface)] sm:grid-cols-[4rem_1fr_auto_auto] sm:gap-x-6"
+        className="menace"
+        data-critique={menace.critique ? "true" : undefined}
       >
-        <span className="font-mono text-xs text-[color:var(--copper-text)]">{ligne.id}</span>
+        <span className="menace__rang">{String(menace.rang).padStart(2, "0")}</span>
+
+        <Schema etape={menace.etape} critique={menace.critique} />
 
         <span className="min-w-0">
-          <span className="font-display text-base font-semibold leading-snug text-[color:var(--text-hi)] sm:text-lg">
-            {ligne.titre}
+          {/* Le titre passe par le dictionnaire et non par `ligne.titre`, alors même
+              que la carte en porte un : l'artefact généré n'est qu'en français, et
+              un visiteur anglophone lisait donc seize titres français au milieu de
+              sa page. `tests/test_menaces_section.py` impose que la version
+              française y soit celle de la carte, mot pour mot, si bien que passer
+              par le dictionnaire n'ouvre aucun écart. */}
+          <span className="menace__titre block">{t(cleTitre(menace))}</span>
+          {/* La définition en clair vient du classement éditorial, pas de la carte :
+              la carte prouve, elle n'explique pas. */}
+          <span className="menace__clair block">{t(cleClair(menace))}</span>
+          <span className="menace__releve mt-2 block">
+            {ingress.length > 0
+              ? `${t("ledger.ingress.label")} ${ingress
+                  .map((i) => t(INGRESS_LABEL[i] ?? "ledger.ingress.mcp"))
+                  .join(" · ")}`
+              : t("ledger.ingress.none")}
           </span>
-          {ingress.length > 0 && (
-            <span className="muted mt-1 block font-mono text-[length:var(--fs-label)]">
-              {t("ledger.ingress.label")} {ingress.map((i) => t(INGRESS_LABEL[i] ?? "ledger.ingress.mcp")).join(" · ")}
-            </span>
-          )}
-          {ingress.length === 0 && (
-            <span className="muted mt-1 block font-mono text-[length:var(--fs-label)]">
-              {t("ledger.ingress.none")}
-            </span>
-          )}
         </span>
 
-        <span className="hidden sm:block">
+        {/* Ce que le backend en tient : la question que la rangée existe pour
+            trancher, donc la colonne qui la ferme. */}
+        <span className="menace__couverture">
+          <Mode mode={mode} />
           <Densite scenarios={scenarios.length} />
+          <span className="menace__id">{ligne.id}</span>
         </span>
-
-        <Mode mode={mode} />
       </button>
 
       {ouverte && (
-        <div className="grid gap-4 px-1 pb-6 sm:grid-cols-[4rem_1fr] sm:gap-x-6">
-          <div aria-hidden="true" />
+        <div className="grid gap-4 px-1 pb-6 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-x-6">
+          <div aria-hidden="true" className="hidden lg:block" />
           <div className="max-w-3xl space-y-4">
             <p className="muted text-sm leading-relaxed">{t(MODE_DEF[mode] ?? "ledger.mode.A.def")}</p>
 
@@ -244,6 +307,39 @@ function Rangee({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Une menace que la carte de couverture n'évalue pas encore.
+ *
+ * Elle n'a ni mode, ni scénario, ni chemin d'entrée : elle ne peut donc pas
+ * s'ouvrir, et sa colonne de droite le dit en toutes lettres plutôt que de rester
+ * vide. Un blanc à la place d'un mode se lirait comme « rien à signaler », qui est
+ * l'inverse de ce qu'il faut comprendre.
+ *
+ * Ces sept lignes ne sont pas un oubli : la carte n'admet une revendication que
+ * prouvée par scénario, et les inscrire sans preuve serait exactement l'affirmation
+ * que `AD-30` interdit.
+ */
+function RangeeHorsCarte({ menace }: { menace: Menace }) {
+  const { t } = useT();
+  return (
+    <div className="menace-bloc">
+      <div className="menace" data-critique={menace.critique ? "true" : undefined}>
+        <span className="menace__rang">{String(menace.rang).padStart(2, "0")}</span>
+        <Schema etape={menace.etape} critique={menace.critique} />
+        <span className="min-w-0">
+          <span className="menace__titre block">{t(cleTitre(menace))}</span>
+          <span className="menace__clair block">{t(cleClair(menace))}</span>
+        </span>
+        <span className="menace__couverture">
+          <span className="label whitespace-nowrap text-[color:var(--text-low)]">
+            {t("ledger.horscarte")}
+          </span>
+        </span>
+      </div>
     </div>
   );
 }
@@ -280,7 +376,7 @@ function Ouverture({
   if (ligne.ouverture === "scenario") {
     return (
       <div className="space-y-3">
-        <h4 className="font-display text-sm font-bold text-brand-bright">
+        <h4 className="font-display text-sm font-bold text-[color:var(--copper-text)]">
           {t("ledger.open.scenario.t")}
         </h4>
         <p className="muted text-sm leading-relaxed">{t("ledger.open.scenario.b")}</p>
@@ -292,7 +388,7 @@ function Ouverture({
   if (ligne.ouverture === "raison") {
     return (
       <div className="space-y-3">
-        <h4 className="font-display text-sm font-bold text-brand-bright">
+        <h4 className="font-display text-sm font-bold text-[color:var(--copper-text)]">
           {t("ledger.open.raison.t")}
         </h4>
         {/* La raison est **publiée dans la carte**, pas rédigée ici : `FR-144` exige
@@ -308,7 +404,7 @@ function Ouverture({
 
   return (
     <div className="space-y-3">
-      <h4 className="font-display text-sm font-bold text-brand-bright">
+      <h4 className="font-display text-sm font-bold text-[color:var(--copper-text)]">
         {t("ledger.open.attestation.t")}
       </h4>
       <p className="muted text-sm leading-relaxed">{t("ledger.open.attestation.b")}</p>
@@ -343,21 +439,43 @@ export function ThreatLedger() {
   const [ouverte, setOuverte] = useState<string | null>(null);
 
   return (
-    <section id="menaces" className="section scroll-mt-20">
-      <div className="wrap">
+    // Bande claire, et plus large que le reste de la page : c'est la section qu'on
+    // lit vraiment. Les jetons employés plus bas sont tous contextuels, donc la
+    // bascule ne demande aucune substitution de couleur au point d'usage.
+    <section id="menaces" className="section section--light scroll-mt-20">
+      <div className="wrap wrap--wide">
         <p className="eyebrow" data-num="01">
           {t("ledger.kicker")}
         </p>
         <h2 className="t-h2 mt-2 max-w-3xl" data-sheen>
-          {t("ledger.title", { lignes: FAITS_PUBLIES.faits.lignes })}
+          {t("ledger.title")}
         </h2>
-        <p className="lead mt-4">{t("ledger.lede")}</p>
+        <p className="lead mt-4 max-w-4xl">
+          {t("ledger.lede", { total: MENACES.length, lignes: FAITS_PUBLIES.faits.lignes })}
+        </p>
+
+        {/* La chaîne d'attaque : la légende des pastilles, montrée une seule fois.
+            Sans elle, le glyphe de chaque rangée serait décoratif ; avec elle, il
+            situe la menace dans un trajet que le lecteur a déjà vu. */}
+        <figure className="mt-10">
+          <ol className="chaine__voie">
+            {ETAPES.map((etape, i) => (
+              <li
+                key={etape}
+                className="chaine__etape"
+                data-tenu={etape === "actions" ? "true" : undefined}
+              >
+                <Points actif={i} />
+                <span className="chaine__nom">{t(cleEtape(etape))}</span>
+              </li>
+            ))}
+          </ol>
+          <figcaption className="muted mt-3 text-sm">{t("ledger.chaine")}</figcaption>
+        </figure>
 
         {/* Le sélecteur de profil. Le filet cuivre ouvre le bloc : sur `xsom.fr`
             (`base.css` l. 227) `.rule` **remplace** le séparateur gris, il ne s'y
-            ajoute pas. Le filet bas du `border-y` disparaît avec lui — le relevé
-            qui suit ouvre déjà sa première rangée sur un filet à lui, et deux
-            traits à huit pixels d'écart n'en disaient qu'un. */}
+            ajoute pas. */}
         <hr className="rule mt-10" />
         <div className="pb-6">
           <p className="label">{t("ledger.profil.title")}</p>
@@ -367,12 +485,8 @@ export function ThreatLedger() {
               const actif = choisis.includes(p.id);
               // `border-brand/60` et `bg-brand/15` n'émettaient **aucune règle** :
               // Tailwind ne sait pas appliquer un modificateur d'opacité à une
-              // couleur qu'il ne peut pas décomposer (`var(--copper)`), défaut déjà
-              // documenté pour `bg-navy/90` en tête de `globals.css`. La puce cochée
-              // retombait donc sur le `border-color: #e5e7eb` du preflight — un
-              // liseré gris clair à 14.64:1, ni cuivre ni discret, et sans lavis.
-              // `--copper-text` (5.15:1) et `--copper-wash` sont le couple que
-              // `.badge-blue` emploie déjà pour ce même rôle.
+              // couleur qu'il ne peut pas décomposer (`var(--copper)`). La puce
+              // cochée retombait sur le `border-color: #e5e7eb` du preflight.
               return (
                 <button
                   key={p.id}
@@ -382,7 +496,7 @@ export function ThreatLedger() {
                   title={t(p.hint)}
                   className={`rounded-sm border px-3 py-1.5 text-left font-mono text-xs transition ${
                     actif
-                      ? "border-[color:var(--copper-text)] bg-[color:var(--copper-wash)] text-brand-bright"
+                      ? "border-[color:var(--copper-text)] bg-[color:var(--paper)] text-[color:var(--copper-text)]"
                       : "border-[color:var(--border-mid)] text-[color:var(--text-mid)] hover:border-[color:var(--copper-line)] hover:text-[color:var(--text-hi)]"
                   }`}
                 >
@@ -402,37 +516,40 @@ export function ThreatLedger() {
           </p>
 
           {positionne?.cap && (
-            // Même défaut qu'au-dessus : `border-brand/50` n'émettait rien et le
-            // filet de l'encadré était gris (#e5e7eb). `border-left: 2px solid
-            // var(--copper)` est la forme de l'encadré sur `xsom.fr`
-            // (`components.css` l. 572 et 715) ; `--copper-text` en est la variante
-            // contextuelle, qui passe en `--copper-deep` sous `.section--light`.
             <p className="muted mt-3 max-w-2xl border-l-2 border-[color:var(--copper-text)] pl-4 text-sm leading-relaxed">
               {t("ledger.cap")}
             </p>
           )}
         </div>
 
-        {/* Le relevé. */}
-        <div className="mt-2">
-          {RELEVE.lignes.map((ligne) => (
-            <Rangee
-              key={ligne.id}
-              ligne={ligne}
-              positionne={positionne}
-              ouverte={ouverte === ligne.id}
-              basculer={() => setOuverte(ouverte === ligne.id ? null : ligne.id)}
-            />
-          ))}
-          {/* Ce trait-ci **n'est pas** un ouvre-section, et il ne prend donc pas le
-              filet cuivre : c'est le dix-septième filet d'une grille de seize
-              rangées, celui qui ferme la dernière. En cuivre, la dernière rangée
-              n'aurait pas le même bord bas que les quinze au-dessus, et un relevé
-              dont la dernière ligne se compose autrement n'est plus un relevé. */}
-          <div className="border-t border-[color:var(--border)]" />
-        </div>
+        {/* Le relevé, dans l'ordre du classement et non dans celui des
+            identifiants : le lecteur qui s'arrête à la cinquième rangée doit avoir
+            lu les cinq qui comptent, pas `M-01` à `M-05`. */}
+        <ol className="paysage mt-2">
+          {MENACES.map((menace) => {
+            const ligne = menace.releve
+              ? RELEVE.lignes.find((l) => l.id === menace.releve)
+              : undefined;
+            return (
+              <li key={menace.rang}>
+                {ligne ? (
+                  <Rangee
+                    ligne={ligne}
+                    menace={menace}
+                    positionne={positionne}
+                    ouverte={ouverte === ligne.id}
+                    basculer={() => setOuverte(ouverte === ligne.id ? null : ligne.id)}
+                  />
+                ) : (
+                  <RangeeHorsCarte menace={menace} />
+                )}
+              </li>
+            );
+          })}
+        </ol>
 
-        <p className="muted mt-6 font-mono text-[length:var(--fs-label)]">
+        <p className="muted mt-6 max-w-4xl text-sm leading-relaxed">{t("ledger.note")}</p>
+        <p className="muted mt-3 font-mono text-[length:var(--fs-label)]">
           {t("ledger.stamp", { date: RELEVE.genere_le, commit: RELEVE.commit })}
         </p>
       </div>

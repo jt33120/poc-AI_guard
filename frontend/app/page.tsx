@@ -5,7 +5,6 @@ import { Audience } from "@/components/Audience";
 import { ProfilProvider } from "@/components/ProfilContext";
 import { ThreatLedger } from "@/components/ThreatLedger";
 import { LanguageToggle } from "@/lib/i18n";
-import { cleClair, cleEtape, cleTitre, ETAPES, MENACES } from "@/lib/menaces";
 import { serverT } from "@/lib/lang";
 import type { StrKey } from "@/lib/strings";
 
@@ -22,30 +21,6 @@ const WHO: [StrKey, StrKey][] = [
   ["land.who.2.t", "land.who.2.b"],
   ["land.who.3.t", "land.who.3.b"],
 ];
-
-/**
- * Les cinq points de la chaîne, celui de l'étape allumé.
- *
- * `aria-hidden` parce que le nom de l'étape est écrit en toutes lettres juste à
- * côté : le glyphe répète, il n'informe pas. Un lecteur d'écran qui l'annoncerait
- * ferait entendre deux fois la même chose.
- */
-function Points({ actif }: { actif: number }) {
-  return (
-    <svg viewBox="0 0 44 8" className="points" aria-hidden="true">
-      <line className="points__voie" x1="4" y1="4" x2="40" y2="4" strokeWidth="1" />
-      {ETAPES.map((etape, i) => (
-        <circle
-          key={etape}
-          className={i === actif ? "points__point points__point--on" : "points__point"}
-          cx={4 + i * 9}
-          cy="4"
-          r={i === actif ? 3 : 1.8}
-        />
-      ))}
-    </svg>
-  );
-}
 
 function FlowArrow() {
   return (
@@ -235,65 +210,6 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* Le paysage des menaces (L4) : ce dont on parle, classé, en clair.
-          Distinct du relevé (L5) plus haut, qui dit ce que la passerelle bloque et
-          le prouve. Cette section ne revendique rien ; `lib/menaces.ts` explique
-          pourquoi la frontière entre les deux est tenue. */}
-      <section className="section">
-        <div className="wrap">
-          <div className="text-center">
-            <p className="eyebrow" data-num="05">
-              {t("land.menace.kicker")}
-            </p>
-            <h2 className="t-h2 mt-2" data-sheen>
-              {t("land.menace.title")}
-            </h2>
-            <p className="lead mx-auto mt-4">{t("land.menace.lead")}</p>
-          </div>
-
-          {/* La chaîne d'attaque : la légende des pastilles, montrée une seule fois. */}
-          <figure className="reveal mt-12" data-delay="1">
-            <ol className="chaine__voie">
-              {ETAPES.map((etape, i) => (
-                <li
-                  key={etape}
-                  className="chaine__etape"
-                  data-tenu={etape === "actions" ? "true" : undefined}
-                >
-                  <Points actif={i} />
-                  <span className="chaine__nom">{t(cleEtape(etape))}</span>
-                </li>
-              ))}
-            </ol>
-            <figcaption className="muted mt-4 text-center text-sm">
-              {t("land.menace.legend")}
-            </figcaption>
-          </figure>
-
-          {/* `reveal` porte sur la liste et non sur chaque rangée : vingt-trois
-              apparitions décalées feraient un défilé, pas une révélation. */}
-          <ol className="paysage reveal mt-10" data-delay="2">
-            {MENACES.map((m) => (
-              <li key={m.rang} className="menace" data-critique={m.critique ? "true" : undefined}>
-                <span className="menace__rang">{String(m.rang).padStart(2, "0")}</span>
-                <h3 className="menace__titre">{t(cleTitre(m))}</h3>
-                <p className="menace__clair">{t(cleClair(m))}</p>
-                <div className="menace__meta">
-                  {m.critique && <span className="menace__flag">{t("land.menace.critique")}</span>}
-                  <span className="menace__etape">
-                    <Points actif={ETAPES.indexOf(m.etape)} />
-                    {t(cleEtape(m.etape))}
-                  </span>
-                  {m.releve && <span className="menace__releve">{m.releve}</span>}
-                </div>
-              </li>
-            ))}
-          </ol>
-
-          <p className="muted mt-8 max-w-3xl text-sm leading-relaxed">{t("land.menace.note")}</p>
         </div>
       </section>
 

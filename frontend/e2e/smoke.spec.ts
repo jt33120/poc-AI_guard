@@ -28,9 +28,9 @@ test("landing page renders", async ({ page }) => {
 // couverture : c'est le relevé (L5) qui le fait, et `tests/test_menaces_section.py`
 // tient la frontière côté source. Ici on vérifie ce que le source ne peut pas dire,
 // à savoir que la section arrive **rendue** et complète.
-test("le paysage des menaces publie le classement en entier", async ({ page }) => {
+test("le relevé publie le classement en entier", async ({ page }) => {
   await page.goto("/");
-  const paysage = page.locator(".paysage");
+  const paysage = page.locator("#menaces .paysage");
 
   // Vingt-trois rangées, et le compte est le contrôle : une liste tronquée par une
   // erreur de rendu se lirait comme un classement volontairement court.
@@ -40,14 +40,15 @@ test("le paysage des menaces publie le classement en entier", async ({ page }) =
   // section qui, elle, prouve quelque chose.
   const premiere = paysage.locator(".menace").first();
   await expect(premiere).toContainText("Injection de prompts indirecte");
-  await expect(premiere.locator(".menace__releve")).toHaveText("M-02");
+  await expect(premiere.locator(".menace__id")).toHaveText("M-02");
   await expect(premiere).toContainText("critique");
 
   // Une menace ajoutée hors carte n'affiche aucun numéro : sans quoi elle
   // promettrait une preuve que le relevé ne porte pas.
   const horsReleve = paysage.locator(".menace").nth(5);
   await expect(horsReleve).toContainText("Outil piégé ou description empoisonnée");
-  await expect(horsReleve.locator(".menace__releve")).toHaveCount(0);
+  await expect(horsReleve.locator(".menace__id")).toHaveCount(0);
+  await expect(horsReleve).toContainText("pas encore évaluée");
 
   // La chaîne d'attaque sert de légende aux pastilles : cinq étapes, et celle que la
   // passerelle tient est marquée.

@@ -22,7 +22,7 @@ Il a déjà produit trois défauts distincts dans ce dépôt :
 
 Les trois ont survécu à leur revue, parce que rien ne signale une règle absente.
 
-Ce garde est un **cliquet**, pas une interdiction : cinquante-deux occurrences
+Ce garde est un **cliquet**, pas une interdiction : cinquante occurrences
 existent déjà, et les corriger toutes changerait le rendu de dix-neuf fichiers
 d'un coup — un arbitrage qui revient à l'opérateur, pas à un lot de correctifs.
 L'inventaire ci-dessous est donc gelé : il peut décroître, jamais croître.
@@ -72,7 +72,7 @@ _CONNU: dict[str, int] = {
     "components/Loader.tsx": 3,
     "components/ProviderCredentials.tsx": 1,
     "components/ReadTokens.tsx": 3,
-    "components/ThreatLedger.tsx": 4,
+    "components/ThreatLedger.tsx": 2,
 }
 
 
