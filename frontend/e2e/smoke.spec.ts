@@ -50,10 +50,38 @@ test("le relevé publie le classement en entier", async ({ page }) => {
   await expect(horsReleve.locator(".menace__id")).toHaveCount(0);
   await expect(horsReleve).toContainText("pas encore évaluée");
 
-  // La chaîne d'attaque sert de légende aux pastilles : cinq étapes, et celle que la
-  // passerelle tient est marquée.
+  // La chaîne d'attaque sert de légende : cinq étapes, et celle que la passerelle
+  // tient est marquée.
   await expect(page.locator(".chaine__etape")).toHaveCount(5);
   await expect(page.locator('.chaine__etape[data-tenu="true"]')).toContainText("Ses actions");
+});
+
+// Les figures ne peuvent être vérifiées qu'ici : `tests/test_schemas_menaces.py` lit
+// leur balisage, mais seul un navigateur dit si elles arrivent RENDUES, avec leurs
+// têtes de flèche résolues et leur nom accessible.
+test("chaque menace porte son diagramme, nommé et fléché", async ({ page }) => {
+  await page.goto("/");
+  const figures = page.locator("#menaces .paysage .diag");
+
+  // Vingt-trois figures, une par rangée. Une seule manquante laisserait un trou dans
+  // une colonne qui en montre vingt-deux.
+  await expect(figures).toHaveCount(23);
+
+  // Le nom accessible : une figure en `role=img` sans nom est annoncée comme un blanc.
+  await expect(figures.first()).toHaveAttribute("role", "img");
+  await expect(figures.first().locator("title")).toContainText("ordre caché");
+
+  // Les marqueurs vivent dans un `<defs>` unique pour toute la page. S'il manquait,
+  // chaque `url(#ax)` pointerait dans le vide et les flèches disparaîtraient sans que
+  // rien n'échoue.
+  await expect(page.locator("marker#fx")).toHaveCount(1);
+  await expect(page.locator("marker#ax")).toHaveCount(1);
+  expect(await page.locator("#menaces .diag [marker-end]").count()).toBeGreaterThan(40);
+
+  // Le mouvement est à l'arrêt tant qu'on ne survole pas : vingt-trois figures animées
+  // en même temps feraient une page qui clignote.
+  const anime = page.locator("#menaces .diag .a-move").first();
+  await expect(anime).toHaveCSS("animation-name", "none");
 });
 
 test("approving a held action from the UI clears it from the queue", async ({ page, context }) => {
