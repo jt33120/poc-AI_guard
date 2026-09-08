@@ -506,37 +506,182 @@ export const STR = {
     fr: "Chaque décision est chaînée par hash dans un journal immuable et exportable.",
   },
 
-  "land.feat.kicker": { en: "Key features", fr: "Fonctionnalités clés" },
-  "land.feat.title": { en: "Everything you need to trust an agent", fr: "Tout pour faire confiance à un agent" },
-  "land.feat.1.t": { en: "Control actions, not prompts", fr: "Contrôler les actions, pas les prompts" },
-  "land.feat.1.b": {
-    en: "A gate on real operations, not a text filter. Allow, block, or pause any tool-call.",
-    fr: "Un contrôle des opérations réelles, pas un filtre de texte. Autoriser, bloquer ou suspendre chaque appel d'outil.",
+  // Le paysage des menaces (remplace les anciennes cartes de fonctionnalites).
+  // Les seize titres francais portant un identifiant de releve sont copies MOT
+  // POUR MOT de `lib/generated/threat-rows.json` ; `tests/test_menaces_section.py`
+  // le verifie, pour qu'une page commerciale ne puisse pas nommer une menace
+  // autrement que la carte de couverture qui la prouve.
+  "land.menace.kicker": { en: "The threat landscape", fr: "Le paysage des menaces" },
+  "land.menace.title": {
+    en: "What can go wrong, in order of importance",
+    fr: "Ce qui peut mal tourner, par ordre d'importance",
   },
-  "land.feat.2.t": { en: "Human in the loop", fr: "L'humain dans la boucle" },
-  "land.feat.2.b": {
-    en: "Irreversible actions pause for explicit approval, with dual control for the riskiest moves.",
-    fr: "Les actions irréversibles s'arrêtent pour validation explicite, avec double validation pour les plus sensibles.",
+  "land.menace.lead": {
+    en: "Ranked by what they actually cost: how likely they are, times what cannot be undone afterwards. The ones at the top share a trait, and it is the whole point of this product: they only become expensive at the moment something is executed or sent.",
+    fr: "Classées par ce qu'elles coûtent vraiment : la probabilité qu'elles arrivent, multipliée par ce qu'on ne peut plus défaire ensuite. Les premières ont un trait commun, et c'est tout le propos de ce produit : elles ne deviennent chères qu'au moment où quelque chose est exécuté ou envoyé.",
   },
-  "land.feat.3.t": { en: "Tamper-proof audit", fr: "Audit inviolable" },
-  "land.feat.3.b": {
-    en: "Every decision hash-chained and append-only. Prove what your agents did, and what they didn't.",
-    fr: "Chaque décision chaînée par hash et append-only. Prouvez ce que vos agents ont fait, et ce qu'ils n'ont pas fait.",
+  "land.menace.legend": {
+    en: "Five places an attack gets in. This gateway holds the fourth, the one where the agent acts.",
+    fr: "Cinq endroits par où une attaque entre. Cette passerelle tient le quatrième, celui où l'agent agit.",
   },
-  "land.feat.4.t": { en: "Compliance, exported", fr: "Conformité, exportée" },
-  "land.feat.4.b": {
-    en: "One-click evidence packs for the EU AI Act and GDPR, ready for your auditors.",
-    fr: "Des dossiers de preuve en un clic pour l'AI Act européen et le RGPD, prêts pour vos auditeurs.",
+  "land.menace.note": {
+    en: "The ledger above says, line by line, what this gateway blocks and what it does not. Threats without a ledger number are not assessed there yet.",
+    fr: "Le relevé plus haut dit, ligne par ligne, ce que cette passerelle bloque et ce qu'elle ne bloque pas. Les menaces sans numéro de relevé n'y sont pas encore évaluées.",
   },
-  "land.feat.5.t": { en: "Deterministic + smart", fr: "Déterministe + intelligent" },
-  "land.feat.5.b": {
-    en: "A fast rules engine decides the clear cases; an LLM judge handles the ambiguous ones.",
-    fr: "Un moteur de règles rapide tranche les cas clairs ; un juge LLM gère les cas ambigus.",
+  "land.menace.critique": { en: "critical", fr: "critique" },
+  "land.menace.et.invite": { en: "The prompt", fr: "L'invite" },
+  "land.menace.et.donnees": { en: "What it reads", fr: "Ce qu'il lit" },
+  "land.menace.et.modele": { en: "The model", fr: "Le modèle" },
+  "land.menace.et.actions": { en: "Its actions", fr: "Ses actions" },
+  "land.menace.et.humain": { en: "The human", fr: "L'humain" },
+
+  "land.menace.01.t": { en: "Indirect prompt injection", fr: "Injection de prompts indirecte" },
+  "land.menace.01.b": {
+    en: "Your agent reads a web page, an email or a document that hides instructions. It follows them as if they came from you.",
+    fr: "L'agent lit une page web, un mail ou un document qui contient des ordres cachés. Il les suit comme s'ils venaient de vous.",
   },
-  "land.feat.6.t": { en: "Multi-tenant by design", fr: "Multi-tenant par conception" },
-  "land.feat.6.b": {
-    en: "Strict tenant isolation at the database level. Your data never crosses lines.",
-    fr: "Isolation stricte des locataires au niveau base de données. Vos données ne se croisent jamais.",
+  "land.menace.02.t": { en: "Excessive agency", fr: "Privilèges excessifs (excessive agency)" },
+  "land.menace.02.b": {
+    en: "The agent holds more rights than its task needs. The day it goes wrong, it goes wrong far.",
+    fr: "L'agent a plus de droits que sa tâche n'en demande. Le jour où il déraille, il déraille loin.",
+  },
+  "land.menace.03.t": { en: "Autonomous agent hijacking", fr: "Piratage d'agents autonomes" },
+  "land.menace.03.b": {
+    en: "Its own tools are turned against you: a transfer, a deletion, a send. The agent does the attacker's work.",
+    fr: "Ses outils sont retournés contre vous : un virement, une suppression, un envoi. L'agent fait le travail de l'attaquant.",
+  },
+  "land.menace.04.t": {
+    en: "Data and IP exfiltration through an LLM",
+    fr: "Exfiltration de données / PI via LLM",
+  },
+  "land.menace.04.b": {
+    en: "Source code, a secret or a client file pasted into a consumer AI tool. Once it is out, it does not come back.",
+    fr: "Du code, un secret ou un fichier client collé dans un outil IA grand public. Une fois sorti, il ne revient pas.",
+  },
+  "land.menace.05.t": { en: "Insecure output handling", fr: "Traitement non sécurisé des sorties" },
+  "land.menace.05.b": {
+    en: "The model's answer goes straight into a database, a shell or a page. The model writes, the machine obeys.",
+    fr: "La réponse du modèle part telle quelle dans une base, un terminal ou une page. Le modèle écrit, la machine obéit.",
+  },
+  "land.menace.06.t": {
+    en: "Booby-trapped tool or poisoned description",
+    fr: "Outil piégé ou description empoisonnée",
+  },
+  "land.menace.06.b": {
+    en: "A tool server describes what it can do, and the model reads that description. Trap the text, or change it quietly after approval, and the tool stops doing what it advertised.",
+    fr: "Un serveur d'outils décrit ce qu'il sait faire, et le modèle lit cette description. Piégez le texte, ou changez-le discrètement après validation, et l'outil ne fait plus ce qu'il annonçait.",
+  },
+  "land.menace.07.t": {
+    en: "No attribution: the agent acts as you",
+    fr: "Aucune attribution : l'agent agit sous votre identité",
+  },
+  "land.menace.07.b": {
+    en: "The agent uses a human's credentials. Afterwards nothing separates what it did from what the person did.",
+    fr: "L'agent emprunte les accès d'un humain. Après coup, rien ne distingue ce qu'il a fait de ce que la personne a fait.",
+  },
+  "land.menace.08.t": { en: "Direct prompt injection", fr: "Injection de prompts directe" },
+  "land.menace.08.b": {
+    en: "Someone asks the agent, to its face, to forget its instructions. Often crude, sometimes enough.",
+    fr: "On demande à l'agent, en face, d'oublier ses consignes. Souvent grossier, parfois suffisant.",
+  },
+  "land.menace.09.t": {
+    en: "System prompt and secret leakage",
+    fr: "Fuite du system prompt & secrets",
+  },
+  "land.menace.09.b": {
+    en: "Internal rules, and sometimes an API key, are written into the prompt. What sits in the prompt eventually comes out.",
+    fr: "Les consignes internes, et parfois une clé d'API, sont écrites dans le prompt. Ce qui est dans le prompt finit par en sortir.",
+  },
+  "land.menace.10.t": {
+    en: "Blind approval of generated code",
+    fr: "Validation aveugle de code (Copilot)",
+  },
+  "land.menace.10.b": {
+    en: "Assistant-written code ships without review. The flaw is old, the speed is new.",
+    fr: "Le code proposé par l'assistant part en production sans relecture. La faille est classique, la vitesse est nouvelle.",
+  },
+  "land.menace.11.t": {
+    en: "Decision built on a hallucination",
+    fr: "Décision fondée sur une hallucination",
+  },
+  "land.menace.11.b": {
+    en: "A wrong answer, delivered with confidence, becomes the basis for a decision. Nothing crashes, and that is the problem.",
+    fr: "Une réponse fausse, dite avec aplomb, sert de base à une décision. Rien ne plante, et c'est bien le problème.",
+  },
+  "land.menace.12.t": {
+    en: "Supply chain (models, libraries)",
+    fr: "Supply chain (modèles / bibliothèques)",
+  },
+  "land.menace.12.b": {
+    en: "A downloaded model or dependency carries more than its description says.",
+    fr: "Un modèle ou une dépendance téléchargée embarque autre chose que ce qu'annonce sa fiche.",
+  },
+  "land.menace.13.t": { en: "Poisoned agent memory", fr: "Mémoire d'agent empoisonnée" },
+  "land.menace.13.b": {
+    en: "The agent keeps notes between sessions. An instruction slipped in there returns at every wake-up, long after the attack.",
+    fr: "L'agent garde des notes entre deux sessions. Un ordre glissé dedans revient à chaque réveil, longtemps après l'attaque.",
+  },
+  "land.menace.14.t": { en: "Unbounded consumption", fr: "Consommation incontrôlée" },
+  "land.menace.14.b": {
+    en: "A loop, or an attacker, keeps the model running. This is not an outage, it is a bill.",
+    fr: "Une boucle, ou un attaquant, fait tourner le modèle sans fin. Ce n'est pas une panne, c'est une facture.",
+  },
+  "land.menace.15.t": { en: "Data poisoning", fr: "Empoisonnement de données" },
+  "land.menace.15.b": {
+    en: "What trains or documents the model is altered, so that it errs at the chosen moment.",
+    fr: "On altère ce qui sert à entraîner ou à documenter le modèle, pour qu'il se trompe au bon moment.",
+  },
+  "land.menace.16.t": {
+    en: "Cross-tenant leak in the vector store",
+    fr: "Fuite entre clients dans la base vectorielle",
+  },
+  "land.menace.16.b": {
+    en: "One document store serves several clients. A poorly partitioned search returns the neighbour's file.",
+    fr: "Une même base de documents sert plusieurs clients. Une recherche mal cloisonnée rend le document du voisin.",
+  },
+  "land.menace.17.t": {
+    en: "Cascading delegation between agents",
+    fr: "Délégation en cascade entre agents",
+  },
+  "land.menace.17.b": {
+    en: "One agent calls another, which calls a third. Nobody checks any more on whose behalf the last action runs.",
+    fr: "Un agent en appelle un autre, qui en appelle un troisième. Personne ne vérifie plus au nom de qui la dernière action est faite.",
+  },
+  "land.menace.18.t": { en: "Hyper-personalised phishing", fr: "Phishing hyper-personnalisé" },
+  "land.menace.18.b": {
+    en: "Phishing mail without a typo, quoting your projects and your colleagues by name.",
+    fr: "Des mails d'hameçonnage sans faute, qui citent vos projets et vos collègues par leur nom.",
+  },
+  "land.menace.19.t": { en: "Deepfake impersonation", fr: "Usurpation par deepfake" },
+  "land.menace.19.b": {
+    en: "A cloned voice or face is enough to get a transfer approved over the phone.",
+    fr: "Une voix ou un visage cloné suffit à faire valider un virement au téléphone.",
+  },
+  "land.menace.20.t": {
+    en: "Silent drift after a model update",
+    fr: "Dérive silencieuse après mise à jour du modèle",
+  },
+  "land.menace.20.b": {
+    en: "The provider ships a new version. The same instructions stop producing the same behaviour, and nothing says so.",
+    fr: "Le fournisseur change de version. Les mêmes consignes ne donnent plus le même comportement, et rien ne le signale.",
+  },
+  "land.menace.21.t": { en: "Model theft and extraction", fr: "Vol de modèle / extraction" },
+  "land.menace.21.b": {
+    en: "Thousands of well-chosen queries are enough to rebuild a proprietary model.",
+    fr: "Des milliers de requêtes bien choisies suffisent à reconstituer un modèle propriétaire.",
+  },
+  "land.menace.22.t": { en: "Polymorphic malware", fr: "Malwares polymorphes" },
+  "land.menace.22.b": {
+    en: "Malware rewritten by AI at every delivery, so it never shows the same signature twice.",
+    fr: "Un code malveillant réécrit par IA à chaque diffusion, pour n'avoir jamais deux fois la même signature.",
+  },
+  "land.menace.23.t": {
+    en: "Evasion attacks (adversarial)",
+    fr: "Attaques par évasion (adversarial)",
+  },
+  "land.menace.23.b": {
+    en: "An image or a text nudged imperceptibly makes the model say the opposite.",
+    fr: "Une image ou un texte modifié de façon imperceptible fait dire au modèle exactement le contraire.",
   },
 
   "land.comp.kicker": { en: "Built for compliance", fr: "Conçu pour la conformité" },

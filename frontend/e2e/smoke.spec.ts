@@ -22,6 +22,39 @@ test("landing page renders", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "xSOM AI Guard" })).toBeVisible();
 });
 
+// --- Le paysage des menaces (L4) ------------------------------------------------
+//
+// La section a remplacé les cartes de fonctionnalités. Elle ne revendique aucune
+// couverture : c'est le relevé (L5) qui le fait, et `tests/test_menaces_section.py`
+// tient la frontière côté source. Ici on vérifie ce que le source ne peut pas dire,
+// à savoir que la section arrive **rendue** et complète.
+test("le paysage des menaces publie le classement en entier", async ({ page }) => {
+  await page.goto("/");
+  const paysage = page.locator(".paysage");
+
+  // Vingt-trois rangées, et le compte est le contrôle : une liste tronquée par une
+  // erreur de rendu se lirait comme un classement volontairement court.
+  await expect(paysage.locator(".menace")).toHaveCount(23);
+
+  // Le rang 01 ouvre, et il porte son numéro de relevé : c'est le lien vers la
+  // section qui, elle, prouve quelque chose.
+  const premiere = paysage.locator(".menace").first();
+  await expect(premiere).toContainText("Injection de prompts indirecte");
+  await expect(premiere.locator(".menace__releve")).toHaveText("M-02");
+  await expect(premiere).toContainText("critique");
+
+  // Une menace ajoutée hors carte n'affiche aucun numéro : sans quoi elle
+  // promettrait une preuve que le relevé ne porte pas.
+  const horsReleve = paysage.locator(".menace").nth(5);
+  await expect(horsReleve).toContainText("Outil piégé ou description empoisonnée");
+  await expect(horsReleve.locator(".menace__releve")).toHaveCount(0);
+
+  // La chaîne d'attaque sert de légende aux pastilles : cinq étapes, et celle que la
+  // passerelle tient est marquée.
+  await expect(page.locator(".chaine__etape")).toHaveCount(5);
+  await expect(page.locator('.chaine__etape[data-tenu="true"]')).toContainText("Ses actions");
+});
+
 test("approving a held action from the UI clears it from the queue", async ({ page, context }) => {
   await authed(context);
   let decided = false;
@@ -301,7 +334,11 @@ test("sans le moteur, le relevé se montre sans se prétendre positionné", asyn
   // Il le dit, et les seize lignes restent là. Se vider se lirait « aucune menace »,
   // qui est la plus mauvaise des réponses fausses.
   await expect(page.getByText(/n'ont pas pu être recalculés|could not be recomputed/)).toBeVisible();
-  await expect(page.getByText("Injection de prompts indirecte")).toBeVisible();
+  // Porté au relevé, et non à la page : le paysage des menaces (L4) nomme la même
+  // ligne plus bas, mot pour mot, et un `getByText` de page en trouverait deux.
+  // C'est justement ce que `tests/test_menaces_section.py` impose : les deux sections
+  // ne peuvent pas appeler une menace autrement l'une que l'autre.
+  await expect(page.locator("#menaces").getByText("Injection de prompts indirecte")).toBeVisible();
 });
 
 test("ouvrir une ligne hors périmètre affiche la raison publiée dans la carte", async ({
