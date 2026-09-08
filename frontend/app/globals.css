@@ -850,3 +850,196 @@ body::before {
     );
   }
 }
+
+/* ============================================================================
+   LE PAYSAGE DES MENACES (`L4`)
+
+   Un relevé numéroté, et non une grille de cartes : vingt-trois rangées séparées
+   d'un filet, rang en mono cuivre dans une gouttière fixe. C'est la forme que le
+   site emploie déjà pour `ThreatLedger`, et c'est délibéré : les deux sections
+   parlent des mêmes objets, donc les faire diverger de forme les ferait lire
+   comme deux sujets.
+
+   **La pastille à cinq points est la seule illustration, et elle est réutilisée
+   vingt-trois fois.** La charte est bichrome ; distinguer cinq étapes par cinq
+   couleurs l'aurait rompue, et cinq pictogrammes auraient donné cinq dessins
+   génériques de plus. Un point allumé sur cinq dit la même chose sans ajouter de
+   teinte, et la chaîne montrée une fois en tête sert de légende. Le nom de
+   l'étape est écrit à côté en toutes lettres : le glyphe est donc redondant, et
+   c'est pour cela qu'il est `aria-hidden`.
+
+   Contrastes, tous mesurés sur `--ink-900` : titre `--title-ink` 16.14:1, phrase
+   en clair `--text-mid` 9.69:1, rang `--copper-text` 5.15:1, rang critique et
+   étiquette `--copper-sheen` 8.85:1, étape `--text-low` 5.58:1, numéro de relevé
+   `--text-faint` 4.93:1. Les filets et les points sont décoratifs au sens de
+   WCAG 1.4.11 : ils n'identifient aucun état que le texte adjacent ne nomme pas.
+
+   Le cas serré est le nom de l'étape tenue, cuivre sur lavis cuivre : **4.69:1**,
+   soit 0,19 de marge. C'est la configuration qui avait échoué à 4.21:1 en bande
+   claire au lot précédent, et elle ne passe ici que parce que le fond est sombre.
+   Le jeton reste `--copper-text` et non `--copper-sheen`, pourtant plus confortable :
+   `--copper-text` bascule sur `--copper-deep` en bande claire, donc il suit si la
+   section change de bande un jour. `--copper-sheen` y tomberait à 1.9:1 sans que
+   rien ne le signale.
+   ========================================================================== */
+@layer components {
+  /* La chaîne d'attaque, montrée une fois en tête de section. */
+  .chaine__voie {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.75rem;
+    align-items: start;
+    overflow-x: auto;
+  }
+
+  .chaine__etape {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+    text-align: center;
+    padding: 0.75rem 0.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+  }
+
+  /* L'étape que la passerelle tient. Le texte de la légende le dit aussi : le
+     cadre ne porte pas seul l'information. */
+  .chaine__etape[data-tenu="true"] {
+    border-color: var(--copper-line);
+    background: var(--copper-wash);
+  }
+
+  .chaine__nom {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: var(--fs-label);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-low);
+  }
+
+  .chaine__etape[data-tenu="true"] .chaine__nom {
+    color: var(--copper-text);
+  }
+
+  /* Le relevé lui-même. */
+  .paysage {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .menace {
+    display: grid;
+    grid-template-columns: 2.75rem minmax(0, 1fr);
+    gap: 0.25rem 1rem;
+    align-items: baseline;
+    padding: 1.15rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  @media (min-width: 900px) {
+    .menace {
+      grid-template-columns: 2.75rem minmax(0, 1fr) 14rem;
+      column-gap: 1.5rem;
+    }
+  }
+
+  .menace__rang {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 0.8125rem;
+    color: var(--copper-text);
+  }
+
+  .menace__titre {
+    font-family: var(--font-display), sans-serif;
+    font-size: 1.0625rem;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--title-ink);
+  }
+
+  /* Le haut du classement se lit d'abord. La graisse et le filet cuivre le
+     disent ; l'étiquette « critique » le dit en toutes lettres, parce qu'un
+     signal typographique seul ne se lit pas en lecteur d'écran. */
+  .menace[data-critique="true"] .menace__titre {
+    font-size: 1.1875rem;
+  }
+
+  .menace[data-critique="true"] .menace__rang {
+    color: var(--copper-sheen);
+  }
+
+  .menace__clair {
+    grid-column: 2;
+    margin-top: 0.35rem;
+    max-width: 62ch;
+    font-size: 0.875rem;
+    line-height: 1.65;
+    color: var(--text-mid);
+  }
+
+  .menace__meta {
+    grid-column: 2;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.9rem;
+    margin-top: 0.6rem;
+  }
+
+  @media (min-width: 900px) {
+    .menace__meta {
+      grid-column: 3;
+      grid-row: 1 / span 2;
+      justify-content: flex-end;
+      margin-top: 0;
+    }
+  }
+
+  .menace__flag,
+  .menace__etape,
+  .menace__releve {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: var(--fs-label);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .menace__flag {
+    padding: 0.15rem 0.45rem;
+    border: 1px solid var(--copper-line);
+    border-radius: 3px;
+    color: var(--copper-sheen);
+  }
+
+  .menace__etape {
+    color: var(--text-low);
+  }
+
+  .menace__releve {
+    color: var(--text-faint);
+    text-transform: none;
+  }
+
+  /* La pastille : cinq points, celui de l'étape allumé. */
+  .points {
+    width: 44px;
+    height: 8px;
+    flex: none;
+  }
+
+  .points__voie {
+    stroke: var(--text-faint);
+  }
+
+  .points__point {
+    fill: var(--text-faint);
+  }
+
+  .points__point--on {
+    fill: var(--copper-sheen);
+  }
+}

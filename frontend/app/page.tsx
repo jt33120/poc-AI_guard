@@ -5,6 +5,7 @@ import { Audience } from "@/components/Audience";
 import { ProfilProvider } from "@/components/ProfilContext";
 import { ThreatLedger } from "@/components/ThreatLedger";
 import { LanguageToggle } from "@/lib/i18n";
+import { cleClair, cleEtape, cleTitre, ETAPES, MENACES } from "@/lib/menaces";
 import { serverT } from "@/lib/lang";
 import type { StrKey } from "@/lib/strings";
 
@@ -16,43 +17,32 @@ const STEPS: [StrKey, StrKey][] = [
   ["land.how.s3.t", "land.how.s3.b"],
 ];
 
-const FEATURES: { t: StrKey; b: StrKey; icon: keyof typeof ICONS }[] = [
-  { t: "land.feat.1.t", b: "land.feat.1.b", icon: "gate" },
-  { t: "land.feat.2.t", b: "land.feat.2.b", icon: "user" },
-  { t: "land.feat.3.t", b: "land.feat.3.b", icon: "lock" },
-  { t: "land.feat.4.t", b: "land.feat.4.b", icon: "doc" },
-  { t: "land.feat.5.t", b: "land.feat.5.b", icon: "cpu" },
-  { t: "land.feat.6.t", b: "land.feat.6.b", icon: "layers" },
-];
-
 const WHO: [StrKey, StrKey][] = [
   ["land.who.1.t", "land.who.1.b"],
   ["land.who.2.t", "land.who.2.b"],
   ["land.who.3.t", "land.who.3.b"],
 ];
 
-const ICONS = {
-  gate: "M4 12h16M4 12l4-4M4 12l4 4M20 4v16",
-  user: "M16 11l2 2 4-4M3 20a7 7 0 0114 0M10 3a4 4 0 100 8 4 4 0 000-8z",
-  lock: "M6 11V8a6 6 0 1112 0v3M5 11h14v9H5z",
-  doc: "M7 3h7l5 5v13H7zM14 3v5h5M9 13h6M9 17h6",
-  cpu: "M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3M6 6h12v12H6z",
-  layers: "M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5",
-} as const;
-
-function FeatureIcon({ d }: { d: string }) {
+/**
+ * Les cinq points de la chaîne, celui de l'étape allumé.
+ *
+ * `aria-hidden` parce que le nom de l'étape est écrit en toutes lettres juste à
+ * côté : le glyphe répète, il n'informe pas. Un lecteur d'écran qui l'annoncerait
+ * ferait entendre deux fois la même chose.
+ */
+function Points({ actif }: { actif: number }) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-5 w-5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d={d} />
+    <svg viewBox="0 0 44 8" className="points" aria-hidden="true">
+      <line className="points__voie" x1="4" y1="4" x2="40" y2="4" strokeWidth="1" />
+      {ETAPES.map((etape, i) => (
+        <circle
+          key={etape}
+          className={i === actif ? "points__point points__point--on" : "points__point"}
+          cx={4 + i * 9}
+          cy="4"
+          r={i === actif ? 3 : 1.8}
+        />
+      ))}
     </svg>
   );
 }
@@ -248,30 +238,62 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Features */}
+      {/* Le paysage des menaces (L4) : ce dont on parle, classé, en clair.
+          Distinct du relevé (L5) plus haut, qui dit ce que la passerelle bloque et
+          le prouve. Cette section ne revendique rien ; `lib/menaces.ts` explique
+          pourquoi la frontière entre les deux est tenue. */}
       <section className="section">
         <div className="wrap">
           <div className="text-center">
             <p className="eyebrow" data-num="05">
-              {t("land.feat.kicker")}
+              {t("land.menace.kicker")}
             </p>
             <h2 className="t-h2 mt-2" data-sheen>
-              {t("land.feat.title")}
+              {t("land.menace.title")}
             </h2>
+            <p className="lead mx-auto mt-4">{t("land.menace.lead")}</p>
           </div>
-          {/* Le décalage repart de 1 au second rang : le CSS ne définit que cinq
-              paliers, et un rang qui démarre à 4 se révélerait après le suivant. */}
-          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map((f, i) => (
-              <div key={f.t} className="card reveal p-6" data-delay={String((i % 3) + 1)}>
-                <div className="grid h-10 w-10 place-items-center rounded-xl bg-[color:var(--copper-wash)] text-brand-bright ring-1 ring-[color:var(--copper-line)]">
-                  <FeatureIcon d={ICONS[f.icon]} />
+
+          {/* La chaîne d'attaque : la légende des pastilles, montrée une seule fois. */}
+          <figure className="reveal mt-12" data-delay="1">
+            <ol className="chaine__voie">
+              {ETAPES.map((etape, i) => (
+                <li
+                  key={etape}
+                  className="chaine__etape"
+                  data-tenu={etape === "actions" ? "true" : undefined}
+                >
+                  <Points actif={i} />
+                  <span className="chaine__nom">{t(cleEtape(etape))}</span>
+                </li>
+              ))}
+            </ol>
+            <figcaption className="muted mt-4 text-center text-sm">
+              {t("land.menace.legend")}
+            </figcaption>
+          </figure>
+
+          {/* `reveal` porte sur la liste et non sur chaque rangée : vingt-trois
+              apparitions décalées feraient un défilé, pas une révélation. */}
+          <ol className="paysage reveal mt-10" data-delay="2">
+            {MENACES.map((m) => (
+              <li key={m.rang} className="menace" data-critique={m.critique ? "true" : undefined}>
+                <span className="menace__rang">{String(m.rang).padStart(2, "0")}</span>
+                <h3 className="menace__titre">{t(cleTitre(m))}</h3>
+                <p className="menace__clair">{t(cleClair(m))}</p>
+                <div className="menace__meta">
+                  {m.critique && <span className="menace__flag">{t("land.menace.critique")}</span>}
+                  <span className="menace__etape">
+                    <Points actif={ETAPES.indexOf(m.etape)} />
+                    {t(cleEtape(m.etape))}
+                  </span>
+                  {m.releve && <span className="menace__releve">{m.releve}</span>}
                 </div>
-                <h3 className="t-h3 mt-4">{t(f.t)}</h3>
-                <p className="muted mt-1.5 text-sm leading-relaxed">{t(f.b)}</p>
-              </div>
+              </li>
             ))}
-          </div>
+          </ol>
+
+          <p className="muted mt-8 max-w-3xl text-sm leading-relaxed">{t("land.menace.note")}</p>
         </div>
       </section>
 
