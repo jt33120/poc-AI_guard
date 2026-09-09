@@ -963,7 +963,7 @@ body::before {
      supplémentaire achète, et la seule raison de l'avoir prise. */
   @media (min-width: 1000px) {
     .menace {
-      grid-template-columns: 2.75rem 8.5rem minmax(0, 1fr) 15rem;
+      grid-template-columns: 2.75rem 13rem minmax(0, 1fr) 14rem;
       column-gap: 1.75rem;
     }
   }
@@ -980,17 +980,10 @@ body::before {
      seule chose qui dise *où* la menace entre. */
   .menace__schema {
     display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding-top: 0.35rem;
-  }
-
-  @media (min-width: 1000px) {
-    .menace__schema {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 0.4rem;
-    }
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.45rem;
+    padding-top: 0.15rem;
   }
 
   .menace__etape {
@@ -1077,5 +1070,157 @@ body::before {
 
   .points__point--on {
     fill: var(--copper-text);
+  }
+}
+
+/* ============================================================================
+   LES DIAGRAMMES DE MENACE (`L4`)
+
+   Une figure par menace, et une seule grammaire pour les vingt-trois : sans elle
+   on obtient une collection de dessins, pas un système. Le vocabulaire tient en
+   six classes, et la couleur ne vient QUE d'elles. Une figure qui écrirait sa
+   propre couleur ne basculerait pas avec la bande, et
+   `tests/test_schemas_menaces.py` la rejette avant la construction.
+
+     .n      une station              .a   le trait de l'attaque
+     .n--hot une station compromise   .x   une barre de blocage
+     .f      un flux normal           .d   une frontière en pointillés
+     .t      une étiquette            .t--hot   une étiquette d'accent
+
+   Contrastes mesurés, bande claire sur `--paper-warm` avec les boîtes en
+   `--paper` : traits et flux 5.83:1 (6.11 sur une boîte), attaque 4.69:1
+   (5.19 sur une boîte), étiquettes 7.59:1, étiquette d'accent 5.19:1. Les traits
+   et les flèches portent de l'information au sens de WCAG 1.4.11 — une figure
+   dont on ne verrait pas les liens ne dirait plus rien — d'où le seuil 3:1 tenu
+   avec `--text-low` et non un gris décoratif.
+
+   **Le lavis est banni ici aussi.** `--copper-wash` sous une étiquette cuivre
+   donnait 4.62:1, soit 0.12 de marge. La station compromise garde donc le fond
+   `--paper` et ne se distingue que par son cadre et son étiquette : 5.19:1. Une
+   surface translucide mange toujours la marge du cuivre, et c'est la troisième
+   fois que ce fichier le constate.
+
+   **Le mouvement est à l'arrêt par défaut**, et c'est délibéré. Vingt-trois
+   figures qui s'animent en même temps font une page qui clignote, pas une page
+   qui explique. Le trait d'attaque ne se met en marche qu'au survol de sa rangée
+   ou quand elle est ouverte : le mouvement devient alors une réponse à un geste,
+   donc une information.
+   ========================================================================== */
+@layer components {
+  .diag {
+    display: block;
+    width: 100%;
+    max-width: 200px;
+    height: auto;
+
+    --diag-line: var(--text-low);
+    --diag-text: var(--text-mid);
+    --diag-hot: var(--copper-text);
+    --diag-face: var(--paper);
+  }
+
+  .diag--grand {
+    max-width: 400px;
+  }
+
+  .diag .n {
+    fill: var(--diag-face);
+    stroke: var(--diag-line);
+    stroke-width: 1;
+  }
+
+  .diag .n--hot {
+    stroke: var(--diag-hot);
+    stroke-width: 1.4;
+  }
+
+  .diag .f {
+    fill: none;
+    stroke: var(--diag-line);
+    stroke-width: 1;
+    stroke-linecap: round;
+  }
+
+  .diag .a {
+    fill: none;
+    stroke: var(--diag-hot);
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* Un polygone d'attaque (une pointe, un éclat) veut du plein, pas un contour.
+     `fill: none` sur `.a` le rendrait invisible ; cette règle le rattrape sans
+     obliger l'auteur de la figure à écrire une couleur. */
+  .diag polygon.a {
+    fill: var(--diag-hot);
+  }
+
+  .diag .x {
+    fill: none;
+    stroke: var(--diag-hot);
+    stroke-width: 2.4;
+    stroke-linecap: round;
+  }
+
+  .diag .d {
+    fill: none;
+    stroke: var(--diag-line);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+  }
+
+  .diag .t {
+    fill: var(--diag-text);
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 8px;
+    letter-spacing: 0.02em;
+  }
+
+  .diag .t--hot {
+    fill: var(--diag-hot);
+  }
+
+  .diag .mk {
+    fill: var(--diag-line);
+    stroke: none;
+  }
+
+  .diag .mk--hot {
+    fill: var(--diag-hot);
+  }
+
+  /* Les marqueurs vivent dans le `<defs>` partagé, hors de tout `.diag` : la règle
+     ci-dessus ne les atteint pas. Ils prennent donc leurs jetons au document. */
+  .mk {
+    fill: var(--text-low);
+    stroke: none;
+  }
+
+  .mk--hot {
+    fill: var(--copper-text);
+  }
+
+  /* Le trait d'attaque en marche : un pointillé qui remonte le chemin. À l'arrêt,
+     `stroke-dasharray` n'est pas posé du tout — le trait reste plein et lisible,
+     ce qui compte pour la figure imprimée ou capturée. */
+  .menace-bloc:hover .diag .a-move,
+  .menace-bloc:focus-within .diag .a-move {
+    stroke-dasharray: 5 4;
+    animation: diagFlux 1.6s linear infinite;
+  }
+
+  @keyframes diagFlux {
+    to {
+      stroke-dashoffset: -18;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menace-bloc:hover .diag .a-move,
+  .menace-bloc:focus-within .diag .a-move {
+    stroke-dasharray: none;
+    animation: none;
   }
 }

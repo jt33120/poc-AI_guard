@@ -28,9 +28,11 @@ import { useState } from "react";
 
 import { useT, type StrKey } from "@/lib/i18n";
 import { FAITS_PUBLIES } from "@/lib/facts";
+import { Diagramme, DiagrammeDefs } from "@/components/Diagramme";
 import { PROFILS, useProfils } from "@/components/ProfilContext";
 import { ReplayPanel } from "@/components/ReplayPanel";
 import { rejeuDe } from "@/lib/replays";
+import { SCHEMAS } from "@/lib/schemas";
 import { RELEVE, type LigneMenace, type ReleveProfil } from "@/lib/threats";
 import {
   cleClair,
@@ -144,11 +146,13 @@ function Densite({ scenarios }: { scenarios: number }) {
 }
 
 /**
- * Les cinq points de la chaîne, celui de l'étape allumé.
+ * Les cinq points de la chaîne d'attaque, celui de l'étape allumé.
  *
- * `aria-hidden` : le nom de l'étape est écrit en toutes lettres juste à côté, donc
- * le glyphe répète et n'informe pas. Un lecteur d'écran qui l'annoncerait ferait
- * entendre deux fois la même chose.
+ * Ne sert plus qu'à la légende en tête de section, où les cinq étapes sont montrées
+ * ensemble. Les rangées, elles, portent désormais un vrai diagramme : une pastille en
+ * plus y répéterait ce que la figure montre déjà.
+ *
+ * `aria-hidden` parce que le nom de l'étape est écrit juste à côté.
  */
 function Points({ actif }: { actif: number }) {
   return (
@@ -168,19 +172,32 @@ function Points({ actif }: { actif: number }) {
 }
 
 /**
- * Le schéma d'une rangée : où la menace entre dans la chaîne, et si elle est du
- * haut du classement.
+ * La colonne de gauche d'une rangée : le diagramme, son étape, et son rang critique.
  *
- * L'étiquette « critique » est écrite en toutes lettres et non seulement portée par
- * la graisse du titre : un signal typographique n'est pas annoncé par un lecteur
- * d'écran, et le haut du classement est précisément ce qu'il ne faut pas rater.
+ * Le diagramme montre le **mécanisme** de cette menace-là, pas une icône de catégorie.
+ * C'est la différence entre « il y a un danger dans les données » et « un document lu
+ * par l'agent porte des ordres cachés qu'il exécute » : la seconde se dessine, et une
+ * fois dessinée elle se comprend sans lire la phrase.
+ *
+ * L'étape reste écrite en toutes lettres sous la figure. Le diagramme la montre déjà,
+ * mais un lecteur d'écran ne lit pas un dessin, et le `<title>` de la figure nomme le
+ * mécanisme, pas la position dans la chaîne.
  */
-function Schema({ etape, critique }: { etape: Etape; critique: boolean }) {
+function Schema({
+  rang,
+  etape,
+  critique,
+}: {
+  rang: number;
+  etape: Etape;
+  critique: boolean;
+}) {
   const { t } = useT();
+  const corps = SCHEMAS[rang];
   return (
     <div className="menace__schema">
       {critique && <span className="menace__flag">{t("land.menace.critique")}</span>}
-      <Points actif={ETAPES.indexOf(etape)} />
+      {corps && <Diagramme corps={corps} />}
       <span className="menace__etape">{t(cleEtape(etape))}</span>
     </div>
   );
@@ -252,7 +269,7 @@ function Rangee({
       >
         <span className="menace__rang">{String(menace.rang).padStart(2, "0")}</span>
 
-        <Schema etape={menace.etape} critique={menace.critique} />
+        <Schema rang={menace.rang} etape={menace.etape} critique={menace.critique} />
 
         <span className="min-w-0">
           {/* Le titre passe par le dictionnaire et non par `ligne.titre`, alors même
@@ -329,7 +346,7 @@ function RangeeHorsCarte({ menace }: { menace: Menace }) {
     <div className="menace-bloc">
       <div className="menace" data-critique={menace.critique ? "true" : undefined}>
         <span className="menace__rang">{String(menace.rang).padStart(2, "0")}</span>
-        <Schema etape={menace.etape} critique={menace.critique} />
+        <Schema rang={menace.rang} etape={menace.etape} critique={menace.critique} />
         <span className="min-w-0">
           <span className="menace__titre block">{t(cleTitre(menace))}</span>
           <span className="menace__clair block">{t(cleClair(menace))}</span>
@@ -444,6 +461,7 @@ export function ThreatLedger() {
     // bascule ne demande aucune substitution de couleur au point d'usage.
     <section id="menaces" className="section section--light scroll-mt-20">
       <div className="wrap wrap--wide">
+        <DiagrammeDefs />
         <p className="eyebrow" data-num="01">
           {t("ledger.kicker")}
         </p>
