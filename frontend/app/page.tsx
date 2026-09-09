@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { ShieldMark, Wordmark, XsomMark } from "@/components/brand";
 import { Audience } from "@/components/Audience";
+import { Fonctionnement } from "@/components/Fonctionnement";
 import { ProfilProvider } from "@/components/ProfilContext";
 import { ThreatLedger } from "@/components/ThreatLedger";
 import { LanguageToggle } from "@/lib/i18n";
@@ -10,34 +11,11 @@ import type { StrKey } from "@/lib/strings";
 
 const DEMO_MAILTO = "mailto:julian.talou@xsom.fr?subject=xSOM%20AI%20Guard%20%3A%20demo";
 
-const STEPS: [StrKey, StrKey][] = [
-  ["land.how.s1.t", "land.how.s1.b"],
-  ["land.how.s2.t", "land.how.s2.b"],
-  ["land.how.s3.t", "land.how.s3.b"],
-];
-
 const WHO: [StrKey, StrKey][] = [
   ["land.who.1.t", "land.who.1.b"],
   ["land.who.2.t", "land.who.2.b"],
   ["land.who.3.t", "land.who.3.b"],
 ];
-
-function FlowArrow() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className="h-6 w-6 rotate-90 text-[color:var(--copper-text)] md:rotate-0"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M5 12h14M13 6l6 6-6 6" />
-    </svg>
-  );
-}
 
 // Composant **serveur**. La page n'avait aucune interactivité en propre : elle
 // portait `"use client"` uniquement parce que `useT` était un hook. La traduction
@@ -94,17 +72,14 @@ export default function LandingPage() {
             </p>
             <p className="lead mt-6">{t("land.hero.sub")}</p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Link href="/login" className="btn btn-primary">
+              <Link href="/signup" className="btn btn-primary">
                 {t("land.hero.cta")}
               </Link>
-              <a href="#how" className="btn btn-ghost">
+              <Link href="/login" className="btn btn-ghost">
                 {t("land.hero.cta2")}
-              </a>
+              </Link>
               <Link href="/executive-preview" className="btn btn-ghost">
                 {t("land.exec.link")}
-              </Link>
-              <Link href="/mise-en-oeuvre" className="btn btn-ghost">
-                {t("mise.kicker")}
               </Link>
               <span className="muted ml-1 inline-flex items-center gap-1.5 text-sm">
                 <ShieldMark className="h-4 w-4 text-brand-bright" />
@@ -145,73 +120,10 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* How it works — première bande claire. Calque de la section « Trois garanties,
-          dans cet ordre » d'`ai-guard.html` : même rôle (le mécanisme), même forme
-          (chapeau, titre, trois cartes). Toutes les teintes écrites en dur à
-          l'intérieur passent par les jetons contextuels, sinon le texte disparaîtrait
-          sur le papier. */}
-      <section id="how" className="section section--light scroll-mt-20">
-        <div className="wrap">
-          <div className="text-center">
-            <p className="eyebrow" data-num="04">
-              {t("land.how.kicker")}
-            </p>
-            <h2 className="t-h2 mt-2" data-sheen>
-              {t("land.how.title")}
-            </h2>
-          </div>
-
-          {/* Diagram: agent → guard → tools */}
-          <div className="mt-12 flex flex-col items-stretch justify-center gap-3 md:flex-row md:items-center">
-            <div className="card flex-1 p-6 text-center">
-              <div className="text-sm font-semibold text-[color:var(--text-hi)]">
-                {t("land.how.agent")}
-              </div>
-              <div className="muted mt-1 text-xs leading-snug">{t("land.how.agent.sub")}</div>
-            </div>
-            <FlowArrow />
-            {/* Le nœud central se distingue par le PAPIER, pas par un lavis. Le
-                lavis empilé sous du cuivre était mesurable : `--copper-wash`
-                par-dessus `--paper-warm` donne rgb(244, 228.3, 221.8), sur
-                lequel `--copper-deep` (la valeur de `--copper-text` en bande
-                claire) ne tenait que 4.21:1 — sous le plancher 4.5:1 — et la
-                pastille, qui empilait un SECOND lavis, 3.80:1. Le site produit
-                exactement cet arbitrage : `.section--light .dg-node` (2 classes)
-                l'emporte sur `.dg-node--hot` (1 classe), si bien qu'en bande
-                claire le nœud chaud de son schéma perd son remplissage cuivre et
-                repasse en `var(--paper)`, ne gardant que le filet. Le blanc
-                remonte le sous-titre à 5.19:1 et la pastille à 4.62:1. */}
-            <div className="relative flex-1 rounded-2xl border border-[color:var(--copper-line)] bg-[color:var(--paper)] p-6 text-center">
-              <div className="mx-auto mb-2 grid h-9 w-9 place-items-center rounded-xl bg-[color:var(--copper-wash)] text-[color:var(--copper-text)] ring-1 ring-[color:var(--copper-line)]">
-                <ShieldMark className="h-5 w-5" />
-              </div>
-              <div className="text-sm font-bold text-[color:var(--text-hi)]">
-                {t("land.how.guard")}
-              </div>
-              <div className="mt-1 text-xs font-medium text-[color:var(--copper-text)]">
-                {t("land.how.guard.sub")}
-              </div>
-            </div>
-            <FlowArrow />
-            <div className="card flex-1 p-6 text-center">
-              <div className="text-sm font-semibold text-[color:var(--text-hi)]">
-                {t("land.how.tools")}
-              </div>
-              <div className="muted mt-1 text-xs leading-snug">{t("land.how.tools.sub")}</div>
-            </div>
-          </div>
-
-          {/* 3 steps */}
-          <div className="mt-6 grid gap-6 sm:grid-cols-3">
-            {STEPS.map(([title, body], i) => (
-              <div key={title} className="card reveal p-6" data-delay={String(i + 1)}>
-                <h3 className="t-h3">{t(title)}</h3>
-                <p className="muted mt-1.5 text-sm leading-relaxed">{t(body)}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Comment ça marche — première bande claire. Le principe, la preuve et
+          le branchement en une seule section : voir `components/Fonctionnement.tsx`
+          pour pourquoi les trois ne font plus qu'un. */}
+      <Fonctionnement />
 
       {/* Compliance — l'aparté, en bande resserrée. Le panneau en dégradé cuivre
           disparaît : sur le site, le cuivre se concentre dans le seul bandeau final
@@ -219,7 +131,7 @@ export default function LandingPage() {
       <section className="section section--tight">
         <div className="wrap split">
           <div>
-            <p className="eyebrow" data-num="06">
+            <p className="eyebrow" data-num="05">
               {t("land.comp.kicker")}
             </p>
             <h2 className="t-h2 mt-4" data-sheen>
@@ -237,7 +149,7 @@ export default function LandingPage() {
       <section className="section section--light">
         <div className="wrap">
           <div className="text-center">
-            <p className="eyebrow" data-num="07">
+            <p className="eyebrow" data-num="06">
               {t("land.who.kicker")}
             </p>
             <h2 className="t-h2 mt-2" data-sheen>
@@ -271,7 +183,7 @@ export default function LandingPage() {
           </h2>
           <p className="lead mx-auto mt-4">{t("land.cta.body")}</p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Link href="/login" className="btn btn-primary">
+            <Link href="/signup" className="btn btn-primary">
               {t("land.hero.cta")}
             </Link>
             <a href={DEMO_MAILTO} className="btn btn-ghost">

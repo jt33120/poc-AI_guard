@@ -62,7 +62,6 @@ _CONNU: dict[str, int] = {
     "app/auth/reset/page.tsx": 2,
     "app/executive-preview/page.tsx": 3,
     "app/forgot-password/page.tsx": 2,
-    "app/mise-en-oeuvre/page.tsx": 3,
     "components/ApiKeys.tsx": 3,
     "components/AppShell.tsx": 2,
     "components/ClientScope.tsx": 3,

@@ -30,7 +30,7 @@ import pytest
 _REPO = Path(__file__).resolve().parent.parent
 _SVG = _REPO / "frontend" / "public" / "demo-replay.svg"
 _TXT = _REPO / "frontend" / "public" / "demo-replay.txt"
-_PAGE = _REPO / "frontend" / "app" / "mise-en-oeuvre" / "page.tsx"
+_PAGE = _REPO / "frontend" / "components" / "Fonctionnement.tsx"
 _RECORD = _REPO / "scripts" / "record_demo.py"
 
 #: Ce que `scripts/demo.py` imprime en dernier quand tous les invariants tiennent.
