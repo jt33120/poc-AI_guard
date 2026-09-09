@@ -25,14 +25,7 @@
  */
 
 /**
- * Les têtes de flèche, posées une seule fois pour toute la page.
- *
- * Le mot « deux » manquait ici, et son absence est volontaire : le garde `L4`
- * (`scripts/gen_marketing.py`) extrait tout le texte entre un `>` et le `<` suivant,
- * ce qui avale plusieurs paragraphes de commentaire d'un seul tenant. Un nombre écrit
- * dans ce commentaire s'y retrouve donc voisin du mot « menace » venu du nom d'un
- * fichier de test, et le garde y lit un chiffre de couverture. C'est un angle mort à
- * lui signaler, pas une raison de l'élargir.
+ * Les deux têtes de flèche, posées une seule fois pour toute la page.
  *
  * `overflow-hidden` et une taille nulle plutôt que `display:none` : un `<defs>` dans
  * un conteneur non rendu est ignoré par certains moteurs, et les flèches

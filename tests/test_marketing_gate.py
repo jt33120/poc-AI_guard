@@ -243,3 +243,116 @@ def test_the_guard_reads_a_copy_that_is_really_there() -> None:
     assert "emplois génériques" in rendu.stdout
     generiques = int(rendu.stdout.split("emplois génériques")[0].strip().split()[-1])
     assert generiques > 10, f"seulement {generiques} phrases parcourues : copie introuvable ?"
+
+
+# --- Le gate ne lit plus les commentaires, et voit toujours le balisage ---------
+#
+# Ce bloc existe parce que le gate a refusé un fichier pour un nombre qui n'était pas
+# sur la page : `_TEXTE_JSX` prend tout ce qui sépare un `>` d'un `<`, et un
+# commentaire d'architecture cite forcément du balisage, si bien qu'un `>` de
+# commentaire trouvait son `<` plusieurs paragraphes plus loin. Punir les commentaires
+# ne protège personne et pousse à en écrire moins.
+#
+# Élargir un gate est plus risqué que le durcir : le durcissement échoue bruyamment,
+# l'élargissement se trompe en silence. Les trois tests qui suivent le premier sont
+# donc les vrais : ils vérifient que le filtre n'a rendu le gate aveugle à rien.
+
+
+@pytest.fixture
+def page_restauree() -> Iterator[Path]:
+    """Rendre la page telle qu'elle était, quoi qu'il arrive au test."""
+    original = _PAGE.read_text(encoding="utf-8")
+    try:
+        yield _PAGE
+    finally:
+        _PAGE.write_text(original, encoding="utf-8")
+
+
+def test_a_number_in_a_comment_is_not_read_as_markup(page_restauree: Path) -> None:
+    """Un commentaire n'est pas de la copie : le visiteur ne le lit jamais."""
+    _inserer(
+        page_restauree,
+        '<main className="relative">',
+        "{/* Seize lignes de menace : le relevé les publie via <ThreatLedger />. */}\n      ",
+    )
+    rendu = _gate()
+    assert rendu.returncode == 0, (
+        "le gate refuse un nombre écrit dans un commentaire :\n" + rendu.stderr
+    )
+
+
+def test_a_number_in_markup_beside_a_comment_is_still_refused(page_restauree: Path) -> None:
+    """Le contrôle qui compte : le filtre n'a pas emporté le balisage avec lui.
+
+    Un retrait de commentaires trop gourmand blanchirait la ligne suivante, et le gate
+    cesserait de voir ce qu'il existe pour voir — sans que rien ne le signale.
+    """
+    _inserer(
+        page_restauree,
+        '<main className="relative">',
+        "{/* Un commentaire qui cite <ThreatLedger /> et parle de menaces. */}\n"
+        "      <p>16 lignes de menace, 8 bloquées</p>\n      ",
+    )
+    rendu = _gate()
+    assert rendu.returncode == 1
+    assert "chiffre de couverture écrit dans le balisage" in rendu.stderr
+
+
+def test_a_double_slash_inside_a_string_opens_no_comment(page_restauree: Path) -> None:
+    """`https://…` n'ouvre pas un commentaire de ligne.
+
+    Sans cette distinction, la moitié d'une ligne portant une URL disparaîtrait de
+    l'analyse, et le chiffre qui la suit avec elle.
+    """
+    _inserer(
+        page_restauree,
+        '<main className="relative">',
+        '<a href="https://exemple.test/a">16 lignes de menace</a>\n      ',
+    )
+    rendu = _gate()
+    assert rendu.returncode == 1
+    assert "chiffre de couverture écrit dans le balisage" in rendu.stderr
+
+
+def test_a_regex_literal_does_not_swallow_the_rest_of_its_line(page_restauree: Path) -> None:
+    r"""Le cas réel qui a dicté la forme du filtre.
+
+    `replace(/^https?:\/\//, "")` figure dans deux composants analysés. Un scanner qui
+    lirait son `//` final comme un commentaire blanchirait la fin de la ligne, et le
+    gate y perdrait la vue. Le littéral est donc consommé d'un bloc, et le chiffre
+    placé APRÈS lui, sur la même ligne, doit rester visible.
+    """
+    _inserer(
+        page_restauree,
+        '<main className="relative">',
+        '<span>{"x".replace(/^https?:\\/\\//, "")}</span><p>16 lignes de menace</p>\n      ',
+    )
+    rendu = _gate()
+    assert rendu.returncode == 1
+    assert "chiffre de couverture écrit dans le balisage" in rendu.stderr
+
+
+def test_a_file_opening_on_a_jsdoc_block_is_still_scanned(page_restauree: Path) -> None:
+    """Non-régression sur un défaut de la première version du filtre.
+
+    Un `/**` en tête de fichier n'a aucun caractère avant lui. L'heuristique qui
+    distingue une regex d'une division lisait donc cette absence comme « on peut ouvrir
+    une regex ici », et consommait l'en-tête jusqu'au premier `/` venu — celui d'un
+    `<X />` cité dans la prose. Le reste du commentaire repassait dans l'analyse, et le
+    balisage suivant en sortait.
+
+    La règle est plus simple que l'heuristique : un `/` suivi de `*` ou de `/` est
+    toujours un commentaire. `//` est le commentaire de ligne de JavaScript, et `/*`
+    n'est pas une expression régulière valide.
+    """
+    _inserer(
+        page_restauree,
+        '<main className="relative">',
+        "{/**\n       * Un en-tête qui cite <ThreatLedger /> et parle de menaces.\n       */}\n"
+        "      <p>16 lignes de menace</p>\n      ",
+    )
+    rendu = _gate()
+    assert rendu.returncode == 1, (
+        "le filtre a emporté le balisage qui suivait un bloc de commentaire :\n" + rendu.stderr
+    )
+    assert "chiffre de couverture écrit dans le balisage" in rendu.stderr
