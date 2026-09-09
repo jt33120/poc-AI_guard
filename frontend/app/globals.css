@@ -936,6 +936,46 @@ body::before {
   /* --- Le relevé ---------------------------------------------------------- */
   .paysage {
     border-top: 1px solid var(--border);
+
+    /* Le gabarit du relevé, déclaré une fois. La barre de libellés et les rangées
+       le lisent toutes deux : deux copies d'un même gabarit finissent par se
+       décaler d'une gouttière, et personne ne sait laquelle a bougé. */
+    --releve-cols: 2.75rem minmax(0, 1fr);
+    --releve-gap: 1rem;
+  }
+
+  @media (min-width: 1000px) {
+    .paysage {
+      --releve-cols: 2.75rem 13rem minmax(0, 1fr) 14rem;
+      --releve-gap: 1.75rem;
+    }
+  }
+
+  /* Les libellés de colonnes. Ils rendent la colonne de droite lisible tout de
+     suite : `[ B ] BLOQUÉ ||||· M-02` se reconstitue sinon par déduction.
+     Sous 1000px la grille n'a que deux colonnes, ils n'auraient rien à
+     surmonter et sortent. `--text-low` plutôt que le `--text-faint` de
+     `.label` : ce sont les plus petits caractères de la section. */
+  .paysage__tete {
+    display: none;
+  }
+
+  @media (min-width: 1000px) {
+    .paysage__tete {
+      display: grid;
+      grid-template-columns: var(--releve-cols);
+      column-gap: var(--releve-gap);
+      padding: 0 0.25rem 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .paysage__tete .label {
+      color: var(--text-low);
+    }
+
+    .paysage__tete .label:last-child {
+      text-align: right;
+    }
   }
 
   .menace-bloc {
@@ -953,19 +993,55 @@ body::before {
     display: grid;
     width: 100%;
     text-align: left;
-    grid-template-columns: 2.75rem minmax(0, 1fr);
-    gap: 0.25rem 1rem;
+    grid-template-columns: var(--releve-cols);
+    gap: 0.25rem var(--releve-gap);
     align-items: start;
     padding: 1.15rem 0.25rem;
   }
 
-  /* Quatre colonnes réelles à partir de 1000px : c'est ce que la largeur
-     supplémentaire achète, et la seule raison de l'avoir prise. */
+  /* Placement explicite, et ce n'est pas une précaution.
+
+     La grille n'a que deux colonnes sous 1000px, mais la rangée a quatre
+     enfants et aucun ne déclarait sa colonne. Le placement automatique posait
+     donc le titre et la phrase en clair DANS la colonne de 2.75rem : mesuré,
+     le corps faisait 44px de large à 900px comme à 390px, le texte se cassait
+     caractère par caractère, et la section pesait dix-huit écrans sur mobile.
+     Le défaut était là avant ce lot et personne ne l'avait vu. */
+  .menace__rang {
+    grid-column: 1;
+  }
+
+  .menace__schema,
+  .menace__corps,
+  .menace__couverture {
+    grid-column: 2;
+  }
+
   @media (min-width: 1000px) {
-    .menace {
-      grid-template-columns: 2.75rem 13rem minmax(0, 1fr) 14rem;
-      column-gap: 1.75rem;
+    .menace__corps {
+      grid-column: 3;
     }
+
+    .menace__couverture {
+      grid-column: 4;
+    }
+  }
+
+  /* Le corps de la rangée. `min-width: 0` porté par la classe et non par un
+     utilitaire au point d'usage : une piste de grille ne se laisse pas
+     rétrécir sous la largeur de son contenu sans qu'on le lui dise, et le
+     titre déborderait sa colonne. */
+  .menace__corps {
+    min-width: 0;
+  }
+
+  /* Le bouton n'avait aucun anneau de focus et retombait sur celui du
+     navigateur. Beaucoup de cibles, dont la plupart hautes de 39px : la
+     navigation au clavier a besoin qu'on dise où elle est. L'offset négatif
+     garde l'anneau dans la rangée, sans heurter le filet de la voisine. */
+  .menace:focus-visible {
+    outline: 2px solid var(--copper-text);
+    outline-offset: -2px;
   }
 
   .menace__rang {
@@ -1051,6 +1127,66 @@ body::before {
     font-family: var(--font-mono), ui-monospace, monospace;
     font-size: var(--fs-label);
     color: var(--text-faint);
+  }
+
+  /* --- Le second registre -------------------------------------------------
+
+     Le haut du classement se lit en rangées pleines ; le reste se lit en
+     lignes. Ce qui coûte la hauteur n'est pas le nombre de rangées, c'est la
+     figure de 112px peinte sur chaque rangée FERMÉE : mesuré, une rangée
+     fermée fait 176px et sa figure en fait 112. La ligne compacte tombe à
+     39px, et la figure revient à l'ouverture.
+
+     Rien n'est retiré du document. La figure, la phrase en clair et le chemin
+     d'entrée sont servis au premier rendu pour toutes les menaces et restent
+     dans `textContent` : la recherche dans la page les trouve, un robot les
+     lit, et la règle que ce fichier s'est donnée — une rangée qui ne concerne
+     pas le visiteur est estompée, jamais cachée — n'est pas contredite. C'est
+     ce qui a fait préférer la compaction à un `<details>` qui aurait replié le
+     bas du classement : le pli n'économisait que 0.73 écran de plus, au prix
+     de tout cela.
+
+     La coupure suit le drapeau `critique` de `lib/menaces.ts`. Aucun rang,
+     aucun seuil, aucun nombre n'est écrit ici : basculer un drapeau dans le
+     classement déplace la rangée de registre toute seule.
+
+     `:not([aria-expanded="true"])` annule la compaction, si bien qu'un clic
+     rend la rangée pleine ET ouvre son panneau de preuve d'un coup. La rangée
+     hors carte ne porte pas l'attribut du tout — elle ne peut pas s'ouvrir —
+     donc elle reste compacte, ce qui est ce qu'il faut. */
+  .releve__suite .menace:not([aria-expanded="true"]) {
+    align-items: center;
+    padding-block: 0.5rem;
+  }
+
+  .releve__suite .menace:not([aria-expanded="true"]) .diag,
+  .releve__suite .menace:not([aria-expanded="true"]) .menace__clair,
+  .releve__suite .menace:not([aria-expanded="true"]) .menace__releve {
+    display: none;
+  }
+
+  /* La figure partie, l'étape reste seule dans sa colonne, en face du titre.
+     `display: none` et non `visibility` ni une opacité : la figure sort ainsi
+     de l'arbre d'accessibilité au lieu d'y laisser son `<title>` en double. */
+  .releve__suite .menace:not([aria-expanded="true"]) .menace__schema {
+    padding-top: 0;
+    gap: 0;
+  }
+
+  /* Au-dessus du point de rupture la couverture repasse en ligne, calée à
+     droite, sur la colonne que la barre de libellés surmonte. Sous 1000px elle
+     retombe sous le titre et la ligne compacte fait deux ou trois lignes : le
+     registre en une ligne n'existe qu'à partir du point de rupture, c'est
+     assumé. */
+  @media (min-width: 1000px) {
+    .releve__suite .menace:not([aria-expanded="true"]) .menace__couverture {
+      flex-direction: row;
+      flex-wrap: nowrap;
+      align-items: baseline;
+      justify-content: flex-end;
+      gap: 0.9rem;
+      margin-top: 0;
+    }
   }
 
   /* La pastille : cinq points, celui de l'étape allumé. */

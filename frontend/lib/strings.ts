@@ -468,14 +468,14 @@ export const STR = {
   },
 
 
-  "land.problem.kicker": { en: "The problem", fr: "Le problème" },
+  "land.problem.kicker": { en: "The gap", fr: "Le décalage" },
   "land.problem.title": {
-    en: "AI agents don't just talk. They act.",
-    fr: "Les agents IA ne font pas que parler. Ils agissent.",
+    en: "AI is spreading faster than its users' understanding",
+    fr: "L'IA se répand plus vite que la compréhension de ses utilisateurs",
   },
   "land.problem.body": {
-    en: "They send emails, update records, move money, delete data, call internal APIs. A prompt filter can't stop a bad action: by the time the text is generated, the action is one tool-call away. You need a control point on what the agent does, not just on what it says.",
-    fr: "Ils envoient des emails, modifient des enregistrements, déplacent de l'argent, suppriment des données, appellent des API internes. Un filtre de prompt ne peut pas arrêter une mauvaise action : quand le texte est généré, l'action n'est qu'à un appel d'outil. Il faut un point de contrôle sur ce que l'agent fait, pas seulement sur ce qu'il dit.",
+    en: "From engineering teams to the business, assistants get wired to real tools: mailboxes, CRM, databases, internal APIs. The agent inherits the rights of whoever installed it, and nobody can say in advance which operations it will trigger: the answer shows up afterwards, in the logs. And once an action has left, it has happened. A sent email, an overwritten record, an issued payment cannot be taken back, and a prompt filter changes none of that: by the time the text exists, the action is one tool-call away.",
+    fr: "Des équipes de développement aux métiers, on branche des assistants sur des outils réels : messagerie, CRM, base de données, API interne. L'agent hérite des droits de la personne qui l'a installé, et personne ne sait dire à l'avance quelles opérations il déclenchera : la réponse arrive après coup, dans les journaux. Or une action partie est une action faite. Un email envoyé, un enregistrement écrasé, un virement émis ne se rattrapent pas, et un filtre de prompt n'y change rien : quand le texte est écrit, l'action n'est qu'à un appel d'outil.",
   },
 
   "land.how.kicker": { en: "How it works", fr: "Comment ça marche" },
@@ -692,33 +692,35 @@ export const STR = {
     fr: "Une image ou un texte modifié de façon imperceptible fait dire au modèle exactement le contraire.",
   },
 
-  "land.comp.kicker": { en: "Built for compliance", fr: "Conçu pour la conformité" },
-  "land.comp.title": { en: "Evidence, not promises", fr: "Des preuves, pas des promesses" },
-  "land.comp.body": {
-    en: "The EU AI Act requires human oversight (Article 14) and record-keeping for high-risk AI. xSOM produces exactly that: a complete, verifiable trail of every decision and approval, exportable for auditors and regulators in one click.",
-    fr: "L'AI Act européen exige une supervision humaine (Article 14) et une traçabilité pour l'IA à haut risque. xSOM produit exactement cela : une trace complète et vérifiable de chaque décision et validation, exportable pour auditeurs et régulateurs en un clic.",
+  "land.offre.kicker": { en: "How you get it", fr: "Comment on l'obtient" },
+  "land.offre.title": {
+    en: "Two offers. The difference is technical before it is commercial.",
+    fr: "Deux offres. La différence est technique avant d'être commerciale.",
   },
-
-  "land.who.kicker": { en: "Who it's for", fr: "Pour qui" },
-  "land.who.title": {
-    en: "For teams putting AI agents to work",
-    fr: "Pour les équipes qui mettent les agents IA au travail",
+  "land.offre.saas.t": { en: "The SaaS offer", fr: "L'offre SaaS" },
+  "land.offre.saas.q": {
+    en: "For developers and small teams: sign up, plug in, nothing to install.",
+    fr: "Pour les développeurs et les petites équipes : on s'inscrit, on branche, rien à installer.",
   },
-  "land.who.1.t": { en: "Customer-facing assistants", fr: "Assistants clients" },
-  "land.who.1.b": {
-    en: "Keep autonomous support and sales agents on-policy.",
-    fr: "Gardez vos agents de support et de vente autonomes conformes à la politique.",
+  "land.offre.saas.b": {
+    en: "Your agent calls POST /v1/authorize before each tool and honours the verdict, or its LLM SDK points at the xSOM proxy, which inspects every outbound prompt and every tool call the model asks for, without touching the agent's logic. The first route is cooperative: we return a verdict, your code decides to apply it. The second strips the calls your policy does not allow out of the model's answer, but it cannot pause an execution for a human approval, and streaming passes through uninspected. An agent that does not honour the verdict acts anyway.",
+    fr: "Votre agent appelle POST /v1/authorize avant chaque outil et honore le verdict, ou son SDK LLM pointe sur le proxy xSOM, qui inspecte chaque prompt sortant et chaque appel d'outil que le modèle demande, sans toucher à la logique de l'agent. La première voie est coopérative : nous rendons un verdict, votre code décide de l'appliquer. La seconde retire de la réponse du modèle les appels que votre politique n'autorise pas, mais elle ne peut pas suspendre une exécution le temps d'une validation humaine, et le streaming passe sans inspection. Un agent qui n'honore pas le verdict agit quand même.",
   },
-  "land.who.2.t": { en: "Internal copilots", fr: "Copilotes internes" },
-  "land.who.2.b": {
-    en: "Let employees' AI tools act on real systems, safely.",
-    fr: "Laissez les outils IA des employés agir sur les vrais systèmes, en toute sécurité.",
+  "land.offre.saas.cta": { en: "Create an account", fr: "Créer un compte" },
+  "land.offre.service.t": { en: "The service offer", fr: "L'offre de service" },
+  "land.offre.service.q": {
+    en: "For large organisations that must be able to prove a refused action did not happen.",
+    fr: "Pour les grands comptes qui doivent pouvoir prouver qu'une action refusée n'a pas eu lieu.",
   },
-  "land.who.3.t": { en: "Back-office automation", fr: "Automatisation back-office" },
-  "land.who.3.b": {
-    en: "Gate the irreversible steps inside autonomous workflows.",
-    fr: "Contrôlez les étapes irréversibles des workflows autonomes.",
+  "land.offre.service.b": {
+    en: "The MCP gateway sits between the agent and its tool servers: it executes, or it does not. Nothing in the agent has to cooperate, which is what makes it the only route that binds tool execution. It runs on your side, started by your own agent; the service offer is installing it with you, writing the policy against your obligations, and standing behind the audit trail. It is carried by the xSOM consultancy, of which this product is one offer.",
+    fr: "La passerelle MCP s'intercale entre l'agent et ses serveurs d'outils : elle exécute, ou elle n'exécute pas. Rien dans l'agent n'a à coopérer, ce qui en fait la seule voie qui contraigne l'exécution d'un outil. Elle tourne chez vous, lancée par votre propre agent ; l'offre de service, c'est l'installer avec vous, écrire la politique sur vos obligations et tenir la preuve d'audit. Elle est portée par le cabinet de conseil xSOM, dont ce produit est une offre.",
   },
+  "land.offre.service.cta": { en: "Request an engagement", fr: "Demander une prestation" },
+  "ledger.col.rang": { en: "Rank", fr: "Rang" },
+  "ledger.col.entree": { en: "Entry", fr: "Entrée" },
+  "ledger.col.menace": { en: "Threat", fr: "Menace" },
+  "ledger.col.preuve": { en: "Mode · Evidence · Row", fr: "Mode · Preuve · Ligne" },
 
   "land.cta.kicker": { en: "Next step", fr: "Prochaine étape" },
   "land.cta.title": {

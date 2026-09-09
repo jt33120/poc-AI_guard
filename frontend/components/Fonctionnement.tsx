@@ -141,7 +141,7 @@ export function Fonctionnement() {
           décalage comme une erreur plutôt que comme une intention. */}
       <div className="wrap wrap--wide">
         <div className="text-center">
-          <p className="eyebrow" data-num="04">
+          <p className="eyebrow" data-num="01">
             {t("land.how.kicker")}
           </p>
           <h2 className="t-h2 mt-2" data-sheen>

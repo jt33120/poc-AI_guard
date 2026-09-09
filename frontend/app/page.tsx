@@ -7,19 +7,12 @@ import { ProfilProvider } from "@/components/ProfilContext";
 import { ThreatLedger } from "@/components/ThreatLedger";
 import { LanguageToggle } from "@/lib/i18n";
 import { serverT } from "@/lib/lang";
-import type { StrKey } from "@/lib/strings";
 
 const DEMO_MAILTO = "mailto:julian.talou@xsom.fr?subject=xSOM%20AI%20Guard%20%3A%20demo";
 
 //: Le cabinet. La voie qui demande une installation y mène, parce qu'elle se vend
 //: avec des humains — ce produit en est une offre, pas l'inverse.
 const SITE_CABINET = "https://www.xsom.fr";
-
-const WHO: [StrKey, StrKey][] = [
-  ["land.who.1.t", "land.who.1.b"],
-  ["land.who.2.t", "land.who.2.b"],
-  ["land.who.3.t", "land.who.3.b"],
-];
 
 // Composant **serveur**. La page n'avait aucune interactivité en propre : elle
 // portait `"use client"` uniquement parce que `useT` était un hook. La traduction
@@ -101,18 +94,18 @@ export default function LandingPage() {
           sélecteurs poseraient au visiteur une question à laquelle il a répondu.
           Les seize lignes restent rendues côté serveur : un robot les voit sans
           exécuter de JavaScript. Ils portent les numéros 01 et 02 de la page. */}
-      <ProfilProvider>
-        <ThreatLedger />
-        <Audience />
-      </ProfilProvider>
+      {/* 01 — Comment ça marche. La section principale passe en tête : c'est elle
+          qui dit ce que le produit FAIT, et tout le reste s'y rapporte. Voir
+          `components/Fonctionnement.tsx` pour pourquoi le principe, la preuve et le
+          branchement n'y font plus qu'un. */}
+      <Fonctionnement />
 
-      {/* Problem */}
-      {/* Deux colonnes éditoriales, et plus de carte : une carte autour d'une section
-          entière est précisément la forme que le site refuse. */}
+      {/* 02 — Le problème. Deux colonnes éditoriales, et plus de carte : une carte
+          autour d'une section entière est précisément la forme que le site refuse. */}
       <section className="section">
         <div className="wrap split">
           <div>
-            <p className="eyebrow" data-num="03">
+            <p className="eyebrow" data-num="02">
               {t("land.problem.kicker")}
             </p>
             <h2 className="t-h2 mt-4" data-sheen>
@@ -125,57 +118,70 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Comment ça marche — première bande claire. Le principe, la preuve et
-          le branchement en une seule section : voir `components/Fonctionnement.tsx`
-          pour pourquoi les trois ne font plus qu'un. */}
-      <Fonctionnement />
+      {/* 03 — Les offres. Elle remplace « pour qui », qui listait des cas d'usage
+          sans jamais dire comment on achète.
 
-      {/* Compliance — l'aparté, en bande resserrée. Le panneau en dégradé cuivre
-          disparaît : sur le site, le cuivre se concentre dans le seul bandeau final
-          plutôt que de se disperser en fonds de section. */}
-      <section className="section section--tight">
-        <div className="wrap split">
-          <div>
-            <p className="eyebrow" data-num="05">
-              {t("land.comp.kicker")}
-            </p>
-            <h2 className="t-h2 mt-4" data-sheen>
-              {t("land.comp.title")}
-            </h2>
-          </div>
-          <div>
-            <p className="lead">{t("land.comp.body")}</p>
-          </div>
-        </div>
-      </section>
+          Deux cartes et non trois : la coupure suit une frontière technique réelle,
+          celle de la contrainte. `/v1/authorize` rend un verdict que l'agent décide
+          d'honorer ; la passerelle exécute ou n'exécute pas. La copie le dit au lieu
+          de le cacher, parce que c'est ce qui sépare les deux offres.
 
-      {/* Who it's for — seconde bande claire. Section entièrement tokenisée
-          (`.card`, `h3`, `.muted`) : elle bascule sans une seule substitution. */}
+          La passerelle n'est PAS réservée au service : `lib/integration.ts` la livre
+          dans l'assistant d'intégration, et `Fonctionnement` la présente en voie
+          numéro un. Ce que le service ajoute, c'est l'installation, la politique
+          écrite sur vos obligations, et l'audit tenu. Prétendre l'inverse ferait
+          mentir cette page contre elle-même. */}
       <section className="section section--light">
         <div className="wrap">
           <div className="text-center">
-            <p className="eyebrow" data-num="06">
-              {t("land.who.kicker")}
+            <p className="eyebrow" data-num="03">
+              {t("land.offre.kicker")}
             </p>
             <h2 className="t-h2 mt-2" data-sheen>
-              {t("land.who.title")}
+              {t("land.offre.title")}
             </h2>
           </div>
-          <div className="mt-12 grid gap-6 sm:grid-cols-3">
-            {WHO.map(([title, body], i) => (
-              <div key={title} className="card reveal p-6" data-delay={String(i + 1)}>
-                {/* Ces trois cartes sont les seules sans pastille d'icône : le numéro
-                    y tient le rôle de marqueur d'entrée. Un chiffre nu est invariant
-                    par langue, comme les `data-num` des chapeaux — il ne passe donc
-                    pas par le dictionnaire. */}
-                <span className="card__num">{`0${i + 1}`}</span>
-                <h3 className="t-h3">{t(title)}</h3>
-                <p className="muted mt-1.5 text-sm leading-relaxed">{t(body)}</p>
+          <div className="mt-12 grid gap-6 lg:grid-cols-2">
+            <div className="card reveal flex flex-col p-8" data-delay="1">
+              <span className="card__num">01</span>
+              <h3 className="t-h3">{t("land.offre.saas.t")}</h3>
+              <p className="mt-2 text-sm font-medium leading-relaxed text-[color:var(--copper-text)]">
+                {t("land.offre.saas.q")}
+              </p>
+              <p className="muted mt-4 text-sm leading-relaxed">{t("land.offre.saas.b")}</p>
+              <div className="mt-auto pt-8">
+                <Link href="/signup" className="btn btn-primary">
+                  {t("land.offre.saas.cta")}
+                </Link>
               </div>
-            ))}
+            </div>
+            <div className="card reveal flex flex-col p-8" data-delay="2">
+              <span className="card__num">02</span>
+              <h3 className="t-h3">{t("land.offre.service.t")}</h3>
+              <p className="mt-2 text-sm font-medium leading-relaxed text-[color:var(--copper-text)]">
+                {t("land.offre.service.q")}
+              </p>
+              <p className="muted mt-4 text-sm leading-relaxed">{t("land.offre.service.b")}</p>
+              <div className="mt-auto pt-8">
+                <a href={SITE_CABINET} target="_blank" rel="noreferrer" className="btn btn-ghost">
+                  {t("land.offre.service.cta")}
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       </section>
+
+      {/* 04 et 05 — Le relevé et son sélecteur, sous un seul `ProfilProvider`.
+          Un seul sélecteur, donc un seul état, et un seul appel au moteur — deux
+          sélecteurs poseraient au visiteur une question à laquelle il a répondu.
+          Les lignes restent rendues côté serveur : un robot les voit sans exécuter
+          de JavaScript. Ils viennent en dernier parce qu'ils répondent à la question
+          que les trois sections précédentes ont posée. */}
+      <ProfilProvider>
+        <Audience />
+        <ThreatLedger />
+      </ProfilProvider>
 
       {/* Final CTA */}
       <section className="section cta-band">

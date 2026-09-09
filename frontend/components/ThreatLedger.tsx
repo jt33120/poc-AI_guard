@@ -271,7 +271,7 @@ function Rangee({
 
         <Schema rang={menace.rang} etape={menace.etape} critique={menace.critique} />
 
-        <span className="min-w-0">
+        <span className="menace__corps">
           {/* Le titre passe par le dictionnaire et non par `ligne.titre`, alors même
               que la carte en porte un : l'artefact généré n'est qu'en français, et
               un visiteur anglophone lisait donc seize titres français au milieu de
@@ -347,7 +347,7 @@ function RangeeHorsCarte({ menace }: { menace: Menace }) {
       <div className="menace" data-critique={menace.critique ? "true" : undefined}>
         <span className="menace__rang">{String(menace.rang).padStart(2, "0")}</span>
         <Schema rang={menace.rang} etape={menace.etape} critique={menace.critique} />
-        <span className="min-w-0">
+        <span className="menace__corps">
           <span className="menace__titre block">{t(cleTitre(menace))}</span>
           <span className="menace__clair block">{t(cleClair(menace))}</span>
         </span>
@@ -455,6 +455,33 @@ export function ThreatLedger() {
   const { choisis, basculer: basculerProfil, positionne, occupe, echoue } = useProfils();
   const [ouverte, setOuverte] = useState<string | null>(null);
 
+  /**
+   * Une rangée du classement, quel que soit son registre.
+   *
+   * Extraite parce que les deux registres la rendent à l'identique : seule la
+   * classe du `<ol>` qui les porte change, et c'est le CSS qui compacte. Écrire
+   * le corps deux fois ferait diverger les deux moitiés du même relevé au premier
+   * changement.
+   */
+  const rendre = (menace: Menace) => {
+    const ligne = menace.releve ? RELEVE.lignes.find((l) => l.id === menace.releve) : undefined;
+    return (
+      <li key={menace.rang}>
+        {ligne ? (
+          <Rangee
+            ligne={ligne}
+            menace={menace}
+            positionne={positionne}
+            ouverte={ouverte === ligne.id}
+            basculer={() => setOuverte(ouverte === ligne.id ? null : ligne.id)}
+          />
+        ) : (
+          <RangeeHorsCarte menace={menace} />
+        )}
+      </li>
+    );
+  };
+
   return (
     // Bande claire, et plus large que le reste de la page : c'est la section qu'on
     // lit vraiment. Les jetons employés plus bas sont tous contextuels, donc la
@@ -462,7 +489,7 @@ export function ThreatLedger() {
     <section id="menaces" className="section section--light scroll-mt-20">
       <div className="wrap wrap--wide">
         <DiagrammeDefs />
-        <p className="eyebrow" data-num="01">
+        <p className="eyebrow" data-num="05">
           {t("ledger.kicker")}
         </p>
         <h2 className="t-h2 mt-2 max-w-3xl" data-sheen>
@@ -543,28 +570,28 @@ export function ThreatLedger() {
         {/* Le relevé, dans l'ordre du classement et non dans celui des
             identifiants : le lecteur qui s'arrête à la cinquième rangée doit avoir
             lu les cinq qui comptent, pas `M-01` à `M-05`. */}
-        <ol className="paysage mt-2">
-          {MENACES.map((menace) => {
-            const ligne = menace.releve
-              ? RELEVE.lignes.find((l) => l.id === menace.releve)
-              : undefined;
-            return (
-              <li key={menace.rang}>
-                {ligne ? (
-                  <Rangee
-                    ligne={ligne}
-                    menace={menace}
-                    positionne={positionne}
-                    ouverte={ouverte === ligne.id}
-                    basculer={() => setOuverte(ouverte === ligne.id ? null : ligne.id)}
-                  />
-                ) : (
-                  <RangeeHorsCarte menace={menace} />
-                )}
-              </li>
-            );
-          })}
-        </ol>
+        {/* Deux registres, un seul classement.
+
+            `.paysage` cesse d'être un `<ol>` et devient un `<div>` porteur : un
+            `<ol>` ne peut pas contenir un autre `<ol>` en enfant direct. Le
+            changement est inerte côté CSS — `.paysage` ne portait qu'un filet — et
+            l'ordre du DOM est préservé, tête puis suite dans l'ordre du classement,
+            si bien que `#menaces .paysage` désigne toujours un seul élément et que
+            les tests de fumée qui comptent les rangées ne bougent pas.
+
+            La coupure suit le drapeau `critique`, jamais un rang ni un seuil : le
+            jour où le classement change d'avis, la rangée change de registre toute
+            seule. */}
+        <div className="paysage mt-2">
+          <div className="paysage__tete" aria-hidden="true">
+            <span className="label">{t("ledger.col.rang")}</span>
+            <span className="label">{t("ledger.col.entree")}</span>
+            <span className="label">{t("ledger.col.menace")}</span>
+            <span className="label">{t("ledger.col.preuve")}</span>
+          </div>
+          <ol>{MENACES.filter((m) => m.critique).map(rendre)}</ol>
+          <ol className="releve__suite">{MENACES.filter((m) => !m.critique).map(rendre)}</ol>
+        </div>
 
         <p className="muted mt-6 max-w-4xl text-sm leading-relaxed">{t("ledger.note")}</p>
         <p className="muted mt-3 font-mono text-[length:var(--fs-label)]">
