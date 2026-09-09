@@ -11,6 +11,10 @@ import type { StrKey } from "@/lib/strings";
 
 const DEMO_MAILTO = "mailto:julian.talou@xsom.fr?subject=xSOM%20AI%20Guard%20%3A%20demo";
 
+//: Le cabinet. La voie qui demande une installation y mène, parce qu'elle se vend
+//: avec des humains — ce produit en est une offre, pas l'inverse.
+const SITE_CABINET = "https://www.xsom.fr";
+
 const WHO: [StrKey, StrKey][] = [
   ["land.who.1.t", "land.who.1.b"],
   ["land.who.2.t", "land.who.2.b"],
@@ -75,12 +79,13 @@ export default function LandingPage() {
               <Link href="/signup" className="btn btn-primary">
                 {t("land.hero.cta")}
               </Link>
-              <Link href="/login" className="btn btn-ghost">
+              {/* La seconde porte sort du produit : la passerelle contraignante
+                  demande une installation, donc le cabinet. Le lien quitte le site,
+                  d'où `rel="noreferrer"` — un onglet ouvert par `target` garde sinon
+                  une référence à celui-ci. */}
+              <a href={SITE_CABINET} target="_blank" rel="noreferrer" className="btn btn-ghost">
                 {t("land.hero.cta2")}
-              </Link>
-              <Link href="/executive-preview" className="btn btn-ghost">
-                {t("land.exec.link")}
-              </Link>
+              </a>
               <span className="muted ml-1 inline-flex items-center gap-1.5 text-sm">
                 <ShieldMark className="h-4 w-4 text-brand-bright" />
                 {t("land.hero.trust")}

@@ -13,8 +13,9 @@ Routes land milestone by milestone. M0 exposes only ``GET /health``.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from enum import StrEnum
 
-from fastapi import Depends, FastAPI, Request, Response
+from fastapi import APIRouter, Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -64,14 +65,109 @@ _SECURITY_HEADERS: dict[str, str] = {
 }
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
-    """Build a hardened FastAPI app. Tests may inject a custom ``Settings``."""
+class Plane(StrEnum):
+    """Le plan qu'un déploiement sert.
+
+    Une seule application montait les vingt-six routeurs, et ils n'ont pas le même
+    métier. `/v1/authorize` est appelé par l'agent à **chaque appel d'outil** ; le
+    proxy l'est à chaque appel de modèle. Le reste est appelé par un humain devant
+    une console, par à-coups.
+
+    Les mêler dans un processus revient à faire dépendre l'autorisation de tous les
+    agents de la santé de l'écran d'export de conformité : un déploiement raté sur
+    un routeur de console arrêtait la flotte entière. La règle 4 de `CLAUDE.md` veut
+    qu'une action refusée n'ait pas lieu — pas que tout s'arrête parce que la console
+    a planté.
+
+    `ALL` reste le défaut et monte tout : c'est ce que lancent le développement
+    local, `make demo` et les tests, et c'est ce qui rend ce découpage réversible.
+    """
+
+    ALL = "all"
+    DECISION = "decision"
+    LLM = "llm"
+    CONSOLE = "console"
+
+
+#: Monté par tous les plans. La sonde de disponibilité en fait partie : chaque
+#: service Railway a son propre healthcheck, et un plan qui ne répondrait pas
+#: serait redémarré en boucle.
+_SOCLE: tuple[APIRouter, ...] = (health_router,)
+
+#: Le plan qui sert chaque routeur.
+#:
+#: Cette table est la **seule** source de `create_app` : un routeur qui n'y figure
+#: pas n'est servi par aucun plan, y compris `ALL`. C'est délibéré — l'oubli se voit
+#: alors en test plutôt que de se traduire par une route qui répond depuis le
+#: mauvais service. `tests/test_api_planes.py` refuse d'ailleurs la construction si
+#: un module d'`api/` expose un `router` absent d'ici.
+_PLANS: dict[Plane, tuple[APIRouter, ...]] = {
+    Plane.DECISION: (authorize_router,),
+    Plane.LLM: (llm_proxy_router,),
+    Plane.CONSOLE: (
+        servers_router,
+        policy_router,
+        approvals_router,
+        audit_router,
+        gateway_tokens_router,
+        agents_router,
+        usage_router,
+        credentials_router,
+        clients_router,
+        dlp_router,
+        ai_router,
+        read_tokens_router,
+        compliance_router,
+        integrity_router,
+        monitor_router,
+        promotion_router,
+        trust_router,
+        corpora_router,
+        verdicts_router,
+        shadow_ai_router,
+        threats_router,
+        triage_router,
+        signup_router,
+    ),
+}
+
+
+#: Ce qu'un plan chaud a le **droit** de servir, préfixe par préfixe.
+#:
+#: Énoncé en liste blanche, et non par comparaison avec la console : un routeur
+#: *déplacé* de la console vers un plan chaud n'est plus dans la console, si bien
+#: qu'une comparaison ne trouve rien à signaler. Éprouvé — la première version de
+#: `tests/test_api_planes.py` était formulée ainsi, et laissait passer `audit_router`
+#: dans le plan `décision` sans qu'aucun des onze contrôles ne bronche.
+_PREFIXES_CHAUDS: dict[Plane, tuple[str, ...]] = {
+    Plane.DECISION: ("/v1/authorize",),
+    Plane.LLM: ("/proxy/",),
+}
+
+#: Servi par tous les plans : les deux sondes, et le principal authentifié.
+_CHEMINS_SOCLE: frozenset[str] = frozenset({"/health", "/health/ready", "/v1/me"})
+
+
+def routers_for(plane: Plane) -> tuple[APIRouter, ...]:
+    """Les routeurs d'un plan, socle compris."""
+    if plane is Plane.ALL:
+        servis = tuple(r for routeurs in _PLANS.values() for r in routeurs)
+    else:
+        servis = _PLANS[plane]
+    return _SOCLE + servis
+
+
+def create_app(settings: Settings | None = None, *, plane: Plane = Plane.ALL) -> FastAPI:
+    """Build a hardened FastAPI app. Tests may inject a custom ``Settings``.
+
+    ``plane`` choisit les routeurs montés ; par défaut, tous.
+    """
     settings = settings or get_settings()
     configure_logging(settings.log_level)
     init_observability(settings)
 
     app = FastAPI(
-        title=settings.app_name,
+        title=settings.app_name if plane is Plane.ALL else f"{settings.app_name} · {plane.value}",
         version="0.1.0",
         debug=False,
         # Disable interactive docs in production (CLAUDE.md §4.8).
@@ -134,32 +230,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "role": user.role.value if user.role else None,
         }
 
-    app.include_router(health_router)
-    app.include_router(servers_router)
-    app.include_router(policy_router)
-    app.include_router(approvals_router)
-    app.include_router(audit_router)
-    app.include_router(gateway_tokens_router)
-    app.include_router(authorize_router)
-    app.include_router(llm_proxy_router)
-    app.include_router(agents_router)
-    app.include_router(usage_router)
-    app.include_router(credentials_router)
-    app.include_router(clients_router)
-    app.include_router(dlp_router)
-    app.include_router(ai_router)
-    app.include_router(read_tokens_router)
-    app.include_router(compliance_router)
-    app.include_router(integrity_router)
-    app.include_router(monitor_router)
-    app.include_router(promotion_router)
-    app.include_router(trust_router)
-    app.include_router(corpora_router)
-    app.include_router(verdicts_router)
-    app.include_router(shadow_ai_router)
-    app.include_router(threats_router)
-    app.include_router(triage_router)
-    app.include_router(signup_router)
+    for router in routers_for(plane):
+        app.include_router(router)
 
     return app
 
