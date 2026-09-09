@@ -36,4 +36,12 @@ USER appuser
 EXPOSE 8000
 # Railway / Render inject $PORT; default to 8000 for local `docker run`.
 # `python -m uvicorn` keeps the working dir on sys.path so `api.main` imports.
-CMD ["sh", "-c", "python -m uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+#
+# `ASGI_APP` choisit le plan servi — une seule image, trois services :
+#   api.decision:app  le chemin chaud, /v1/authorize
+#   api.llm:app       le proxy des fournisseurs, /proxy/*
+#   api.console:app   les vingt-trois routeurs des écrans
+# Le défaut reste `api.main:app`, qui monte tout : c'est ce que veut un
+# `docker run` local ou un déploiement mono-service, et c'est ce qui rend le
+# découpage réversible sans toucher à l'image.
+CMD ["sh", "-c", "python -m uvicorn ${ASGI_APP:-api.main:app} --host 0.0.0.0 --port ${PORT:-8000}"]
