@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import Link from "next/link";
+
 import { ShieldMark } from "@/components/brand";
 import { mcpConfig, snippet } from "@/lib/integration";
 import { serverT } from "@/lib/lang";
@@ -228,6 +230,12 @@ export function Fonctionnement() {
               {TRANSCRIPTION_DEMO}
             </pre>
           </details>
+          {/* La suite naturelle de la capture : le lecteur vient de voir l'exécution,
+              voici le rapport qu'elle produit. C'est la place de ce lien depuis que le
+              hero ne garde que deux portes — le libre-service et le cabinet. */}
+          <Link href="/executive-preview" className="btn btn-ghost mt-6">
+            {t("land.exec.link")}
+          </Link>
         </figure>
       </div>
 

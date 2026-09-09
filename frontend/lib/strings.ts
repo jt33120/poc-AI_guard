@@ -460,8 +460,8 @@ export const STR = {
     en: "xSOM AI Guard sits between your agent and its tools. Every action is checked against your policy, paused for human approval when it's irreversible, and written to a tamper-proof audit trail.",
     fr: "xSOM AI Guard s'intercale entre votre agent et ses outils. Chaque action est vérifiée selon votre politique, suspendue pour validation humaine si elle est irréversible, et inscrite dans un journal inviolable.",
   },
-  "land.hero.cta": { en: "Join the beta", fr: "Rejoindre la beta" },
-  "land.hero.cta2": { en: "See the demo account", fr: "Voir le compte démo" },
+  "land.hero.cta": { en: "Get started", fr: "Commencer" },
+  "land.hero.cta2": { en: "Request an engagement", fr: "Demander une prestation" },
   "land.hero.trust": {
     en: "Designed for the EU AI Act & GDPR",
     fr: "Conçu pour l'AI Act européen et le RGPD",
