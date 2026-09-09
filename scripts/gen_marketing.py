@@ -152,6 +152,113 @@ _REF_LIGNE = re.compile(r"\bM-\d{2}\b")
 #: ne l'est pas — ce dernier vient du moteur, ce qui est le but.
 _TEXTE_JSX = re.compile(r">([^<>{}]*[^\s<>{}][^<>{}]*)<")
 
+#: Les caractères après lesquels un `/` ouvre une expression régulière et non une
+#: division. Heuristique classique : après une valeur (identifiant, nombre, parenthèse
+#: fermante) le `/` divise ; après un ouvrant ou un opérateur, il commence une regex.
+_AVANT_REGEX = frozenset("(,=:[!&|?{};+-*%~^<>")
+
+
+def _sans_commentaires(source: str) -> str:
+    r"""Le source TSX, ses commentaires remplacés par des espaces.
+
+    **Pourquoi ce filtre existe.** `_TEXTE_JSX` prend tout ce qui sépare un `>` d'un
+    `<`. Dans un fichier `.tsx`, un commentaire qui cite du balisage — et un
+    commentaire d'architecture en cite toujours — ouvre un `>` que le prochain `<`
+    referme des paragraphes plus loin. Le garde lisait donc de la prose de commentaire
+    comme s'il s'agissait de copie visible, et refusait un fichier pour un nombre que
+    personne ne verrait jamais à l'écran. Un garde qui punit les commentaires est un
+    garde qu'on finit par contourner en écrivant moins de commentaires.
+
+    **Pourquoi remplacer et non supprimer.** Deux fragments séparés par un commentaire
+    ne doivent pas se retrouver collés : la concaténation fabriquerait une phrase que
+    personne n'a écrite, et le garde la jugerait. Les sauts de ligne sont conservés
+    pour la même raison.
+
+    **Les chaînes sont gardées telles quelles.** Un nombre écrit dans un littéral
+    passé en propriété est du texte que le visiteur peut voir ; le retirer de l'analyse
+    ouvrirait précisément le trou que ce garde ferme.
+
+    **Les littéraux d'expression régulière sont consommés d'un bloc**, et ce n'est pas
+    du zèle : `replace(/^https?:\/\//, "")` existe dans les fichiers analysés. Un
+    scanner naïf y verrait le `//` final, blanchirait la fin de la ligne, et cesserait
+    d'y chercher un chiffre. Le faux négatif serait silencieux, ce qui est la pire
+    façon dont un garde puisse se tromper.
+    """
+    sortie: list[str] = []
+    i, n = 0, len(source)
+    dernier = ""  # dernier caractère significatif, pour trancher regex ou division
+
+    while i < n:
+        c = source[i]
+        duo = source[i : i + 2]
+
+        if duo == "//":
+            fin = source.find("\n", i)
+            fin = n if fin < 0 else fin
+            sortie.append(" " * (fin - i))
+            i = fin
+            continue
+
+        if duo == "/*":
+            fin = source.find("*/", i + 2)
+            fin = n if fin < 0 else fin + 2
+            sortie.append("".join(k if k == "\n" else " " for k in source[i:fin]))
+            i = fin
+            continue
+
+        # Après les commentaires, jamais avant : un `/` suivi de `*` ou de `/` est
+        # toujours un commentaire, et jamais une regex — `//` est le commentaire de
+        # ligne de JavaScript, et `/*` n'est pas une expression régulière valide.
+        # L'ordre inverse faisait lire le `/**` d'un en-tête de fichier, qui n'a rien
+        # avant lui, comme l'ouverture d'une regex : le commentaire n'était alors
+        # blanchi que jusqu'au premier `/` venu, et sa prose repassait dans l'analyse.
+        if c == "/" and (dernier == "" or dernier in _AVANT_REGEX):
+            j, classe = i + 1, False
+            while j < n:
+                k = source[j]
+                if k == "\\":
+                    j += 2
+                    continue
+                if k == "[":
+                    classe = True
+                elif k == "]":
+                    classe = False
+                elif k == "/" and not classe:
+                    break
+                elif k == "\n":  # une regex ne franchit pas la ligne : ce n'en était pas une
+                    j = i
+                    break
+                j += 1
+            if j > i:
+                j += 1
+                while j < n and source[j].isalpha():  # drapeaux g, i, m…
+                    j += 1
+                sortie.append(source[i:j])
+                dernier = "/"
+                i = j
+                continue
+
+        if c in "\"'`":
+            j = i + 1
+            while j < n:
+                if source[j] == "\\":
+                    j += 2
+                    continue
+                if source[j] == c:
+                    break
+                j += 1
+            sortie.append(source[i : j + 1])
+            dernier = c
+            i = j + 1
+            continue
+
+        sortie.append(c)
+        if not c.isspace():
+            dernier = c
+        i += 1
+
+    return "".join(sortie)
+
 
 def facts() -> dict[str, int]:
     """Les faits publiables, tous dérivés, aucun écrit.
@@ -212,7 +319,8 @@ def _check_chiffres(connus: frozenset[str]) -> list[str]:
             )
     for motif in _PAGES:
         for chemin in sorted(_REPO.glob(motif)):
-            for fragment in _TEXTE_JSX.findall(chemin.read_text(encoding="utf-8")):
+            source = _sans_commentaires(chemin.read_text(encoding="utf-8"))
+            for fragment in _TEXTE_JSX.findall(source):
                 if _MOT_COUVERTURE.search(fragment) and _NOMBRE.search(fragment):
                     erreurs.append(
                         f"{chemin.relative_to(_REPO)} : chiffre de couverture écrit "
