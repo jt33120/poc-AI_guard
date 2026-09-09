@@ -144,7 +144,7 @@ export function Audience() {
   return (
     <section id="pour-qui" className="section scroll-mt-20">
       <div className="wrap">
-        <p className="eyebrow" data-num="02">
+        <p className="eyebrow" data-num="04">
           {t("pourqui.kicker")}
         </p>
         <h2 className="t-h2 mt-2 max-w-3xl" data-sheen>
