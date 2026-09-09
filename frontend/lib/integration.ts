@@ -2,7 +2,7 @@
  * Les blocs d'intégration, à un seul endroit (`L9`).
  *
  * Ils vivaient dans l'assistant d'intégration, où un client les reçoit après avoir
- * créé son jeton. La page publique `/mise-en-oeuvre` montre **exactement les mêmes** :
+ * créé son jeton. La section publique « comment ça marche » montre **exactement les mêmes** :
  * une page « comment ça marche » qui divergerait de ce qu'on remet réellement au
  * client est pire que pas de page — elle apprend à faire ce qui ne marchera pas.
  *

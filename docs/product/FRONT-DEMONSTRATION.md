@@ -241,8 +241,13 @@ cocher.
 
 ### 2.6 « Comment ça marche »
 
-Une page `/mise-en-oeuvre`, organisée par **ce que le lecteur peut modifier**, dans
-l'ordre décroissant de garantie :
+Une section de la page d'accueil (`components/Fonctionnement.tsx`, ancre `#how`), qui
+porte le principe, la preuve et le branchement. La page `/mise-en-oeuvre` qui portait
+ce dernier a été fondue dedans : le lecteur devait quitter l'accueil pour finir de
+comprendre, et repartait rarement.
+
+Le branchement est organisé par **ce que le lecteur peut modifier**, dans l'ordre
+décroissant de garantie :
 
 1. **Passerelle MCP** — contraignante : xSOM exécute ou n'exécute pas. Livré : le bloc
    de configuration MCP.
@@ -283,7 +288,7 @@ Ordonnés. Chacun est autonome, vérifiable, et livrable en PR séparée.
 | **L6** | **Le rejeu** | Le hook de capture, le générateur, le lecteur. ~~Les 8 lignes.~~ **7 rejeux + 1 raison publiée.** | **Fait** — voir §5 septies. |
 | **L7** | **Pour qui** | La section, adossée au moteur de triage : **les bascules**, et le profil sur lequel nous perdons. | **Fait** — voir §5 octies. |
 | **L8** | **La démo, porte 1** | L'instantané généré, ~~les quatre écrans~~ **les deux que la fixture alimente**, le bandeau. | **Fait** — voir §5 nonies. |
-| **L9** | **`/mise-en-oeuvre`** | Les trois voies, la capture de `make demo`. | |
+| **L9** | **« Comment ça marche »** | Les trois voies, la capture de `make demo` — fondues dans la section d'accueil. | **Fait**. |
 | **L10** | **Porte 2, l'accès nominatif** | Formulaire, compte réel, révocation. | Optionnel — voir §5. |
 | **L11** | *(conditionnel)* **Durcir pour un compte public** | Les six correctifs du §1.5. | Seulement si tu tranches en faveur du compte partagé. |
 

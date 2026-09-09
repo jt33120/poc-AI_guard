@@ -522,16 +522,21 @@ test("ce que l'instantané ne montre pas est dit, avec sa raison", async ({ page
   await expect(page.getByText(/Une file est vivante ou n'est pas/)).toBeVisible();
 });
 
-// `/mise-en-oeuvre` (`L9`). Les gardes Python de `tests/test_integration_snippets.py`
-// prouvent que les extraits n'ont **qu'une** définition, partagée avec l'assistant
-// d'intégration. Ce qu'ils ne peuvent pas atteindre : que cette définition ait
-// réellement produit du texte, et que ce texte soit arrivé dans la page. Un composant
-// serveur qui échoue, ou un `<pre>` qui rendrait `[object Object]`, passerait chacun
-// d'eux au vert. La leçon de `L5`, `L7` et `L8` s'est répétée trois fois : regarder la
-// page rendue trouve ce que les types, les tests et le build ne trouvent pas.
+// La section « comment ça marche » (`L9`), désormais sur la page d'accueil. Les
+// gardes Python de `tests/test_integration_snippets.py` prouvent que les extraits
+// n'ont **qu'une** définition, partagée avec l'assistant d'intégration. Ce qu'ils ne
+// peuvent pas atteindre : que cette définition ait réellement produit du texte, et que
+// ce texte soit arrivé dans la page. Un composant serveur qui échoue, ou un `<pre>` qui
+// rendrait `[object Object]`, passerait chacun d'eux au vert. La leçon de `L5`, `L7` et
+// `L8` s'est répétée trois fois : regarder la page rendue trouve ce que les types, les
+// tests et le build ne trouvent pas.
+//
+// Les trois contrôles sont portés sur `#how` et non sur la page entière : la section a
+// fondu dans l'accueil, où d'autres sections ont leurs propres titres et leurs propres
+// `<details>`. Un sélecteur non porté attraperait les leurs.
 
-test("la page d'intégration livre un extrait MCP réellement rendu", async ({ page }) => {
-  const reponse = await page.goto("/mise-en-oeuvre");
+test("la section d'intégration livre un extrait MCP réellement rendu", async ({ page }) => {
+  const reponse = await page.goto("/");
   const html = (await reponse?.text()) ?? "";
 
   // Rendu par le serveur : un lecteur sans JavaScript, et un robot, voient l'extrait.
@@ -542,9 +547,9 @@ test("la page d'intégration livre un extrait MCP réellement rendu", async ({ p
 });
 
 test("les trois voies apparaissent dans l'ordre décroissant de garantie", async ({ page }) => {
-  await page.goto("/mise-en-oeuvre");
+  await page.goto("/");
   // L'ordre du DOM, et non celui du fichier source : c'est celui que le lecteur subit.
-  const titres = await page.locator("h2").allInnerTexts();
+  const titres = await page.locator("#how h4").allInnerTexts();
   const rangs = ["Passerelle MCP", "/v1/authorize", "Proxy du fournisseur LLM"].map((t) =>
     titres.findIndex((titre) => titre.includes(t)),
   );
@@ -557,9 +562,17 @@ test("les trois voies apparaissent dans l'ordre décroissant de garantie", async
   await expect(page.getByText(/votre agent honore le verdict/)).toBeVisible();
 });
 
-test("aucun jeton de la page publique ne peut se lire comme un vrai", async ({ page }) => {
-  await page.goto("/mise-en-oeuvre");
-  const texte = await page.locator("body").innerText();
+test("aucun jeton de la section publique ne peut se lire comme un vrai", async ({ page }) => {
+  await page.goto("/");
+
+  // Les extraits sont repliés : `innerText` ne rend PAS le contenu d'un `<details>`
+  // fermé, et sans cette ouverture le contrôle passerait au vert en ne lisant rien.
+  // C'est exactement le mode de panne qu'un garde ne doit pas avoir.
+  await page
+    .locator("#how details")
+    .evaluateAll((blocs) => blocs.forEach((b) => ((b as HTMLDetailsElement).open = true)));
+
+  const texte = await page.locator("#how").innerText();
 
   // Un paramètre qui ressemble à un secret finit collé tel quel, et le premier appel
   // échoue sans que personne comprenne pourquoi. Il doit se voir comme un modèle.

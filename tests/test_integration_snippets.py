@@ -1,6 +1,6 @@
 """`L9` — la page publique enseigne exactement ce que le client reçoit.
 
-`/mise-en-oeuvre` montre les extraits d'intégration à un visiteur qui n'a pas encore
+La section « comment ça marche » montre les extraits d'intégration à un visiteur qui n'a pas encore
 de compte. L'assistant d'intégration montre les mêmes à un client qui vient de créer
 son jeton. **Ce sont les mêmes**, et ce fichier tient cette propriété.
 
@@ -25,7 +25,7 @@ from pathlib import Path
 _RACINE = Path(__file__).resolve().parent.parent
 _FRONT = _RACINE / "frontend"
 _PARTAGE = _FRONT / "lib" / "integration.ts"
-_PUBLIQUE = _FRONT / "app" / "mise-en-oeuvre" / "page.tsx"
+_PUBLIQUE = _FRONT / "components" / "Fonctionnement.tsx"
 _ASSISTANT = _FRONT / "app" / "(app)" / "onboarding" / "page.tsx"
 
 #: Les fonctions qui produisent un extrait collé par un humain dans sa configuration.

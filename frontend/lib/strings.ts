@@ -148,7 +148,6 @@ export const STR = {
   // rédigés ici : ils viennent de `lib/integration.ts`, partagé avec l'assistant
   // d'intégration, pour qu'une page publique ne puisse pas apprendre autre chose que
   // ce qu'un client reçoit réellement.
-  "mise.kicker": { en: "How it works", fr: "Comment ça marche" },
   // La capture d'ouverture. Le libellé dit ce qu'elle est — un enregistrement —
   // parce qu'`AD-26` fait de cette distinction la propriété qui compte : une
   // animation fabriquée à la ressemblance d'un succès dirait la même chose à
@@ -458,11 +457,11 @@ export const STR = {
     fr: "Déployez vos agents IA en production. Sans perdre le contrôle.",
   },
   "land.hero.sub": {
-    en: "xSOM AI Guard sits between your agent and the tools it uses. Every action is checked against your policy, paused for human approval when it's irreversible, and written to a tamper-proof audit trail. You get the productivity of autonomous agents with the control your business and regulators require.",
-    fr: "xSOM AI Guard s'intercale entre votre agent et les outils qu'il utilise. Chaque action est vérifiée selon votre politique, suspendue pour validation humaine si elle est irréversible, et inscrite dans un journal d'audit inviolable. Vous obtenez la productivité des agents autonomes, avec le contrôle qu'exigent votre entreprise et vos régulateurs.",
+    en: "xSOM AI Guard sits between your agent and its tools. Every action is checked against your policy, paused for human approval when it's irreversible, and written to a tamper-proof audit trail.",
+    fr: "xSOM AI Guard s'intercale entre votre agent et ses outils. Chaque action est vérifiée selon votre politique, suspendue pour validation humaine si elle est irréversible, et inscrite dans un journal inviolable.",
   },
-  "land.hero.cta": { en: "Open the console", fr: "Ouvrir la console" },
-  "land.hero.cta2": { en: "See how it works", fr: "Voir comment ça marche" },
+  "land.hero.cta": { en: "Join the beta", fr: "Rejoindre la beta" },
+  "land.hero.cta2": { en: "See the demo account", fr: "Voir le compte démo" },
   "land.hero.trust": {
     en: "Designed for the EU AI Act & GDPR",
     fr: "Conçu pour l'AI Act européen et le RGPD",
