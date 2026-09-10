@@ -37,7 +37,7 @@ from core.triage import diagnose
 _RACINE = Path(__file__).resolve().parent.parent
 _GATE = _RACINE / "scripts" / "gen_marketing.py"
 _COPIE = _RACINE / "frontend" / "lib" / "strings.ts"
-_PAGE = _RACINE / "frontend" / "app" / "page.tsx"
+_PAGE = _RACINE / "frontend" / "app" / "evidence" / "page.tsx"
 _FAITS = _RACINE / "frontend" / "lib" / "generated" / "marketing-facts.json"
 _CARTE = _RACINE / "coverage" / "map.json"
 

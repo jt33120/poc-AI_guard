@@ -22,7 +22,18 @@ API are mocked. Never configure this test mode on a deployed environment.
 
 `frontend/e2e/smoke.spec.ts` preserves the existing public evidence, bilingual
 metadata, integration snippets, tenant proxy, audit export and policy-save
-checks. `frontend/e2e/signal.spec.ts` verifies the redesigned interaction contract:
+checks. The complete threat ledger and integration snippets now live on public
+`/evidence`; their counts, SSR rendering, profile IDs, engine statements and replay
+proofs are unchanged. The POC landing remains on `/`.
+
+`frontend/e2e/heritage.spec.ts` checks the illustrative employee, developer and
+confidential-data paths, cloud/internal choices, explicit integration limitations,
+zero API calls during exploration, navigation to real evidence, and French/English
+layout at all three viewport widths. A recursive guard reads every nested phrase
+of `GUARD_COPY` and rejects invented coverage counts. The brand guard also checks the exact bytes
+of the original blue logo, not a recolored substitute.
+
+`frontend/e2e/signal.spec.ts` verifies the operator interaction contract:
 
 | Behavior | Observable acceptance |
 |---|---|
@@ -34,9 +45,14 @@ checks. `frontend/e2e/signal.spec.ts` verifies the redesigned interaction contra
 | Risk is observed | A real clean-approval streak and drift count remain unchanged in presentation. Missing scores have no numeric meter. Failed feeds show unknown values, not reassuring zeroes. |
 | Executive classification | Uninspected relays, missing or unfamiliar verdicts, observation-mode events and guard observations never inflate the authorization count. They remain separately visible. |
 | Demo is explicit | The overview's interactive flow is labelled as illustrative. Switching Guarded/Unguarded or the illustrated verdict never writes to the service. |
-| User preferences | Light theme and reduced motion survive reload. The operating system's reduced-motion setting takes precedence over a local animation preference. |
+| User preferences | The default theme is light; an explicit dark choice and reduced motion survive reload. The operating system's reduced-motion setting takes precedence over a local animation preference. |
 | Console language | The redesigned risk view and its actual shared components switch to English, retain their language on reload, and render again when switched back to French. |
 | Operator viewport | Inspector, approvals, audit, policy, risk, settings, onboarding and admin retain a contained page at 390, 768 and 1440 pixels. Dense content may scroll within a labelled region. |
+
+The landing smoke reads computed styles and loaded font faces to prove that
+Manrope and Source Sans are actually applied, rather than silently replaced by
+fallback fonts. The onboarding step-two mode selector must keep a computed
+text/background contrast of at least 4.5:1 in both themes at all three widths.
 
 `frontend/e2e/signal-components.spec.ts` checks the shared runtime through the
 real onboarding and audit screens. Reduced motion prevents video downloads,
@@ -72,7 +88,7 @@ connectivity. Check the console API's `/health/ready`; its database, schema and
 issuer must be available. Decision and LLM planes do not require the issuer, so
 their `ok` verdict may be true with `issuer: false`.
 
-Before release, visually compare the corporate AI Guard page and the console in
+Before release, visually compare the corporate homepage and the POC/console in
 dark and light modes. Check keyboard focus, the accessible preference controls,
 the static reduced-motion rendering, clearly labelled demo diagrams and all
 approval states. Inspect the mobile navigation and long tool names. Network
@@ -80,8 +96,9 @@ errors must not turn unknown risk or an unreadable audit into reassuring zeroes.
 
 The corporate repository remains a static GitHub Pages site. Its complementary
 checks are `node tools/sync-partials.js --check` and
-`node --test tests/signal-contract.test.cjs`, followed by a browser pass on the
-French and English home, expertise, AI Guard and contact pages. That pass must
+`node --test tests/*.test.cjs`, including exact original editorial-copy parity,
+followed by a browser pass on the French and English home, expertise, sovereignty
+and contact pages. The corporate site no longer promotes the POC. That pass must
 also check posters, user-controlled video playback, no third-party font or
 tracking requests, valid language links and the existing contact form's field
 validation. Do not send test email through the production form.

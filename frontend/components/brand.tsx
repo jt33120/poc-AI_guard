@@ -10,7 +10,7 @@
  * - `ShieldMark` est une **icône d'interface** : un bouclier coché, qui veut dire
  *   « contrôlé ». Il sert de puce et de pictogramme dans les schémas, il n'a
  *   jamais été le logo — et le favicon ne le montre plus : `app/icon.svg` porte
- *   désormais la variante cuivre du vrai logo. `tests/test_brand_mark.py` tient
+ *   désormais la variante bleue originale du vrai logo. `tests/test_brand_mark.py` tient
  *   la même propriété qu'avant (« la marque a un tracé, pas deux ») mais sur les
  *   deux cibles qui sont réellement la marque : le favicon et `xsom-mark.svg`.
  *   Il interdit maintenant explicitement `MARK_SHIELD` dans le favicon.
@@ -24,7 +24,7 @@
 import { MARK_CHECK, MARK_SHIELD, MARK_VIEWBOX } from "@/lib/mark";
 
 /**
- * Le logo xSOM, sur fond sombre.
+ * Original xSOM variants, selected by the shared theme without altering the SVG.
  *
  * `alt=""` : le logo est décoratif. Le nom accessible « xSOM AI Guard » est porté
  * par le texte posé à côté ; donner un `alt` au signe le ferait annoncer deux fois
@@ -36,17 +36,25 @@ import { MARK_CHECK, MARK_SHIELD, MARK_VIEWBOX } from "@/lib/mark";
  */
 export function XsomMark({ className = "h-[42px] w-[42px]" }: { className?: string }) {
   return (
-    // `next/image` ne peut pas optimiser un SVG : il le renvoie tel quel en ajoutant
-    // un wrapper. La balise brute est ici le choix simple, pas le raccourci — la
-    // règle est donc levée sur cette ligne, motif à l'appui.
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src="/xsom-mark.svg"
-      alt=""
-      width={42}
-      height={42}
-      className={`shrink-0 object-contain ${className}`}
-    />
+    <span aria-hidden="true" className={`xsom-brand-mark shrink-0 ${className}`}>
+      {/* SVG assets already carry their original paths; no raster optimizer. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/xsom-mark.svg"
+        alt=""
+        width={42}
+        height={42}
+        className="xsom-brand-mark__dark"
+      />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/xsom-mark-light.svg"
+        alt=""
+        width={42}
+        height={42}
+        className="xsom-brand-mark__light"
+      />
+    </span>
   );
 }
 

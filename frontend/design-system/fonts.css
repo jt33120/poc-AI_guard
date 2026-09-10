@@ -1,17 +1,17 @@
-/* Existing xSOM font files, SIL Open Font License 1.1. No third-party request. */
+/* Self-hosted SIL OFL fonts. Provenance and licences: ./licenses/. */
 @font-face {
-  font-family: "Saira";
+  font-family: "Manrope";
   font-style: normal;
-  font-weight: 600 800;
+  font-weight: 200 800;
   font-display: swap;
-  src: url("./assets/saira-600-800.woff2") format("woff2");
+  src: url("./assets/manrope-latin-variable.woff2") format("woff2");
 }
 @font-face {
-  font-family: "Inter";
+  font-family: "Source Sans 3";
   font-style: normal;
-  font-weight: 400;
+  font-weight: 200 900;
   font-display: swap;
-  src: url("./assets/inter-400.woff2") format("woff2");
+  src: url("./assets/source-sans-3-latin-variable.woff2") format("woff2");
 }
 @font-face {
   font-family: "JetBrains Mono";

@@ -25,21 +25,24 @@ from __future__ import annotations
 
 import re
 import xml.etree.ElementTree as ET
+from hashlib import sha256
 from pathlib import Path
 
 _RACINE = Path(__file__).resolve().parent.parent
 _SOURCE = _RACINE / "frontend" / "lib" / "mark.ts"
 _ICONE = _RACINE / "frontend" / "app" / "icon.svg"
 _LOGO = _RACINE / "frontend" / "public" / "xsom-mark.svg"
+_LOGO_CLAIR = _RACINE / "frontend" / "public" / "xsom-mark-light.svg"
 _SIGNAL = _RACINE / "frontend" / "design-system" / "assets" / "mark.svg"
 _COMPOSANT = _RACINE / "frontend" / "components" / "brand.tsx"
 _MIDDLEWARE = _RACINE / "frontend" / "middleware.ts"
 
 _SVG = "{http://www.w3.org/2000/svg}"
 
-# Les trois couleurs de la marque Signal générée pour le site et la console :
-# cuivre historique, bronze, neutre. Le tracé original reste inchangé.
-_SIGNAL_PALETTE = frozenset({"#e2603a", "#ba7758", "#a6ac9b"})
+# Source d'identité conservée dans le site original a9dfd3c :
+# assets/logo/moderne-dark.svg. Le client exige le vrai logo bleu, non recoloré.
+_SIGNAL_PALETTE = frozenset({"#3f93ff", "#1e64de", "#cad2dc"})
+_ORIGINAL_LOGO_SHA256 = "92425e9553245374f5fe5095d9a7340876511a0c999d2df16ba4e8b6d90cb00a"
 
 
 def _constantes() -> dict[str, str]:
@@ -60,9 +63,8 @@ def _sans_commentaires(chemin: Path) -> str:
 def _geometrie(chemin: Path) -> dict[str, list[str]]:
     """Ce qui est réellement dessiné : le repère, les tracés, les polygones.
 
-    On compare la géométrie et non le fichier entier : le favicon est la variante
-    cuivre du logo, donc ses couleurs diffèrent de celles servies dans la page — c'est
-    voulu, et documenté dans les deux fichiers. Le dessin, lui, doit être le même.
+    Cette comparaison explique précisément une divergence de dessin. Un second
+    contrôle verrouille aussi les octets du logo bleu original.
     """
     svg = _sans_commentaires(chemin)
     return {
@@ -128,13 +130,8 @@ def test_the_favicon_is_the_brand_and_not_the_interface_icon() -> None:
         )
 
 
-def test_the_favicon_stands_alone_in_the_copper_variant() -> None:
-    """La marque détourée porte la palette partagée, sans fond ajouté.
-
-    La refonte Signal harmonise le favicon et la marque affichée sur une source
-    générée unique. Le cuivre historique reste l'accent, le bronze et le neutre
-    distinguent les deux autres flèches sans introduire un bleu de produit tiers.
-    """
+def test_the_favicon_stands_alone_in_the_original_blue_variant() -> None:
+    """Le vrai logo bleu est conservé au caractère près, sans fond ajouté."""
     racine = ET.parse(_ICONE).getroot()  # noqa: S314 - fichier du dépôt, cf. plus bas
     couleurs: set[str] = set()
     for enfant in racine:
@@ -152,8 +149,11 @@ def test_the_favicon_stands_alone_in_the_copper_variant() -> None:
             )
 
     assert couleurs == _SIGNAL_PALETTE, f"la palette du favicon diverge : {couleurs}"
-    assert _sans_commentaires(_ICONE) == _sans_commentaires(_SIGNAL), (
-        "le favicon ne provient plus de la marque générée par le design system"
+    assert _ICONE.read_bytes() == _LOGO.read_bytes() == _SIGNAL.read_bytes(), (
+        "le favicon, le logo servi et la source partagée doivent être identiques"
+    )
+    assert sha256(_SIGNAL.read_bytes()).hexdigest() == _ORIGINAL_LOGO_SHA256, (
+        "la source partagée ne correspond plus aux octets du logo bleu original"
     )
 
 
@@ -173,7 +173,9 @@ def test_the_icon_route_is_excluded_from_the_auth_middleware() -> None:
     assert bloc, "le tableau matcher est introuvable"
     motifs = re.findall(r'"([^"\n]+)"', bloc.group(1))
     assert motifs, "le tableau matcher ne contient aucun motif"
-    for nom in (_ICONE.name, _LOGO.name):
+    for fichier in (_ICONE, _LOGO, _LOGO_CLAIR):
+        assert fichier.exists(), f"la variante de marque {fichier.name} est absente"
+        nom = fichier.name
         assert nom in bloc.group(1), (
             f"{nom} n'est pas exclu du matcher — chaque requête "
             "d'image traverserait l'authentification"

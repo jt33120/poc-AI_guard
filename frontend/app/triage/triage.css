@@ -1,0 +1,43 @@
+/* Public diagnostic follows both shared themes, including inherited form labels. */
+.guard-diagnostic {
+  color: var(--signal-text);
+}
+.guard-diagnostic :is(label, legend, input) {
+  color: var(--signal-text);
+}
+.guard-diagnostic :is(.text-slate-500, .text-slate-600) {
+  color: var(--signal-muted);
+}
+.guard-diagnostic :is(.border-slate-200, .border-slate-300) {
+  border-color: var(--signal-line);
+}
+.guard-diagnostic input[type="email"] {
+  background: var(--signal-surface);
+  color: var(--signal-text);
+  min-height: var(--signal-touch);
+}
+.guard-diagnostic input[type="checkbox"] {
+  accent-color: var(--signal-accent-text);
+}
+.guard-diagnostic label:has(input[type="checkbox"]) {
+  background: var(--signal-surface);
+  min-height: var(--signal-touch);
+}
+.guard-diagnostic label:has(input:checked) {
+  border-color: var(--signal-accent-text);
+  background: var(--signal-accent-wash);
+}
+.guard-diagnostic [role="alert"] {
+  color: var(--signal-deny);
+}
+.guard-diagnostic button {
+  min-height: var(--signal-touch);
+}
+.guard-diagnostic button[type="submit"] {
+  background: var(--signal-accent);
+  color: var(--signal-accent-ink);
+}
+.guard-diagnostic :is(button, input):focus-visible {
+  outline: var(--signal-focus) solid var(--signal-accent-text);
+  outline-offset: var(--signal-focus-offset);
+}

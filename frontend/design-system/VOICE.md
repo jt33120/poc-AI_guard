@@ -1,5 +1,20 @@
 # xSOM Signal — voice
 
+## Current content authority
+
+Corporate pages preserve the original copy from commit `a9dfd3c`. This is a visual
+redesign, not a positioning or tone rewrite. The firm remains specialised in
+cybersecurity. Do not shorten, replace or repurpose its original content to suit
+a layout. The explicit exceptions are removal of AI Guard promotion and an
+accurate technical privacy notice about local fonts/preferences.
+
+The separate AI Guard site presents an experimental POC. Introduce user needs
+(employees, developers, confidential data) before integration vocabulary. A
+provider selection is an illustration, not a connection or a protection claim.
+Personal ChatGPT/Claude web use is not automatically covered by the gateway.
+
+## Operational interface rules
+
 French first, English with equal information. Short sentences. Name the action, actor and evidence. Labels may retain technical terms (policy, dry-run, HITL) where translating would obscure their meaning.
 
 | Situation | Français | English |

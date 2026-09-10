@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import type { CSSProperties } from "react";
 
 import { Motion } from "@/components/Motion";
 import { LanguageProvider } from "@/lib/i18n";
@@ -11,31 +12,20 @@ import "./signal-console.css";
 import { SignalBootstrap } from "@/design-system/react";
 import { SIGNAL_BOOTSTRAP_SCRIPT } from "@/design-system/bootstrap";
 
-// Les trois voix du système xSOM, reprises de `xsom.fr`. Elles ont des rôles
-// distincts, et c'est le système à trois voix qui fait l'identité — pas une police
-// de plus : Saira compose les titres, Inter le corps, JetBrains Mono **toute**
-// étiquette et tout chiffre.
-//
-// Auto-hébergées, et c'est une décision de doctrine, pas une optimisation : aucune
-// adresse IP de visiteur n'est transmise à un tiers, une requête externe de moins au
-// chargement, et la cohérence avec ce que le cabinet défend en matière de
-// souveraineté. Passer par `next/font/google` annulerait cela pour économiser trois
-// fichiers de 103 Ko au total. Licence SIL OFL 1.1, redistribuables.
-
-// Saira descend de la DIN : la lettre de la signalétique technique, des plans
-// d'infrastructure et de l'étiquetage industriel. Fichier variable, 600 à 800.
-const saira = localFont({
-  src: "../design-system/assets/saira-600-800.woff2",
-  weight: "600 800",
+// Softer shared typography. Files and redistribution licences live in the
+// canonical package; no visitor request is sent to a font CDN.
+const manrope = localFont({
+  src: "../design-system/assets/manrope-latin-variable.woff2",
+  weight: "200 800",
   style: "normal",
   variable: "--font-display",
   display: "swap",
-  fallback: ["Roboto Condensed", "Arial Narrow", "sans-serif"],
+  fallback: ["Segoe UI", "Arial", "sans-serif"],
 });
 
-const inter = localFont({
-  src: "../design-system/assets/inter-400.woff2",
-  weight: "400",
+const sourceSans = localFont({
+  src: "../design-system/assets/source-sans-3-latin-variable.woff2",
+  weight: "200 900",
   style: "normal",
   variable: "--font-body",
   display: "swap",
@@ -98,7 +88,14 @@ export default function RootLayout({
   return (
     <html
       lang={lang}
-      className={`${saira.variable} ${inter.variable} ${mono.variable}`}
+      className={`${manrope.variable} ${sourceSans.variable} ${mono.variable}`}
+      style={
+        {
+          "--signal-font-display": manrope.style.fontFamily,
+          "--signal-font-body": sourceSans.style.fontFamily,
+          "--signal-font-mono": mono.style.fontFamily,
+        } as CSSProperties
+      }
       // `data-motion` est posé sur `<html>` par le script ci-dessous, avant
       // hydratation : React lit alors un attribut qu'il n'a pas rendu et avertit.
       // L'attribut ne fait pas partie de l'arbre React, il ne sera jamais réconcilié,
