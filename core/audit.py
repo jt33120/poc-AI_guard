@@ -224,6 +224,16 @@ def log_event(
     gateway_token_id: str | None = None,
     client_request_id: str | None = None,
     upstream_request_id: str | None = None,
+    #: Pourquoi la décision a été resserrée hors policy (`plan_quota_exhausted`…).
+    #: Colonne ANNEXE : hors `payload_v1`, donc la chaîne déjà écrite reste
+    #: vérifiable — même choix que `gateway_token_id` en `0006`.
+    constraint_reason: str | None = None,
+    #: La métrique de gamme à débiter, **dans cette transaction**. Le compteur est
+    #: incrémenté sous le verrou consultatif déjà tenu ici : pas de verrou de plus,
+    #: pas d'ordre de verrouillage de plus. Et le débit vit dans son propre point de
+    #: sauvegarde, pour qu'une écriture de facturation ne puisse jamais faire perdre
+    #: une écriture de preuve (§4.2).
+    usage_metric: str | None = None,
 ) -> str:
     """Append one hash-chained audit entry for a decision. Returns its entry_hash.
 
@@ -277,8 +287,9 @@ def log_event(
             "(ts, tenant_id, user_id, request_id, tool_name, action_class, decision, "
             " policy_rule_id, judge_used, args_hash, latency_ms, error, gateway_token_id, "
             " client_request_id, upstream_request_id, ingress, enforcement_mode, "
-            " prev_hash, entry_hash) "
-            "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            " prev_hash, entry_hash, constraint_reason) "
+            "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
+            "%s)",
             (
                 ts,
                 tenant_id,
@@ -299,9 +310,24 @@ def log_event(
                 origin.enforcement_mode.value,
                 prev_hash,
                 entry_hash,
+                _bounded(constraint_reason),
             ),
         )
+        if usage_metric is not None:
+            # Après l'insertion, et sous point de sauvegarde : la preuve est déjà
+            # écrite quand le compteur s'exécute, et son échec ne peut rien lui faire.
+            _debiter(conn, tenant_id, usage_metric)
     return entry_hash
+
+
+def _debiter(conn: psycopg.Connection, tenant_id: str, metric: str) -> None:
+    """Débiter la métrique de gamme sans jamais compromettre l'entrée d'audit."""
+    from core import entitlements  # importé ici : `entitlements` ne dépend pas d'`audit`
+
+    try:
+        entitlements.consume(conn, tenant_id, entitlements.Metric(metric))
+    except Exception:  # pragma: no cover - `consume` avale déjà tout
+        logger.warning("usage_debit_failed", extra={"tenant_id": tenant_id, "metric": metric})
 
 
 def verify_chain(conn: psycopg.Connection, tenant_id: str | None = None) -> ChainResult:
