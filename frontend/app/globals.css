@@ -1039,6 +1039,46 @@ body::before {
      navigateur. Beaucoup de cibles, dont la plupart hautes de 39px : la
      navigation au clavier a besoin qu'on dise où elle est. L'offset négatif
      garde l'anneau dans la rangée, sans heurter le filet de la voisine. */
+  /* Le maillon de chaîne est un bouton depuis qu'il filtre. Trois états à dire :
+     survol, focus clavier, et pressé. Le pressé passe par le PAPIER et un filet
+     cuivre, jamais par un lavis — `bg-brand/15` n'émet aucune règle, et un lavis
+     sous du cuivre était mesuré à 4.21:1 en bande claire. */
+  .chaine__etape {
+    width: 100%;
+    cursor: pointer;
+    transition:
+      border-color 0.2s,
+      background-color 0.2s;
+  }
+
+  .chaine__etape:hover {
+    border-color: var(--copper-line);
+  }
+
+  .chaine__etape:focus-visible {
+    outline: 2px solid var(--copper-text);
+    outline-offset: 2px;
+  }
+
+  .chaine__etape[aria-pressed="true"] {
+    border-color: var(--copper-text);
+    background: var(--paper);
+  }
+
+  /* Le compte par maillon. Il est là pour que replier ne cache rien : le lecteur
+     voit combien de menaces chaque maillon porte avant de cliquer. */
+  .chaine__compte {
+    display: block;
+    margin-top: 0.35rem;
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 0.6875rem;
+    color: var(--text-low);
+  }
+
+  .chaine__etape[aria-pressed="true"] .chaine__compte {
+    color: var(--copper-text);
+  }
+
   .menace:focus-visible {
     outline: 2px solid var(--copper-text);
     outline-offset: -2px;

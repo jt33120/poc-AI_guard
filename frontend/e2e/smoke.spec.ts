@@ -467,16 +467,26 @@ test("un seul sélecteur de profil pilote les deux sections", async ({ page }) =
   await expect(section.getByText(/P3/)).toBeVisible();
 });
 
-test("le profil sur lequel nous perdons est publié sans qu'on ait à le cocher", async ({
-  page,
-}) => {
+test("un maillon de la chaîne filtre le relevé, et se relâche", async ({ page }) => {
   await page.goto("/");
+  const rangees = page.locator("#menaces .menace");
+  const total = await rangees.count();
+  expect(total).toBeGreaterThan(10);
 
-  // Rien de coché : l'affirmation la plus crédible de la page doit déjà être là.
-  // La cacher derrière une case la réserverait à ceux qui ont deviné.
-  const section = page.locator("#pour-qui");
-  await expect(section.getByText(/nous n'y bloquons rien/i)).toBeVisible();
-  await expect(section.getByText(/aucune passerelle ne s'y intercale/i)).toBeVisible();
+  // Le maillon porte son compte AVANT le clic : filtrer ne doit pas être une
+  // surprise, le lecteur voit ce qu'il va obtenir.
+  const maillon = page.locator("#menaces .chaine__etape").nth(3); // « ses actions »
+  const annonce = Number((await maillon.locator(".chaine__compte").innerText()).trim());
+  expect(annonce).toBeGreaterThan(0);
+  expect(annonce).toBeLessThan(total);
+
+  await maillon.click();
+  await expect(maillon).toHaveAttribute("aria-pressed", "true");
+  expect(await rangees.count()).toBe(annonce);
+
+  // Et il se relâche, sinon le filtre serait un cul-de-sac.
+  await page.locator("#menaces figcaption button").click();
+  expect(await rangees.count()).toBe(total);
 });
 
 // --- L'instantané de démonstration (L8) ----------------------------------------

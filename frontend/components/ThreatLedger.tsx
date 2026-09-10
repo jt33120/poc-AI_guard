@@ -455,6 +455,9 @@ export function ThreatLedger() {
   const { t } = useT();
   const { choisis, basculer: basculerProfil, positionne, occupe, echoue } = useProfils();
   const [ouverte, setOuverte] = useState<string | null>(null);
+  // `null` = toute la chaîne. Le filtre ne retire jamais une rangée du document
+  // sans le dire : le compte par maillon reste affiché sur chaque bouton.
+  const [maillon, setMaillon] = useState<Etape | null>(null);
 
   /**
    * Une rangée du classement, quel que soit son registre.
@@ -464,6 +467,8 @@ export function ThreatLedger() {
    * le corps deux fois ferait diverger les deux moitiés du même relevé au premier
    * changement.
    */
+  const retenues = maillon ? MENACES.filter((m) => m.etape === maillon) : MENACES;
+
   const rendre = (menace: Menace) => {
     const ligne = menace.releve ? RELEVE.lignes.find((l) => l.id === menace.releve) : undefined;
     return (
@@ -500,23 +505,49 @@ export function ThreatLedger() {
           {t("ledger.lede", { lignes: FAITS_PUBLIES.faits.lignes })}
         </p>
 
-        {/* La chaîne d'attaque : la légende des pastilles, montrée une seule fois.
-            Sans elle, le glyphe de chaque rangée serait décoratif ; avec elle, il
-            situe la menace dans un trajet que le lecteur a déjà vu. */}
+        {/* La chaîne, et le filtre : c'est le même objet.
+
+            Elle était une légende — elle situait la pastille de chaque rangée dans un
+            trajet déjà vu. Elle porte maintenant la navigation : un maillon cliqué ne
+            montre que les menaces qui entrent par lui. Le geste et l'explication sont
+            ainsi la même chose, et le lecteur apprend la structure de la surface
+            d'attaque en s'en servant.
+
+            Chaque maillon est un `<button>` et non un `<li>` cliquable : le rôle, le
+            focus clavier et l'annonce de l'état pressé viennent alors du navigateur,
+            et non d'attributs qu'il faudrait penser à écrire. */}
         <figure className="mt-10">
           <ol className="chaine__voie">
             {ETAPES.map((etape, i) => (
-              <li
-                key={etape}
-                className="chaine__etape"
-                data-tenu={etape === "actions" ? "true" : undefined}
-              >
-                <Points actif={i} />
-                <span className="chaine__nom">{t(cleEtape(etape))}</span>
+              <li key={etape}>
+                <button
+                  type="button"
+                  className="chaine__etape"
+                  data-tenu={etape === "actions" ? "true" : undefined}
+                  aria-pressed={maillon === etape}
+                  onClick={() => setMaillon(maillon === etape ? null : etape)}
+                >
+                  <Points actif={i} />
+                  <span className="chaine__nom">{t(cleEtape(etape))}</span>
+                  <span className="chaine__compte">
+                    {MENACES.filter((m) => m.etape === etape).length}
+                  </span>
+                </button>
               </li>
             ))}
           </ol>
-          <figcaption className="muted mt-3 text-sm">{t("ledger.chaine")}</figcaption>
+          <figcaption className="muted mt-3 flex flex-wrap items-center gap-3 text-sm">
+            <span>{maillon ? t("ledger.chaine.filtre") : t("ledger.chaine")}</span>
+            {maillon && (
+              <button
+                type="button"
+                className="label text-[color:var(--copper-text)] underline underline-offset-4"
+                onClick={() => setMaillon(null)}
+              >
+                {t("ledger.chaine.toutes")}
+              </button>
+            )}
+          </figcaption>
         </figure>
 
         {/* Le sélecteur de profil. Le filet cuivre ouvre le bloc : sur `xsom.fr`
@@ -590,8 +621,8 @@ export function ThreatLedger() {
             <span className="label">{t("ledger.col.menace")}</span>
             <span className="label">{t("ledger.col.preuve")}</span>
           </div>
-          <ol>{MENACES.filter((m) => m.critique).map(rendre)}</ol>
-          <ol className="releve__suite">{MENACES.filter((m) => !m.critique).map(rendre)}</ol>
+          <ol>{retenues.filter((m) => m.critique).map(rendre)}</ol>
+          <ol className="releve__suite">{retenues.filter((m) => !m.critique).map(rendre)}</ol>
         </div>
 
         <p className="muted mt-6 max-w-4xl text-sm leading-relaxed">{t("ledger.note")}</p>
