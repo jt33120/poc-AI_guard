@@ -14,11 +14,14 @@ un import. La frontière est donc ici, et la garde `scripts/audit_sovereignty.py
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from fastapi import Depends, Header, HTTPException, Request, status
 
 from core import db, tenant_tokens
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -36,6 +39,7 @@ def resolve_gateway_principal(request: Request, raw_token: str | None) -> Gatewa
     unknown/revoked token all deny (401/503).
     """
     if not raw_token:
+        _refus("missing", None)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing gateway token"
         )
@@ -49,10 +53,30 @@ def resolve_gateway_principal(request: Request, raw_token: str | None) -> Gatewa
             token_id, tenant_id = tenant_tokens.authenticate_gateway_principal(conn, raw_token)
             conn.commit()
     except PermissionError:
+        _refus("rejected", raw_token)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid gateway token"
         ) from None
     return GatewayPrincipal(tenant_id=tenant_id, token_id=token_id)
+
+
+def _refus(motif: str, raw_token: str | None) -> None:
+    """Journalise un refus d'authentification de passerelle.
+
+    Il n'en restait **aucune** trace : ni journal, ni `audit_log` (ce chemin
+    n'appelle pas `log_event`), ni Sentry — une `HTTPException` est gérée par
+    FastAPI et n'atteint jamais le handler d'`api/errors.py`. Un jeton révoqué qui
+    martèle l'API, ou un balayage de jetons, ne laissait pour seul indice qu'un
+    `last_used_at` qui ne bougeait pas.
+
+    L'**empreinte** et jamais le jeton : elle suffit à compter les tentatives par
+    porteur, et elle ne peut pas servir à rejouer. C'est la lecture stricte de
+    §4.10 — des métadonnées, pas le secret.
+    """
+    extra: dict[str, str] = {"reason": motif}
+    if raw_token:
+        extra["token_fp"] = tenant_tokens.hash_token(raw_token)[:16]
+    logger.warning("gateway_auth_refused", extra=extra)
 
 
 def get_gateway_principal(
