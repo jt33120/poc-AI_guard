@@ -24,7 +24,7 @@ from api.main import create_app
 from api.security import TokenVerifier
 from core import approvals, audit, decision, entitlements
 from core.config import Settings
-from core.entitlements import Capability, Meter, Metric
+from core.entitlements import Meter, Metric
 from core.judge import Judge
 from core.policy import ActionClass, Approval, PolicyOutcome, parse_policy
 from tests.conftest import DBHandle
@@ -390,25 +390,40 @@ def test_a_plan_without_the_judge_hardens_rather_than_relaxes(db: DBHandle) -> N
         "tools:\n  - {name: shell.exec, classify: ambiguous, approval: auto}\n"
         "defaults: {unknown_tool: deny}\n"
     )
-    # **Un juge est fourni dans les deux cas**, et c'est ce qui rend le contrôle non
-    # vide : sans lui, « pas de capacité » et « pas de juge configuré » produiraient
-    # le même résultat, et retirer la condition de capacité ne ferait rien bouger.
-    # Éprouvé par mutation — la première version de ce test ne mordait pas.
-    juge = Judge(lambda _s, _u: '{"action_class": "read"}')
+    # **Le budget est intact, seule la capacité manque** — et c'est la seule forme
+    # qui éprouve la ligne visée.
+    #
+    # Deux versions précédentes ne mordaient pas. La première ne fournissait aucun
+    # juge : « pas de capacité » et « pas de juge configuré » donnaient le même
+    # résultat. La seconde en fournissait un mais partait de `free`, dont le
+    # `judge_calls` vaut **0** : le compteur fermait la porte avant la capacité, si
+    # bien que retirer la condition de capacité ne changeait toujours rien. Les deux
+    # verrous gardent la même chose sur ce palier-là.
+    #
+    # Ici le tenant est `pro` — deux mille appels de juge au budget — et on lui retire
+    # la seule capacité. Ce qui reste debout est exactement la ligne mutée.
+    sans_capacite_tid = _tenant(db, "pro")
+    db.conn.execute("delete from plan_capabilities where plan = 'pro' and capability = 'judge'")
+    db.conn.commit()
+    assert entitlements.load_entitlement(db.conn, sans_capacite_tid).limite(Metric.judge_calls), (
+        "le budget doit rester, sinon c'est le compteur qu'on éprouve"
+    )
 
     sans_capacite = decision.authorize(
         database_url=db.url,
         policy=policy,
-        tenant_id=_tenant(db, "free"),
+        tenant_id=sans_capacite_tid,
         tool="shell.exec",
         arguments={"cmd": "rm -rf /"},
-        judge=juge,
+        judge=Judge(lambda _s, _u: '{"action_class": "read"}'),
     )
-    assert not entitlements.load_entitlement(db.conn, _tenant(db, "free")).allows(Capability.judge)
     assert sans_capacite["decision"] == "hold"
     assert sans_capacite["action_class"] == "irreversible", (
         "sans la capacité, le juge ne doit pas tourner — et son absence plancherise"
     )
+
+    db.conn.execute("insert into plan_capabilities values ('pro', 'judge')")
+    db.conn.commit()
 
     avec_capacite = decision.authorize(
         database_url=db.url,
