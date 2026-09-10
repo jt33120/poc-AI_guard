@@ -301,7 +301,7 @@ def consume(conn: psycopg.Connection, tenant_id: str, metric: Metric, n: int = 1
     `Meter.unknown` par l'appelant.
     """
     try:
-        if True:
+        with conn.transaction():
             row = conn.execute(
                 "insert into plan_usage_counters (tenant_id, metric, period_start, used) "
                 "values (%s, %s, %s, %s) "
