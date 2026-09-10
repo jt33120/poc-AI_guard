@@ -127,7 +127,7 @@ test("audit explorer lists entries and offers exports", async ({ page, context }
   });
 
   await page.goto("/audit");
-  await expect(page.getByText("crm.read")).toBeVisible();
+  await expect(page.getByRole("button", { name: "crm.read", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: /Export AI Act/ })).toBeVisible();
 });
 

@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 
 import { useClientScope } from "@/components/ClientScope";
 import { ProviderIcon } from "@/components/ProviderIcon";
+import { ConsoleHeader } from "@/components/ConsoleUI";
+import { AuthorizationFlow, SignalVideo } from "@/design-system/react";
 import { apiSend, apiSendVoid } from "@/lib/client";
 import { type StrKey, useT } from "@/lib/i18n";
 import {
@@ -29,7 +31,11 @@ function resolveApiBase(): string {
 type Tpl = "monitor" | "balanced" | "strict";
 // A natural-language prompt for a self-modifying agent (openclaw, Claude Code…)
 // to reconfigure its own LLM endpoint. Null for non-proxy stacks.
-function integrationPrompt(stack: Stack, key: string, api: string): string | null {
+function integrationPrompt(
+  stack: Stack,
+  key: string,
+  api: string,
+): string | null {
   const base = proxyBase(stack, key, api);
   if (!base) return null;
   const hint = OPENAI_STYLE[stack]?.keyHint ?? "Anthropic";
@@ -50,9 +56,27 @@ const TEMPLATES: { id: Tpl; t: StrKey; d: StrKey }[] = [
 ];
 
 const CLASS_APPROVALS: Record<Tpl, Record<string, string>> = {
-  monitor: { read: "auto", write: "auto", external_send: "auto", irreversible: "auto", unknown: "auto" },
-  balanced: { read: "auto", write: "auto", external_send: "human_in_the_loop", irreversible: "human_in_the_loop", unknown: "deny" },
-  strict: { read: "auto", write: "human_in_the_loop", external_send: "human_dual", irreversible: "human_dual", unknown: "deny" },
+  monitor: {
+    read: "auto",
+    write: "auto",
+    external_send: "auto",
+    irreversible: "auto",
+    unknown: "auto",
+  },
+  balanced: {
+    read: "auto",
+    write: "auto",
+    external_send: "human_in_the_loop",
+    irreversible: "human_in_the_loop",
+    unknown: "deny",
+  },
+  strict: {
+    read: "auto",
+    write: "human_in_the_loop",
+    external_send: "human_dual",
+    irreversible: "human_dual",
+    unknown: "deny",
+  },
 };
 
 function policyYaml(tpl: Tpl, agent: string): string {
@@ -90,7 +114,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
 }
 
 export default function OnboardingPage() {
-  const { t } = useT();
+  const { t, lang } = useT();
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");
   const [stack, setStack] = useState<Stack>("http");
@@ -117,7 +141,8 @@ export default function OnboardingPage() {
     if (clients.length === 0) setProjectId("__new__");
   }, [clients.length]);
 
-  const effectiveYaml = mode === "ai" && aiYaml ? aiYaml : policyYaml(tpl, name.trim());
+  const effectiveYaml =
+    mode === "ai" && aiYaml ? aiYaml : policyYaml(tpl, name.trim());
 
   async function draftAI() {
     if (!aiPrompt.trim()) return;
@@ -129,7 +154,11 @@ export default function OnboardingPage() {
       });
       setAiYaml(doc.yaml);
     } catch (e: unknown) {
-      setAiError(String(e).includes("503") ? t("admin.ai.unavailable") : t("admin.ai.error"));
+      setAiError(
+        String(e).includes("503")
+          ? t("admin.ai.unavailable")
+          : t("admin.ai.error"),
+      );
     } finally {
       setAiBusy(false);
     }
@@ -150,11 +179,18 @@ export default function OnboardingPage() {
       } else if (projectId && projectId !== "__new__") {
         clientId = projectId;
       }
-      const tok = await apiSend<{ id: string; token: string }>("v1/gateway-tokens", "POST", {
-        name: name.trim() || "agent",
-      });
+      const tok = await apiSend<{ id: string; token: string }>(
+        "v1/gateway-tokens",
+        "POST",
+        {
+          name: name.trim() || "agent",
+        },
+      );
       if (clientId) {
-        await apiSendVoid("v1/clients/assign", "POST", { token_id: tok.id, client_id: clientId });
+        await apiSendVoid("v1/clients/assign", "POST", {
+          token_id: tok.id,
+          client_id: clientId,
+        });
       }
       setApiKey(tok.token);
       reload();
@@ -166,35 +202,54 @@ export default function OnboardingPage() {
     }
   }
 
-  const steps: StrKey[] = ["onb.s1", "onb.s2", "onb.s3"];
+  const steps = [
+    t("onb.s1"),
+    t("onb.s2"),
+    t("onb.s3"),
+    lang === "fr" ? "Intégrer" : "Integrate",
+  ];
 
   return (
-    <section className="mx-auto flex max-w-2xl animate-fade-up flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-bold sm:text-3xl">{t("onb.title")}</h1>
-        <p className="muted mt-1.5">{t("onb.subtitle")}</p>
-      </header>
+    <section className="console-page console-onboarding">
+      <ConsoleHeader
+        eyebrow="09 / CONNECT"
+        title={
+          lang === "fr"
+            ? "Brancher. Borner. Vérifier."
+            : "Connect. Bound. Verify."
+        }
+        description={
+          lang === "fr"
+            ? "Quatre étapes pour faire passer votre agent par Guard."
+            : "Four steps to route your agent through Guard."
+        }
+      />
+      {step === 1 && (
+        <div className="onboarding-intro">
+          <section className="console-panel">
+            <AuthorizationFlow lang={lang} interactive={false} mode="demo" />
+            <p className="console-note">
+              {lang === "fr"
+                ? "Schéma de principe. La protection commence lorsque l’agent appelle ses outils à travers la passerelle."
+                : "Concept diagram. Protection starts when the agent calls its tools through the gateway."}
+            </p>
+          </section>
+          <SignalVideo lang={lang} />
+        </div>
+      )}
 
       {/* Step indicator */}
-      <div className="flex items-center gap-2">
+      <ol className="onboarding-stepper">
         {steps.map((s, i) => {
           const n = i + 1;
-          const active = step >= n;
           return (
-            <div key={s} className="flex items-center gap-2">
-              <span
-                className={`grid h-7 w-7 place-items-center rounded-full text-xs font-bold ${
-                  active ? "bg-brand text-white" : "bg-white/10 text-white/50"
-                }`}
-              >
-                {n}
-              </span>
-              <span className={`text-sm ${active ? "text-white" : "text-white/50"}`}>{t(s)}</span>
-              {i < steps.length - 1 ? <span className="mx-1 h-px w-6 bg-white/15" /> : null}
-            </div>
+            <li key={s} aria-current={step === n ? "step" : undefined}>
+              <span>{step > n ? "✓" : `0${n}`}</span>
+              <span>{s}</span>
+            </li>
           );
         })}
-      </div>
+      </ol>
 
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
 
@@ -202,8 +257,11 @@ export default function OnboardingPage() {
       {step === 1 ? (
         <div className="card flex flex-col gap-5 p-6">
           <div>
-            <label className="label">{t("onb.name.label")}</label>
+            <label htmlFor="onboarding-agent-name" className="label">
+              {t("onb.name.label")}
+            </label>
             <input
+              id="onboarding-agent-name"
               className="input mt-1.5"
               placeholder={t("onb.name.ph")}
               value={name}
@@ -211,8 +269,11 @@ export default function OnboardingPage() {
             />
           </div>
           <div>
-            <label className="label">{t("onb.project.label")}</label>
+            <label htmlFor="onboarding-project" className="label">
+              {t("onb.project.label")}
+            </label>
             <select
+              id="onboarding-project"
               className="input mt-1.5"
               value={projectId}
               onChange={(e) => setProjectId(e.target.value)}
@@ -242,6 +303,7 @@ export default function OnboardingPage() {
                   key={s.id}
                   type="button"
                   onClick={() => setStack(s.id)}
+                  aria-pressed={stack === s.id}
                   className={`flex items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-left text-sm transition ${
                     stack === s.id
                       ? "border-brand bg-brand/10 text-white"
@@ -255,7 +317,11 @@ export default function OnboardingPage() {
             </div>
           </div>
           <div className="flex justify-end">
-            <button type="button" className="btn btn-primary" onClick={() => setStep(2)}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => setStep(2)}
+            >
               {t("onb.next")}
             </button>
           </div>
@@ -272,11 +338,18 @@ export default function OnboardingPage() {
                 key={m}
                 type="button"
                 onClick={() => setMode(m)}
+                aria-pressed={mode === m}
                 className={`rounded-pill px-3.5 py-1 transition ${
-                  mode === m ? "bg-brand text-white" : "text-white/55 hover:text-white"
+                  mode === m
+                    ? "bg-brand text-white"
+                    : "text-white/55 hover:text-white"
                 }`}
               >
-                {t(m === "template" ? "onb.tpl.mode.template" : "onb.tpl.mode.ai")}
+                {t(
+                  m === "template"
+                    ? "onb.tpl.mode.template"
+                    : "onb.tpl.mode.ai",
+                )}
               </button>
             ))}
           </div>
@@ -290,6 +363,7 @@ export default function OnboardingPage() {
                     key={opt.id}
                     type="button"
                     onClick={() => setTpl(opt.id)}
+                    aria-pressed={tpl === opt.id}
                     className={`rounded-xl border p-4 text-left transition ${
                       tpl === opt.id
                         ? "border-brand bg-brand/10"
@@ -299,7 +373,9 @@ export default function OnboardingPage() {
                     <div className="flex items-center gap-2">
                       <span className="font-semibold">{t(opt.t)}</span>
                       {opt.id === "balanced" ? (
-                        <span className="badge badge-blue">{t("onb.recommended")}</span>
+                        <span className="badge badge-blue">
+                          {t("onb.recommended")}
+                        </span>
                       ) : null}
                     </div>
                     <p className="muted mt-1 text-sm">{t(opt.d)}</p>
@@ -328,10 +404,14 @@ export default function OnboardingPage() {
                 </button>
                 <p className="muted text-xs">{t("admin.ai.hint")}</p>
               </div>
-              {aiError ? <p className="text-sm text-red-300">{aiError}</p> : null}
+              {aiError ? (
+                <p className="text-sm text-red-300">{aiError}</p>
+              ) : null}
               {aiYaml ? (
                 <>
-                  <p className="text-sm text-emerald-300">{t("onb.ai.ready")}</p>
+                  <p className="text-sm text-emerald-300">
+                    {t("onb.ai.ready")}
+                  </p>
                   <pre className="overflow-x-auto rounded-xl bg-navy-mid/70 p-4 text-xs text-white/80">
                     {aiYaml}
                   </pre>
@@ -341,7 +421,11 @@ export default function OnboardingPage() {
           )}
 
           <div className="flex justify-between">
-            <button type="button" className="btn btn-ghost" onClick={() => setStep(1)}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setStep(1)}
+            >
               {t("onb.back")}
             </button>
             <button
@@ -369,10 +453,19 @@ export default function OnboardingPage() {
             {t("onb.warn")}
           </p>
           <div className="flex justify-between">
-            <button type="button" className="btn btn-ghost" onClick={() => setStep(2)}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setStep(2)}
+            >
               {t("onb.back")}
             </button>
-            <button type="button" className="btn btn-primary" onClick={finish} disabled={busy}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={finish}
+              disabled={busy}
+            >
               {busy ? t("onb.generating") : t("onb.generate")}
             </button>
           </div>
@@ -402,7 +495,10 @@ export default function OnboardingPage() {
             <div className="card p-5">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold">{t("onb.url.title")}</h3>
-                <CopyButton text={proxyBase(stack, apiKey, apiBase) ?? ""} label={t("onb.copy")} />
+                <CopyButton
+                  text={proxyBase(stack, apiKey, apiBase) ?? ""}
+                  label={t("onb.copy")}
+                />
               </div>
               <p className="muted mt-1 text-xs">{t("onb.url.note")}</p>
               <code className="mt-2 block break-all rounded-lg bg-navy-mid/70 px-3 py-2 font-mono text-xs text-brand-bright">
@@ -414,8 +510,13 @@ export default function OnboardingPage() {
           {integrationPrompt(stack, apiKey, apiBase) ? (
             <div className="card p-5">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold">{t("onb.prompt.title")}</h3>
-                <CopyButton text={integrationPrompt(stack, apiKey, apiBase) ?? ""} label={t("onb.copy")} />
+                <h3 className="text-sm font-semibold">
+                  {t("onb.prompt.title")}
+                </h3>
+                <CopyButton
+                  text={integrationPrompt(stack, apiKey, apiBase) ?? ""}
+                  label={t("onb.copy")}
+                />
               </div>
               <p className="muted mt-1 text-xs">{t("onb.prompt.note")}</p>
               <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded-xl bg-navy-mid/70 p-4 text-xs text-white/80">
@@ -426,11 +527,20 @@ export default function OnboardingPage() {
 
           <div className="card p-5">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold">{t("onb.snippet.title")}</h3>
-              <CopyButton text={snippet(stack, apiKey, apiBase)} label={t("onb.copy")} />
+              <h3 className="text-sm font-semibold">
+                {t("onb.snippet.title")}
+              </h3>
+              <CopyButton
+                text={snippet(stack, apiKey, apiBase)}
+                label={t("onb.copy")}
+              />
             </div>
             <p className="muted mt-1 text-xs">
-              {t(OPENAI_STYLE[stack] || stack === "anthropic" ? "onb.snippet.proxy" : "onb.snippet.note")}
+              {t(
+                OPENAI_STYLE[stack] || stack === "anthropic"
+                  ? "onb.snippet.proxy"
+                  : "onb.snippet.note",
+              )}
             </p>
             <pre className="mt-2 overflow-x-auto rounded-xl bg-navy-mid/70 p-4 text-xs text-white/80">
               {snippet(stack, apiKey, apiBase)}

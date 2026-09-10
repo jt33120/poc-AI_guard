@@ -40,12 +40,15 @@ export default function LoginPage() {
   return (
     <>
       {redirecting ? (
-        <FullScreenLoader label={t("login.securing")} slowLabel={t("common.waking")} />
+        <FullScreenLoader
+          label={t("login.securing")}
+          slowLabel={t("common.waking")}
+        />
       ) : null}
       <div className="absolute right-6 top-6">
         <LanguageToggle />
       </div>
-      <main className="flex min-h-screen items-center justify-center p-6">
+      <main className="console-shell signal-auth flex min-h-screen items-center justify-center p-6">
         <div className="w-full max-w-sm animate-fade-up">
           <div className="mb-6 flex items-center gap-2.5">
             <XsomMark className="h-9 w-9" />
@@ -73,18 +76,32 @@ export default function LoginPage() {
                 className="input"
                 required
               />
-              <button type="submit" disabled={busy} className="btn btn-primary mt-1 w-full">
+              <button
+                type="submit"
+                disabled={busy}
+                className="btn btn-primary mt-1 w-full"
+              >
                 {busy ? t("login.submitting") : t("login.submit")}
               </button>
-              {error ? <p className="text-sm text-red-300">{error}</p> : null}
+              {error ? (
+                <p role="alert" className="text-sm text-red-300">
+                  {error}
+                </p>
+              ) : null}
             </form>
             <p className="mt-4 text-center text-sm">
-              <Link href="/forgot-password" className="text-brand-bright hover:underline">
+              <Link
+                href="/forgot-password"
+                className="text-brand-bright hover:underline"
+              >
                 {t("login.forgot")}
               </Link>
             </p>
             <p className="mt-2 text-center text-sm">
-              <Link href="/signup" className="text-brand-bright hover:underline">
+              <Link
+                href="/signup"
+                className="text-brand-bright hover:underline"
+              >
                 {t("login.signup")}
               </Link>
             </p>

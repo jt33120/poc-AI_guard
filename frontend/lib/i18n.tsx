@@ -50,14 +50,20 @@ export function LanguageProvider({
     router.refresh();
   };
 
-  return <LangContext.Provider value={{ lang, setLang: set }}>{children}</LangContext.Provider>;
+  return (
+    <LangContext.Provider value={{ lang, setLang: set }}>
+      {children}
+    </LangContext.Provider>
+  );
 }
 
 export function useT() {
   const { lang, setLang } = useContext(LangContext);
   const t = (key: StrKey, vars?: Record<string, string | number>) => {
     let s: string = STR[key]?.[lang] ?? STR[key]?.en ?? String(key);
-    if (vars) for (const [k, v] of Object.entries(vars)) s = s.replace(`{${k}}`, String(v));
+    if (vars)
+      for (const [k, v] of Object.entries(vars))
+        s = s.replace(`{${k}}`, String(v));
     return s;
   };
   return { t, lang, setLang };
@@ -66,14 +72,20 @@ export function useT() {
 export function LanguageToggle() {
   const { lang, setLang } = useT();
   return (
-    <div className="flex items-center rounded-sm border border-white/15 bg-white/[0.04] p-0.5 font-mono text-xs">
+    <div
+      className="console-language"
+      role="group"
+      aria-label={lang === "fr" ? "Langue" : "Language"}
+    >
       {(["fr", "en"] as Lang[]).map((l) => (
         <button
           key={l}
           type="button"
           onClick={() => setLang(l)}
           className={`rounded-sm px-2.5 py-1 transition ${
-            lang === l ? "bg-brand text-white" : "text-white/55 hover:text-white"
+            lang === l
+              ? "bg-brand text-white"
+              : "text-white/55 hover:text-white"
           }`}
           aria-pressed={lang === l}
         >

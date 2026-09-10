@@ -39,6 +39,35 @@ call before you execute a tool), and the **LLM provider proxy** (point an SDK's
 | **AI observability** | Per-agent usage, cost and latency, OTLP `gen_ai` ingestion, cost-anomaly detection. |
 | **Tenancy** | Multi-tenant by Postgres RLS, self-serve signup, gateway tokens (hash-stored), client/project scoping. |
 
+## xSOM Signal console
+
+The console and corporate site share the versioned `frontend/design-system/`
+package: warm charcoal / copper tokens, self-hosted fonts and mark, verdict
+colors, interactive diagrams and accessible display preferences. The source
+tokens are `frontend/design-system/design/tokens.json`, vendored from the
+corporate repository. Edit that canonical package, regenerate with
+`node design-system/build.mjs`, then synchronize both repos as documented in
+`frontend/design-system/README.md`. Do not change generated token CSS by hand.
+See `frontend/design-system/VOICE.md` for copy rules.
+
+Start only the frontend with `cd frontend && npm ci && npm run dev`; use the
+existing `.env.example` configuration for Supabase and `CONTROL_API_URL`.
+`npm run typecheck`, `npm run lint`, `npm run build` and `npm run test:e2e`
+validate the frontend. E2E fixtures are hermetic and are never live customer data.
+
+The operational routes are `/home`, `/inspector`, `/approvals`, `/audit`, `/risk`,
+`/costs`, `/executive`, `/policy`, `/onboarding`, `/admin` and `/settings`.
+Policy editing remains available in `/admin` for existing workflows. Display
+preferences persist locally; auth tokens still use the existing server cookies.
+
+The inspector reads effective rules and recorded metadata; it does not execute
+tools. Approval countdowns disable expired actions locally, while the server
+remains authoritative for every decision. Audit exports cover the tenant and
+selected date range. The event sequence does not claim cryptographic verification:
+the current audit API does not return chain hashes. Risk screens show actual trust
+and integrity rows; absent per-call scores stay unknown. Interactive examples and
+videos are explicitly illustrative.
+
 ## Prerequisites
 
 - **Python 3.12** and [uv](https://docs.astral.sh/uv/)
