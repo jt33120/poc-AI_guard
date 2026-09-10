@@ -17,6 +17,7 @@ from typing import Any, Protocol
 import httpx
 import psycopg
 
+from core import plan_changes
 from core.config import Settings
 
 logger = logging.getLogger("xsom.signup")
@@ -100,6 +101,19 @@ def provision_account(
         conn.execute(
             "insert into memberships (user_id, tenant_id, role) values (%s, %s, 'admin')",
             (user_id, tenant_id),
+        )
+        # Le palier est celui de la colonne (`free`, `0030`) : on ne le passe pas ici,
+        # pour qu'il n'existe qu'un seul endroit qui décide du palier d'entrée. Ce
+        # qu'on écrit, c'est l'**entrée dans la gamme** — sans elle, l'histoire des
+        # paliers d'un tenant commence à sa première rétrogradation, c'est-à-dire au
+        # moment précis où elle est contestée. Dans la même transaction que le tenant
+        # et l'appartenance : une inscription à moitié inscrite n'existe pas.
+        plan_changes.record(
+            conn,
+            tenant_id=tenant_id,
+            from_tier=None,
+            to_tier="free",
+            reason=plan_changes.Raison.signup,
         )
         conn.commit()
         admin.set_app_metadata(user_id, {"tenant_id": tenant_id, "role": "admin"})

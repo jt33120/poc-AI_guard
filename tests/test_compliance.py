@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+from uuid import uuid4
+
 import pytest
 
-from core import audit, compliance
+from core import approvals, audit, compliance
 from tests.conftest import DBHandle
 
 # `log_event` requires the ingestion adapter to name its door (FR-160). These
@@ -168,3 +171,62 @@ def test_the_declared_sections_are_the_ones_the_pack_produces(db: DBHandle) -> N
         "Soit la section est à implémenter, soit la déclaration est à retirer — une "
         "facette « Attesté » adossée à une section absente est une revendication vide."
     )
+
+
+def test_an_emptied_journal_is_not_reported_as_ready(db: DBHandle) -> None:
+    """L'attestation qui disait que tout allait bien sur un journal anéanti.
+
+    `verify_chain` sur zéro ligne ne parcourt rien, donc ne trouve aucune rupture :
+    `ok=True`. Combiné à `oversight_coverage`, dont le `coverage_ok` est
+    `auto_allowed == 0` — vrai aussi quand il n'y a **aucune** ligne —, le dossier
+    sortait `chain_ok: true`, `ready: true`. Le trou TRUNCATE que `0028` referme
+    rendait cet état atteignable en une commande.
+
+    Le témoin est mécanique : toute approbation naît d'un `hitl_pending` écrit dans
+    `audit_log`. Des approbations sans une seule ligne de journal n'est pas un état
+    que le produit sait produire.
+
+    `chain_ok` reste **vrai** — la chaîne est cohérente, et c'est exactement ce qui
+    rendait l'anomalie invisible. Elle sort dans son propre champ.
+    """
+    tenant_id = str(uuid4())
+    db.conn.execute("insert into tenants (id, name) values (%s, 'A')", (tenant_id,))
+    approvals.create(
+        db.conn,
+        tenant_id=tenant_id,
+        request_id=uuid4().hex,
+        tool_name="crm.delete",
+        action_class="irreversible",
+        ah="h",
+        arguments_summary={},
+        dry_run={},
+        required_count=1,
+        expires_at=datetime.now(UTC) + timedelta(hours=1),
+        requested_by=None,
+    )
+    db.conn.commit()
+
+    etat = compliance.status(db.conn, tenant_id)
+
+    assert etat["entries"] == 0
+    assert etat["chain_ok"] is True, "la chaîne EST cohérente — c'est le piège"
+    assert etat["journal_missing"] is True
+    assert etat["ready"] is False
+
+
+def test_a_brand_new_tenant_is_not_accused_of_losing_its_journal(db: DBHandle) -> None:
+    """L'erreur symétrique, et pourquoi `chain_ok` ne doit pas mentir.
+
+    Zéro ligne est l'état normal d'un client le jour de son inscription. Un garde qui
+    répondrait « journal disparu » à un tenant neuf rendrait un démarrage
+    indistinguable d'un effacement — et serait désactivé dans la semaine.
+    """
+    tenant_id = str(uuid4())
+    db.conn.execute("insert into tenants (id, name) values (%s, 'B')", (tenant_id,))
+    db.conn.commit()
+
+    etat = compliance.status(db.conn, tenant_id)
+
+    assert etat["entries"] == 0
+    assert etat["journal_missing"] is False
+    assert etat["ready"] is True

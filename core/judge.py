@@ -12,6 +12,7 @@ judge enforces that itself rather than trusting its caller to have done it.
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Callable
 from typing import Any
 
@@ -23,6 +24,8 @@ from core.policy import ActionClass, PolicyOutcome, escalate_for_class
 Completer = Callable[[str, str], str]
 
 _VALID = {c.value for c in ActionClass}
+
+logger = logging.getLogger("xsom.judge")
 
 _CLASSIFY_SYSTEM = (
     "You are a security action classifier for an AI-agent tool gateway. "
@@ -46,10 +49,31 @@ class Judge:
         self._completer = completer
         self._max_calls = max_calls
         self._calls = 0
+        self._classifications = 0
 
     @property
     def calls(self) -> int:
+        """Appels **tentés**. C'est le compteur du budget : un fournisseur en panne
+        ne doit pas pouvoir faire dépenser plus que `max_calls`."""
         return self._calls
+
+    @property
+    def classifications(self) -> int:
+        """Appels dont une classe est réellement revenue du modèle.
+
+        Distinct de :attr:`calls`, et c'est tout l'objet. `resolve_ambiguous` posait
+        `judge_used = judge.calls > before`, or `self._calls += 1` précède le `try` :
+        un appel qui expirait ou qui rendait du JSON invalide était donc **crédité au
+        juge**, et la ligne d'audit portait `judge_used=True` sur une classification
+        que le modèle n'a jamais faite. Le docstring de `resolve_ambiguous` énonce
+        l'inverse comme invariant (`AD-21.4`), et `core/compliance.py` compte ces
+        lignes comme des classifications réelles.
+
+        Une panne Mistral bascule tout outil ambigu en `irreversible` donc en HITL :
+        la file d'approbation se remplit, ce qui est le bon comportement — et le
+        journal attestait que le juge avait tranché.
+        """
+        return self._classifications
 
     def _over_budget(self) -> bool:
         return self._calls >= self._max_calls
@@ -75,10 +99,16 @@ class Judge:
         try:
             raw = self._completer(_CLASSIFY_SYSTEM, user)
             value = json.loads(raw).get("action_class")
-        except Exception:
+        except Exception as exc:
+            # Le **type** seul, jamais la charge (§4.10) : `TimeoutError` et
+            # `RateLimitError` demandent des réactions opposées, et rien dans le
+            # dépôt ne les distinguait — l'échec était silencieux.
+            logger.warning("judge_call_failed", extra={"error_type": type(exc).__name__})
             return ActionClass.irreversible
         if value in _VALID:
+            self._classifications += 1
             return ActionClass(value)
+        logger.warning("judge_call_unusable", extra={"error_type": "unparsable_class"})
         return ActionClass.irreversible
 
     def narrate(self, framework: str, counts: dict[str, int], total: int) -> str:
@@ -92,7 +122,9 @@ class Judge:
         return self._completer(_NARRATE_SYSTEM, user).strip()
 
 
-def litellm_completer(model: str, api_key: str) -> Completer:  # pragma: no cover - needs network
+def litellm_completer(
+    model: str, api_key: str, timeout: float = 8.0
+) -> Completer:  # pragma: no cover - needs network
     """Default completer calling Mistral via LiteLLM with strict JSON output."""
 
     def complete(system: str, user: str) -> str:
@@ -107,6 +139,10 @@ def litellm_completer(model: str, api_key: str) -> Completer:  # pragma: no cove
             ],
             temperature=0.0,
             max_tokens=400,
+            # Borné : voir `Settings.judge_timeout_seconds`. Sans lui, un point de
+            # terminaison qui accepte la connexion sans répondre gèle la décision
+            # pour toute la flotte du plan.
+            timeout=timeout,
         )
         content: str = response.choices[0].message.content or ""
         return content
@@ -118,7 +154,9 @@ def build_judge(settings: Any) -> Judge | None:
     """Construct a judge from settings, or None when no model key is configured."""
     if not settings.mistral_api_key:
         return None
-    completer = litellm_completer(settings.mistral_model, settings.mistral_api_key)
+    completer = litellm_completer(
+        settings.mistral_model, settings.mistral_api_key, settings.judge_timeout_seconds
+    )
     return Judge(completer, max_calls=settings.judge_max_calls)
 
 
@@ -149,12 +187,19 @@ def resolve_ambiguous(
     if judge is None:
         judged, reason, used = ActionClass.irreversible, "judge_unavailable", False
     else:
-        before = judge.calls
+        tentes, classes = judge.calls, judge.classifications
         judged = judge.classify(tool_name, redact(arguments))
-        # Over budget, `classify` fails closed without calling the model. Compare the
-        # counter rather than assuming a judge object means a model call (AD-21.4).
-        used = judge.calls > before
-        reason = "judge" if used else "judge_over_budget"
+        # `classifications` et non `calls` : le second s'incrémente **avant** l'appel,
+        # donc un juge qui expire ou qui rend du JSON invalide se créditait
+        # lui-même une classification qu'il n'a pas faite (`AD-21.4`). Trois états à
+        # distinguer, pas deux — et le troisième était invisible.
+        used = judge.classifications > classes
+        if used:
+            reason = "judge"
+        elif judge.calls > tentes:
+            reason = "judge_error"  # le modèle a été appelé et n'a pas répondu
+        else:
+            reason = "judge_over_budget"  # il n'a même pas été appelé
     return PolicyOutcome(
         action_class=judged,
         decision=escalate_for_class(outcome.decision, judged),

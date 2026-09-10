@@ -6,11 +6,13 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+import psycopg
+import pytest
 from fastapi.testclient import TestClient
 
 from api.main import create_app
 from api.security import TokenVerifier
-from core import approvals
+from core import approval_chain, approvals
 from core.config import Settings
 from tests.conftest import DBHandle
 
@@ -192,3 +194,134 @@ def test_separation_of_duties_counts_authenticated_identities(
     assert approve(first) == "pending"
     assert approve(first) == "pending"  # the same signature, twice, is still one human
     assert approve(second) == "approved"
+
+
+def _evenements(db: DBHandle, tenant_id: str) -> list[tuple[str, str, int, int]]:
+    return [
+        (r[0], r[1], r[2], r[3])
+        for r in db.conn.execute(
+            "select event, subject, approved_count, required_count "
+            "from approval_decision_events where tenant_id = %s order by id",
+            (tenant_id,),
+        ).fetchall()
+    ]
+
+
+def test_the_human_decision_is_chained_at_the_click_not_at_the_poll(
+    db: DBHandle, test_verifier: TokenVerifier, make_token: Callable[..., str]
+) -> None:
+    """Le cas le plus net : l'agent ne revient jamais, et la décision existe quand même.
+
+    Avant, cette route n'écrivait **rien** — ni audit, ni chaîne. La ligne
+    `hitl_approved` du journal n'apparaissait qu'au *poll* suivant de l'agent. Un
+    agent qui plante, qui abandonne, ou dont l'opérateur a coupé le processus
+    emportait donc avec lui la seule trace de l'approbation humaine d'une action
+    irréversible ; il ne restait qu'une ligne dans `approvals`, une file de travail
+    qu'un `update` réécrit.
+
+    Ce contrôle n'appelle jamais `poll`. C'est tout son objet : un test qui approuve
+    *puis* interroge ne distingue pas les deux mondes.
+    """
+    tenant = uuid4()
+    db.conn.execute("insert into tenants (id, name) values (%s, 'A')", (tenant,))
+    db.conn.commit()
+    approval_id = _seed_pending(db, str(tenant))
+    client = _client(db.url, test_verifier)
+    token = make_token(sub="op-chaine", tenant_id=str(tenant), role="operator")
+
+    resp = client.post(
+        f"/v1/approvals/{approval_id}/decision", headers=_auth(token), json={"decision": "approve"}
+    )
+    assert resp.status_code == 200
+
+    assert _evenements(db, str(tenant)) == [("approved", "op-chaine", 1, 1)]
+    assert approval_chain.verify_chain(db.conn, str(tenant)).ok is True
+
+
+def test_a_refusal_is_chained_too_and_names_its_author(
+    db: DBHandle, test_verifier: TokenVerifier, make_token: Callable[..., str]
+) -> None:
+    """Le refus est la moitié qu'on oublie, et c'est celle qu'on conteste.
+
+    « Pourquoi mon agent n'a-t-il pas pu faire X » est la question que l'on pose
+    après coup, et elle a besoin de la même trace que l'approbation.
+    """
+    tenant = uuid4()
+    db.conn.execute("insert into tenants (id, name) values (%s, 'A')", (tenant,))
+    db.conn.commit()
+    approval_id = _seed_pending(db, str(tenant))
+    client = _client(db.url, test_verifier)
+    token = make_token(sub="op-refus", tenant_id=str(tenant), role="operator")
+
+    client.post(
+        f"/v1/approvals/{approval_id}/decision", headers=_auth(token), json={"decision": "deny"}
+    )
+
+    assert _evenements(db, str(tenant)) == [("denied", "op-refus", 0, 1)]
+
+
+def test_a_dual_control_approval_chains_each_signature_with_its_quorum(
+    db: DBHandle, test_verifier: TokenVerifier, make_token: Callable[..., str]
+) -> None:
+    """`human_dual` doit pouvoir se **prouver**, pas seulement se déclarer.
+
+    Le quorum atteint entre dans la charge hachée à chaque signature : une chaîne
+    qui ne porterait que « approuvé » ne distinguerait pas une action levée par deux
+    personnes d'une action levée par une seule dont le compteur a été retouché.
+
+    La seconde signature du même humain n'écrit rien de plus au quorum — c'est la
+    même propriété que `test_separation_of_duties_counts_authenticated_identities`,
+    vue depuis la chaîne.
+    """
+    tenant = uuid4()
+    db.conn.execute("insert into tenants (id, name) values (%s, 'A')", (tenant,))
+    db.conn.commit()
+    approval_id = _seed_dual(db, str(tenant))
+    client = _client(db.url, test_verifier)
+    premier = make_token(sub="op-1", tenant_id=str(tenant), role="operator")
+    second = make_token(sub="op-2", tenant_id=str(tenant), role="admin")
+
+    for jeton in (premier, second):
+        assert (
+            client.post(
+                f"/v1/approvals/{approval_id}/decision",
+                headers=_auth(jeton),
+                json={"decision": "approve"},
+            ).status_code
+            == 200
+        )
+
+    assert _evenements(db, str(tenant)) == [
+        ("approved", "op-1", 1, 2),
+        ("approved", "op-2", 2, 2),
+    ]
+    assert approval_chain.verify_chain(db.conn, str(tenant)).ok is True
+
+
+def test_the_decision_chain_refuses_to_be_rewritten(
+    db: DBHandle, test_verifier: TokenVerifier, make_token: Callable[..., str]
+) -> None:
+    """La table est append-only, sinon elle ne vaut pas mieux que celle qu'elle double.
+
+    Toute la raison d'être de cette chaîne est que `approvals` est mutable par
+    conception. Une seconde table mutable n'aurait rien apporté.
+    """
+    tenant = uuid4()
+    db.conn.execute("insert into tenants (id, name) values (%s, 'A')", (tenant,))
+    db.conn.commit()
+    approval_id = _seed_pending(db, str(tenant))
+    client = _client(db.url, test_verifier)
+    client.post(
+        f"/v1/approvals/{approval_id}/decision",
+        headers=_auth(make_token(sub="op-1", tenant_id=str(tenant), role="operator")),
+        json={"decision": "approve"},
+    )
+
+    for sql in (
+        "update approval_decision_events set subject = 'quelqun-dautre'",
+        "delete from approval_decision_events",
+        "truncate approval_decision_events",
+    ):
+        with pytest.raises(psycopg.errors.RaiseException):
+            db.conn.execute(sql)
+        db.conn.rollback()

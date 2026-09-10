@@ -26,7 +26,7 @@ Schema:
       class: read | write | external_send | irreversible
       approval: auto | human_in_the_loop | human_dual
   defaults:
-    unknown_tool: auto | human_in_the_loop | human_dual | deny
+    unknown_tool: human_in_the_loop | human_dual | deny
     auto_classify: true | false
     class_approvals:
       read: <approval>
@@ -40,8 +40,10 @@ Rules:
   = delete/deploy/wipe/refund.
 - Prefer `auto_classify: true` with `class_approvals`, so tools the user did not
   name are still handled by their class.
-- Be least-privilege and fail closed: `unknown_tool: deny`, unless the user
-  explicitly asks to only observe/monitor (then `auto`).
+- Be least-privilege and fail closed: `unknown_tool: deny`. `auto` is NOT a
+  legal value for it and the policy will be rejected: "only observe, do not
+  block" is a bounded observation window opened by an admin from the control
+  plane, not a policy that auto-allows every tool nobody has named.
 - Map intent: "block/forbid" -> deny; "ask a human / needs approval" ->
   human_in_the_loop; "two approvers / dual control / four eyes" -> human_dual;
   "let it run / automatic / fine" -> auto.

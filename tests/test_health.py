@@ -6,6 +6,7 @@ bundled head" is only worth asserting if a real ledger says so.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -132,7 +133,7 @@ def test_ready_is_memoised(monkeypatch: pytest.MonkeyPatch) -> None:
     """An anonymous caller must not be able to amplify probes into the database."""
     calls = 0
 
-    def counting(settings: Settings) -> health.Readiness:
+    def counting(settings: Settings, plane: str = "all") -> health.Readiness:
         nonlocal calls
         calls += 1
         return health.Readiness(ok=True, database=True, schema_current=True, issuer=True)
@@ -229,3 +230,107 @@ def test_an_unknown_claims_shape_stops_the_boot() -> None:
     """
     with pytest.raises(ValidationError):
         Settings(_env_file=None, issuer_claims="keycloak")
+
+
+@pytest.mark.parametrize(
+    ("plane", "pret"),
+    [("decision", True), ("llm", True), ("console", False), ("all", False)],
+)
+def test_readiness_only_requires_an_issuer_on_the_planes_that_verify_a_token(
+    migrated_url: str, plane: str, pret: bool
+) -> None:
+    """La cascade que le découpage en plans existe pour empêcher, réintroduite par la sonde.
+
+    `health_router` est dans le socle, donc les trois services rendaient le même
+    verdict. Or le plan `décision` ne vérifie **aucun** JWT : `api/authorize.py`
+    authentifie par `X-Gateway-Token`. Une panne JWKS — ou un projet Supabase en
+    pause, cas mesuré dans `docs/DEPLOY.md` — sortait `/v1/authorize` de la rotation
+    pour une dépendance qu'il n'appelle jamais. Et un agent coopératif privé de
+    verdict refuse tout : une panne d'authentification console arrêtait la flotte.
+
+    **La base doit être saine ici, et c'est tout le contrôle.** Une première version
+    de ce test utilisait un DSN mort : `database` était faux, donc `ok` l'était pour
+    les quatre plans, et l'assertion passait aussi bien avec le correctif que sans.
+    Éprouvé par mutation — elle ne mordait pas. Avec une base migrée, `issuer` est le
+    **seul** verrou qui reste, et les quatre cas se séparent.
+    """
+    reglages = Settings(
+        _env_file=None,
+        env="prod",
+        cors_allow_origins=["https://exemple.fr"],
+        database_url=migrated_url,
+    )
+    verdict = health.evaluate(reglages, plane)
+
+    assert verdict.database is True and verdict.schema_current is True
+    # L'émetteur est absent dans les quatre cas, et le booléen reste publié partout :
+    # il est informatif, seul le rollup change.
+    assert verdict.issuer is False
+    assert verdict.ok is pret, (
+        f"plan {plane} : ok={verdict.ok}, attendu {pret}\n"
+        "  un plan qui ne lit aucun JWT ne doit pas sortir de la rotation sur une "
+        "panne d'émetteur ;\n  la console, si — sans émetteur elle n'autorise rien."
+    )
+
+
+def test_the_planes_that_verify_a_token_are_the_planes_that_exist() -> None:
+    """L'ensemble est écrit en dur ici : ce contrôle l'empêche de dériver.
+
+    Il ne peut pas être déduit d'`api.main` sans import circulaire — `api/main.py`
+    importe déjà `api/health.py`. Une liste écrite à la main sans confrontation est
+    ce que cette session a déjà vu échouer deux fois ; celle-ci est confrontée.
+    """
+    from api.main import Plane
+
+    connus = {p.value for p in Plane}
+    assert connus >= health._PLANS_QUI_VERIFIENT_UN_JETON, (
+        f"plans inconnus : {health._PLANS_QUI_VERIFIENT_UN_JETON - connus}"
+    )
+    assert "console" in health._PLANS_QUI_VERIFIENT_UN_JETON, "la console lit bien des JWT"
+    assert "all" in health._PLANS_QUI_VERIFIENT_UN_JETON, "le monolithe sert la console"
+
+
+def test_the_probe_evaluates_once_under_concurrent_load(migrated_url: str) -> None:
+    """La mémoïsation que le docstring du module promet, et que le code ne tenait pas.
+
+    « The verdict is memoised for a few seconds so the probe cannot be used as an
+    anonymous database or JWKS amplifier » — mais la lecture et l'écriture de
+    `state.readiness` n'étaient protégées par rien, dans une fonction **synchrone**,
+    donc exécutée dans le pool de threads de Starlette. Vingt requêtes simultanées
+    sur une route anonyme et non limitée ouvraient vingt connexions sur le DSN
+    qu'utilise aussi le chemin de décision.
+
+    Une relecture croit le commentaire. Ce contrôle compte les évaluations réelles.
+    """
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    client = _client(database_url=migrated_url)
+    evaluations = 0
+    verrou = threading.Lock()
+    vrai_evaluate = health.evaluate
+
+    def compter(*a: Any, **k: Any) -> Any:
+        nonlocal evaluations
+        with verrou:
+            evaluations += 1
+        time.sleep(0.05)  # une évaluation réelle touche la base : elle dure
+        return vrai_evaluate(*a, **k)
+
+    health.evaluate = compter  # type: ignore[assignment]
+    try:
+        with ThreadPoolExecutor(max_workers=20) as pool:
+            reponses = [f.result() for f in [pool.submit(_appel, client) for _ in range(20)]]
+    finally:
+        health.evaluate = vrai_evaluate  # type: ignore[assignment]
+
+    assert all(code == 200 for code in reponses), reponses
+    assert evaluations == 1, (
+        f"{evaluations} évaluations pour 20 requêtes simultanées — la sonde est un "
+        "amplificateur : chaque évaluation ouvre une connexion sur le DSN du chemin "
+        "de décision, depuis une route anonyme et non limitée."
+    )
+
+
+def _appel(client: TestClient) -> int:
+    return client.get("/health/ready").status_code

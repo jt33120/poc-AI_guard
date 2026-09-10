@@ -233,9 +233,24 @@ class PolicyDefaults(BaseModel):
             )
         return data
 
-    unknown_tool: Approval = Approval.deny
+    # **Les deux champs sont bornés au parse, pas au site d'appel.**
+    #
+    # Ils étaient déclarés sur l'`Approval` complet, sans validateur, alors que
+    # §4.4 pose « outil inconnu → deny » comme non négociable et que leurs
+    # consommateurs ne testent que `is deny`. Le défaut sûr ne suffisait pas : un
+    # YAML de tenant — ou une policy proposée par l'assistant LLM, qui offrait
+    # littéralement `auto` dans son schéma — pouvait le retourner, et rien ne le
+    # refusait. `evaluate(policy, "rm_rf", {})` rendait alors `auto`.
+    unknown_tool: Literal[Approval.human_in_the_loop, Approval.human_dual, Approval.deny] = (
+        Approval.deny
+    )
     hitl_timeout_seconds: int = Field(default=3600, ge=1, le=86400)
-    on_approval_service_down: Approval = Approval.deny
+    # Restreint à deux valeurs pour la même raison, plus une : `human_in_the_loop`
+    # est la valeur qui se **lit** comme la plus prudente, et c'est la seule qui
+    # trahissait. Les deux consommateurs ne testent que `deny` ; déclarer
+    # « tenir l'humain quand le service d'approbation est tombé » donnait donc
+    # l'exécution de l'action, puisqu'on ne peut par construction tenir personne.
+    on_approval_service_down: Literal[Approval.deny, Approval.auto] = Approval.deny
     # Zero-config onboarding: classify un-listed tools by name and gate them by
     # class. Off by default so existing policies are unaffected (backward compat).
     auto_classify: bool = False
@@ -494,6 +509,19 @@ def escalate_for_class(base: Approval, action_class: ActionClass) -> Approval:
     return raise_to(base, floor)
 
 
+#: Les classes d'action sur lesquelles on refuse plutôt que de laisser passer.
+#:
+#: Une classe **inconnue** en fait partie : ne pas savoir ce qu'une action fait n'est
+#: pas une raison d'être indulgent avec elle. Nommée ici pour n'exister qu'une fois —
+#: `service_down_verdict` et le garde d'audit de la passerelle décident tous deux sur
+#: cette liste, et deux copies auraient fini par diverger sur la classe la plus rare.
+CLASSES_RISQUEES: tuple[ActionClass | None, ...] = (
+    None,
+    ActionClass.irreversible,
+    ActionClass.external_send,
+)
+
+
 def service_down_verdict(policy: Policy, action_class: ActionClass | None) -> Approval:
     """Verdict when the approval service cannot be reached at all.
 
@@ -508,7 +536,7 @@ def service_down_verdict(policy: Policy, action_class: ActionClass | None) -> Ap
     500 -- an error, not a verdict, on a contract whose whole premise is that the
     agent honours the verdict.
     """
-    if action_class in (None, ActionClass.irreversible, ActionClass.external_send):
+    if action_class in CLASSES_RISQUEES:
         return Approval.deny
     return policy.defaults.on_approval_service_down
 

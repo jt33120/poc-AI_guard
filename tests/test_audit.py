@@ -86,6 +86,63 @@ def test_append_only_triggers_block_update_and_delete(db: DBHandle) -> None:
     db.conn.rollback()
 
 
+def test_truncate_is_refused_like_update_and_delete(db: DBHandle) -> None:
+    """Le trou que le test ci-dessus laissait, et qu'aucune relecture ne voit.
+
+    `0005_audit_log.sql` annonce des « triggers that hard-block mutation even for the
+    service role », et les deux triggers présents le font croire. Mais ils sont
+    `for each row`, et **un trigger ligne à ligne ne se déclenche pas sur TRUNCATE** :
+    il faut `before truncate ... for each statement`. Il fallait connaître cette
+    sémantique de PostgreSQL pour voir le trou, et le contrôle d'à côté n'exerçait
+    qu'`update` et `delete`.
+
+    Ce n'est pas théorique : `core/db.py` documente que l'immuabilité repose sur la
+    **propriété de table**, et un propriétaire a le droit de TRUNCATE.
+
+    Et le mode d'échec est le pire possible — voir
+    `test_an_annihilated_journal_is_not_reported_as_intact` : sur une table vide,
+    `verify_chain` rend `ok=True`. La preuve détruite, et l'attestation qui dit que
+    tout va bien.
+    """
+    audit.log_event(db.conn, tenant_id="t1", decision="allow", origin=_ORIGIN)
+    db.conn.commit()
+    with pytest.raises(psycopg.errors.RaiseException):
+        db.conn.execute("truncate audit_log")
+    db.conn.rollback()
+    assert db.conn.execute("select count(*) from audit_log").fetchone()[0] == 1  # type: ignore[index]
+
+
+def test_the_two_other_chained_tables_refuse_truncate_too(db: DBHandle) -> None:
+    """`control_plane_events` et `third_party_verdicts` répètent le même patron.
+
+    Les trois tables chaînées du dépôt ont été écrites sur le modèle de la première,
+    trou compris. Les nommer ici plutôt que dans leurs fichiers respectifs met les
+    trois assertions côte à côte : c'est la propriété qui est commune, pas la table.
+    """
+    for table in ("control_plane_events", "third_party_verdicts"):
+        with pytest.raises(psycopg.errors.RaiseException):
+            db.conn.execute(f"truncate {table}")
+        db.conn.rollback()
+
+
+def test_an_annihilated_journal_is_not_reported_as_intact(db: DBHandle) -> None:
+    """Ce que `verify_chain` dit d'une table vide — et pourquoi ce n'est pas assez.
+
+    Aucune ligne à parcourir, donc aucune rupture : `ok=True, count=0`. Le résultat
+    est honnête pris isolément, et trompeur là où il est lu. C'est `count` qui porte
+    l'information, et c'est à l'appelant d'en faire quelque chose — voir
+    `core/compliance.py`, qui distingue désormais « chaîne intacte » de « chaîne
+    vide » plutôt que de répondre `ready: true` sur un journal anéanti.
+
+    Ce contrôle fige la sémantique pour qu'on ne « corrige » pas `verify_chain` en
+    lui faisant rendre `ok=False` sur un tenant neuf, ce qui rendrait le démarrage
+    de tout nouveau client indistinguable d'un effacement.
+    """
+    resultat = audit.verify_chain(db.conn)
+    assert resultat.ok is True
+    assert resultat.count == 0
+
+
 def test_chain_is_per_tenant(db: DBHandle) -> None:
     audit.log_event(db.conn, tenant_id="t1", decision="allow", origin=_ORIGIN)
     audit.log_event(db.conn, tenant_id="t2", decision="allow", origin=_ORIGIN)

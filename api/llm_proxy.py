@@ -51,6 +51,7 @@ from core import (
     db,
     dlp,
     dlp_config,
+    entitlements,
     monitor,
     policy_store,
     pricing,
@@ -59,6 +60,8 @@ from core import (
 )
 from core import usage as usage_store
 from core.config import Settings
+from core.entitlements import Capability, Entitlement, Meter, Metric
+from core.judge import Judge, build_judge, resolve_ambiguous
 from core.policy import ActionClass, Approval, Policy, evaluate
 
 logger = logging.getLogger("xsom.llm_proxy")
@@ -174,14 +177,31 @@ def _extract_usage(style: str, data: dict[str, Any]) -> tuple[str | None, int, i
     return (model, prompt, completion)
 
 
-def _verdict(policy: Policy, name: str, args: dict[str, Any]) -> tuple[str | None, str]:
-    outcome = evaluate(policy, name, args)
+def _verdict(
+    policy: Policy, name: str, args: dict[str, Any], judge: Judge | None
+) -> tuple[str | None, str]:
+    """Le verdict de cette porte — **la même étape de classification que les deux autres.**
+
+    `resolve_ambiguous` manquait ici, et son propre docstring affirme pourtant être
+    « shared by every ingress path, so the classification step cannot drift between
+    them ». Deux appelants seulement l'invoquaient : `core/decision.py` et
+    `gateway/server.py`. Conséquence exacte, pour un même tenant et une même policy :
+    une règle `{classify: ambiguous, approval: auto}` était honorée **telle quelle**
+    par le proxy — l'appel d'outil partait — là où les deux autres portes la
+    plancherisent à `irreversible`, donc à une approbation humaine.
+
+    Et la ligne d'audit écrite par cette porte portait `action_class` à NULL : rien,
+    dans la chaîne, ne signalait que l'action n'avait pas été classée. Un juge absent
+    ne coûte aucun appel de modèle et rend `irreversible` (`AD-34`), donc le correctif
+    est gratuit pour les déploiements sans clé.
+    """
+    outcome = resolve_ambiguous(evaluate(policy, name, args), judge, name, args)
     action_class = outcome.action_class.value if outcome.action_class else None
     return action_class, _VERDICT.get(outcome.decision, outcome.decision.value)
 
 
 def _process(
-    style: str, data: dict[str, Any], policy: Policy, observing: bool
+    style: str, data: dict[str, Any], policy: Policy, observing: bool, judge: Judge | None
 ) -> list[tuple[str, str | None, str, str]]:
     """Audit rows [(tool, class, decision, args_hash)]; drop the calls that must not stand.
 
@@ -194,7 +214,7 @@ def _process(
 
     def drop(name: str, args: dict[str, Any]) -> bool:
         """Whether this tool call must be removed from the relayed response."""
-        raw_class, decision = _verdict(policy, name, args)
+        raw_class, decision = _verdict(policy, name, args, judge)
         action_class = ActionClass(raw_class) if raw_class else None
         blocked = decision != "allow"
         relaxed = blocked and observing and monitor.observes(action_class)
@@ -244,10 +264,11 @@ def _inspect(
     data: dict[str, Any],
     observing: bool,
     latency_ms: float | None = None,
+    judge: Judge | None = None,
 ) -> None:
     with db.connection(url) as conn:
         policy = policy_store.load_policy(conn, tenant_id)
-    audited = _process(style, data, policy, observing)
+    audited = _process(style, data, policy, observing, judge)
     usage = _extract_usage(style, data)
     billed = _extract_billed(provider, data)
     if not audited and usage is None and billed is None:
@@ -312,12 +333,21 @@ def _inspect(
         conn.commit()
 
 
-def _observing(url: str, principal: GatewayPrincipal) -> bool:
+def _observing(url: str, principal: GatewayPrincipal, droit: Entitlement) -> bool:
     """Whether an admin has an observation window open on this agent (G-25).
 
     A control plane we cannot read is not permission to stop enforcing: any failure
     answers "no window", which means enforce.
+
+    Et la fenêtre est une **capacité vendue** (`monitor_windows`), distincte de
+    `monitor_admin` qui verrouille la route qui l'ouvre. Sans la capacité, il n'y a
+    pas de fenêtre — donc pas de relâchement. C'est la seule direction dans laquelle
+    un palier peut toucher ce garde : elle **resserre**, comme partout ailleurs dans
+    la gamme. L'inverse — un palier qui ouvrirait une fenêtre — serait la
+    facturation devenue moteur de policy.
     """
+    if not droit.allows(Capability.monitor_windows):
+        return False
     try:
         with db.connection(url) as conn:
             window = monitor.active_window(conn, principal.tenant_id, principal.token_id)
@@ -508,16 +538,105 @@ def _audit_streamed(
         logger.warning("streamed_audit_failed", extra={"tenant_id": tenant_id})
 
 
+def _audit_unparsed(
+    url: str | None, tenant_id: str, gateway_token_id: str, provider: str, *, observing: bool
+) -> None:
+    """Le second angle mort du proxy : un 200 dont le corps n'est pas exploitable.
+
+    Le fournisseur a répondu `200`, mais `upstream_resp.json()` lève ou ne rend pas
+    un objet : la réponse est relayée **telle quelle**, sans qu'aucun appel d'outil
+    soit examiné. C'est exactement la situation que `_audit_streamed` déclare pour le
+    streaming — et ce jumeau-ci ne déclarait rien, alors que ce module argumente
+    lui-même que « le silence était indiscernable d'une absence de trafic ».
+
+    La différence compte : un fournisseur qui change de format de réponse, ou une
+    passerelle intermédiaire qui réécrit le corps, ouvre cette branche pour **tout**
+    le trafic d'un agent, et l'enforcement disparaît sans qu'aucune ligne ne bouge.
+
+    Métadonnées seules, comme pour le streaming : nous n'avons pas lu le corps, et en
+    inventer un contenu serait pire que de n'en pas écrire.
+    """
+    if not url:
+        return
+    try:
+        with db.connection(url) as conn:
+            audit.log_event(
+                conn,
+                tenant_id=tenant_id,
+                decision="relayed_unparsed",
+                gateway_token_id=gateway_token_id,
+                error=f"provider={provider}",
+                origin=audit.Origin.llm_proxy(observing=observing),
+            )
+            conn.commit()
+    except Exception:  # l'audit est best-effort ; il ne casse jamais le relais
+        logger.warning("unparsed_audit_failed", extra={"tenant_id": tenant_id})
+
+
+def _debiter_un_appel(url: str, tenant_id: str) -> tuple[Entitlement, Meter]:
+    """Débiter `proxy_calls` avant que l'appel ne coûte quoi que ce soit.
+
+    `proxy_calls` était publiée par `metric_catalog`, plafonnée par `plan_limits`
+    dans les trois paliers, affichée au client — et **comptée nulle part**. Une
+    limite qui ne s'applique pas a le coût commercial d'une promesse et l'effet
+    technique de rien : le client paie pour un plafond qu'il ne peut pas atteindre,
+    et nous facturons un volume que nous ne mesurons pas.
+
+    Placé en tête de `_forward`, avant la DLP et avant le garde-prompt : les deux
+    coûtent du calcul et une lecture de base, et un appel qu'on va refuser n'a pas à
+    les payer. Une base injoignable rend `unknown`, que l'appelant lit comme une
+    indisponibilité — jamais comme une permission.
+    """
+    try:
+        with db.connection(url) as conn:
+            # Une seule lecture du droit pour tout le chemin : le plafond d'appels,
+            # puis les trois capacités qui le consultent — le proxy lui-même, la DLP
+            # et le garde-prompt. Deux requêtes identiques par appel de modèle se
+            # paieraient sur tout le trafic de la flotte.
+            droit = entitlements.load_entitlement(conn, tenant_id)
+            etat = entitlements.flux_allows(conn, tenant_id, Metric.proxy_calls, droit=droit)
+            return droit, etat
+    except Exception:
+        logger.warning("proxy_quota_unreadable", extra={"tenant_id": tenant_id})
+        return entitlements.AUCUNE, Meter.unknown
+
+
 async def _forward(request: Request, principal: GatewayPrincipal, provider: str) -> Response:
     settings: Settings = request.app.state.settings
     url = database_url(request)
+
+    droit, etat = await run_in_threadpool(_debiter_un_appel, url, principal.tenant_id)
+    if etat is Meter.capped:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="plan limit reached: proxy calls for this period",
+        )
+    if etat is Meter.unknown:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Quota store unavailable",
+        )
+    # Le routeur du proxy ne porte aucun verrou de gamme : `requires` résout un jeton
+    # **console**, que ce chemin ne présente pas (`X-Gateway-Token`). Le verrou vit
+    # donc ici, là où le principal EST résolu — un quota et une capacité se
+    # vérifient où l'identité existe, pas où le montage est commode.
+    if not droit.allows(Capability.llm_proxy):
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="'llm_proxy' is not included in your plan",
+        )
+
     body = await request.body()
 
     # Egress data-loss guard: scan the outbound prompt for secrets/PII BEFORE it
     # leaves for the provider. Blocks fixed-form secrets, flags/redacts PII per the
     # tenant's config. Platform-gated by DLP_ENABLED (zero overhead when off); when
     # on, the tenant's console config decides verdicts. Value never logged.
-    if settings.dlp_enabled:
+    # `settings.dlp_enabled` est l'interrupteur **plateforme** ; la capacité est
+    # l'interrupteur **commercial**. Il manquait : la DLP inspectait l'egress de tous
+    # les paliers, y compris ceux qui ne l'ont pas achetée. `dlp_config` verrouillait
+    # le réglage fin et laissait le service lui-même gratuit.
+    if settings.dlp_enabled and droit.allows(Capability.dlp):
         state = await run_in_threadpool(_load_dlp_state, url, principal.tenant_id, settings)
         if state.enabled:
             scan = await run_in_threadpool(dlp.scan_request, body, state.policy)
@@ -538,7 +657,7 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
     # dit. C'est ce que `Orchestré` autorise à revendiquer, et l'endroit exact où le
     # produit s'arrête de ne pas être un pare-feu de prompts.
     guard = getattr(request.app.state, "prompt_guard", None)
-    if guard is not None:
+    if guard is not None and droit.allows(Capability.prompt_guard):
         texte = _extract_prompt(body)
         if texte:
             verdict = await run_in_threadpool(guard.inspect, texte)
@@ -554,7 +673,7 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
     # The agent being controlled does not get to say whether it is controlled
     # (G-25). Enforcement is the default; only an open control-plane window, opened
     # by an admin and bounded in time, relaxes it -- and never for the irreversible.
-    observing = await run_in_threadpool(_observing, url, principal)
+    observing = await run_in_threadpool(_observing, url, principal, droit)
     style = "anthropic" if provider == "anthropic" else "openai"
     base = _base_url(settings, provider).rstrip("/")
 
@@ -641,11 +760,21 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
                 data,
                 observing,
                 latency_ms,
+                build_judge(settings),
             )
             # The response is rewritten in every mode: under observation `_process`
             # keeps what a window may cover, so the payload only differs where the
             # window does not reach.
             return Response(content=json.dumps(data).encode(), media_type="application/json")
+        # 200, mais illisible : relayé sans inspection, et désormais écrit.
+        await run_in_threadpool(
+            _audit_unparsed,
+            url,
+            principal.tenant_id,
+            principal.token_id,
+            provider,
+            observing=observing,
+        )
     return Response(
         content=upstream_resp.content,
         status_code=upstream_resp.status_code,

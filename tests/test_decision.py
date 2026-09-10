@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from uuid import uuid4
 
+import pytest
+
 from core import approvals, decision
 from core.judge import Judge
 from core.policy import parse_policy
@@ -219,3 +221,58 @@ def test_service_down_still_denies_the_irreversible_whatever_the_setting(db: DBH
         arguments={"id": "1"},
     )
     assert res["decision"] == "deny"
+
+
+_GRADUEE = (
+    "tools:\n"
+    "  - {name: mock.fetch, class: read, approval: auto}\n"
+    "defaults:\n"
+    "  unknown_tool: deny\n"
+    "  risk_bands: {auto: 30, notify: 50, hitl: 80}\n"
+)
+
+
+def test_a_failed_trust_lookup_is_a_verdict_not_an_error(
+    db: DBHandle, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """L'autonomie graduée ouvrait une connexion hors de tout `try`.
+
+    `test_service_down_answers_deny_not_an_error` énonce la garantie du fichier :
+    « a raised exception surfaced as an HTTP 500, which is an error, not a decision ».
+    Elle était **conditionnelle à une option de policy** que ce test, comme les deux
+    autres tests de panne, n'active pas : avec `risk_bands`, la lecture de confiance
+    précédait le `try` et une base absente remontait en 500. Un tenant en autonomie
+    graduée retrouvait donc exactement le défaut que ces tests gardent.
+
+    Et le repli doit être le plus strict que `escalate_by_risk` accepte — ne pas
+    savoir si un agent a mérité la confiance se lit comme « il ne l'a pas méritée »
+    (`AD-10`). C'est ce que l'égalité ci-dessous vérifie : la panne rend le même
+    verdict qu'un agent que la base connaît et n'a jamais vu.
+    """
+    policy = parse_policy(_GRADUEE)
+    args = {"path": "/etc/shadow"}
+
+    inconnu = decision.authorize(
+        database_url=db.url,
+        policy=policy,
+        tenant_id=_tenant(db),
+        tool="mock.fetch",
+        arguments=args,
+    )
+
+    def boum(*_a: object, **_k: object) -> object:
+        raise RuntimeError("trust store unreachable")
+
+    monkeypatch.setattr(decision.trust, "observed", boum)
+    en_panne = decision.authorize(
+        database_url=db.url,
+        policy=policy,
+        tenant_id=_tenant(db),
+        tool="mock.fetch",
+        arguments=args,
+    )
+
+    assert en_panne["decision"] == inconnu["decision"], (
+        "une lecture de confiance en panne ne rend pas le même verdict qu'un agent "
+        "jamais vu — elle relâche ou elle durcit, et les deux sont faux"
+    )

@@ -10,12 +10,17 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
 import psycopg
+
+from core.export import is_summarised
+
+logger = logging.getLogger("xsom.audit")
 
 GENESIS = "GENESIS"
 
@@ -219,6 +224,16 @@ def log_event(
     gateway_token_id: str | None = None,
     client_request_id: str | None = None,
     upstream_request_id: str | None = None,
+    #: Pourquoi la décision a été resserrée hors policy (`plan_quota_exhausted`…).
+    #: Colonne ANNEXE : hors `payload_v1`, donc la chaîne déjà écrite reste
+    #: vérifiable — même choix que `gateway_token_id` en `0006`.
+    constraint_reason: str | None = None,
+    #: La métrique de gamme à débiter, **dans cette transaction**. Le compteur est
+    #: incrémenté sous le verrou consultatif déjà tenu ici : pas de verrou de plus,
+    #: pas d'ordre de verrouillage de plus. Et le débit vit dans son propre point de
+    #: sauvegarde, pour qu'une écriture de facturation ne puisse jamais faire perdre
+    #: une écriture de preuve (§4.2).
+    usage_metric: str | None = None,
 ) -> str:
     """Append one hash-chained audit entry for a decision. Returns its entry_hash.
 
@@ -226,6 +241,16 @@ def log_event(
     called it) and `upstream_request_id` (what the LLM provider called it) are
     declared values and are kept apart from it — see the note above `log_event`.
     """
+    # **Une décision que le récit de conformité ne sait pas ranger s'annonce ici.**
+    #
+    # Elle n'est pas refusée : §4.2 dit que rien d'accessoire ne casse une écriture
+    # d'audit, et `summarise` la compte déjà honnêtement en `unclassified`. Mais elle
+    # cesse d'être silencieuse — et `tests/conftest.py` fait échouer tout test qui en
+    # écrit une, ce qui rend le garde complet par construction : il voit toutes les
+    # décisions réellement écrites, y compris celles qu'aucun scan du code ne
+    # retrouve parce qu'elles sont calculées ou lues dans une table.
+    if not is_summarised(decision):
+        logger.warning("decision_not_summarised", extra={"decision": decision})
     ts = datetime.now(UTC)
     # `FR-163` : borner AVANT le hachage, et hacher exactement ce qui sera stocké.
     tool_name = _bounded(tool_name)
@@ -262,8 +287,9 @@ def log_event(
             "(ts, tenant_id, user_id, request_id, tool_name, action_class, decision, "
             " policy_rule_id, judge_used, args_hash, latency_ms, error, gateway_token_id, "
             " client_request_id, upstream_request_id, ingress, enforcement_mode, "
-            " prev_hash, entry_hash) "
-            "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            " prev_hash, entry_hash, constraint_reason) "
+            "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
+            "%s)",
             (
                 ts,
                 tenant_id,
@@ -284,9 +310,24 @@ def log_event(
                 origin.enforcement_mode.value,
                 prev_hash,
                 entry_hash,
+                _bounded(constraint_reason),
             ),
         )
+        if usage_metric is not None:
+            # Après l'insertion, et sous point de sauvegarde : la preuve est déjà
+            # écrite quand le compteur s'exécute, et son échec ne peut rien lui faire.
+            _debiter(conn, tenant_id, usage_metric)
     return entry_hash
+
+
+def _debiter(conn: psycopg.Connection, tenant_id: str, metric: str) -> None:
+    """Débiter la métrique de gamme sans jamais compromettre l'entrée d'audit."""
+    from core import entitlements  # importé ici : `entitlements` ne dépend pas d'`audit`
+
+    try:
+        entitlements.consume(conn, tenant_id, entitlements.Metric(metric))
+    except Exception:  # pragma: no cover - `consume` avale déjà tout
+        logger.warning("usage_debit_failed", extra={"tenant_id": tenant_id, "metric": metric})
 
 
 def verify_chain(conn: psycopg.Connection, tenant_id: str | None = None) -> ChainResult:
@@ -336,8 +377,7 @@ def distinct_tools(conn: psycopg.Connection, tenant_id: str) -> list[str]:
     return [r[0] for r in rows]
 
 
-def list_events(
-    conn: psycopg.Connection,
+def _filtres(
     *,
     from_ts: str | None = None,
     to_ts: str | None = None,
@@ -345,9 +385,15 @@ def list_events(
     tool: str | None = None,
     agent: str | None = None,
     client_id: str | None = None,
-    limit: int = 500,
-) -> list[dict[str, Any]]:
-    """Tenant-scoped (RLS) audit events with optional filters; metadata only."""
+) -> tuple[str, list[Any]]:
+    """La clause `where` des trois lecteurs, écrite **une fois**.
+
+    Extraite parce que `count_events` et `tally` doivent porter **exactement** les
+    mêmes bornes que `list_events` : un dossier qui annonce une période dans son
+    en-tête et compte sur une autre est pire qu'un dossier tronqué, parce qu'il a
+    l'air cohérent. Deux copies de ces six clauses auraient fini par diverger sur le
+    filtre le moins exercé.
+    """
     clauses: list[str] = []
     params: list[Any] = []
     if from_ts:
@@ -368,7 +414,72 @@ def list_events(
     if client_id:
         clauses.append("gateway_token_id in (select id from gateway_tokens where client_id = %s)")
         params.append(client_id)
-    where = (" where " + " and ".join(clauses)) if clauses else ""
+    return (" where " + " and ".join(clauses)) if clauses else "", params
+
+
+def count_events(conn: psycopg.Connection, **filtres: Any) -> int:
+    """Combien d'événements la période contient **vraiment**, sans limite.
+
+    `list_events` en rend au plus `limit`, et le dossier de conformité publiait ce
+    nombre-là comme `event_count` : pour tout tenant dépassant la tranche, il
+    annonçait l'historique complet et n'en résumait qu'un bout, dans le même
+    dictionnaire où `chain_integrity` et `oversight_coverage` interrogent la table
+    entière. Aucun champ ne déclarait la troncature.
+    """
+    where, params = _filtres(**filtres)
+    row = conn.execute(
+        "select count(*) from audit_log" + where,
+        tuple(params),
+    ).fetchone()
+    return int(row[0]) if row else 0
+
+
+def tally(conn: psycopg.Connection, **filtres: Any) -> tuple[dict[str, int], dict[str, int]]:
+    """Le décompte par décision et par porte, agrégé **en SQL sur toute la période**.
+
+    Déclarer la troncature ne suffisait pas : `summary` et `ingress_mix` étaient
+    calculés en Python sur la liste tronquée, donc l'`article_26.decision_summary`
+    d'un gros tenant serait resté faux même une fois la troncature annoncée. Un
+    régulateur lit ces chiffres ; ils doivent porter sur ce qu'ils prétendent.
+    """
+    where, params = _filtres(**filtres)
+    decisions = {
+        r[0]: int(r[1])
+        for r in conn.execute(
+            "select decision, count(*) from audit_log" + where + " group by decision",
+            tuple(params),
+        ).fetchall()
+    }
+    portes = {
+        (r[0] or "unrecorded"): int(r[1])
+        for r in conn.execute(
+            "select ingress, count(*) from audit_log" + where + " group by ingress",
+            tuple(params),
+        ).fetchall()
+    }
+    return decisions, portes
+
+
+def list_events(
+    conn: psycopg.Connection,
+    *,
+    from_ts: str | None = None,
+    to_ts: str | None = None,
+    decision: str | None = None,
+    tool: str | None = None,
+    agent: str | None = None,
+    client_id: str | None = None,
+    limit: int = 500,
+) -> list[dict[str, Any]]:
+    """Tenant-scoped (RLS) audit events with optional filters; metadata only."""
+    where, params = _filtres(
+        from_ts=from_ts,
+        to_ts=to_ts,
+        decision=decision,
+        tool=tool,
+        agent=agent,
+        client_id=client_id,
+    )
     params.append(limit)
     rows = conn.execute(
         "select id, ts, tool_name, action_class, decision, policy_rule_id, judge_used, "

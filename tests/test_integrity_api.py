@@ -57,8 +57,16 @@ def test_list_integrity_is_tenant_isolated(
     tenant = _tenant(db)
     _seed(db, tenant)
     client = _client(db.url, test_verifier)
-    other = make_token(tenant_id=str(uuid4()), role="viewer")
-    assert client.get("/v1/tools/integrity", headers=_auth(other)).json() == []
+    # Un tenant que la base ne connaît pas n'a aucune capacité (`load_entitlement`
+    # retombe sur `AUCUNE`, jamais sur `free`) : il est arrêté avant la route. Plus
+    # tôt et plus fort que « RLS lui rend zéro ligne », qui reste vrai en dessous.
+    inconnu = make_token(tenant_id=str(uuid4()), role="viewer")
+    assert client.get("/v1/tools/integrity", headers=_auth(inconnu)).status_code == 402
+
+    # Et l'isolation d'origine, sur un tenant qui existe : c'est RLS qui répond.
+    voisin = _tenant(db)
+    jeton = make_token(tenant_id=voisin, role="viewer")
+    assert client.get("/v1/tools/integrity", headers=_auth(jeton)).json() == []
 
 
 def test_admin_approve_rebaselines_tool(

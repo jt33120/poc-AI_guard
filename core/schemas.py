@@ -699,6 +699,10 @@ class ComplianceStatus(BaseModel):
     chain_ok: bool
     entries: int
     first_broken_id: int | None
+    #: Journal vide alors qu'une autre table atteste l'activité du tenant — un
+    #: effacement, pas un démarrage. `chain_ok` reste vrai : c'est bien la chaîne
+    #: qui est cohérente, et c'est précisément ce qui rendait l'état invisible.
+    journal_missing: bool
     oversight_gated: int
     oversight_auto_allowed: int
     oversight_coverage_ok: bool

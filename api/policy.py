@@ -7,10 +7,12 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from api.deps import database_url, require_tenant
+from api.entitlement_guard import enforce_capability, enforce_policy_capabilities
 from api.ratelimit import limiter, policy_draft_rate_limit
 from api.security import get_current_user, require_role
 from core import audit, db, judge, policy_assistant, policy_store, servers
 from core.config import Settings
+from core.entitlements import Capability
 from core.policy import PolicyError, evaluate, parse_policy
 from core.schemas import (
     CurrentUser,
@@ -35,7 +37,8 @@ def draft_policy(
     user: CurrentUser = Depends(_require_admin),
 ) -> dict[str, Any]:
     """Draft a validated policy YAML from a plain-language description (admin)."""
-    require_tenant(user)
+    tenant_id = require_tenant(user)
+    enforce_capability(database_url(request), tenant_id, Capability.policy_assistant)
     settings: Settings = request.app.state.settings
     if not settings.mistral_api_key:
         raise HTTPException(status_code=503, detail="Policy assistant is not configured")
@@ -69,10 +72,15 @@ def put_policy(
 ) -> dict[str, Any]:
     tenant_id = require_tenant(user)
     try:
-        parse_policy(payload.yaml)  # validate before persisting (422 on failure)
+        document = parse_policy(payload.yaml)  # validate before persisting (422 on failure)
     except PolicyError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     url = database_url(request)
+    # Quatre fonctionnalités vendues sont des **champs de policy** : le tenant les
+    # allume en éditant son YAML, et rien ne lisait son palier à ce moment-là. Le
+    # contrôle est ici et pas à la décision — refuser d'honorer un garde déjà
+    # enregistré retirerait une garde à l'exécution pour une raison commerciale.
+    enforce_policy_capabilities(url, tenant_id, document)
     with db.connection(url) as conn:
         version = policy_store.save_yaml(conn, tenant_id, payload.yaml)
     return {"yaml": payload.yaml, "version": version}

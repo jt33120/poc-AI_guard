@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from core.judge import Judge, resolve_ambiguous
+from core.judge import Judge, litellm_completer, resolve_ambiguous
 from core.policy import ActionClass, Approval, PolicyOutcome
 
 
@@ -123,3 +123,164 @@ def test_resolve_redacts_arguments_before_the_model_sees_them() -> None:
     # La forme traverse — c'est elle qui porte la classification.
     assert "mock.mail" in seen[0]
     assert "to" in seen[0]
+
+
+def test_a_completer_that_raises_is_classified_irreversible() -> None:
+    """Le mode de panne le plus probable du juge n'était exercé nulle part.
+
+    Les seize constructions de `Judge` de la suite passent toutes un completer qui
+    *retourne* une chaîne — mal formée parfois, mais qui retourne. Or un juge tombe
+    par timeout, par 429 ou par coupure réseau, pas par JSON invalide : c'est le
+    chemin que Mistral prendra un mardi matin, et le seul que personne ne jouait.
+
+    La direction est la seule tenable : ne pas avoir pu classer se lit comme la
+    classe la plus lourde, jamais comme une absence de risque.
+    """
+
+    def completer_qui_tombe(_s: str, _u: str) -> str:
+        raise TimeoutError("upstream timed out")
+
+    judge = Judge(completer_qui_tombe)
+    assert judge.classify("shell.exec", {"cmd": "ls"}) is ActionClass.irreversible
+
+
+def test_a_failed_call_still_counts_against_the_budget() -> None:
+    """Et il consomme le budget, sinon un endpoint en panne devient une boucle.
+
+    `self._calls += 1` précède le `try`, donc un fournisseur qui refuse toutes les
+    requêtes ne peut pas faire dépenser plus que `max_calls` appels. C'est écrit ici
+    parce que « ne compter que les succès » est le geste naturel de quelqu'un qui
+    voudrait rendre le budget plus juste — et qui ouvrirait une facture non bornée.
+    """
+
+    def completer_qui_tombe(_s: str, _u: str) -> str:
+        raise TimeoutError("upstream timed out")
+
+    judge = Judge(completer_qui_tombe, max_calls=2)
+    for _ in range(5):
+        judge.classify("shell.exec", {"cmd": "ls"})
+    assert judge.calls == 2
+
+
+def test_a_failed_judge_call_is_not_credited_to_the_judge() -> None:
+    """La ligne d'audit attestait une classification que le modèle n'a jamais faite.
+
+    `resolve_ambiguous` posait `judge_used = judge.calls > before`, et
+    `self._calls += 1` **précède** le `try`. Un appel qui expire, qui prend un 429 ou
+    qui rend du JSON invalide incrémentait donc le compteur, et la ligne portait
+    `judge_used=True` avec `reason="judge"`. Le docstring de `resolve_ambiguous`
+    énonce l'inverse comme invariant (`AD-21.4`), et `core/compliance.py` compte ces
+    lignes comme des classifications réelles.
+
+    Concrètement : une panne Mistral bascule tout outil ambigu en `irreversible` donc
+    en HITL — la file d'approbation se remplit, ce qui est le bon comportement — et le
+    journal affirmait que le juge avait tranché. Défaut de conformité autant que
+    d'exploitation.
+
+    Trois états, pas deux : classé, appelé sans réponse, pas appelé du tout.
+    """
+
+    def qui_tombe(_s: str, _u: str) -> str:
+        raise TimeoutError("upstream timed out")
+
+    ambigu = PolicyOutcome(None, Approval.auto, "regle", "ambiguous: needs judge", ambiguous=True)
+    resolu = resolve_ambiguous(ambigu, Judge(qui_tombe), "shell.exec", {"cmd": "ls"})
+
+    assert resolu.action_class is ActionClass.irreversible, "le plancher doit tenir"
+    assert resolu.judge_used is False, "un juge en panne ne s'attribue pas une classification"
+    assert resolu.reason == "judge_error"
+
+
+def test_an_unparsable_answer_is_not_credited_either() -> None:
+    """Le modèle a répondu, mais pas quelque chose d'exploitable. Même verdict.
+
+    Distinct du cas précédent parce que le chemin de code l'est : ici le completer
+    rend une chaîne, `json.loads` la refuse. C'est le mode de panne d'un modèle qui
+    bavarde autour du JSON, et il est plus fréquent que la coupure réseau.
+    """
+    ambigu = PolicyOutcome(None, Approval.auto, "regle", "ambiguous: needs judge", ambiguous=True)
+    resolu = resolve_ambiguous(
+        ambigu, Judge(lambda _s, _u: "bien sûr ! voici : {..."), "shell.exec", {"cmd": "ls"}
+    )
+
+    assert resolu.action_class is ActionClass.irreversible
+    assert resolu.judge_used is False
+    assert resolu.reason == "judge_error"
+
+
+def test_a_successful_classification_is_still_credited() -> None:
+    """Non-vacuité : un correctif qui ne créditerait plus jamais le juge passerait
+    les deux contrôles ci-dessus, et rendrait la métrique de conformité muette."""
+    ambigu = PolicyOutcome(None, Approval.auto, "regle", "ambiguous: needs judge", ambiguous=True)
+    resolu = resolve_ambiguous(
+        ambigu,
+        Judge(lambda _s, _u: '{"action_class": "write"}'),
+        "shell.exec",
+        {"cmd": "ls"},
+    )
+
+    assert resolu.judge_used is True
+    assert resolu.reason == "judge"
+
+
+def test_an_exhausted_budget_stays_distinguishable_from_a_failure() -> None:
+    """Trois états, trois raisons. Le budget épuisé n'est pas une panne du modèle.
+
+    L'un se corrige en relevant `JUDGE_MAX_CALLS` ou en cassant une boucle d'agent,
+    l'autre en regardant le fournisseur. Les confondre envoie l'astreinte dans le
+    mur, et c'est ce que faisait `judge_over_budget` avant qu'un troisième cas
+    existe.
+    """
+    judge = Judge(lambda _s, _u: '{"action_class": "read"}', max_calls=1)
+    judge.classify("x", {})  # consomme le budget
+
+    ambigu = PolicyOutcome(None, Approval.auto, "regle", "ambiguous: needs judge", ambiguous=True)
+    resolu = resolve_ambiguous(ambigu, judge, "shell.exec", {"cmd": "ls"})
+
+    assert resolu.judge_used is False
+    assert resolu.reason == "judge_over_budget"
+    assert resolu.action_class is ActionClass.irreversible
+
+
+def test_the_model_call_carries_a_timeout() -> None:
+    """La seule sortie réseau non bornée du dépôt, et elle est dans la décision.
+
+    Toutes les autres portent un délai — `core/notify.py` 10 s, `core/signup.py`
+    15 s, `core/egress.py` 30/300 s, `api/llm_proxy.py` 120 s, `api/security.py`
+    5 s, `api/health.py` 3 s. Celle-ci, non, et c'est celle qui est appelée
+    **synchroniquement** dans la boucle de `/v1/authorize` et de la passerelle : un
+    point de terminaison qui accepte la connexion sans jamais répondre gèle la
+    décision pour tous les tenants du plan.
+
+    Le contrôle porte sur les kwargs réellement passés, pas sur une relecture.
+    """
+    import sys
+    import types
+
+    captures: dict[str, object] = {}
+    faux = types.ModuleType("litellm")
+    faux.completion = lambda **kw: captures.update(kw) or _Reponse()  # type: ignore[attr-defined]
+    ancien = sys.modules.get("litellm")
+    sys.modules["litellm"] = faux
+    try:
+        judge_completer = litellm_completer("mistral/x", "cle", 3.5)
+        judge_completer("sys", "user")
+    finally:
+        if ancien is None:
+            del sys.modules["litellm"]
+        else:
+            sys.modules["litellm"] = ancien
+
+    assert captures["timeout"] == 3.5
+
+
+class _Reponse:
+    """La forme minimale que `litellm_completer` lit."""
+
+    class _Choix:
+        class _Message:
+            content = '{"action_class": "read"}'
+
+        message = _Message()
+
+    choices = (_Choix(),)

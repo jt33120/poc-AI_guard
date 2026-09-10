@@ -26,6 +26,7 @@ from core import (
     approvals,
     audit,
     db,
+    entitlements,
     integrity,
     monitor,
     risk,
@@ -34,11 +35,13 @@ from core import (
     trust,
 )
 from core.config import Settings
+from core.entitlements import Capability, Entitlement, Meter, Metric
 from core.judge import Judge, resolve_ambiguous
 from core.logging import configure_logging
 from core.notify import Notifier
 from core.observability import init_observability
 from core.policy import (
+    CLASSES_RISQUEES,
     ActionClass,
     Approval,
     Policy,
@@ -75,6 +78,51 @@ class EmptyBackend:
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> types.CallToolResult:
         raise ValueError(f"no such tool: {name}")
+
+
+@dataclass(frozen=True, slots=True)
+class _Gamme:
+    """Ce que le palier du tenant dit de **cet appel-ci**, lu une fois.
+
+    Un porteur unique plutôt que quatre paramètres qui voyagent ensemble : cinq
+    sites d'audit et deux fonctions du flux d'approbation en ont besoin, et une
+    valeur oubliée en chemin est une ligne facturée sans motif ou un garde qui ne
+    voit pas le palier.
+
+    Toutes ses réponses vont dans le sens du durcissement. Aucune ne peut rendre un
+    verdict plus permissif que la policy — c'est l'invariant de la gamme entière, et
+    il tient ici par construction : le champ `plafonne` déclenche `tighten`, jamais
+    l'inverse, et `droit` ne sert qu'à retirer des fonctionnalités.
+    """
+
+    droit: Entitlement
+    #: Le juge a-t-il le droit de tourner ? `False` **plancherise** l'ambigu (`AD-34`).
+    juge_permis: bool
+    #: Le motif écrit dans `audit_log.constraint_reason`, ou `None` si rien ne serre.
+    contrainte: str | None
+    plafonne: bool
+    etat: Meter = Meter.ok
+
+    @classmethod
+    def depuis(cls, droit: Entitlement, *, juge_permis: bool, etat: Meter) -> _Gamme:
+        plafonne = etat in (Meter.capped, Meter.unknown)
+        return cls(
+            droit=droit,
+            juge_permis=juge_permis,
+            contrainte=f"plan_{etat.value}" if plafonne else None,
+            plafonne=plafonne,
+            etat=etat,
+        )
+
+    @classmethod
+    def hors_tenant(cls) -> _Gamme:
+        """Sans contexte d'approbation il n'y a pas de tenant, donc pas de palier.
+
+        On rend le comportement d'avant la gamme. Cet état refuse déjà toute classe
+        risquée par ailleurs, puisque `_audit` ne peut rien écrire — et il n'accorde
+        aucune capacité : `AUCUNE` ne dit oui à rien.
+        """
+        return cls(droit=entitlements.AUCUNE, juge_permis=True, contrainte=None, plafonne=False)
 
 
 def _denied_result(message: str) -> types.CallToolResult:
@@ -153,13 +201,26 @@ class PolicyBackend:
         return await self._screen_tools(tools)
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> types.CallToolResult:
+        resolved = await self._proxy.resolve(name)
+        canonical = f"{resolved[0]}.{resolved[1]}" if resolved else name
+
+        # La quarantaine d'intégrité, déplacée APRÈS la résolution du nom canonique.
+        #
+        # Elle était le seul des cinq gardes du fichier à ne laisser aucune ligne
+        # d'audit — RBAC, arrêt, taint et le filtrage de liste en écrivent une. Un
+        # outil dont l'empreinte a changé était refusé en silence.
+        #
+        # L'ordre importe : auditer sous `name` réintroduirait le défaut déjà corrigé
+        # plus bas, où la quarantaine disait « echo » et tout le reste « mock.echo »,
+        # si bien qu'un export filtré par outil manquait les quarantaines.
+        # `_integrity_blocks` continue de recevoir `name` : c'est la clé de son
+        # ensemble mémoire.
         if self._integrity_on:
             blocked = await self._integrity_blocks(name)
             if blocked is not None:
-                logger.info("tool_quarantined", extra={"tool": name, "reason": blocked})
-                return _denied_result(f"'{name}' quarantined by integrity guard: {blocked}")
-        resolved = await self._proxy.resolve(name)
-        canonical = f"{resolved[0]}.{resolved[1]}" if resolved else name
+                logger.info("tool_quarantined", extra={"tool": canonical, "reason": blocked})
+                self._audit_gate(canonical, "tool_quarantined", blocked)
+                return _denied_result(f"'{canonical}' quarantined by integrity guard: {blocked}")
 
         # Per-tool RBAC / confused-deputy guard: an agent outside a tool's client
         # allowlist can never invoke it, regardless of the action class (fail-closed).
@@ -171,10 +232,25 @@ class PolicyBackend:
 
         outcome = evaluate(self._policy, canonical, arguments)
 
+        # **Le droit du tenant, sur la porte obligatoire.**
+        #
+        # Il n'était lu que par `core/decision.py`, c'est-à-dire par la porte
+        # *coopérative* — celle qu'un agent peut ne jamais emprunter. Dans le
+        # déploiement que le produit recommande, l'agent parle MCP et rien d'autre :
+        # la gamme entière ne s'appliquait donc à aucun appel réel. Deux
+        # conséquences, et les deux se lisent comme des fonctionnalités qui
+        # marchent. `decisions` comptait ~0 pour un client normal, donc la
+        # facturation à l'usage mesurait le vide. Et le juge, vendu à partir de
+        # `pro`, tournait ici pour tout le monde — un palier `free` obtenait par
+        # MCP l'enrichissement qu'il n'a pas acheté.
+        gamme = self._lire_le_droit(outcome.ambiguous)
+
         # Ambiguous tools: classify, then floor for that class. The judge only
         # classifies — never authorizes — and an absent judge floors to
         # irreversible rather than letting the rule's approval stand (AD-34).
-        outcome = resolve_ambiguous(outcome, self._judge, canonical, arguments)
+        outcome = resolve_ambiguous(
+            outcome, self._judge if gamme.juge_permis else None, canonical, arguments
+        )
 
         # `FR-166` — l'ordre d'arrêt de l'opérateur, relu **par appel**.
         #
@@ -218,7 +294,7 @@ class PolicyBackend:
         # tenant obtenait deux comportements selon la porte empruntée ; `AD-28` dit
         # qu'une propriété vraie sur un chemin ne se lit pas comme vraie partout, et
         # ici la divergence n'était pas voulue, seulement pas encore refermée.
-        if outcome.decision is not Approval.auto and self._observation_relaxes(outcome):
+        if outcome.decision is not Approval.auto and self._observation_relaxes(outcome, gamme):
             # `AD-27.3` : la distinction vit dans `decision`, à l'intérieur de la
             # charge hachée — sinon « nous avons bloqué » et « nous aurions bloqué »
             # hachent à l'identique et le vérificateur autonome ne les sépare pas.
@@ -234,27 +310,79 @@ class PolicyBackend:
                 latency_ms=int((time.monotonic() - start) * 1000),
                 request_id=uuid4().hex,
                 error="downstream_error" if result.isError else None,
+                constraint_reason=gamme.contrainte,
             )
             # Le marquage de taint est un état post-appel, pas un palier : un résultat
             # porteur d'injection teinte la session que l'appel ait été observé ou non.
             self._mark_taint(canonical, result)
             return result
 
+        # **Le plafond du palier, appliqué APRÈS la policy et jamais contre elle.**
+        #
+        # Placé ici, sous la fenêtre d'observation et non au-dessus, pour deux
+        # raisons. `tighten` réécrit `reason`, et la fenêtre lit `reason == "taint"`
+        # pour refuser de relâcher une escalade d'injection : resserrer plus haut
+        # effacerait ce mot. Et c'est sans effet sur ce que la fenêtre relaie —
+        # `tighten` ne touche que `CLASSES_RISQUEES`, que `monitor.observes` refuse
+        # déjà — donc placer le resserrement au plus près du dispatch ne coûte rien
+        # et retire une coïncidence du chemin.
+        #
+        # Ce que `tighten` garantit vaut ici comme sur l'autre porte : un quota ne
+        # descend jamais l'ordre de sévérité, n'entre pas sur une décision déjà tenue
+        # par un humain, et laisse tourner les classes légères. Un tenant à sec ne
+        # perd pas la lecture — il perd l'irréversible que personne ne tient.
+        if gamme.plafonne:
+            outcome = entitlements.tighten(outcome, self._policy, reason=gamme.etat)
+
         if outcome.decision in (Approval.auto, Approval.notify):
             # notify-and-proceed (M11) relays like auto but is recorded distinctly.
             decision = "allow" if outcome.decision is Approval.auto else "notify"
-            start = time.monotonic()
-            result = await self._proxy.call_tool(name, arguments)
-            latency_ms = int((time.monotonic() - start) * 1000)
-            self._audit(
-                decision,
-                canonical,
-                outcome,
-                arguments,
-                latency_ms=latency_ms,
-                request_id=uuid4().hex,
-                error="downstream_error" if result.isError else None,
-            )
+            request_id = uuid4().hex
+
+            # **Prouver avant d'agir, sur ce qui ne se défait pas.**
+            #
+            # L'ordre était : relayer, puis auditer — et `_audit` avalait l'échec
+            # d'écriture (« audit is best-effort; never break the call path »). Une
+            # base momentanément injoignable suffisait donc à ce qu'un virement
+            # parte sans laisser la moindre ligne, et rien ne le disait. C'est la
+            # revendication centrale du produit, fausse précisément dans le cas où
+            # elle compte.
+            #
+            # Sur les classes risquées, la preuve s'écrit d'abord et son échec
+            # refuse l'action (§4.2, §4.4). Le prix est `latency_ms`, qu'on ne peut
+            # pas connaître avant l'appel : perdre une mesure coûte moins cher que
+            # perdre la ligne. Les classes légères gardent l'ordre inverse et leur
+            # mesure — un `read` qu'on n'a pas pu auditer ne vaut pas qu'on refuse
+            # le service, et `CLASSES_RISQUEES` est la même liste que celle sur
+            # laquelle `service_down_verdict` refuse déjà.
+            if outcome.action_class in CLASSES_RISQUEES:
+                if not self._audit(
+                    decision,
+                    canonical,
+                    outcome,
+                    arguments,
+                    request_id=request_id,
+                    constraint_reason=gamme.contrainte,
+                ):
+                    logger.warning(
+                        "denied_audit_unavailable",
+                        extra={"tool": canonical, "decision": decision},
+                    )
+                    return _denied_result(f"'{canonical}' denied: audit unavailable")
+                result = await self._proxy.call_tool(name, arguments)
+            else:
+                start = time.monotonic()
+                result = await self._proxy.call_tool(name, arguments)
+                self._audit(
+                    decision,
+                    canonical,
+                    outcome,
+                    arguments,
+                    latency_ms=int((time.monotonic() - start) * 1000),
+                    request_id=request_id,
+                    error="downstream_error" if result.isError else None,
+                    constraint_reason=gamme.contrainte,
+                )
             self._mark_taint(canonical, result)
             return result
         if outcome.decision is Approval.deny:
@@ -262,11 +390,70 @@ class PolicyBackend:
                 "tool_denied",
                 extra={"tool": canonical, "decision": "deny", "reason": outcome.reason},
             )
-            self._audit("deny", canonical, outcome, arguments, request_id=uuid4().hex)
+            self._audit(
+                "deny",
+                canonical,
+                outcome,
+                arguments,
+                request_id=uuid4().hex,
+                constraint_reason=gamme.contrainte,
+            )
             return _denied_result(f"'{canonical}' not permitted by policy: deny ({outcome.reason})")
-        return await self._handle_hitl(name, arguments, canonical, outcome)
+        return await self._handle_hitl(name, arguments, canonical, outcome, gamme)
 
-    def _observation_relaxes(self, outcome: PolicyOutcome) -> bool:
+    def _lire_le_droit(self, ambigu: bool) -> _Gamme:
+        """Le droit du tenant, lu par appel et **jamais mis en cache**.
+
+        Rend deux choses, et les deux sont des durcissements : si le juge a le droit
+        de tourner, et où en est le compteur de décisions. Rien de ce qu'elle rend ne
+        peut rendre un verdict plus permissif que la policy.
+
+        `try` et non `with` nu : une base injoignable sur la porte obligatoire doit
+        rester un **verdict**, jamais une exception qui remonte au client MCP. Le
+        repli renvoie `Meter.ok` et pas `Meter.unknown` — quand *rien* n'est lisible,
+        ce n'est plus une question de palier, et parler de plafond ici volerait la
+        parole au garde d'audit, qui refusera l'irréversible trois lignes plus bas
+        avec un motif utile à qui lit l'incident. C'est le raisonnement, et le mot,
+        de `core/decision.py`.
+
+        Sans contexte d'approbation il n'y a pas de tenant, donc pas de palier à
+        appliquer : on rend le comportement d'avant la gamme. Cet état refuse déjà
+        toute classe risquée, puisque `_audit` ne peut rien écrire.
+        """
+        ctx = self._approval_ctx
+        if ctx is None:
+            return _Gamme.hors_tenant()
+        try:
+            with db.connection(ctx.database_url) as conn:
+                droit = entitlements.load_entitlement(conn, ctx.tenant_id)
+                # Le juge est un enrichissement payant, et son absence **durcit**
+                # (`AD-34`) : sans lui, un outil ambigu est plancherisé à
+                # `irreversible`, donc à une approbation humaine. Le budget compte
+                # les appels **tentés** — sinon un fournisseur en panne ouvrirait une
+                # facture non bornée.
+                juge = droit.allows(Capability.judge) and ambigu
+                if juge:
+                    juge = (
+                        entitlements.meter(
+                            droit,
+                            Metric.judge_calls,
+                            consomme=entitlements.consume(conn, ctx.tenant_id, Metric.judge_calls),
+                        )
+                        is not Meter.capped
+                    )
+                    conn.commit()
+                # Le consommé vient de la **même requête** que le droit : une
+                # connexion de plus par appel d'outil se paie sur tout le trafic de
+                # la flotte, et `perf/overhead.json` publie ce que celle-ci coûte.
+                etat = entitlements.meter(
+                    droit, Metric.decisions, consomme=droit.consomme(Metric.decisions)
+                )
+                return _Gamme.depuis(droit, juge_permis=juge, etat=etat)
+        except Exception:
+            logger.warning("entitlement_unreadable", extra={"tenant": ctx.tenant_id})
+            return _Gamme(entitlements.AUCUNE, juge_permis=False, contrainte=None, plafonne=False)
+
+    def _observation_relaxes(self, outcome: PolicyOutcome, gamme: _Gamme) -> bool:
         """Whether an open observation window may relay this refused call (`AD-27`).
 
         Le mode observation existe pour un client dont la policy n'est pas encore
@@ -298,6 +485,13 @@ class PolicyBackend:
         """
         ctx = self._approval_ctx
         if ctx is None or ctx.gateway_token_id is None:
+            return False
+        # **La fenêtre est une capacité vendue** (`monitor_windows`), distincte de
+        # `monitor_admin` qui verrouille la route qui l'ouvre. Sans elle, il n'y a pas
+        # de fenêtre, donc pas de relâchement : c'est la seule direction dans laquelle
+        # un palier peut toucher ce garde. L'inverse — un palier qui *ouvrirait* une
+        # fenêtre — serait la facturation devenue moteur de policy.
+        if not gamme.droit.allows(Capability.monitor_windows):
             return False
         if outcome.reason == "taint":
             return False
@@ -436,8 +630,17 @@ class PolicyBackend:
         ctx = self._approval_ctx
         if bands is None or ctx is None or outcome.decision is not Approval.auto:
             return outcome
-        with db.connection(ctx.database_url) as conn:
-            seen, streak = trust.observed(conn, tenant_id=ctx.tenant_id, tool=canonical)
+        # Même repli que `core/decision.py` : ici l'exception ne devenait pas un 500
+        # mais un résultat d'erreur MCP, ce qui revient au même pour l'agent — on lui
+        # doit un verdict, pas une panne. `(False, 0)` est l'entrée la plus stricte.
+        try:
+            with db.connection(ctx.database_url) as conn:
+                seen, streak = trust.observed(conn, tenant_id=ctx.tenant_id, tool=canonical)
+        except Exception:
+            logger.warning(
+                "trust_lookup_failed", extra={"tool": canonical, "tenant_id": ctx.tenant_id}
+            )
+            seen, streak = False, 0
         tier = risk.escalate_by_risk(
             outcome.decision,
             outcome.action_class,
@@ -522,7 +725,12 @@ class PolicyBackend:
             # is the one path where a store failure loses a guard rather than
             # tightening one.
             logger.warning("taint_write_failed", extra={"tool": canonical, "reason": reason})
-        self._audit_gate(canonical, "taint_marked", reason)
+        else:
+            # Dans le `else`, jamais après le `try`. L'appel était inconditionnel :
+            # sur un journal append-only qu'on ne peut pas corriger, la chaîne
+            # attestait un garde qui n'avait pas eu lieu — et `core/export.py` le
+            # range en `guard_recorded` pour un régulateur.
+            self._audit_gate(canonical, "taint_marked", reason)
 
     def _audit_gate(self, tool_name: str, decision: str, reason: str | None) -> None:
         """Best-effort audit of a pre-policy gate decision (integrity / rbac)."""
@@ -555,17 +763,30 @@ class PolicyBackend:
         latency_ms: int | None = None,
         request_id: str | None = None,
         error: str | None = None,
-    ) -> None:
+        user_id: str | None = None,
+        constraint_reason: str | None = None,
+    ) -> bool:
+        """Écrit la ligne d'audit. Rend `False` si elle n'a pas pu l'être.
+
+        Le retour est ce qui permet à l'appelant de refuser plutôt que de relayer :
+        avant, l'échec était avalé ici même et l'appelant ne pouvait pas savoir.
+        """
         ctx = self._approval_ctx
         if ctx is None:
-            return
+            return False
         try:
             with db.connection(ctx.database_url) as conn:
                 audit.log_event(
                     conn,
                     tenant_id=ctx.tenant_id,
                     decision=decision,
-                    user_id=ctx.requested_by,
+                    # `requested_by` est le **demandeur**. Sur toute autre ligne c'est
+                    # la bonne valeur — l'agent est bien à l'origine de l'appel —, mais
+                    # sur `hitl_approved` elle disait que l'agent avait autorisé sa
+                    # propre action irréversible. La colonne entre dans la charge
+                    # hachée, donc la chaîne l'attestait. L'appelant qui connaît
+                    # l'approbateur le passe désormais.
+                    user_id=user_id if user_id is not None else ctx.requested_by,
                     request_id=request_id,
                     tool_name=canonical,
                     action_class=outcome.action_class.value if outcome.action_class else None,
@@ -586,12 +807,40 @@ class PolicyBackend:
                     gateway_token_id=ctx.gateway_token_id,
                     # The mandatory door: an agent speaking MCP cannot route around it.
                     origin=audit.Origin.mcp_gateway(),
+                    constraint_reason=constraint_reason,
+                    # **Le débit, dans la transaction qui écrit la preuve.**
+                    #
+                    # Inconditionnel ici, et c'est ce qui rend le compteur
+                    # vérifiable : toute ligne qu'`_audit` écrit est une décision de
+                    # policy, et toute décision de policy passe par `_audit`. Le
+                    # compteur d'une période est donc réconciliable avec le journal
+                    # — `tests/test_gateway_metering.py` le recompte. Un débit posé
+                    # au petit bonheur des sites d'appel n'aurait pas cette
+                    # propriété, et une facture qu'on ne peut pas recompter depuis
+                    # la preuve n'est pas défendable devant le client qui la
+                    # conteste.
+                    #
+                    # `_audit_gate` ne facture rien : RBAC, quarantaine et ordre
+                    # d'arrêt rendent leur verdict **avant** le moteur de policy.
+                    # Refuser un appel qu'on n'a pas eu à évaluer ne se facture pas.
+                    #
+                    # Et si l'écriture échoue, rien n'est débité : `_debiter` vit
+                    # dans la même transaction. C'est le bon sens de l'échec — on ne
+                    # facture pas une décision dont il ne reste aucune trace.
+                    usage_metric=Metric.decisions.value,
                 )
-        except Exception:  # audit is best-effort; never break the call path
+        except Exception:
             logger.warning("audit_write_failed", extra={"tool": canonical, "decision": decision})
+            return False
+        return True
 
     async def _handle_hitl(
-        self, name: str, arguments: dict[str, Any], canonical: str, outcome: PolicyOutcome
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        canonical: str,
+        outcome: PolicyOutcome,
+        gamme: _Gamme,
     ) -> types.CallToolResult:
         ctx = self._approval_ctx
         if ctx is None:
@@ -600,7 +849,9 @@ class PolicyBackend:
             )
         required = 2 if outcome.decision is Approval.human_dual else 1
         try:
-            return await self._run_approval_flow(ctx, name, arguments, canonical, outcome, required)
+            reponse = await self._run_approval_flow(
+                ctx, name, arguments, canonical, outcome, required, gamme
+            )
         except Exception:
             # Approval service unavailable. Same shared verdict as the cooperative
             # path (AD-37): deny on irreversible / external_send / unknown class,
@@ -608,9 +859,55 @@ class PolicyBackend:
             # now nothing read (CLAUDE.md §4.4).
             logger.exception("approval_service_error", extra={"tool": canonical})
             verdict = service_down_verdict(self._policy, outcome.action_class)
-            if verdict is Approval.deny:
+            # Les deux branches laissent une ligne. Aucune n'en écrivait, alors que le
+            # jumeau coopératif le fait et que les deux se réclament du même `AD-37` :
+            # la décision la plus discutable du produit — relayer sans avoir pu tenir
+            # l'humain — était la seule à ne pas être écrite.
+            # `is not auto` et non `is deny` : toute valeur future ajoutée à l'enum
+            # tombe du côté fermé. `on_approval_service_down` est désormais borné à
+            # deux valeurs au parse, donc ce test est redondant aujourd'hui — et c'est
+            # exactement la propriété qu'on veut garder le jour où la borne bouge.
+            refus = verdict is not Approval.auto
+            self._audit(
+                "deny" if refus else "allow",
+                canonical,
+                outcome,
+                arguments,
+                request_id=uuid4().hex,
+                error="approval_service_unavailable",
+                constraint_reason=gamme.contrainte,
+            )
+            if refus:
                 return _denied_result(f"'{canonical}' held: approval service unavailable")
             return await self._proxy.call_tool(name, arguments)
+
+        # **L'exécution est ici, hors du `try`, et c'est tout l'objet du correctif.**
+        #
+        # Elle vivait à l'intérieur de `_run_approval_flow`, donc à l'intérieur du
+        # bloc gardé ci-dessus, et **après** `consume()` + `commit()` + la ligne
+        # `hitl_approved`. Une coupure vers le serveur aval survenue une fois l'outil
+        # exécuté remontait alors dans le `except`, était diagnostiquée « service
+        # d'approbation indisponible », et la dernière ligne **rappelait
+        # `call_tool`** : l'action qu'un humain venait d'approuver s'exécutait une
+        # seconde fois. Sur un virement, c'est deux virements.
+        #
+        # Le flux rend désormais une décision, pas un effet. `None` veut dire
+        # « approuvé et consommé, à toi de relayer » — le seul cas où l'on agit.
+        if reponse is not None:
+            return reponse
+        try:
+            return await self._proxy.call_tool(name, arguments)
+        except Exception:
+            # Et l'échec aval devient une réponse, pas une exception qui remonte au
+            # `except` d'à côté. L'approbation est consommée, l'outil a peut-être agi :
+            # c'est ce que l'agent doit lire, plutôt qu'« indisponible » — le message
+            # que l'ancien code servait après avoir exécuté l'action.
+            logger.exception("downstream_failed_after_approval", extra={"tool": canonical})
+            return _denied_result(
+                f"'{canonical}' was approved and attempted, but the downstream server "
+                "failed: the outcome is unknown. The approval is consumed — retrying "
+                "requires a new one."
+            )
 
     async def _run_approval_flow(
         self,
@@ -620,7 +917,14 @@ class PolicyBackend:
         canonical: str,
         outcome: PolicyOutcome,
         required: int,
-    ) -> types.CallToolResult:
+        gamme: _Gamme,
+    ) -> types.CallToolResult | None:
+        """La décision d'approbation, **sans l'exécuter**.
+
+        Rend `None` quand l'appel est approuvé et consommé : c'est à l'appelant de
+        relayer, hors de tout bloc `try` qui pourrait le rejouer. Tout autre cas
+        rend la réponse à servir telle quelle.
+        """
         with db.connection(ctx.database_url) as conn:
             ah = approvals.args_hash(arguments)
             record = approvals.find_active(conn, ctx.tenant_id, canonical, ah)
@@ -633,8 +937,20 @@ class PolicyBackend:
                     conn, ctx, canonical, outcome, arguments, ah, required
                 )
                 summary = record.dry_run.get("summary", "")
-                _notify(ctx.notifier, record.id, summary, record.expires_at.isoformat())
-                self._audit("hitl_pending", canonical, outcome, arguments, request_id=record.id)
+                # `notify` — « Notification des approbations en attente » — est vendue
+                # à partir de `pro` et partait pour tous les paliers. Ne pas notifier
+                # ne retient rien : l'approbation est créée, elle attend dans la
+                # console, et §4.1 est tenu. Seul le canal de prévenance est payant.
+                if gamme.droit.allows(Capability.notify):
+                    _notify(ctx.notifier, record.id, summary, record.expires_at.isoformat())
+                self._audit(
+                    "hitl_pending",
+                    canonical,
+                    outcome,
+                    arguments,
+                    request_id=record.id,
+                    constraint_reason=gamme.contrainte,
+                )
                 return _requires_approval_result(record.id, summary)
 
             if record.status == "pending":
@@ -644,9 +960,16 @@ class PolicyBackend:
                 if approvals.consume(conn, record.id):
                     conn.commit()
                     self._audit(
-                        "hitl_approved", canonical, outcome, arguments, request_id=record.id
+                        "hitl_approved",
+                        canonical,
+                        outcome,
+                        arguments,
+                        request_id=record.id,
+                        user_id=record.decided_by,
+                        constraint_reason=gamme.contrainte,
                     )
-                    return await self._proxy.call_tool(name, arguments)
+                    # Approuvé et consommé. On ne relaie PAS ici : voir `_handle_hitl`.
+                    return None
                 conn.commit()
                 return _denied_result(f"'{canonical}' approval already consumed")
 
@@ -655,7 +978,19 @@ class PolicyBackend:
             approvals.consume(conn, record.id)
             conn.commit()
             decision = "hitl_denied" if record.status == "denied" else "expired"
-            self._audit(decision, canonical, outcome, arguments, request_id=record.id)
+            # Sur un refus, `decided_by` nomme celui qui a refusé. Sur une expiration
+            # il vaut `None` — personne n'a rien décidé — et la ligne retombe sur le
+            # demandeur comme toutes les autres lignes de cette porte, ce qui est le
+            # comportement voulu : c'est bien sa demande qui a expiré.
+            self._audit(
+                decision,
+                canonical,
+                outcome,
+                arguments,
+                request_id=record.id,
+                user_id=record.decided_by,
+                constraint_reason=gamme.contrainte,
+            )
             return _denied_result(f"'{canonical}' approval {record.status}")
 
     def _create_approval(

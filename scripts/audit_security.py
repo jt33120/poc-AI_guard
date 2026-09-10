@@ -189,6 +189,70 @@ def check_frontend_no_service_role(findings: list[Finding]) -> None:
             )
 
 
+def check_no_new_tenant_flag_columns(findings: list[Finding]) -> None:
+    """La régression vers le mur de colonnes.
+
+    `0027` a ajouté `tenants.mcp_gateway_enabled` pour **une** raison précise : la
+    passerelle exige une installation chez le client, elle ne se vend pas au clic.
+    La tentation, à la deuxième fonctionnalité, est d'ajouter une colonne de plus —
+    puis dix. Le mur de booléens qui en résulte n'a ni catalogue, ni clé étrangère,
+    ni test d'exhaustivité : chacun est un `false` qu'on croit avoir mis à `true`,
+    et une combinaison que personne n'exerce.
+
+    La gamme (`0030`) est la réponse : une capacité est une **ligne présente**, et
+    la faute de frappe est refusée à l'écriture. Ce contrôle empêche de revenir en
+    arrière sans le dire.
+    """
+    migrations = REPO / "supabase" / "migrations"
+    if not migrations.exists():
+        return
+    pattern = re.compile(r"add column if not exists\s+(\w+_enabled)\b", re.IGNORECASE)
+    for path in sorted(migrations.glob("*.sql")):
+        rel = _rel(path)
+        if rel.endswith("0027_gateway_entitlement.sql"):
+            continue  # la seule, et sa raison est écrite dans le fichier
+        for colonne in pattern.findall(_read(path)):
+            findings.append(
+                Finding(
+                    CRITICAL,
+                    "TENANT_FLAG_COLUMN",
+                    f"{rel} adds `{colonne}` — use the plan catalogue (0030), not a "
+                    "per-tenant boolean: a column has no catalogue, no foreign key and "
+                    "no exhaustiveness test",
+                )
+            )
+
+
+def check_capabilities_exist_in_the_catalog(findings: list[Finding]) -> None:
+    """La clé fantôme que la clé étrangère ne peut pas attraper côté Python.
+
+    La base refuse `('pro','judgee')`. Elle ne peut rien contre un
+    `requires(Capability.judgee)` côté code — sauf que l'enum le refuse déjà. Le
+    trou restant est le littéral : `requires("judgee")` passerait mypy si quelqu'un
+    élargissait la signature, et produirait un 402 permanent sur une route.
+    """
+    catalogue = _read(REPO / "supabase" / "migrations" / "0030_saas_plans.sql")
+    if not catalogue:
+        return
+    connues = set(re.findall(r"^\s*\('([a-z][a-z0-9_]*)','", catalogue, re.MULTILINE))
+    if not connues:
+        return
+    for path in _iter_code_files():
+        rel = _rel(path)
+        if not rel.startswith("api/") and not rel.startswith("core/"):
+            continue
+        for litteral in re.findall(r'requires\(\s*"([a-z_]+)"\s*\)', _read(path)):
+            if litteral not in connues:
+                findings.append(
+                    Finding(
+                        CRITICAL,
+                        "UNKNOWN_CAPABILITY",
+                        f"{rel} requires `{litteral}`, absent from capability_catalog: "
+                        "the route answers 402 forever and nothing fails to say so",
+                    )
+                )
+
+
 CHECKS = (
     check_env_gitignored,
     check_env_not_tracked,
@@ -198,6 +262,8 @@ CHECKS = (
     check_docs_gated,
     check_rls_migrations,
     check_frontend_no_service_role,
+    check_no_new_tenant_flag_columns,
+    check_capabilities_exist_in_the_catalog,
 )
 
 

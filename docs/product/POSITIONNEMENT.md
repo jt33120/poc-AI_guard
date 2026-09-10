@@ -117,11 +117,11 @@ mesure, et gaté en CI :
 
 | Chemin | Connexions PostgreSQL | Allers-retours SQL |
 |---|---|---|
-| MCP — appel autorisé | 1 | 3 |
-| MCP — appel refusé | 1 | 3 |
-| MCP — première mise en attente | 2 | 5 |
-| `POST /v1/authorize` — autorisé | 3 | 6 |
-| `POST /v1/authorize` — refusé | 3 | 6 |
+| MCP — appel autorisé | 2 | 5 |
+| MCP — appel refusé | 2 | 5 |
+| MCP — première mise en attente | 3 | 7 |
+| `POST /v1/authorize` — autorisé | 4 | 8 |
+| `POST /v1/authorize` — refusé | 4 | 7 |
 
 **Comment lire ce tableau.** Il n'y a pas de pool : `core/db.py` ouvre une connexion
 neuve par opération. Multipliez donc ces entiers par la latence d'établissement de
@@ -130,11 +130,26 @@ et que nous ne pouvons pas connaître à votre place. Trois gardes sont éteinte
 défaut (intégrité, bandes de risque, taint) et ajoutent une à deux connexions chacune
 quand on les active ; `perf/overhead.json` les nomme.
 
-**Ce que le tableau dit sur nous.** Le chemin coopératif coûte **trois fois** les
+**Ce que le tableau dit sur nous.** Le chemin coopératif coûte **deux fois** les
 connexions du chemin obligatoire, parce qu'il ré-authentifie le jeton et relit la
 policy à chaque requête là où MCP tient une session. C'est le prix de la
 non-obligation, et il va dans le même sens que le §1 : l'étage MCP n'est pas seulement
 le plus contraignant, il est aussi le moins cher.
+
+**Ce que la lecture du droit achète, sur les deux portes.** Le palier et les plafonds
+du tenant sont lus à chaque appel et **jamais mis en cache**. C'est un choix, pas une
+négligence : un droit servi de mémoire est un droit qu'on ne peut plus retirer, et la
+fenêtre pendant laquelle il survivrait est exactement celle où un client rétrogradé a
+intérêt à continuer. Le palier, les capacités, les plafonds, les quotas négociés et la
+consommation du mois tiennent en **une seule** requête — trois lectures séparées
+faisaient passer le chemin coopératif de six à onze allers-retours, et c'est le gate de
+surcoût qui l'a dit avant la revue.
+
+La porte MCP paie cette lecture depuis peu, et l'écart se lit dans le tableau : une
+connexion et deux allers-retours de plus par appel. C'est ce que coûte le fait que la
+gamme s'applique là où le produit **exécute**. Sans elle, un plafond de plan ne
+resserrait que la voie qu'un agent peut ne pas emprunter, et le compteur d'usage d'un
+déploiement MCP — celui que nous recommandons — restait à zéro.
 
 **Ce que chercher ce chiffre a trouvé.** Le premier constat n'a pas été une latence à
 publier mais un défaut à corriger : `/v1/authorize` et le proxy LLM ré-analysaient le

@@ -75,7 +75,14 @@ never automatic — it cannot happen as a side effect of a container start.
 ### 3. Control API
 
 Build the repository `Dockerfile` (`railway.json` configures Railway; any
-container host works). Healthcheck: `GET /health`.
+container host works). Healthcheck: **`GET /health/ready`**.
+
+> `railway.json` used to point at `/health`, which is a static `{"status":"ok"}`
+> that touches nothing. A container with a wrong `DATABASE_URL`, a paused
+> database, or migrations behind the bundled head passed that check, was
+> promoted, and stayed in rotation — `restartPolicyType: ON_FAILURE` never fires,
+> because the process is perfectly alive. `/health/ready` is the probe that reads
+> the gates, and it was wired only into `docker-compose.yml`.
 
 | Var | Value | Notes |
 |---|---|---|
@@ -101,7 +108,9 @@ leaving it empty turns off.
 > deploy log. On another host, read yours the same way rather than copying this
 > one — `python -m cli doctor` then confirms it (`ratelimit.forwarded`).
 
-Verify: `curl https://<your-backend-host>/health` ⇒ `{"status":"ok"}`.
+Verify: `curl https://<your-backend-host>/health/ready` ⇒ four booleans, all
+true. `/health` answers `{"status":"ok"}` whatever the state of the deployment,
+so it proves only that a process is listening.
 
 ### 4. Console
 
@@ -145,6 +154,13 @@ Managed Postgres projects pause when idle. When the same project also serves aut
 `database` **and** `issuer` at once, while `GET /health` keeps answering `200`:
 liveness never touches either. That is `DEP-6` in the field, so read the gates,
 not the probe you happened to curl.
+
+The deployment healthcheck now points at `/health/ready`, so a paused database
+does take the container out of rotation instead of leaving it green. And the
+readiness verdict is **per plane**: the `decision` service does not verify JWTs
+(`api/authorize.py` authenticates by `X-Gateway-Token`), so a JWKS outage no
+longer sends the hot path red for a dependency it never calls — which is the
+cascade the plane split exists to prevent.
 
 Measured on 2026-09-07, waking the project from paused to `ACTIVE_HEALTHY`:
 

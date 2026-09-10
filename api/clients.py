@@ -12,8 +12,10 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from api.deps import database_url, require_tenant
+from api.entitlement_guard import enforce_stock
 from api.security import get_current_user, require_role
 from core import clients, db
+from core.entitlements import Metric
 from core.schemas import (
     ClientAssign,
     ClientCreate,
@@ -55,6 +57,13 @@ def create_client(
 ) -> dict[str, Any]:
     tenant_id = require_tenant(user)
     with db.connection(database_url(request)) as conn:
+        enforce_stock(
+            conn,
+            tenant_id,
+            Metric.clients,
+            compte_sql="select count(*) from clients where tenant_id::text = %s",
+            etiquette="clients",
+        )
         return clients.create_client(
             conn, tenant_id=tenant_id, name=payload.name, website=payload.website
         )

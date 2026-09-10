@@ -19,7 +19,8 @@ from uuid import uuid4
 
 import psycopg
 
-from core import approvals, audit, db, risk, trust
+from core import approvals, audit, db, entitlements, risk, trust
+from core.entitlements import Capability, Meter, Metric
 from core.judge import Judge, resolve_ambiguous
 from core.notify import Notifier
 from core.policy import Approval, Policy, PolicyOutcome, evaluate, service_down_verdict
@@ -46,17 +47,35 @@ def _audit(
     tool: str,
     request_id: str,
     action_class: str | None,
+    # Qui a levé le HITL. Absent de cette signature jusqu'ici, donc `audit_log.user_id`
+    # était NULL sur la voie coopérative — alors que la colonne entre dans la charge
+    # hachée, si bien que la chaîne attestait une approbation sans approbateur.
+    user_id: str | None = None,
     policy_rule_id: str | None = None,
     judge_used: bool = False,
     args_hash: str | None = None,
     gateway_token_id: str | None = None,
     client_request_id: str | None = None,
-) -> None:
-    with db.connection(database_url) as conn:
-        audit.log_event(
-            conn,
+    constraint_reason: str | None = None,
+    usage_metric: str | None = None,
+) -> bool:
+    """Écrit la ligne. Rend `False` si elle n'a pas pu l'être.
+
+    **La porte coopérative doit elle aussi prouver avant d'autoriser.** Le lot 2 l'a
+    fait sur la passerelle ; ici l'échec d'écriture remontait en `OperationalError`,
+    donc en HTTP 500 — une **erreur**, pas un verdict, sur un contrat dont toute la
+    prémisse est que l'agent honore le verdict. Et un agent qui reçoit une erreur
+    devine, dans le sens qui l'arrange.
+
+    Le retour est ce qui permet à l'appelant de refuser plutôt que d'autoriser sans
+    preuve.
+    """
+    try:
+        _ecrire(
+            database_url,
             tenant_id=tenant_id,
             decision=decision,
+            user_id=user_id,
             request_id=request_id,
             tool_name=tool,
             action_class=action_class,
@@ -65,10 +84,26 @@ def _audit(
             args_hash=args_hash,
             gateway_token_id=gateway_token_id,
             client_request_id=client_request_id,
+            constraint_reason=constraint_reason,
+            usage_metric=usage_metric,
+        )
+    except Exception:
+        logger.warning("audit_write_failed", extra={"tool": tool, "decision": decision})
+        return False
+    return True
+
+
+def _ecrire(database_url: str, **champs: Any) -> None:
+    """L'écriture nue. Séparée pour que `_audit` n'ait qu'un seul chemin d'échec."""
+    with db.connection(database_url) as conn:
+        audit.log_event(
+            conn,
             # The cooperative door. Fixed here, not passed in: an adapter states
             # what it is, it does not accept being told (FR-160).
             origin=audit.Origin.authorize_api(),
+            **champs,
         )
+        conn.commit()
 
 
 def _notify(notifier: Notifier | None, approval_id: str, summary: str, expires_at: str) -> None:
@@ -103,15 +138,78 @@ def authorize(
     """
     outcome = evaluate(policy, tool, arguments)
 
+    # **Le droit du tenant, lu une fois, jamais mis en cache.** Il décide de deux
+    # choses ici : si le juge a le droit de tourner, et si le verdict doit être
+    # resserré parce que le plan est au plafond. Les deux sont des **durcissements** :
+    # rien de ce qui suit ne peut rendre un verdict plus permissif que la policy.
+    # `try` et non `with` nu : une base injoignable ici doit devenir un **verdict**,
+    # pas une erreur HTTP 500 — c'est la garantie que ce module énonce trente lignes
+    # plus bas pour le service d'approbation, et elle ne peut pas dépendre de l'ordre
+    # dans lequel les lectures sont écrites. Le repli est fail-closed des deux côtés :
+    # aucun droit, donc pas de juge, et un compteur illisible qui resserre.
+    droit = entitlements.AUCUNE
+    juge_permis = False
+    droit_lu = False
+    etat_compteur = Meter.unknown
+    try:
+        with db.connection(database_url) as conn:
+            droit = entitlements.load_entitlement(conn, tenant_id)
+            # Le juge est un enrichissement payant, et son absence **durcit**
+            # (`AD-34`) : couper le juge plafonne les outils ambigus à `irreversible`,
+            # donc à une approbation humaine. Un palier sans juge est plus strict,
+            # jamais plus laxiste — c'est ce qui permet de le vendre sans rouvrir le
+            # moteur de policy.
+            juge_permis = droit.allows(Capability.judge) and outcome.ambiguous
+            if juge_permis:
+                juge_permis = (
+                    entitlements.meter(
+                        droit,
+                        Metric.judge_calls,
+                        consomme=entitlements.consume(conn, tenant_id, Metric.judge_calls),
+                    )
+                    is not Meter.capped
+                )
+                conn.commit()
+            # Le consommé vient de la **même requête** que le droit : le garde de
+            # surcoût a chiffré ce que coûtait la version naïve — deux connexions et
+            # cinq allers-retours SQL de plus par appel d'autorisation, sur le chemin
+            # que l'agent emprunte à chaque outil. Une connexion, c'est un aller-retour
+            # réseau, un handshake TLS et une place dans le pooler ; un aller-retour,
+            # c'est la latence de la base multipliée par tout le trafic de la flotte.
+            etat_compteur = entitlements.meter(
+                droit, Metric.decisions, consomme=droit.consomme(Metric.decisions)
+            )
+            droit_lu = True
+    except Exception:
+        logger.warning("entitlement_unreadable", extra={"tenant": tenant_id})
+
     # Ambiguous tools: classify, then floor for that class. Same shared step as the
     # MCP path — an absent judge floors to irreversible rather than letting the
     # rule's declared approval stand (AD-34).
-    outcome = resolve_ambiguous(outcome, judge, tool, arguments)
+    outcome = resolve_ambiguous(outcome, judge if juge_permis else None, tool, arguments)
 
     # Graduated autonomy (M11): risk-score an `auto` outcome and tighten it (opt-in).
     if policy.defaults.risk_bands is not None and outcome.decision is Approval.auto:
-        with db.connection(database_url) as conn:
-            seen, streak = trust.observed(conn, tenant_id=tenant_id, tool=tool)
+        # **Une lecture de confiance injoignable ne doit pas devenir une erreur HTTP.**
+        #
+        # `db.connection` vivait hors de tout `try` : une base momentanément absente
+        # remontait en 500, c'est-à-dire en *erreur* et non en *verdict*, sur un contrat
+        # dont toute la prémisse est que l'agent honore le verdict — la faute que le
+        # `except` d'`_hold_for_humans` corrige trente lignes plus bas. Et elle ne se
+        # produisait que chez les tenants ayant activé l'autonomie graduée, si bien que
+        # les trois tests de panne du fichier, tous écrits sur des policies sans
+        # `risk_bands`, ne pouvaient pas la voir.
+        #
+        # Le repli est l'entrée la plus stricte que `escalate_by_risk` accepte :
+        # `seen_before=False` ajoute les 10 points de nouveauté, `clean_streak=0`
+        # n'accorde aucune remise. Ne pas savoir si un agent a mérité la confiance se
+        # lit donc comme « il ne l'a pas méritée » (`AD-10`).
+        try:
+            with db.connection(database_url) as conn:
+                seen, streak = trust.observed(conn, tenant_id=tenant_id, tool=tool)
+        except Exception:
+            logger.warning("trust_lookup_failed", extra={"tool": tool, "tenant_id": tenant_id})
+            seen, streak = False, 0
         tier = risk.escalate_by_risk(
             outcome.decision,
             outcome.action_class,
@@ -123,11 +221,31 @@ def authorize(
         if tier is not outcome.decision:
             outcome = replace(outcome, decision=tier, reason="risk")
 
+    # **Le plafond de décisions, appliqué APRÈS la policy et jamais contre elle.**
+    #
+    # Le compteur est lu ici et débité plus bas, dans la transaction qui écrit la
+    # preuve. Lire d'abord permet de resserrer *ce* verdict-ci ; débiter dans la
+    # transaction d'audit garantit que ce qui est compté est ce qui a été écrit.
+    # **`Meter.unknown` resserre — mais seulement si le droit, lui, a été lu.**
+    #
+    # La nuance est fine et elle compte. Un compteur illisible sur un droit connu est
+    # bien l'état que `tighten` doit fermer : on sait ce que ce tenant a acheté, on ne
+    # sait pas où il en est. Mais quand **rien** n'est lisible — base entière absente
+    # —, ce n'est plus une question de plan, et parler de plafond ici volerait la
+    # parole aux gardes plus profonds, qui disent la même chose en plus précis :
+    # « service d'approbation indisponible », « audit indisponible ». Ils rendent le
+    # même verdict sur les classes risquées (`service_down_verdict`), donc rien ne
+    # s'ouvre — seul le motif change, et il devient utile à qui lit l'incident.
+    etat = etat_compteur if droit_lu else Meter.ok
+    if etat in (Meter.capped, Meter.unknown):
+        outcome = entitlements.tighten(outcome, policy, reason=etat)
+    contrainte = f"plan_{etat.value}" if etat in (Meter.capped, Meter.unknown) else None
+
     ah = approvals.args_hash(arguments)
 
     if outcome.decision is Approval.auto:
         request_id = uuid4().hex
-        _audit(
+        ecrit = _audit(
             database_url,
             tenant_id=tenant_id,
             decision="allow",
@@ -139,14 +257,27 @@ def authorize(
             args_hash=ah,
             gateway_token_id=gateway_token_id,
             client_request_id=client_request_id,
+            constraint_reason=contrainte,
+            usage_metric=Metric.decisions.value,
         )
+        if not ecrit:
+            # **Prouver avant d'autoriser, ici aussi.** Le lot 2 l'a fait sur la
+            # passerelle ; cette porte-ci rendait `allow` quand l'écriture échouait —
+            # ou, pire, une erreur HTTP 500, qu'un agent interprète dans le sens qui
+            # l'arrange. Une autorisation qu'on ne peut pas prouver n'est pas une
+            # autorisation (§4.2, §4.4).
+            return {
+                "decision": "deny",
+                "action_class": _class(outcome),
+                "reason": "audit_unavailable",
+            }
         return {"decision": "allow", "action_class": _class(outcome), "reason": outcome.reason}
 
     if outcome.decision is Approval.notify:
         # Notify-and-proceed (M11): the agent may act, but the action is recorded
         # distinctly ("notify") so ops can watch it — no human gate.
         request_id = uuid4().hex
-        _audit(
+        ecrit = _audit(
             database_url,
             tenant_id=tenant_id,
             decision="notify",
@@ -158,7 +289,15 @@ def authorize(
             args_hash=ah,
             gateway_token_id=gateway_token_id,
             client_request_id=client_request_id,
+            constraint_reason=contrainte,
+            usage_metric=Metric.decisions.value,
         )
+        if not ecrit:
+            return {
+                "decision": "deny",
+                "action_class": _class(outcome),
+                "reason": "audit_unavailable",
+            }
         return {
             "decision": "allow",
             "action_class": _class(outcome),
@@ -180,6 +319,8 @@ def authorize(
             args_hash=ah,
             gateway_token_id=gateway_token_id,
             client_request_id=client_request_id,
+            constraint_reason=contrainte,
+            usage_metric=None,
         )
         return {"decision": "deny", "action_class": _class(outcome), "reason": outcome.reason}
 
@@ -212,7 +353,7 @@ def authorize(
             _audit(
                 database_url,
                 tenant_id=tenant_id,
-                decision="deny" if verdict is Approval.deny else "allow",
+                decision="deny" if verdict is not Approval.auto else "allow",
                 tool=tool,
                 request_id=uuid4().hex,
                 action_class=_class(outcome),
@@ -224,7 +365,9 @@ def authorize(
             )
         except Exception:  # the audit store may be the thing that is down
             logger.warning("audit_write_failed", extra={"tool": tool})
-        if verdict is Approval.deny:
+        # `is not auto`, comme sur la passerelle : les deux portes se réclament du
+        # même `AD-37`, elles doivent tomber du même côté sur une valeur inattendue.
+        if verdict is not Approval.auto:
             return {"decision": "deny", "action_class": _class(outcome), "reason": reason}
         return {"decision": "allow", "action_class": _class(outcome), "reason": reason}
 
@@ -344,6 +487,10 @@ def _resolve_terminal(
             tool=record.tool_name,
             request_id=record.id,
             action_class=record.action_class,
+            # L'approbateur, pas le demandeur. La colonne était NULL ici et portait
+            # `requested_by` côté passerelle : deux façons différentes d'être faux
+            # sur le seul champ qui dit qui a autorisé une action irréversible.
+            user_id=record.decided_by,
             gateway_token_id=gateway_token_id,
         )
     else:

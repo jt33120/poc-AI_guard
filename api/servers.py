@@ -14,8 +14,10 @@ from psycopg import errors as pg_errors
 
 from api.deps import database_url as _database_url
 from api.deps import require_tenant as _require_tenant
+from api.entitlement_guard import enforce_stock
 from api.security import get_current_user, require_role
 from core import db, servers
+from core.entitlements import Metric
 from core.schemas import CurrentUser, Role, ServerCreate, ServerOut, ServerUpdate
 
 router = APIRouter(prefix="/v1/servers", tags=["servers"])
@@ -44,6 +46,13 @@ def create_server(
     tenant_id = _require_tenant(user)
     url = _database_url(request)
     with db.connection(url) as conn:
+        enforce_stock(
+            conn,
+            tenant_id,
+            Metric.downstream_servers,
+            compte_sql="select count(*) from downstream_servers where tenant_id::text = %s",
+            etiquette="downstream servers",
+        )
         try:
             return servers.create_server(
                 conn, tenant_id, payload.name, payload.transport.value, payload.config

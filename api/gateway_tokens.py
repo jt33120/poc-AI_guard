@@ -13,8 +13,10 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from api.deps import database_url, require_tenant
+from api.entitlement_guard import enforce_stock
 from api.security import require_role
 from core import db, tenant_tokens
+from core.entitlements import Metric
 from core.schemas import CurrentUser, GatewayTokenCreate, GatewayTokenCreated, GatewayTokenOut, Role
 
 router = APIRouter(prefix="/v1/gateway-tokens", tags=["gateway-tokens"])
@@ -39,6 +41,21 @@ def create_gateway_token(
 ) -> dict[str, Any]:
     tenant_id = require_tenant(user)
     with db.connection(database_url(request)) as conn:
+        # Un jeton de passerelle **est** un agent : c'est l'identité sur laquelle le
+        # taint, les fenêtres d'observation et l'attribution d'audit sont toutes
+        # clés. Le plafond se compte donc ici, sur les jetons vivants — un jeton
+        # révoqué n'occupe plus de place, sinon un client atteindrait son plafond
+        # avec des identités qui ne peuvent plus rien faire.
+        enforce_stock(
+            conn,
+            tenant_id,
+            Metric.agents,
+            compte_sql=(
+                "select count(*) from gateway_tokens "
+                "where tenant_id::text = %s and revoked_at is null"
+            ),
+            etiquette="agents",
+        )
         raw, view = tenant_tokens.mint(conn, tenant_id=tenant_id, name=payload.name)
     return {**view, "token": raw}
 

@@ -13,9 +13,11 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from api.deps import database_url, require_tenant
+from api.entitlement_guard import enforce_flux
 from api.ratelimit import export_rate_limit, limiter
 from api.security import get_current_user
 from core import approvals, audit, compliance, db, export
+from core.entitlements import Metric
 from core.export import Narrator
 from core.judge import build_judge
 from core.schemas import ComplianceStatus, CurrentUser, Role
@@ -38,6 +40,7 @@ def _narrator(request: Request) -> Narrator | None:
 
 
 @router.get("/status", response_model=ComplianceStatus)
+@limiter.limit(export_rate_limit)
 def get_compliance_status(
     request: Request,
     user: CurrentUser = Depends(get_current_user),
@@ -62,6 +65,10 @@ def export_evidence_pack(
         raise HTTPException(status_code=422, detail="render must be json or pdf")
     tenant_id = require_tenant(user)
     url = database_url(request)
+    # Le dossier de conformité est l'acte le plus cher de la console : il lit dix
+    # mille lignes, appelle le narrateur, et rend un PDF. `export_jobs` le plafonne
+    # dans les trois paliers depuis `0030` — et rien ne le comptait.
+    enforce_flux(url, tenant_id, Metric.export_jobs, etiquette="evidence exports")
     floor = request.app.state.settings.audit_retention_days
     with db.tenant_reader(
         url, user_id=user.user_id, tenant_id=tenant_id, role=(user.role or Role.viewer)
