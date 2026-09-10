@@ -37,6 +37,7 @@ from api.health import router as health_router
 from api.integrity import router as integrity_router
 from api.llm_proxy import router as llm_proxy_router
 from api.monitor import router as monitor_router
+from api.ops import router as ops_router
 from api.policy import router as policy_router
 from api.promotion import router as promotion_router
 from api.ratelimit import limiter
@@ -94,7 +95,12 @@ class Plane(StrEnum):
 #: Monté par tous les plans. La sonde de disponibilité en fait partie : chaque
 #: service Railway a son propre healthcheck, et un plan qui ne répondrait pas
 #: serait redémarré en boucle.
-_SOCLE: tuple[APIRouter, ...] = (health_router,)
+#:
+#: Le point de scrutation aussi, et pour une raison voisine : les compteurs vivent
+#: **dans le processus** qui répond. Monté sur le seul plan console, il ne dirait rien
+#: du plan décision ni du proxy — c'est-à-dire rien des deux chemins chauds, ceux dont
+#: on veut justement voir le volume et la latence.
+_SOCLE: tuple[APIRouter, ...] = (health_router, ops_router)
 
 #: Le plan qui sert chaque routeur.
 #:
@@ -159,7 +165,7 @@ _CAPACITE_PAR_ROUTEUR: tuple[tuple[APIRouter, Capability | None], ...] = (
     (trust_router, None),  # lecture du capital de confiance, adossée à l'audit
     # --- Ceux qui n'authentifient PAS par JWT, et que ce garde ne peut pas tenir ----
     #
-    # `requires` résout un jeton **console** (`get_current_user`). Ces trois-là
+    # `requires` résout un jeton **console** (`get_current_user`). Ceux-là
     # n'en présentent aucun : le proxy et l'ingestion AI s'authentifient par jeton de
     # passerelle, la lecture AI par jeton de lecture serveur-à-serveur, et le triage
     # est public. Les verrouiller ici ne les aurait pas facturés — cela les aurait
@@ -172,6 +178,11 @@ _CAPACITE_PAR_ROUTEUR: tuple[tuple[APIRouter, Capability | None], ...] = (
     (llm_proxy_router, None),  # X-Gateway-Token → plafonné par `proxy_calls`
     (ai_router, None),  # jeton de passerelle (ingestion) et de lecture (console)
     (triage_router, None),  # public : il n'y a pas encore de tenant à facturer
+    # Et celui qui n'appartient à aucun tenant : le relevé d'exploitation compte ce
+    # que **ce processus** a fait, tous tenants confondus, sans jamais nommer aucun
+    # d'eux. Il n'y a donc pas de palier à consulter, et son verrou est un jeton de
+    # scrutation dédié (`OPS_METRICS_TOKEN`) — absent, la route répond 404.
+    (ops_router, None),
     # --- Les capacités de gamme ---------------------------------------------------
     (gateway_tokens_router, Capability.agents_inventory),
     (agents_router, Capability.agents_inventory),
@@ -203,8 +214,11 @@ _PREFIXES_CHAUDS: dict[Plane, tuple[str, ...]] = {
     Plane.LLM: ("/proxy/",),
 }
 
-#: Servi par tous les plans : les deux sondes, et le principal authentifié.
-_CHEMINS_SOCLE: frozenset[str] = frozenset({"/health", "/health/ready", "/v1/me"})
+#: Servi par tous les plans : les deux sondes, le relevé opérationnel, et le principal
+#: authentifié.
+_CHEMINS_SOCLE: frozenset[str] = frozenset(
+    {"/health", "/health/ready", "/v1/ops/metrics", "/v1/me"}
+)
 
 
 def _capacite_de(router: APIRouter) -> Capability | None:

@@ -170,8 +170,9 @@ async def test_the_registry_is_measured_and_written(
 
     # --- chemin HTTP (coopératif) -------------------------------------------------
     # Peu d'échantillons, et c'est délibéré : les comptes sont déterministes, donc
-    # répéter n'apporte rien — et `AUTHORIZE_RATE_LIMIT` vaut 120/minute, donc une
-    # boucle longue mesurerait des 429 au lieu de la chaîne de gardes.
+    # répéter n'apporte rien — et le compartiment est désormais borné par le palier du
+    # tenant (`plan_limits.authorize_rpm`), donc une boucle longue mesurerait des 429
+    # au lieu de la chaîne de gardes.
     app = create_app(Settings(_env_file=None, env="dev", database_url=db.url))
     client = TestClient(app)
 

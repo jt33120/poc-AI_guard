@@ -127,6 +127,57 @@ def resolve_principal(conn: psycopg.Connection, raw_token: str) -> tuple[str, st
     return (str(row[0]), str(row[1])) if row else None
 
 
+def resolve_principal_and_debits(
+    conn: psycopg.Connection, raw_token: str
+) -> tuple[str, str, int | None, int | None] | None:
+    """``(token_id, tenant_id, authorize_rpm, proxy_rpm)`` — en **une** instruction.
+
+    Les deux débits sont vendus par palier (`plan_limits`, forme `debit`) et n'étaient
+    appliqués nulle part : `api/ratelimit.py` lisait des chaînes de configuration, si
+    bien qu'un `entreprise` qui a payé 3000/min était bridé à 120 et qu'un `free` qui a
+    droit à 60 en obtenait 120.
+
+    **Deux sous-requêtes scalaires et pas une seconde lecture**, et c'est la contrainte
+    qui a dicté la forme. `perf/overhead.json` fige le coût de `/v1/authorize` à quatre
+    connexions et huit allers-retours SQL, `make overhead-gate` échoue sur toute dérive,
+    et `tests/test_overhead.py` mesure le chemin HTTP **sans préchauffage** — donc même
+    un cache à durée de vie courte serait mesuré à froid. Élargir la requête que
+    l'authentification fait déjà coûte zéro instruction de plus.
+
+    Un débit `None` veut dire « ce palier ne publie pas cette métrique » : l'appelant
+    retombe alors sur le plafond d'infrastructure, jamais sur une absence de limite.
+    """
+    if not raw_token:
+        return None
+    row = conn.execute(
+        # `coalesce(o.limit_value, l.limit_value)` : le quota négocié gagne, et un
+        # override **expiré** retombe sur le chiffre du palier — même règle exactement
+        # que `core/entitlements.load_entitlement`, et pour la même raison.
+        "select g.id, g.tenant_id, "
+        "  (select coalesce(o.limit_value, l.limit_value) from plan_limits l "
+        "     left join tenant_quota_overrides o "
+        "            on o.tenant_id = g.tenant_id and o.metric = l.metric "
+        "           and (o.expires_at is null or o.expires_at > now()) "
+        "    where l.plan = t.plan and l.metric = 'authorize_rpm'), "
+        "  (select coalesce(o.limit_value, l.limit_value) from plan_limits l "
+        "     left join tenant_quota_overrides o "
+        "            on o.tenant_id = g.tenant_id and o.metric = l.metric "
+        "           and (o.expires_at is null or o.expires_at > now()) "
+        "    where l.plan = t.plan and l.metric = 'proxy_rpm') "
+        "from gateway_tokens g join tenants t on t.id = g.tenant_id "
+        "where g.token_hash = %s and g.revoked_at is null",
+        (hash_token(raw_token),),
+    ).fetchone()
+    if not row:
+        return None
+    return (
+        str(row[0]),
+        str(row[1]),
+        int(row[2]) if row[2] is not None else None,
+        int(row[3]) if row[3] is not None else None,
+    )
+
+
 def resolve_client_id(conn: psycopg.Connection, raw_token: str) -> str | None:
     """Return the client id an active token belongs to (for per-tool RBAC), or None."""
     if not raw_token:
@@ -138,13 +189,23 @@ def resolve_client_id(conn: psycopg.Connection, raw_token: str) -> str | None:
     return str(row[0]) if row and row[0] is not None else None
 
 
-def authenticate_gateway_principal(conn: psycopg.Connection, raw_token: str) -> tuple[str, str]:
-    """Resolve ``(token_id, tenant_id)`` for a session or raise — fail-closed.
+def authenticate_gateway_principal(
+    conn: psycopg.Connection, raw_token: str
+) -> tuple[str, str, int | None, int | None]:
+    """``(token_id, tenant_id, authorize_rpm, proxy_rpm)`` pour un appelant, ou lève.
+
+    Les deux débits voyagent avec le principal parce qu'ils se lisent dans la **même**
+    requête : c'est la seule forme qui applique le débit du palier sans ajouter un
+    aller-retour SQL sur un chemin que l'agent emprunte à chaque appel.
+
+    `authenticate_gateway_session` — la porte MCP — ne change pas : elle parle stdio,
+    elle n'a pas de limiteur HTTP, et l'élargir déplacerait `mcp.autorise` dans
+    `perf/overhead.json` pour rien.
 
     Raises:
         PermissionError: if the token is missing, unknown, or revoked.
     """
-    principal = resolve_principal(conn, raw_token)
+    principal = resolve_principal_and_debits(conn, raw_token)
     if principal is None:
         raise PermissionError("invalid or missing tenant token")
     conn.execute(

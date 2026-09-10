@@ -12,6 +12,7 @@ gateway, xSOM does not execute the action here — enforcement is **cooperative*
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -22,6 +23,7 @@ import psycopg
 from core import approvals, audit, db, entitlements, risk, trust
 from core.entitlements import Capability, Meter, Metric
 from core.judge import Judge, resolve_ambiguous
+from core.metrics import registre
 from core.notify import Notifier
 from core.policy import Approval, Policy, PolicyOutcome, evaluate, service_down_verdict
 
@@ -58,6 +60,7 @@ def _audit(
     client_request_id: str | None = None,
     constraint_reason: str | None = None,
     usage_metric: str | None = None,
+    decision_ms: int | None = None,
 ) -> bool:
     """Écrit la ligne. Rend `False` si elle n'a pas pu l'être.
 
@@ -86,9 +89,17 @@ def _audit(
             client_request_id=client_request_id,
             constraint_reason=constraint_reason,
             usage_metric=usage_metric,
+            decision_ms=decision_ms,
         )
     except Exception:
         logger.warning("audit_write_failed", extra={"tool": tool, "decision": decision})
+        # **La perte de preuve doit se voir de loin.** Elle ne laissait qu'une ligne de
+        # journal applicatif, c'est-à-dire rien qu'un exploitant puisse mettre sous
+        # alerte. C'est pourtant la seule panne du produit qui touche sa revendication
+        # centrale (§4.2), et l'appelant y répond déjà par un refus.
+        registre.compter(
+            "xsom_audit_failures_total", ingress=audit.Ingress.authorize_api.value, stage="decision"
+        )
         return False
     return True
 
@@ -136,6 +147,9 @@ def authorize(
     is stored as a *declared* value: nothing verifies it, so it never becomes the
     audit entry's identity (FR-161).
     """
+    # Le chronomètre de la garde. Il démarre avant l'évaluation de policy — c'est
+    # déjà du travail que l'appelant paie parce que xSOM est sur le chemin.
+    depuis = time.monotonic()
     outcome = evaluate(policy, tool, arguments)
 
     # **Le droit du tenant, lu une fois, jamais mis en cache.** Il décide de deux
@@ -241,6 +255,14 @@ def authorize(
         outcome = entitlements.tighten(outcome, policy, reason=etat)
     contrainte = f"plan_{etat.value}" if etat in (Meter.capped, Meter.unknown) else None
 
+    # **Le verdict est définitif : le chronomètre de la garde s'arrête ici.**
+    #
+    # Une seule mesure pour les cinq issues de cette fonction. Sur cette porte le
+    # produit ne relaie rien — il rend un verdict —, donc mesurer à l'écriture aurait
+    # donné à peu près la même chose ; « à peu près » est précisément ce qu'on ne veut
+    # pas d'un chiffre publié, et la porte MCP, elle, n'a pas ce luxe.
+    cout = audit.cout_de_garde(depuis)
+
     ah = approvals.args_hash(arguments)
 
     if outcome.decision is Approval.auto:
@@ -259,6 +281,7 @@ def authorize(
             client_request_id=client_request_id,
             constraint_reason=contrainte,
             usage_metric=Metric.decisions.value,
+            decision_ms=cout,
         )
         if not ecrit:
             # **Prouver avant d'autoriser, ici aussi.** Le lot 2 l'a fait sur la
@@ -291,6 +314,7 @@ def authorize(
             client_request_id=client_request_id,
             constraint_reason=contrainte,
             usage_metric=Metric.decisions.value,
+            decision_ms=cout,
         )
         if not ecrit:
             return {
@@ -321,6 +345,7 @@ def authorize(
             client_request_id=client_request_id,
             constraint_reason=contrainte,
             usage_metric=None,
+            decision_ms=cout,
         )
         return {"decision": "deny", "action_class": _class(outcome), "reason": outcome.reason}
 
@@ -340,6 +365,7 @@ def authorize(
             notifier=notifier,
             gateway_token_id=gateway_token_id,
             client_request_id=client_request_id,
+            decision_ms=cout,
         )
     except Exception:
         # Approval service unavailable. The cooperative contract is that the agent
@@ -362,6 +388,7 @@ def authorize(
                 args_hash=ah,
                 gateway_token_id=gateway_token_id,
                 client_request_id=client_request_id,
+                decision_ms=cout,
             )
         except Exception:  # the audit store may be the thing that is down
             logger.warning("audit_write_failed", extra={"tool": tool})
@@ -386,6 +413,9 @@ def _hold_for_humans(
     notifier: Notifier | None,
     gateway_token_id: str | None,
     client_request_id: str | None = None,
+    #: Mesuré par l'appelant, au verdict. Ici l'attente d'un humain a déjà commencé,
+    #: et une attente d'humain n'est pas un coût que la garde ajoute.
+    decision_ms: int | None = None,
 ) -> dict[str, Any]:
     """Create or resume the approval for a held action. Raises if the store is down."""
     with db.connection(database_url) as conn:
@@ -425,6 +455,7 @@ def _hold_for_humans(
                 args_hash=ah,
                 gateway_token_id=gateway_token_id,
                 client_request_id=client_request_id,
+                decision_ms=decision_ms,
             )
             _notify(notifier, record.id, summary, record.expires_at.isoformat())
             return _hold(record.id, record.action_class, summary)
@@ -432,7 +463,9 @@ def _hold_for_humans(
         if record.status == "pending":
             return _hold(record.id, record.action_class, str(record.dry_run.get("summary", "")))
 
-        return _resolve_terminal(database_url, conn, tenant_id, record, gateway_token_id)
+        return _resolve_terminal(
+            database_url, conn, tenant_id, record, gateway_token_id, decision_ms
+        )
 
 
 def poll(
@@ -443,6 +476,10 @@ def poll(
     gateway_token_id: str | None = None,
 ) -> dict[str, Any] | None:
     """Current verdict for a held action; None if the approval is unknown to the tenant."""
+    # `poll` est une requête à part entière, donc son propre coût de garde. Reprendre
+    # celui d'`authorize` ferait remonter dans l'histogramme le temps qu'un humain a
+    # mis à cliquer, sous le nom de ce que la garde coûte.
+    depuis = time.monotonic()
     with db.connection(database_url) as conn:
         record = approvals.get(conn, tenant_id, approval_id)
         if record is None:
@@ -451,7 +488,9 @@ def poll(
         conn.commit()
         if record.status == "pending":
             return _hold(record.id, record.action_class, str(record.dry_run.get("summary", "")))
-        return _resolve_terminal(database_url, conn, tenant_id, record, gateway_token_id)
+        return _resolve_terminal(
+            database_url, conn, tenant_id, record, gateway_token_id, audit.cout_de_garde(depuis)
+        )
 
 
 def _hold(approval_id: str, action_class: str | None, summary: str) -> dict[str, Any]:
@@ -471,6 +510,7 @@ def _resolve_terminal(
     tenant_id: str,
     record: approvals.ApprovalRecord,
     gateway_token_id: str | None = None,
+    decision_ms: int | None = None,
 ) -> dict[str, Any]:
     audit_decision, verdict = _TERMINAL[record.status]
     # No `client_request_id` here, deliberately: this row is written when a *poll*
@@ -492,6 +532,7 @@ def _resolve_terminal(
             # sur le seul champ qui dit qui a autorisé une action irréversible.
             user_id=record.decided_by,
             gateway_token_id=gateway_token_id,
+            decision_ms=decision_ms,
         )
     else:
         conn.commit()

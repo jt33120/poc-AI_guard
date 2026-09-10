@@ -26,7 +26,7 @@ from fastapi import FastAPI
 from fastapi.routing import APIRoute
 from starlette.routing import Route
 
-from api import gateway_auth, security
+from api import gateway_auth, ops, security
 from api.main import create_app
 from core.config import Settings
 
@@ -35,8 +35,21 @@ from core.config import Settings
 #: reconnu par aucune heuristique de mots-clés, et un garde qui rate un
 #: authentificateur classe une route protégée comme publique — puis exige qu'on
 #: l'inscrive dans l'allowlist, ce qui grave l'erreur.
+#:
+#: Cinq désormais, et les deux ajouts corrigent chacun une classification fausse.
+#: `get_gateway_principal_from_path` authentifie les deux routes du proxy dont le jeton
+#: voyage dans le **chemin** : elles le faisaient dans le corps, invisiblement pour ce
+#: garde, et figuraient donc dans l'allowlist ci-dessous — l'erreur gravée que le
+#: paragraphe précédent décrit. `require_ops_reader` tient le relevé d'exploitation, et
+#: il a été écrit comme dépendance **pour** être vu ici.
 _AUTHENTICATORS = frozenset(
-    {security.get_current_user, security.get_ai_reader, gateway_auth.get_gateway_principal}
+    {
+        security.get_current_user,
+        security.get_ai_reader,
+        gateway_auth.get_gateway_principal,
+        gateway_auth.get_gateway_principal_from_path,
+        ops.require_ops_reader,
+    }
 )
 
 #: La surface non authentifiée, gelée. Chaque entrée porte sa raison d'exister.
@@ -51,12 +64,11 @@ _PUBLIC = frozenset(
         # adresse pour lire une liste de menaces. En lecture seule d'un artefact déjà
         # committé — aucune base, aucune donnée personnelle, aucune écriture.
         ("GET", "/v1/threats"),
-        # Les deux routes du proxy LLM s'authentifient **dans le handler**, par le
-        # jeton porté dans le chemin : la dépendance FastAPI ne peut pas le faire,
-        # le jeton n'étant pas un en-tête. Elles sont publiques au sens de ce garde
-        # et ne le sont pas au sens du produit.
-        ("POST", "/proxy/{provider}/{token}/v1/chat/completions"),
-        ("POST", "/proxy/anthropic/{token}/v1/messages"),
+        # Les deux routes du proxy à jeton dans le chemin ne sont plus ici : elles
+        # s'authentifiaient dans le handler, ce garde ne pouvait pas le voir, et
+        # l'allowlist gravait une route protégée comme publique. Elles passent par
+        # `get_gateway_principal_from_path`, une vraie dépendance — que ce garde
+        # reconnaît, et qui s'exécute avant le limiteur de débit par surcroît.
     }
 )
 

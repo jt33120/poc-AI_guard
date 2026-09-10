@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -19,6 +20,7 @@ from typing import Any
 import psycopg
 
 from core.export import is_summarised
+from core.metrics import registre
 
 logger = logging.getLogger("xsom.audit")
 
@@ -134,6 +136,27 @@ def _bounded(value: object | None) -> str | None:
     return text if len(text) <= MAX_FIELD else text[: MAX_FIELD - 1] + "\u2026"
 
 
+def cout_de_garde(depuis: float) -> int:
+    """Millisecondes passées dans la garde, à l'instant où le verdict est atteint.
+
+    Une seule implémentation pour les trois portes, et c'est le point. Chacune
+    mesurait déjà quelque chose sous le nom `latency_ms` — l'outil aval sur la
+    passerelle, le fournisseur sur le proxy —, c'est-à-dire des durées que xSOM
+    **subit**. `decision_ms` est la durée que xSOM **produit**, et trois expressions
+    recopiées auraient fini par mesurer trois choses différentes sous un même nom de
+    colonne, ce qui est pire que de ne pas mesurer.
+
+    **À appeler au moment du verdict, jamais au moment de l'écriture.** Plusieurs
+    sites d'audit du produit écrivent leur ligne *après* avoir relayé l'appel, pour
+    pouvoir renseigner `latency_ms`. Mesurer là compterait l'aval une seconde fois,
+    sous un nom qui promet le contraire.
+
+    Bornée à zéro : `time.monotonic()` ne recule pas, mais un `max` coûte moins cher
+    qu'une valeur négative à expliquer dans un histogramme.
+    """
+    return max(0, int((time.monotonic() - depuis) * 1000))
+
+
 def canonical_ts(value: datetime) -> str:
     """La représentation canonique de l'horodatage dans la charge v1.
 
@@ -234,6 +257,12 @@ def log_event(
     #: sauvegarde, pour qu'une écriture de facturation ne puisse jamais faire perdre
     #: une écriture de preuve (§4.2).
     usage_metric: str | None = None,
+    #: Millisecondes passées **dans la garde**, de la réception de l'appel au verdict.
+    #: À ne pas confondre avec `latency_ms`, qui mesure ce que la garde *attend* —
+    #: l'outil aval, ou le fournisseur de modèle. Colonne ANNEXE (`0031`) : hors
+    #: `payload_v1`, sinon chaque entrée déjà écrite deviendrait invérifiable, et la
+    #: vérifiabilité dépendrait de la vitesse de la machine.
+    decision_ms: int | None = None,
 ) -> str:
     """Append one hash-chained audit entry for a decision. Returns its entry_hash.
 
@@ -287,9 +316,9 @@ def log_event(
             "(ts, tenant_id, user_id, request_id, tool_name, action_class, decision, "
             " policy_rule_id, judge_used, args_hash, latency_ms, error, gateway_token_id, "
             " client_request_id, upstream_request_id, ingress, enforcement_mode, "
-            " prev_hash, entry_hash, constraint_reason) "
+            " prev_hash, entry_hash, constraint_reason, decision_ms) "
             "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
-            "%s)",
+            "%s, %s)",
             (
                 ts,
                 tenant_id,
@@ -311,12 +340,29 @@ def log_event(
                 prev_hash,
                 entry_hash,
                 _bounded(constraint_reason),
+                decision_ms,
             ),
         )
         if usage_metric is not None:
             # Après l'insertion, et sous point de sauvegarde : la preuve est déjà
             # écrite quand le compteur s'exécute, et son échec ne peut rien lui faire.
             _debiter(conn, tenant_id, usage_metric)
+    # **Après le commit, et c'est tout l'intérêt du site.** Les trois portes du produit
+    # convergent ici et nulle part ailleurs ; instrumenter ce point rend la mesure
+    # complète par construction, y compris pour un verdict calculé ou lu en base
+    # qu'aucun balayage du code ne retrouverait. Et compter après l'écriture veut dire
+    # que le compteur ne peut pas annoncer une décision que la base a refusée.
+    #
+    # Aucune étiquette ne nomme le tenant, l'agent ni l'outil : voir l'en-tête de
+    # `core/metrics.py`. Les trois retenues viennent de vocabulaires fermés.
+    registre.compter(
+        "xsom_decisions_total",
+        decision=decision,
+        ingress=origin.ingress.value,
+        enforcement_mode=origin.enforcement_mode.value,
+    )
+    if decision_ms is not None:
+        registre.observer("xsom_decision_ms", decision_ms, ingress=origin.ingress.value)
     return entry_hash
 
 

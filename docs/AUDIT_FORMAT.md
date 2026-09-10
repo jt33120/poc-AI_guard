@@ -101,13 +101,53 @@ existantes, et elles ne sont pas attestées par la chaîne non plus.
 | `upstream_request_id` | **déclaré par le fournisseur LLM** |
 | `ingress` | dérivé serveur — par quelle porte |
 | `enforcement_mode` | dérivé serveur — `enforcing` / `observing` |
+| `constraint_reason` | dérivé serveur — pourquoi le verdict a été resserré hors policy (`plan_capped`, `plan_unknown`) |
+| `decision_ms` | dérivé serveur — millisecondes passées **dans la garde**, du début de l'appel au verdict |
 
 La distinction déclaré/dérivé est le sujet de `FR-161` : une valeur qu'un tiers
 choisit ne peut pas servir de preuve, donc elle est stockée à côté de la preuve et
 non dedans.
 
+`decision_ms` n'entre pas dans la charge pour une raison de plus que les autres : une
+durée est la seule colonne de cette table qui ne se reproduit pas à l'identique d'une
+exécution à l'autre. La hacher ferait dépendre la vérifiabilité de la vitesse de la
+machine. Elle se distingue de `latency_ms`, qui est **dans** la charge et mesure ce que
+la garde *attend* — l'outil aval, ou le fournisseur de modèle. `0` veut dire « mesuré,
+sous la milliseconde » ; `null` veut dire « pas mesuré ».
+
+## Le témoin de la chaîne (`audit_checkpoints`)
+
+La chaîne prouve qu'aucune ligne n'a été **modifiée**. Elle ne prouve pas qu'aucune
+n'a été **retirée en queue** : le préfixe restant est parfaitement cohérent, et
+`verify_chain` sur une table vide rend `ok=True, count=0`. Aucune garantie interne à
+la base ne ferme ce trou — le backend est propriétaire des tables, donc il peut
+désactiver les triggers de `0005`/`0028`.
+
+`audit_checkpoints` (`0032`) écrit donc, à une date, ce que la chaîne d'un tenant
+contenait : `entries`, `last_audit_id`, `last_entry_hash`. La ligne est signée
+**Ed25519** et porte sa clé **publique** ; la clé privée est lue dans l'environnement
+du processus et aucune colonne de la table ne peut la contenir. N'importe qui peut donc
+recalculer l'empreinte depuis `audit_log` et vérifier la signature sans nous.
+
+L'empreinte signée est un `sha256` de la même sérialisation canonique que la charge v1
+(`sort_keys=True, separators=(",", ":")`), sur : `tenant_id`, `entries`,
+`last_audit_id`, `last_entry_hash`, `at` (forme `canonical_ts`), `algorithm`, `key_id`,
+`public_key`. La clé publique y entre pour que la remplacer invalide la signature.
+
+Les témoins se chaînent entre eux (`prev_hash` / `entry_hash`, mêmes primitives), sinon
+il suffirait de supprimer le témoin gênant plutôt que des entrées.
+
+**Ce que le témoin n'achète pas.** L'indépendance ne vient pas de l'algorithme mais de
+la **garde** de la clé privée. `CHECKPOINT_KEY_CUSTODY` la fait déclarer, et
+`core/compliance.verification_independence` ne publie `independent: true` que lorsque
+la clé est déclarée hors de l'hôte de la base. C'est la seconde moitié de `FR-169`, et
+elle est déclarative parce qu'aucun code ne peut constater où un opérateur range un
+secret.
+
 ## Où c'est implémenté
 
 * `core/audit.py` — `canonical_ts`, `payload_v1`, `compute_entry_hash`, `verify_chain`.
+* `core/checkpoints.py` — `entry_digest`, `record`, `verify`, `build_signer`.
 * `tests/test_audit_format.py` — les vecteurs dorés, écrits en dur.
+* `tests/test_checkpoints.py` — le témoin, et ce qu'il détecte que la chaîne ne voit pas.
 * `docs/SPEC.md` §9 — la formule, dont ce fichier est le détail normatif.

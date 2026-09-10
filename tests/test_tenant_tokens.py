@@ -127,5 +127,11 @@ def test_the_cooperative_path_is_not_gated(db: DBHandle) -> None:
     passer, parce que les deux fonctions se ressemblent.
     """
     tenant_id, raw = _seed_token(db.conn)  # non accordé
-    token_id, resolu = authenticate_gateway_principal(db.conn, raw)
+    # Et les deux débits du palier voyagent avec le principal, lus dans la MÊME
+    # requête : c'est la seule forme qui applique `authorize_rpm` / `proxy_rpm` sans
+    # ajouter un aller-retour SQL au chemin que l'agent emprunte à chaque appel.
+    token_id, resolu, authorize_rpm, proxy_rpm = authenticate_gateway_principal(db.conn, raw)
     assert resolu == tenant_id and token_id
+    # Les chiffres du palier `entreprise`, que `tests/conftest.py` impose par défaut à
+    # tout tenant de la suite — pas un repli maison, pas la chaîne de configuration.
+    assert (authorize_rpm, proxy_rpm) == (3000, 6000)

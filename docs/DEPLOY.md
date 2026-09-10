@@ -74,15 +74,30 @@ never automatic — it cannot happen as a side effect of a container start.
 
 ### 3. Control API
 
-Build the repository `Dockerfile` (`railway.json` configures Railway; any
-container host works). Healthcheck: **`GET /health/ready`**.
+Build the repository `Dockerfile` (any container host works). Healthcheck:
+**`GET /health/ready`** — and you have to set it **on the service**, by hand.
 
-> `railway.json` used to point at `/health`, which is a static `{"status":"ok"}`
-> that touches nothing. A container with a wrong `DATABASE_URL`, a paused
-> database, or migrations behind the bundled head passed that check, was
-> promoted, and stayed in rotation — `restartPolicyType: ON_FAILURE` never fires,
-> because the process is perfectly alive. `/health/ready` is the probe that reads
-> the gates, and it was wired only into `docker-compose.yml`.
+> `/health` is a static `{"status":"ok"}` that touches nothing. A container with a
+> wrong `DATABASE_URL`, a paused database, or migrations behind the bundled head
+> passes that check, is promoted, and stays in rotation — `restartPolicyType:
+> ON_FAILURE` never fires, because the process is perfectly alive. `/health/ready`
+> is the probe that reads the gates.
+
+> **Measured on 2026-09-10, and it cost two failed builds to find.** The repository
+> ships a `railway.json` that declares the Dockerfile builder and this healthcheck.
+> Railway has **deprecated** config-as-code (`railway.json` / `railway.toml`) in
+> favour of `.railway/railway.ts`, so that file is no longer read: the production
+> service was running on the dashboard defaults — Railpack, and `/health`. A file
+> that declares a guarantee nobody reads is worse than no file at all, because it
+> makes the question look settled. Read each service's own settings; do not assume
+> the repository configures them.
+
+> Railpack, the default builder, does **not** find this project's entry point on its
+> own — it detects Python and uv, then fails the build with "No start command
+> detected". Set the start command explicitly on each service:
+> `python -m uvicorn $ASGI_APP --host 0.0.0.0 --port $PORT`, with `ASGI_APP` naming
+> the plane (below). It is the same variable the image's own `CMD` reads, so the two
+> paths cannot drift.
 
 | Var | Value | Notes |
 |---|---|---|
@@ -96,6 +111,10 @@ container host works). Healthcheck: **`GET /health/ready`**.
 | `MISTRAL_API_KEY` | _(optional)_ | LLM judge + compliance narratives. Absent ⇒ judge off and ambiguous tools escalate to a human (fail-closed). |
 | `SMTP_*` / `APPROVAL_NOTIFY_TO` | _(optional)_ | HITL approval emails. Absent ⇒ reviewers watch the queue in the console. |
 | `SENTRY_DSN` | _(optional)_ | Error reporting. |
+| `OPS_METRICS_TOKEN` | _(optional)_ | Bearer token a scraper presents to `GET /v1/ops/metrics` (Prometheus text). Unset ⇒ that route answers **404**: a traffic readout tells an anonymous caller which deployment is worth attacking. Counters are per process, in memory, and never carry a tenant, agent or tool name. |
+| `CHECKPOINT_SIGNING_KEY` | _(optional)_ | Ed25519 seed, base64, 32 bytes (`openssl rand -base64 32`). Signs the witnesses of `audit_checkpoints`. Unset ⇒ no witness is taken, and the evidence pack keeps saying so. The seed never enters the database: only the derived **public** key is written, which is what lets a third party verify without asking you. |
+| `CHECKPOINT_KEY_CUSTODY` | `same_host` \| `separate_host` \| `kms` | Where you keep that seed. Declarative — no code can observe where an operator stores a secret — and it is the half of `FR-169` that decides whether the pack may call its verification *independent*. Unset reads as `same_host`, so the pack never over-promises. |
+| `AI_TRACES_RATE_LIMIT` | _(optional)_ | Guard on `POST /v1/ai-traces` (OTLP ingest). Its own setting: the proxy ceiling below is now sized for the top plan, and sharing it would multiply this route's only guard by 25. |
 | `FORWARDED_ALLOW_IPS` | _(your edge's address)_ — on Railway, `100.64.0.0/10` | Only needed behind an edge, and only for the public routes. uvicorn rewrites the client address from `X-Forwarded-For` only when the immediate peer is in this list, whose default is `127.0.0.1` — never an edge. See the security checklist for what unset and `*` each cost. |
 
 Everything else has a working default; `.env.example` documents each one and what
@@ -111,6 +130,57 @@ leaving it empty turns off.
 Verify: `curl https://<your-backend-host>/health/ready` ⇒ four booleans, all
 true. `/health` answers `{"status":"ok"}` whatever the state of the deployment,
 so it proves only that a process is listening.
+
+#### Optional: one image, three services
+
+The same image serves four *planes*, chosen by `ASGI_APP`. Splitting them is optional
+— the default `api.main:app` mounts everything, which is what a single-service
+deployment wants — and it buys one thing: a failed deploy on a console screen can no
+longer take the fleet's authorization path down with it.
+
+| Service | `ASGI_APP` | Serves | Does **not** need |
+|---|---|---|---|
+| decision | `api.decision:app` | `POST /v1/authorize` — the agent's hot path | `SUPABASE_SERVICE_ROLE_KEY`; no JWT is verified here |
+| llm | `api.llm:app` | `/proxy/*` — one call per model call | `SUPABASE_SERVICE_ROLE_KEY` |
+| console | `api.console:app` | the twenty-three console routers | — |
+
+Every plane serves `/health`, `/health/ready` and `/v1/ops/metrics`, so each service
+has its own probe and its own readout. That last point is not a detail: the counters
+live **in the process that answers**, so a readout mounted on the console alone would
+say nothing about either hot path.
+
+Give each service the same `DATABASE_URL`; Railway's `${{<service>.DATABASE_URL}}`
+reference keeps one copy of the secret. Run `python -m cli migrate` as a pre-deploy
+step on **one** service only — the runner takes an advisory lock, so concurrent
+replicas are safe, but there is nothing to gain from three of them racing.
+
+Readiness is per plane: the `decision` service does not verify JWTs, so a JWKS outage
+no longer sends the hot path red for a dependency it never calls.
+
+### 3b. Witness the audit chain (optional, recommended)
+
+The hash chain proves no row was **edited**. It cannot prove none was **removed**: a
+truncated prefix is perfectly consistent, and on an empty table `verify_chain` returns
+`ok=True, count=0`. The triggers of `0005`/`0028` stop an accident and an injection;
+they do not stop whoever can disable them, and the backend owns the tables.
+
+A witness is the sentence that was missing — *at time T this tenant's chain held N
+entries and ended with H* — signed with a key whose private half is never stored in
+the database:
+
+```bash
+DATABASE_URL="<your dsn>" CHECKPOINT_SIGNING_KEY="<base64 seed>" \
+  uv run python -m cli checkpoint take      # on a schedule; hourly is plenty
+DATABASE_URL="<your dsn>" uv run python -m cli checkpoint verify
+```
+
+`verify` needs no key: each row carries the **public** key it was signed with, so a
+regulator, an auditor or the customer can repeat the check without you. It exits
+non-zero when the journal no longer contains what a witness attested.
+
+Set `CHECKPOINT_KEY_CUSTODY` honestly. A key kept on the database host buys
+tamper-evidence, not independence — whoever takes the host takes both — and the
+evidence pack says exactly that rather than letting a reader assume otherwise.
 
 ### 4. Console
 

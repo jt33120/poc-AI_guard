@@ -31,7 +31,7 @@ import psycopg
 from pydantic import ValidationError
 from pydantic_settings import SettingsError
 
-from core import db, migrate, secrets, shadow_ai, signup, tenant_tokens, triage
+from core import checkpoints, db, migrate, secrets, shadow_ai, signup, tenant_tokens, triage
 from core.config import Settings, get_settings
 from core.notify import SmtpNotifier, build_notifier
 from core.schemas import SignupRequest
@@ -376,6 +376,69 @@ def cmd_token(settings: Settings, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_checkpoint(settings: Settings, args: argparse.Namespace) -> int:
+    """Poser ou vérifier les témoins signés de la chaîne d'audit (`FR-169`).
+
+    Destinée à une tâche périodique — une fois par heure suffit, la valeur du témoin
+    tient à sa **date**, pas à sa fréquence. Poser un témoin ne modifie rien : c'est
+    une ligne de plus dans une table append-only, et elle refuse de s'écrire si la
+    chaîne qu'elle attesterait est déjà rompue.
+    """
+    signer = checkpoints.build_signer(settings)
+    if args.action == "take" and signer is None:
+        raise CliError(
+            "no checkpoint signing key configured.\n"
+            "  fix: set CHECKPOINT_SIGNING_KEY to 32 random bytes in base64 "
+            "(`openssl rand -base64 32`), and CHECKPOINT_KEY_CUSTODY to say where you "
+            "keep it. Without a key, nothing witnesses the chain and a tail deletion "
+            "stays invisible."
+        )
+
+    with _connect(settings) as conn, _db_errors(f"checkpoint {args.action} failed"):
+        tenants = (
+            [_uuid(args.tenant, "tenant")]
+            if args.tenant
+            else [str(r[0]) for r in conn.execute("select id from tenants order by id").fetchall()]
+        )
+        if not tenants:
+            print("no tenant to checkpoint")
+            return 0
+
+        if args.action == "take" and signer is not None:
+            for tenant_id in tenants:
+                try:
+                    temoin = checkpoints.record(conn, tenant_id=tenant_id, signer=signer)
+                except checkpoints.CheckpointError as exc:
+                    # Un tenant dont la chaîne est déjà rompue ne doit pas empêcher
+                    # d'attester les autres : c'est précisément le moment où les
+                    # témoins des voisins comptent.
+                    print(f"[FAIL] {tenant_id}  {exc}")
+                    continue
+                conn.commit()
+                print(
+                    f"[OK  ] {tenant_id}  {temoin.entries} entries  "
+                    f"upto={temoin.last_audit_id}  key={temoin.key_id[:16]}"
+                )
+            return 0
+
+        rompus = 0
+        for tenant_id in tenants:
+            verdict = checkpoints.verify(conn, tenant_id)
+            if not verdict.attested:
+                print(f"[WARN] {tenant_id}  no checkpoint yet — nothing witnesses this chain")
+                continue
+            if verdict.ok:
+                print(f"[OK  ] {tenant_id}  {verdict.checkpoints} checkpoint(s) agree")
+                continue
+            rompus += 1
+            print(f"[FAIL] {tenant_id}  {verdict.detail}")
+        if rompus:
+            print(f"\ncheckpoint: {rompus} tenant(s) BROKEN — the journal lost attested entries")
+            return 1
+        print("\ncheckpoint: every witness agrees with the journal")
+    return 0
+
+
 # ---------------------------------------------------------------------------
 # doctor
 # ---------------------------------------------------------------------------
@@ -644,6 +707,83 @@ def _check_forwarded_allow_ips() -> list[Check]:
     return [Check("OK", "ratelimit.forwarded", f"edge de confiance déclaré ({valeur})")]
 
 
+def _check_debit_ceiling(settings: Settings) -> list[Check]:
+    """Le plafond d'infrastructure bride-t-il en silence ce qui a été vendu ?
+
+    `plan_limits` publie `authorize_rpm` et `proxy_rpm` par palier, et `api/ratelimit.py`
+    compose la limite du palier **avec** ce plafond : la plus stricte gagne. Un plafond
+    resté sous le plus haut palier bride donc les clients qui ont payé le plus, sans
+    rien casser — la route répond, le 429 arrive, tout a l'air normal. C'est le mode de
+    panne que ce contrôle existe pour rendre visible.
+
+    Lu depuis la **grille publiée** et non depuis une constante recopiée ici : deux
+    listes finissent par diverger, et c'est la grille qui fait foi devant le client.
+    """
+    plafonds = {
+        "authorize_rpm": settings.authorize_rate_limit,
+        "proxy_rpm": settings.llm_proxy_rate_limit,
+    }
+    try:
+        with _connect(settings) as conn:
+            vendus = {
+                str(r[0]): int(r[1])
+                for r in conn.execute(
+                    "select metric, max(limit_value) from plan_limits "
+                    "where metric = any(%s) group by metric",
+                    (list(plafonds),),
+                ).fetchall()
+            }
+    except (CliError, psycopg.Error) as exc:
+        return [Check("WARN", "ratelimit.ceiling", f"could not read plan_limits: {_reason(exc)}")]
+
+    checks: list[Check] = []
+    for metric, chaine in plafonds.items():
+        vendu = vendus.get(metric)
+        if vendu is None:
+            continue
+        applique = _par_minute(chaine)
+        if applique is None:
+            checks.append(
+                Check("WARN", f"ratelimit.{metric}", f"unreadable rate-limit string: {chaine!r}")
+            )
+        elif applique < vendu:
+            checks.append(
+                Check(
+                    "FAIL",
+                    f"ratelimit.{metric}",
+                    f"infrastructure ceiling is {applique}/min but the top plan sells {vendu}/min",
+                    f"raise it to at least {vendu}/minute, or stop selling that tier — "
+                    "as it stands the customer is throttled below what they paid for, "
+                    "and nothing errors.",
+                )
+            )
+        else:
+            checks.append(
+                Check(
+                    "OK",
+                    f"ratelimit.{metric}",
+                    f"ceiling {applique}/min >= top plan {vendu}/min",
+                )
+            )
+    return checks
+
+
+def _par_minute(chaine: str) -> int | None:
+    """`"3000/minute"` -> 3000. Les autres périodes ne sont pas comparées, faute de sens.
+
+    Rendre `None` plutôt que de convertir une heure en minutes : un plafond horaire sur
+    ces deux routes serait une décision assez inhabituelle pour mériter d'être vue, pas
+    devinée.
+    """
+    compte, _, periode = chaine.strip().partition("/")
+    if periode.strip().lower() not in ("minute", "min", "m", "1 minute"):
+        return None
+    try:
+        return int(compte.strip())
+    except ValueError:
+        return None
+
+
 def _check_ports() -> list[Check]:
     """`DEP-10` : nommer une collision de port comme un échec diagnosticable.
 
@@ -712,6 +852,7 @@ def cmd_doctor(settings: Settings, args: argparse.Namespace) -> int:
         *_check_capabilities(settings),
         *_check_hardening(settings),
         *_check_forwarded_allow_ips(),
+        *_check_debit_ceiling(settings),
         *_check_ports(),
     ]
     for check in checks:
@@ -818,6 +959,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("doctor", help="diagnose this deployment and print what to fix")
 
+    checkpoint_cmd = sub.add_parser(
+        "checkpoint", help="witness the audit chain, or check the journal against its witnesses"
+    )
+    checkpoint_sub = checkpoint_cmd.add_subparsers(dest="action", required=True)
+    take_cmd = checkpoint_sub.add_parser(
+        "take", help="sign a witness of the chain's current state (run this on a schedule)"
+    )
+    take_cmd.add_argument("--tenant", help="one tenant; omit for every tenant")
+    verify_cmd = checkpoint_sub.add_parser(
+        "verify", help="does the journal still contain what its witnesses attested?"
+    )
+    verify_cmd.add_argument("--tenant", help="one tenant; omit for every tenant")
+
     triage_cmd = sub.add_parser(
         "triage", help="position a client on the usage profiles and print what concerns them"
     )
@@ -906,6 +1060,7 @@ _COMMANDS = {
     "doctor": cmd_doctor,
     "triage": cmd_triage,
     "shadow-ai": cmd_shadow_ai,
+    "checkpoint": cmd_checkpoint,
 }
 
 

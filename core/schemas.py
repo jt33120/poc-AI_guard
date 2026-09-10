@@ -703,6 +703,16 @@ class ComplianceStatus(BaseModel):
     #: effacement, pas un démarrage. `chain_ok` reste vrai : c'est bien la chaîne
     #: qui est cohérente, et c'est précisément ce qui rendait l'état invisible.
     journal_missing: bool
+    #: Un témoin signé existe-t-il pour ce tenant (`FR-169`) ? `False` veut dire que
+    #: **rien n'a jamais attesté** cette chaîne : la vérification reste une
+    #: auto-vérification, et une suppression de queue y est invisible.
+    witnessed: bool
+    #: Les témoins concordent-ils avec le journal actuel ? Sans témoin, `True` par
+    #: vacuité — la question ne se pose pas encore.
+    witness_ok: bool
+    #: Le journal a **perdu** des entrées qu'un témoin attestait. C'est le seul état
+    #: de cette liste qu'aucune garantie interne à la base ne pouvait détecter.
+    entries_lost: bool
     oversight_gated: int
     oversight_auto_allowed: int
     oversight_coverage_ok: bool

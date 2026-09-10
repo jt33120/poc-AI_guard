@@ -82,6 +82,11 @@ def export_evidence_pack(
             approvals=supervision,
             retention_floor_days=floor,
             narrator=_narrator(request),
+            # `FR-169` : le pack doit pouvoir dire s'il existe un témoin signé, et où
+            # la clé qui le signe est **déclarée** vivre. Sans les réglages, il retombe
+            # sur l'aveu d'avant ce lot — « aucun témoin configuré » —, ce qui reste
+            # honnête mais serait faux dès qu'une clé est posée.
+            settings=request.app.state.settings,
         )
     if render == "pdf":
         pdf = export.render_pdf(pack)
