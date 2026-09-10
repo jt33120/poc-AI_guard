@@ -39,6 +39,7 @@ from core.logging import configure_logging
 from core.notify import Notifier
 from core.observability import init_observability
 from core.policy import (
+    CLASSES_RISQUEES,
     ActionClass,
     Approval,
     Policy,
@@ -153,13 +154,26 @@ class PolicyBackend:
         return await self._screen_tools(tools)
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> types.CallToolResult:
+        resolved = await self._proxy.resolve(name)
+        canonical = f"{resolved[0]}.{resolved[1]}" if resolved else name
+
+        # La quarantaine d'intégrité, déplacée APRÈS la résolution du nom canonique.
+        #
+        # Elle était le seul des cinq gardes du fichier à ne laisser aucune ligne
+        # d'audit — RBAC, arrêt, taint et le filtrage de liste en écrivent une. Un
+        # outil dont l'empreinte a changé était refusé en silence.
+        #
+        # L'ordre importe : auditer sous `name` réintroduirait le défaut déjà corrigé
+        # plus bas, où la quarantaine disait « echo » et tout le reste « mock.echo »,
+        # si bien qu'un export filtré par outil manquait les quarantaines.
+        # `_integrity_blocks` continue de recevoir `name` : c'est la clé de son
+        # ensemble mémoire.
         if self._integrity_on:
             blocked = await self._integrity_blocks(name)
             if blocked is not None:
-                logger.info("tool_quarantined", extra={"tool": name, "reason": blocked})
-                return _denied_result(f"'{name}' quarantined by integrity guard: {blocked}")
-        resolved = await self._proxy.resolve(name)
-        canonical = f"{resolved[0]}.{resolved[1]}" if resolved else name
+                logger.info("tool_quarantined", extra={"tool": canonical, "reason": blocked})
+                self._audit_gate(canonical, "tool_quarantined", blocked)
+                return _denied_result(f"'{canonical}' quarantined by integrity guard: {blocked}")
 
         # Per-tool RBAC / confused-deputy guard: an agent outside a tool's client
         # allowlist can never invoke it, regardless of the action class (fail-closed).
@@ -243,18 +257,44 @@ class PolicyBackend:
         if outcome.decision in (Approval.auto, Approval.notify):
             # notify-and-proceed (M11) relays like auto but is recorded distinctly.
             decision = "allow" if outcome.decision is Approval.auto else "notify"
-            start = time.monotonic()
-            result = await self._proxy.call_tool(name, arguments)
-            latency_ms = int((time.monotonic() - start) * 1000)
-            self._audit(
-                decision,
-                canonical,
-                outcome,
-                arguments,
-                latency_ms=latency_ms,
-                request_id=uuid4().hex,
-                error="downstream_error" if result.isError else None,
-            )
+            request_id = uuid4().hex
+
+            # **Prouver avant d'agir, sur ce qui ne se défait pas.**
+            #
+            # L'ordre était : relayer, puis auditer — et `_audit` avalait l'échec
+            # d'écriture (« audit is best-effort; never break the call path »). Une
+            # base momentanément injoignable suffisait donc à ce qu'un virement
+            # parte sans laisser la moindre ligne, et rien ne le disait. C'est la
+            # revendication centrale du produit, fausse précisément dans le cas où
+            # elle compte.
+            #
+            # Sur les classes risquées, la preuve s'écrit d'abord et son échec
+            # refuse l'action (§4.2, §4.4). Le prix est `latency_ms`, qu'on ne peut
+            # pas connaître avant l'appel : perdre une mesure coûte moins cher que
+            # perdre la ligne. Les classes légères gardent l'ordre inverse et leur
+            # mesure — un `read` qu'on n'a pas pu auditer ne vaut pas qu'on refuse
+            # le service, et `CLASSES_RISQUEES` est la même liste que celle sur
+            # laquelle `service_down_verdict` refuse déjà.
+            if outcome.action_class in CLASSES_RISQUEES:
+                if not self._audit(decision, canonical, outcome, arguments, request_id=request_id):
+                    logger.warning(
+                        "denied_audit_unavailable",
+                        extra={"tool": canonical, "decision": decision},
+                    )
+                    return _denied_result(f"'{canonical}' denied: audit unavailable")
+                result = await self._proxy.call_tool(name, arguments)
+            else:
+                start = time.monotonic()
+                result = await self._proxy.call_tool(name, arguments)
+                self._audit(
+                    decision,
+                    canonical,
+                    outcome,
+                    arguments,
+                    latency_ms=int((time.monotonic() - start) * 1000),
+                    request_id=request_id,
+                    error="downstream_error" if result.isError else None,
+                )
             self._mark_taint(canonical, result)
             return result
         if outcome.decision is Approval.deny:
@@ -522,7 +562,12 @@ class PolicyBackend:
             # is the one path where a store failure loses a guard rather than
             # tightening one.
             logger.warning("taint_write_failed", extra={"tool": canonical, "reason": reason})
-        self._audit_gate(canonical, "taint_marked", reason)
+        else:
+            # Dans le `else`, jamais après le `try`. L'appel était inconditionnel :
+            # sur un journal append-only qu'on ne peut pas corriger, la chaîne
+            # attestait un garde qui n'avait pas eu lieu — et `core/export.py` le
+            # range en `guard_recorded` pour un régulateur.
+            self._audit_gate(canonical, "taint_marked", reason)
 
     def _audit_gate(self, tool_name: str, decision: str, reason: str | None) -> None:
         """Best-effort audit of a pre-policy gate decision (integrity / rbac)."""
@@ -555,10 +600,15 @@ class PolicyBackend:
         latency_ms: int | None = None,
         request_id: str | None = None,
         error: str | None = None,
-    ) -> None:
+    ) -> bool:
+        """Écrit la ligne d'audit. Rend `False` si elle n'a pas pu l'être.
+
+        Le retour est ce qui permet à l'appelant de refuser plutôt que de relayer :
+        avant, l'échec était avalé ici même et l'appelant ne pouvait pas savoir.
+        """
         ctx = self._approval_ctx
         if ctx is None:
-            return
+            return False
         try:
             with db.connection(ctx.database_url) as conn:
                 audit.log_event(
@@ -587,8 +637,10 @@ class PolicyBackend:
                     # The mandatory door: an agent speaking MCP cannot route around it.
                     origin=audit.Origin.mcp_gateway(),
                 )
-        except Exception:  # audit is best-effort; never break the call path
+        except Exception:
             logger.warning("audit_write_failed", extra={"tool": canonical, "decision": decision})
+            return False
+        return True
 
     async def _handle_hitl(
         self, name: str, arguments: dict[str, Any], canonical: str, outcome: PolicyOutcome
@@ -600,7 +652,9 @@ class PolicyBackend:
             )
         required = 2 if outcome.decision is Approval.human_dual else 1
         try:
-            return await self._run_approval_flow(ctx, name, arguments, canonical, outcome, required)
+            reponse = await self._run_approval_flow(
+                ctx, name, arguments, canonical, outcome, required
+            )
         except Exception:
             # Approval service unavailable. Same shared verdict as the cooperative
             # path (AD-37): deny on irreversible / external_send / unknown class,
@@ -608,9 +662,50 @@ class PolicyBackend:
             # now nothing read (CLAUDE.md §4.4).
             logger.exception("approval_service_error", extra={"tool": canonical})
             verdict = service_down_verdict(self._policy, outcome.action_class)
-            if verdict is Approval.deny:
+            # Les deux branches laissent une ligne. Aucune n'en écrivait, alors que le
+            # jumeau coopératif le fait et que les deux se réclament du même `AD-37` :
+            # la décision la plus discutable du produit — relayer sans avoir pu tenir
+            # l'humain — était la seule à ne pas être écrite.
+            refus = verdict is Approval.deny
+            self._audit(
+                "deny" if refus else "allow",
+                canonical,
+                outcome,
+                arguments,
+                request_id=uuid4().hex,
+                error="approval_service_unavailable",
+            )
+            if refus:
                 return _denied_result(f"'{canonical}' held: approval service unavailable")
             return await self._proxy.call_tool(name, arguments)
+
+        # **L'exécution est ici, hors du `try`, et c'est tout l'objet du correctif.**
+        #
+        # Elle vivait à l'intérieur de `_run_approval_flow`, donc à l'intérieur du
+        # bloc gardé ci-dessus, et **après** `consume()` + `commit()` + la ligne
+        # `hitl_approved`. Une coupure vers le serveur aval survenue une fois l'outil
+        # exécuté remontait alors dans le `except`, était diagnostiquée « service
+        # d'approbation indisponible », et la dernière ligne **rappelait
+        # `call_tool`** : l'action qu'un humain venait d'approuver s'exécutait une
+        # seconde fois. Sur un virement, c'est deux virements.
+        #
+        # Le flux rend désormais une décision, pas un effet. `None` veut dire
+        # « approuvé et consommé, à toi de relayer » — le seul cas où l'on agit.
+        if reponse is not None:
+            return reponse
+        try:
+            return await self._proxy.call_tool(name, arguments)
+        except Exception:
+            # Et l'échec aval devient une réponse, pas une exception qui remonte au
+            # `except` d'à côté. L'approbation est consommée, l'outil a peut-être agi :
+            # c'est ce que l'agent doit lire, plutôt qu'« indisponible » — le message
+            # que l'ancien code servait après avoir exécuté l'action.
+            logger.exception("downstream_failed_after_approval", extra={"tool": canonical})
+            return _denied_result(
+                f"'{canonical}' was approved and attempted, but the downstream server "
+                "failed: the outcome is unknown. The approval is consumed — retrying "
+                "requires a new one."
+            )
 
     async def _run_approval_flow(
         self,
@@ -620,7 +715,13 @@ class PolicyBackend:
         canonical: str,
         outcome: PolicyOutcome,
         required: int,
-    ) -> types.CallToolResult:
+    ) -> types.CallToolResult | None:
+        """La décision d'approbation, **sans l'exécuter**.
+
+        Rend `None` quand l'appel est approuvé et consommé : c'est à l'appelant de
+        relayer, hors de tout bloc `try` qui pourrait le rejouer. Tout autre cas
+        rend la réponse à servir telle quelle.
+        """
         with db.connection(ctx.database_url) as conn:
             ah = approvals.args_hash(arguments)
             record = approvals.find_active(conn, ctx.tenant_id, canonical, ah)
@@ -646,7 +747,8 @@ class PolicyBackend:
                     self._audit(
                         "hitl_approved", canonical, outcome, arguments, request_id=record.id
                     )
-                    return await self._proxy.call_tool(name, arguments)
+                    # Approuvé et consommé. On ne relaie PAS ici : voir `_handle_hitl`.
+                    return None
                 conn.commit()
                 return _denied_result(f"'{canonical}' approval already consumed")
 
