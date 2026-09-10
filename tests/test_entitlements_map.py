@@ -26,7 +26,8 @@ from fastapi import APIRouter
 
 import api
 from api.main import _CAPACITE_PAR_ROUTEUR, _capacite_de
-from core.entitlements import PLANCHER, Capability, Metric
+from core.entitlements import PLANCHER, Capability, Metric, capacites_requises
+from core.policy import parse_policy
 from tests.conftest import DBHandle
 
 
@@ -259,6 +260,18 @@ def _metriques_nommees_par_le_produit() -> set[str]:
     return vues
 
 
+def _capacites_nommees_par_le_produit() -> set[str]:
+    """Les capacités que le code de production nomme, hors module de définition."""
+    racine = Path(__file__).resolve().parent.parent
+    vues: set[str] = set()
+    for paquet in ("api", "core", "gateway"):
+        for fichier in (racine / paquet).rglob("*.py"):
+            if fichier.relative_to(racine).as_posix() in _HORS_PREUVE:
+                continue
+            vues.update(re.findall(r"\bCapability\.([a-z_]+)", fichier.read_text(encoding="utf-8")))
+    return vues
+
+
 def test_the_enum_and_the_catalogue_name_the_same_metrics(db: DBHandle) -> None:
     """`Metric` et `metric_catalog` sont deux listes ; elles doivent être la même.
 
@@ -313,6 +326,136 @@ def test_every_published_metric_is_either_counted_or_declared_uncounted(db: DBHa
 
     inconnues = sorted(set(NON_CABLEES) - publiees)
     assert not inconnues, (
-        f"`NON_CABLEES` nomme des métriques que le catalogue ne publie pas : "
-        f"{inconnues}"
+        f"`NON_CABLEES` nomme des métriques que le catalogue ne publie pas : {inconnues}"
+    )
+
+
+#: Les capacités que `capability_catalog` publie et que rien ne vérifie, chacune avec
+#: la raison qui rend l'absence défendable. Jumeau exact de `NON_CABLEES` : une
+#: fonctionnalité vendue par palier et servie à tous les paliers est une ligne de
+#: prix sans effet, et elle ne se découvre pas — le code fait ce qu'il a toujours
+#: fait, aucun test n'échoue, et le client `free` reçoit ce qu'il n'a pas payé.
+NON_VERIFIEES: dict[str, str] = {
+    "fria": (
+        "section du dossier de conformité (`core/compliance.py::fria_scaffold`), "
+        "déjà verrouillé par `compliance_pack` sur son routeur. Deux verrous pour "
+        "une porte."
+    ),
+    "third_party_verdicts": (
+        "idem : le chaînage des verdicts tiers se lit dans le dossier de "
+        "conformité, et l'ingestion a son propre verrou (`verdicts_ingest`)."
+    ),
+    "control_plane_export": (
+        "idem : `control_plane.assignments_section` est la section "
+        "« identity_federation » du dossier de conformité."
+    ),
+    "triage": "surface publique — il n'y a pas encore de tenant à facturer.",
+    "profiles": (
+        "les profils de déploiement sont servis par le triage public "
+        "(`api/threats.py`, `core/threat_map.py`) : même raison."
+    ),
+    "sso_federation": (
+        "réglage de **déploiement** et non de tenant : `settings.issuer_claims` "
+        "gouverne l'émetteur pour toute l'instance (`api/security.py`). Il n'y a "
+        "pas de site par tenant où le vérifier."
+    ),
+    "quota_override": (
+        "aucune route ne crée de dérogation : `tenant_quota_overrides` se remplit "
+        "en base, comme geste commercial. La capacité documente une éligibilité, "
+        "elle ne garde aucun chemin — et le dire vaut mieux que le laisser croire."
+    ),
+}
+
+
+def _capacites_exigees_par_une_policy() -> set[str]:
+    """Ce que le verrou d'enregistrement de policy sait exiger.
+
+    `capacites_requises` vit dans `core/entitlements.py`, que le scan statique
+    exclut — l'énumération y est définie, donc y trouver `Capability.x` ne prouve
+    rien. On interroge donc la fonction sur son **comportement** : une policy qui
+    allume la fonctionnalité, et la capacité qu'elle réclame en retour.
+    """
+    base = "defaults:\n  unknown_tool: deny\n"
+    documents = (
+        base + "  integrity_enabled: true\n",
+        base + "  taint_policy: escalate\n",
+        base + "  risk_bands: {auto: 30, notify: 50, hitl: 70}\n",
+        "tools:\n  - {name: t, class: irreversible, approval: human_dual}\n" + base,
+    )
+    exigees: set[str] = set()
+    for texte in documents:
+        exigees.update(c.value for c in capacites_requises(parse_policy(texte)))
+    return exigees
+
+
+def test_the_policy_gate_asks_for_a_capability_per_paid_switch() -> None:
+    """Quatre fonctionnalités vendues sont des **champs de policy**.
+
+    Un tenant `free` les allumait en tapant quatre lignes de YAML. Le contrôle vit
+    à l'enregistrement et jamais à la décision : refuser d'honorer un garde déjà
+    enregistré retirerait une garde à l'exécution pour une raison commerciale, ce
+    que `tighten` existe précisément pour interdire.
+    """
+    assert _capacites_exigees_par_une_policy() == {
+        Capability.integrity.value,
+        Capability.taint_guard.value,
+        Capability.risk_bands.value,
+        Capability.hitl_dual.value,
+    }
+
+
+def test_a_policy_that_turns_nothing_on_asks_for_nothing() -> None:
+    """Sinon le verrou refuserait la policy par défaut, et personne ne pourrait rien
+    enregistrer."""
+    assert capacites_requises(parse_policy("defaults:\n  unknown_tool: deny\n")) == frozenset()
+
+
+def test_every_published_capability_is_either_checked_or_declared_unchecked(
+    db: DBHandle,
+) -> None:
+    """Une capacité vendue que rien ne vérifie est servie gratuitement à tous.
+
+    C'est l'autre moitié du garde des métriques, et le même mode de panne : le
+    défaut ne casse rien, donc aucun test écrit après coup ne le trouve. Le seul
+    moment où l'oubli est visible est celui où on écrit la table.
+
+    `PLANCHER` est une explication à part entière et pas une exception : §4.1 et
+    §4.2 sont dans les trois paliers **par construction**, donc les verrouiller
+    n'aurait aucun sens — il n'existe pas de palier qui puisse les refuser.
+    """
+    rows = db.conn.execute("select capability from capability_catalog").fetchall()
+    publiees = {str(r[0]) for r in rows}
+    verifiees = _capacites_nommees_par_le_produit() | _capacites_exigees_par_une_policy()
+    plancher = {c.value for c in PLANCHER}
+
+    muettes = sorted(publiees - verifiees - plancher - set(NON_VERIFIEES))
+    assert not muettes, (
+        f"ces capacités sont vendues par palier et vérifiées nulle part : {muettes}\n"
+        "  tous les paliers les reçoivent, y compris ceux qui ne les ont pas\n"
+        "  achetées, et rien n'échouera jamais pour le signaler.\n"
+        "  fix : vérifiez-les au site qui sert la fonctionnalité, ou déclarez-les\n"
+        "  dans `NON_VERIFIEES` avec la raison."
+    )
+
+    perimees = sorted(set(NON_VERIFIEES) & (verifiees | plancher))
+    assert not perimees, (
+        f"ces capacités sont déclarées non vérifiées et le produit les vérifie "
+        f"pourtant : {perimees}\n"
+        "  fix : retirez-les de `NON_VERIFIEES`."
+    )
+
+    inconnues = sorted(set(NON_VERIFIEES) - publiees)
+    assert not inconnues, (
+        f"`NON_VERIFIEES` nomme des capacités que le catalogue ne publie pas : {inconnues}"
+    )
+
+
+def test_the_capability_enum_and_the_catalogue_name_the_same_things(db: DBHandle) -> None:
+    """Deux listes, une seule vérité — même raison que pour les métriques."""
+    rows = db.conn.execute("select capability from capability_catalog").fetchall()
+    catalogue = {str(r[0]) for r in rows}
+    enum = {c.value for c in Capability}
+    assert catalogue == enum, (
+        f"catalogue seul : {sorted(catalogue - enum)} · énumération seule : "
+        f"{sorted(enum - catalogue)}"
     )

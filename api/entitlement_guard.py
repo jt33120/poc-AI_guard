@@ -25,6 +25,7 @@ from api.deps import database_url, require_tenant
 from api.security import get_current_user
 from core import db, entitlements
 from core.entitlements import Capability, Meter, Metric
+from core.policy import Policy
 from core.schemas import CurrentUser
 
 logger = logging.getLogger("xsom.api")
@@ -50,28 +51,37 @@ def requires(capability: Capability) -> Callable[..., None]:
     """
 
     def _garde(request: Request, user: CurrentUser = Depends(get_current_user)) -> None:
-        tenant_id = require_tenant(user)
-        url = database_url(request)
-        try:
-            with db.connection(url) as conn:
-                droit = entitlements.load_entitlement(conn, tenant_id)
-        except Exception:
-            logger.warning("entitlement_unreadable", extra={"tenant_id": tenant_id})
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Entitlement store unavailable",
-            ) from None
-        if not droit.allows(capability):
-            logger.info(
-                "capability_refused",
-                extra={"tenant_id": tenant_id, "capability": capability.value},
-            )
-            raise HTTPException(
-                status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                detail=f"'{capability.value}' is not included in your plan",
-            )
+        enforce_capability(database_url(request), require_tenant(user), capability)
 
     return _garde
+
+
+def enforce_capability(url: str, tenant_id: str, capability: Capability) -> None:
+    """Le verrou lui-même, hors de toute dépendance FastAPI.
+
+    :func:`requires` le monte sur un routeur ; certaines routes doivent l'appeler
+    en ligne — parce qu'elles vivent dans un routeur qui, lui, ne se vend pas
+    (`POST /v1/policy/draft` est dans le routeur de policy, qui est du socle), ou
+    parce que l'identité du tenant n'est résolue qu'au milieu du traitement.
+    """
+    try:
+        with db.connection(url) as conn:
+            droit = entitlements.load_entitlement(conn, tenant_id)
+    except Exception:
+        logger.warning("entitlement_unreadable", extra={"tenant_id": tenant_id})
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Entitlement store unavailable",
+        ) from None
+    if not droit.allows(capability):
+        logger.info(
+            "capability_refused",
+            extra={"tenant_id": tenant_id, "capability": capability.value},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=f"'{capability.value}' is not included in your plan",
+        )
 
 
 def enforce_stock(
@@ -149,4 +159,45 @@ def enforce_flux(url: str, tenant_id: str, metric: Metric, *, etiquette: str) ->
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"plan limit reached: {etiquette} for this period",
+        )
+
+
+def enforce_policy_capabilities(url: str, tenant_id: str, policy: Policy) -> None:
+    """Refuser d'**enregistrer** une policy qui allume ce que le palier ne vend pas.
+
+    Le seul site : `PUT /v1/policy`. C'est aussi le seul endroit où ces quatre
+    fonctionnalités entrent dans le produit, puisqu'elles vivent dans le YAML du
+    tenant et nulle part ailleurs.
+
+    402 et non 403 : la console doit afficher l'écran d'offre, pas celui des
+    permissions — l'admin a bien le droit d'éditer la policy, c'est la fonctionnalité
+    qui n'est pas dans son palier. Le message les **nomme**, sinon l'utilisateur
+    retire des lignes au hasard jusqu'à ce que ça passe.
+
+    Raises:
+        HTTPException: 402 si une capacité manque, 503 si le palier est illisible.
+    """
+    requises = entitlements.capacites_requises(policy)
+    if not requises:
+        return
+    try:
+        with db.connection(url) as conn:
+            droit = entitlements.load_entitlement(conn, tenant_id)
+    except Exception:
+        logger.warning("entitlement_unreadable", extra={"tenant_id": tenant_id})
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Entitlement store unavailable",
+        ) from None
+    manquantes = sorted(c.value for c in requises if not droit.allows(c))
+    if manquantes:
+        logger.info(
+            "policy_capability_refused",
+            extra={"tenant_id": tenant_id, "capabilities": manquantes},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=(
+                "this policy turns on features your plan does not include: " + ", ".join(manquantes)
+            ),
         )

@@ -350,7 +350,47 @@ def consume(conn: psycopg.Connection, tenant_id: str, metric: Metric, n: int = 1
     return int(row[0]) if row else None
 
 
-def flux_allows(conn: psycopg.Connection, tenant_id: str, metric: Metric) -> Meter:
+def capacites_requises(policy: Policy) -> frozenset[Capability]:
+    """Ce qu'un document de policy exige du palier pour être **enregistré**.
+
+    Quatre fonctionnalités vendues sont des **champs de policy** : le tenant les
+    allume en éditant son propre YAML. Rien ne lisait son palier à ce moment-là, si
+    bien qu'un `free` obtenait l'intégrité, l'autonomie graduée, la contamination de
+    session et la double approbation en tapant quatre lignes.
+
+    **Le contrôle vit à l'enregistrement, jamais à la décision.** Refuser d'honorer
+    un `taint_policy` déjà enregistré retirerait une garde à l'exécution pour une
+    raison commerciale — exactement ce que :func:`tighten` existe pour interdire, et
+    la faute serait pire ici puisqu'elle s'appliquerait dans la session teintée. Le
+    palier gouverne donc ce qu'on peut **allumer** ; ce qui est allumé le reste.
+
+    Conséquence assumée : une rétrogradation laisse tourner ce qui tournait déjà.
+    Cela se règle côté facturation — jamais en rendant un verdict plus permissif.
+
+    Et un refus d'enregistrement ne dégrade rien : la policy précédente reste en
+    place. C'est la seule direction d'échec qui ne coûte pas une garde.
+    """
+    requises: set[Capability] = set()
+    reglages = policy.defaults
+    if reglages.integrity_enabled:
+        requises.add(Capability.integrity)
+    if reglages.risk_bands is not None:
+        requises.add(Capability.risk_bands)
+    if reglages.taint_policy != "off":
+        requises.add(Capability.taint_guard)
+    verdicts = {
+        reglages.unknown_tool,
+        *reglages.class_approvals.values(),
+        *(regle.approval for regle in policy.tools),
+    }
+    if Approval.human_dual in verdicts:
+        requises.add(Capability.hitl_dual)
+    return frozenset(requises)
+
+
+def flux_allows(
+    conn: psycopg.Connection, tenant_id: str, metric: Metric, *, droit: Entitlement | None = None
+) -> Meter:
     """Autoriser un acte payant à l'unité, et le débiter — dans cet ordre.
 
     **Lire puis débiter, jamais débiter puis lire.** L'ordre inverse est plus court
@@ -366,8 +406,13 @@ def flux_allows(conn: psycopg.Connection, tenant_id: str, metric: Metric) -> Met
     À distinguer de :func:`tighten`, qui vit sur le chemin de décision et **resserre
     un verdict**. Ici il n'y a pas de verdict de sécurité à resserrer : l'acte est
     payant, il passe ou il ne passe pas.
+
+    ``droit`` évite une seconde lecture à l'appelant qui l'a déjà — le proxy LLM lit
+    le même droit pour trois capacités du même chemin, et deux requêtes identiques
+    par appel de modèle se paient sur tout le trafic de la flotte.
     """
-    droit = load_entitlement(conn, tenant_id)
+    if droit is None:
+        droit = load_entitlement(conn, tenant_id)
     etat = meter(droit, metric, consomme=droit.consomme(metric))
     if etat in (Meter.ok, Meter.grace):
         if consume(conn, tenant_id, metric) is None:

@@ -2,19 +2,41 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from api.deps import database_url, require_tenant
+from api.entitlement_guard import enforce_capability
 from api.ratelimit import export_rate_limit, limiter
 from api.security import get_current_user
-from core import approvals, audit, db, export
+from core import approvals, audit, db, entitlements, export
+from core.entitlements import Capability
 from core.export import Narrator
 from core.judge import Judge, build_judge
 from core.schemas import AuditEntry, CurrentUser, Role
 
+logger = logging.getLogger("xsom.api")
+
 router = APIRouter(prefix="/v1/audit", tags=["audit"])
+
+
+def _droit_au_recit(url: str, tenant_id: str) -> bool:
+    """Le palier accorde-t-il les synthèses rédigées par modèle ?
+
+    Un droit illisible rend `False` : l'export part sans récit plutôt que de
+    refuser. C'est la direction juste **ici** et seulement ici — le récit est du
+    confort, la preuve est dans les chiffres qui l'accompagnent, et refuser un
+    export de conformité parce qu'un compteur de facturation ne répond pas serait
+    disproportionné. Là où c'est une garde qui est en jeu, la panne resserre.
+    """
+    try:
+        with db.connection(url) as conn:
+            return entitlements.load_entitlement(conn, tenant_id).allows(Capability.ai_summary)
+    except Exception:
+        logger.warning("entitlement_unreadable", extra={"tenant_id": tenant_id})
+        return False
 
 
 def _narrator(judge: Judge | None) -> Narrator | None:
@@ -73,6 +95,22 @@ def export_audit(
         raise HTTPException(status_code=422, detail="render must be json or pdf")
     tenant_id = require_tenant(user)
     url = database_url(request)
+    # **Deux capacités sur une seule route, et elles ne disent pas la même chose.**
+    #
+    # `audit_export_raw` verrouille l'export lui-même. Le routeur d'audit est du
+    # socle — §4.2, le journal prouve et ne se facture pas — donc le verrou est posé
+    # ici, sur cette route et pas sur les autres : consulter son journal reste
+    # gratuit, en extraire un dossier formaté est un produit. Les trois paliers
+    # l'incluent aujourd'hui, ce qui rend le contrôle sans effet visible — et c'est
+    # bien ce qu'on veut : le jour où un palier ne l'aura plus, rien à retrouver.
+    #
+    # `ai_summary` — « Synthèses rédigées par modèle » — verrouille le **narrateur**,
+    # qui appelle un modèle par export. Il tournait pour tous les paliers depuis
+    # cette route, alors que son jumeau de `/v1/compliance/export` est derrière
+    # `compliance_pack`. Sans la capacité, l'export sort avec ses chiffres et sans
+    # le récit : c'est un retrait de confort, jamais de preuve.
+    enforce_capability(url, tenant_id, Capability.audit_export_raw)
+    recit = _droit_au_recit(url, tenant_id)
     with db.tenant_reader(
         url, user_id=user.user_id, tenant_id=tenant_id, role=(user.role or Role.viewer)
     ) as conn:
@@ -93,7 +131,7 @@ def export_audit(
         approvals=supervision,
         range_from=from_ts,
         range_to=to_ts,
-        narrator=_narrator(build_judge(request.app.state.settings)),
+        narrator=_narrator(build_judge(request.app.state.settings)) if recit else None,
         totals=totaux,
     )
     if render == "pdf":

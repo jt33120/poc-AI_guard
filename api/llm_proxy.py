@@ -60,7 +60,7 @@ from core import (
 )
 from core import usage as usage_store
 from core.config import Settings
-from core.entitlements import Meter, Metric
+from core.entitlements import Capability, Entitlement, Meter, Metric
 from core.judge import Judge, build_judge, resolve_ambiguous
 from core.policy import ActionClass, Approval, Policy, evaluate
 
@@ -333,12 +333,21 @@ def _inspect(
         conn.commit()
 
 
-def _observing(url: str, principal: GatewayPrincipal) -> bool:
+def _observing(url: str, principal: GatewayPrincipal, droit: Entitlement) -> bool:
     """Whether an admin has an observation window open on this agent (G-25).
 
     A control plane we cannot read is not permission to stop enforcing: any failure
     answers "no window", which means enforce.
+
+    Et la fenêtre est une **capacité vendue** (`monitor_windows`), distincte de
+    `monitor_admin` qui verrouille la route qui l'ouvre. Sans la capacité, il n'y a
+    pas de fenêtre — donc pas de relâchement. C'est la seule direction dans laquelle
+    un palier peut toucher ce garde : elle **resserre**, comme partout ailleurs dans
+    la gamme. L'inverse — un palier qui ouvrirait une fenêtre — serait la
+    facturation devenue moteur de policy.
     """
+    if not droit.allows(Capability.monitor_windows):
+        return False
     try:
         with db.connection(url) as conn:
             window = monitor.active_window(conn, principal.tenant_id, principal.token_id)
@@ -564,7 +573,7 @@ def _audit_unparsed(
         logger.warning("unparsed_audit_failed", extra={"tenant_id": tenant_id})
 
 
-def _debiter_un_appel(url: str, tenant_id: str) -> Meter:
+def _debiter_un_appel(url: str, tenant_id: str) -> tuple[Entitlement, Meter]:
     """Débiter `proxy_calls` avant que l'appel ne coûte quoi que ce soit.
 
     `proxy_calls` était publiée par `metric_catalog`, plafonnée par `plan_limits`
@@ -580,17 +589,23 @@ def _debiter_un_appel(url: str, tenant_id: str) -> Meter:
     """
     try:
         with db.connection(url) as conn:
-            return entitlements.flux_allows(conn, tenant_id, Metric.proxy_calls)
+            # Une seule lecture du droit pour tout le chemin : le plafond d'appels,
+            # puis les trois capacités qui le consultent — le proxy lui-même, la DLP
+            # et le garde-prompt. Deux requêtes identiques par appel de modèle se
+            # paieraient sur tout le trafic de la flotte.
+            droit = entitlements.load_entitlement(conn, tenant_id)
+            etat = entitlements.flux_allows(conn, tenant_id, Metric.proxy_calls, droit=droit)
+            return droit, etat
     except Exception:
         logger.warning("proxy_quota_unreadable", extra={"tenant_id": tenant_id})
-        return Meter.unknown
+        return entitlements.AUCUNE, Meter.unknown
 
 
 async def _forward(request: Request, principal: GatewayPrincipal, provider: str) -> Response:
     settings: Settings = request.app.state.settings
     url = database_url(request)
 
-    etat = await run_in_threadpool(_debiter_un_appel, url, principal.tenant_id)
+    droit, etat = await run_in_threadpool(_debiter_un_appel, url, principal.tenant_id)
     if etat is Meter.capped:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -601,6 +616,15 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Quota store unavailable",
         )
+    # Le routeur du proxy ne porte aucun verrou de gamme : `requires` résout un jeton
+    # **console**, que ce chemin ne présente pas (`X-Gateway-Token`). Le verrou vit
+    # donc ici, là où le principal EST résolu — un quota et une capacité se
+    # vérifient où l'identité existe, pas où le montage est commode.
+    if not droit.allows(Capability.llm_proxy):
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="'llm_proxy' is not included in your plan",
+        )
 
     body = await request.body()
 
@@ -608,7 +632,11 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
     # leaves for the provider. Blocks fixed-form secrets, flags/redacts PII per the
     # tenant's config. Platform-gated by DLP_ENABLED (zero overhead when off); when
     # on, the tenant's console config decides verdicts. Value never logged.
-    if settings.dlp_enabled:
+    # `settings.dlp_enabled` est l'interrupteur **plateforme** ; la capacité est
+    # l'interrupteur **commercial**. Il manquait : la DLP inspectait l'egress de tous
+    # les paliers, y compris ceux qui ne l'ont pas achetée. `dlp_config` verrouillait
+    # le réglage fin et laissait le service lui-même gratuit.
+    if settings.dlp_enabled and droit.allows(Capability.dlp):
         state = await run_in_threadpool(_load_dlp_state, url, principal.tenant_id, settings)
         if state.enabled:
             scan = await run_in_threadpool(dlp.scan_request, body, state.policy)
@@ -629,7 +657,7 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
     # dit. C'est ce que `Orchestré` autorise à revendiquer, et l'endroit exact où le
     # produit s'arrête de ne pas être un pare-feu de prompts.
     guard = getattr(request.app.state, "prompt_guard", None)
-    if guard is not None:
+    if guard is not None and droit.allows(Capability.prompt_guard):
         texte = _extract_prompt(body)
         if texte:
             verdict = await run_in_threadpool(guard.inspect, texte)
@@ -645,7 +673,7 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
     # The agent being controlled does not get to say whether it is controlled
     # (G-25). Enforcement is the default; only an open control-plane window, opened
     # by an admin and bounded in time, relaxes it -- and never for the irreversible.
-    observing = await run_in_threadpool(_observing, url, principal)
+    observing = await run_in_threadpool(_observing, url, principal, droit)
     style = "anthropic" if provider == "anthropic" else "openai"
     base = _base_url(settings, provider).rstrip("/")
 

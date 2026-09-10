@@ -22,9 +22,10 @@ from uuid import uuid4
 import mcp.types as types
 
 from core import monitor
+from core.entitlements import Capability, Entitlement
 from core.policy import ActionClass, Approval, PolicyOutcome, parse_policy
 from gateway.downstream import DownstreamProxy, ServerSpec
-from gateway.server import ApprovalContext, PolicyBackend
+from gateway.server import ApprovalContext, PolicyBackend, _Gamme
 from tests.conftest import DBHandle, mint_agent
 
 _MOCK = Path(__file__).resolve().parent / "fixtures" / "mock_mcp_server.py"
@@ -272,12 +273,27 @@ async def test_taint_escalation_is_never_relaxed(db: DBHandle) -> None:
         rule_name="r",
         reason="taint",
     )
-    assert backend._observation_relaxes(escalade) is False
+    # Le palier accorde explicitement la fenêtre : sans cela, le verrou de gamme
+    # rendrait `False` avant la clause de taint, et ce test passerait sans jamais
+    # l'atteindre — la vacuité exacte que ce fichier existe pour refuser.
+    gamme = _Gamme(
+        droit=Entitlement(
+            plan="pro", capabilities=frozenset({Capability.monitor_windows}), limites={}
+        ),
+        juge_permis=True,
+        contrainte=None,
+        plafonne=False,
+    )
+    assert backend._observation_relaxes(escalade, gamme) is False
 
     # Le même verdict sans l'origine « taint » est, lui, relâché : c'est la raison qui
     # tranche, pas la classe ni le palier.
     ordinaire = replace(escalade, reason="policy")
-    assert backend._observation_relaxes(ordinaire) is True
+    assert backend._observation_relaxes(ordinaire, gamme) is True
+
+    # Et sans la capacité, il n'y a pas de fenêtre du tout : le palier resserre.
+    sans = replace(gamme, droit=Entitlement(plan="free", capabilities=frozenset(), limites={}))
+    assert backend._observation_relaxes(ordinaire, sans) is False
 
 
 async def test_a_window_never_relaxes_a_tainted_action_with_an_exfiltration_target(

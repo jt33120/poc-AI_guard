@@ -35,7 +35,7 @@ from core import (
     trust,
 )
 from core.config import Settings
-from core.entitlements import Capability, Meter, Metric
+from core.entitlements import Capability, Entitlement, Meter, Metric
 from core.judge import Judge, resolve_ambiguous
 from core.logging import configure_logging
 from core.notify import Notifier
@@ -78,6 +78,51 @@ class EmptyBackend:
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> types.CallToolResult:
         raise ValueError(f"no such tool: {name}")
+
+
+@dataclass(frozen=True, slots=True)
+class _Gamme:
+    """Ce que le palier du tenant dit de **cet appel-ci**, lu une fois.
+
+    Un porteur unique plutôt que quatre paramètres qui voyagent ensemble : cinq
+    sites d'audit et deux fonctions du flux d'approbation en ont besoin, et une
+    valeur oubliée en chemin est une ligne facturée sans motif ou un garde qui ne
+    voit pas le palier.
+
+    Toutes ses réponses vont dans le sens du durcissement. Aucune ne peut rendre un
+    verdict plus permissif que la policy — c'est l'invariant de la gamme entière, et
+    il tient ici par construction : le champ `plafonne` déclenche `tighten`, jamais
+    l'inverse, et `droit` ne sert qu'à retirer des fonctionnalités.
+    """
+
+    droit: Entitlement
+    #: Le juge a-t-il le droit de tourner ? `False` **plancherise** l'ambigu (`AD-34`).
+    juge_permis: bool
+    #: Le motif écrit dans `audit_log.constraint_reason`, ou `None` si rien ne serre.
+    contrainte: str | None
+    plafonne: bool
+    etat: Meter = Meter.ok
+
+    @classmethod
+    def depuis(cls, droit: Entitlement, *, juge_permis: bool, etat: Meter) -> _Gamme:
+        plafonne = etat in (Meter.capped, Meter.unknown)
+        return cls(
+            droit=droit,
+            juge_permis=juge_permis,
+            contrainte=f"plan_{etat.value}" if plafonne else None,
+            plafonne=plafonne,
+            etat=etat,
+        )
+
+    @classmethod
+    def hors_tenant(cls) -> _Gamme:
+        """Sans contexte d'approbation il n'y a pas de tenant, donc pas de palier.
+
+        On rend le comportement d'avant la gamme. Cet état refuse déjà toute classe
+        risquée par ailleurs, puisque `_audit` ne peut rien écrire — et il n'accorde
+        aucune capacité : `AUCUNE` ne dit oui à rien.
+        """
+        return cls(droit=entitlements.AUCUNE, juge_permis=True, contrainte=None, plafonne=False)
 
 
 def _denied_result(message: str) -> types.CallToolResult:
@@ -198,15 +243,13 @@ class PolicyBackend:
         # facturation à l'usage mesurait le vide. Et le juge, vendu à partir de
         # `pro`, tournait ici pour tout le monde — un palier `free` obtenait par
         # MCP l'enrichissement qu'il n'a pas acheté.
-        juge_permis, etat_compteur = self._lire_le_droit(outcome.ambiguous)
-        plafonne = etat_compteur in (Meter.capped, Meter.unknown)
-        contrainte = f"plan_{etat_compteur.value}" if plafonne else None
+        gamme = self._lire_le_droit(outcome.ambiguous)
 
         # Ambiguous tools: classify, then floor for that class. The judge only
         # classifies — never authorizes — and an absent judge floors to
         # irreversible rather than letting the rule's approval stand (AD-34).
         outcome = resolve_ambiguous(
-            outcome, self._judge if juge_permis else None, canonical, arguments
+            outcome, self._judge if gamme.juge_permis else None, canonical, arguments
         )
 
         # `FR-166` — l'ordre d'arrêt de l'opérateur, relu **par appel**.
@@ -251,7 +294,7 @@ class PolicyBackend:
         # tenant obtenait deux comportements selon la porte empruntée ; `AD-28` dit
         # qu'une propriété vraie sur un chemin ne se lit pas comme vraie partout, et
         # ici la divergence n'était pas voulue, seulement pas encore refermée.
-        if outcome.decision is not Approval.auto and self._observation_relaxes(outcome):
+        if outcome.decision is not Approval.auto and self._observation_relaxes(outcome, gamme):
             # `AD-27.3` : la distinction vit dans `decision`, à l'intérieur de la
             # charge hachée — sinon « nous avons bloqué » et « nous aurions bloqué »
             # hachent à l'identique et le vérificateur autonome ne les sépare pas.
@@ -267,7 +310,7 @@ class PolicyBackend:
                 latency_ms=int((time.monotonic() - start) * 1000),
                 request_id=uuid4().hex,
                 error="downstream_error" if result.isError else None,
-                constraint_reason=contrainte,
+                constraint_reason=gamme.contrainte,
             )
             # Le marquage de taint est un état post-appel, pas un palier : un résultat
             # porteur d'injection teinte la session que l'appel ait été observé ou non.
@@ -288,8 +331,8 @@ class PolicyBackend:
         # descend jamais l'ordre de sévérité, n'entre pas sur une décision déjà tenue
         # par un humain, et laisse tourner les classes légères. Un tenant à sec ne
         # perd pas la lecture — il perd l'irréversible que personne ne tient.
-        if plafonne:
-            outcome = entitlements.tighten(outcome, self._policy, reason=etat_compteur)
+        if gamme.plafonne:
+            outcome = entitlements.tighten(outcome, self._policy, reason=gamme.etat)
 
         if outcome.decision in (Approval.auto, Approval.notify):
             # notify-and-proceed (M11) relays like auto but is recorded distinctly.
@@ -319,7 +362,7 @@ class PolicyBackend:
                     outcome,
                     arguments,
                     request_id=request_id,
-                    constraint_reason=contrainte,
+                    constraint_reason=gamme.contrainte,
                 ):
                     logger.warning(
                         "denied_audit_unavailable",
@@ -338,7 +381,7 @@ class PolicyBackend:
                     latency_ms=int((time.monotonic() - start) * 1000),
                     request_id=request_id,
                     error="downstream_error" if result.isError else None,
-                    constraint_reason=contrainte,
+                    constraint_reason=gamme.contrainte,
                 )
             self._mark_taint(canonical, result)
             return result
@@ -353,12 +396,12 @@ class PolicyBackend:
                 outcome,
                 arguments,
                 request_id=uuid4().hex,
-                constraint_reason=contrainte,
+                constraint_reason=gamme.contrainte,
             )
             return _denied_result(f"'{canonical}' not permitted by policy: deny ({outcome.reason})")
-        return await self._handle_hitl(name, arguments, canonical, outcome, contrainte)
+        return await self._handle_hitl(name, arguments, canonical, outcome, gamme)
 
-    def _lire_le_droit(self, ambigu: bool) -> tuple[bool, Meter]:
+    def _lire_le_droit(self, ambigu: bool) -> _Gamme:
         """Le droit du tenant, lu par appel et **jamais mis en cache**.
 
         Rend deux choses, et les deux sont des durcissements : si le juge a le droit
@@ -379,7 +422,7 @@ class PolicyBackend:
         """
         ctx = self._approval_ctx
         if ctx is None:
-            return True, Meter.ok
+            return _Gamme.hors_tenant()
         try:
             with db.connection(ctx.database_url) as conn:
                 droit = entitlements.load_entitlement(conn, ctx.tenant_id)
@@ -402,14 +445,15 @@ class PolicyBackend:
                 # Le consommé vient de la **même requête** que le droit : une
                 # connexion de plus par appel d'outil se paie sur tout le trafic de
                 # la flotte, et `perf/overhead.json` publie ce que celle-ci coûte.
-                return juge, entitlements.meter(
+                etat = entitlements.meter(
                     droit, Metric.decisions, consomme=droit.consomme(Metric.decisions)
                 )
+                return _Gamme.depuis(droit, juge_permis=juge, etat=etat)
         except Exception:
             logger.warning("entitlement_unreadable", extra={"tenant": ctx.tenant_id})
-            return False, Meter.ok
+            return _Gamme(entitlements.AUCUNE, juge_permis=False, contrainte=None, plafonne=False)
 
-    def _observation_relaxes(self, outcome: PolicyOutcome) -> bool:
+    def _observation_relaxes(self, outcome: PolicyOutcome, gamme: _Gamme) -> bool:
         """Whether an open observation window may relay this refused call (`AD-27`).
 
         Le mode observation existe pour un client dont la policy n'est pas encore
@@ -441,6 +485,13 @@ class PolicyBackend:
         """
         ctx = self._approval_ctx
         if ctx is None or ctx.gateway_token_id is None:
+            return False
+        # **La fenêtre est une capacité vendue** (`monitor_windows`), distincte de
+        # `monitor_admin` qui verrouille la route qui l'ouvre. Sans elle, il n'y a pas
+        # de fenêtre, donc pas de relâchement : c'est la seule direction dans laquelle
+        # un palier peut toucher ce garde. L'inverse — un palier qui *ouvrirait* une
+        # fenêtre — serait la facturation devenue moteur de policy.
+        if not gamme.droit.allows(Capability.monitor_windows):
             return False
         if outcome.reason == "taint":
             return False
@@ -789,7 +840,7 @@ class PolicyBackend:
         arguments: dict[str, Any],
         canonical: str,
         outcome: PolicyOutcome,
-        contrainte: str | None = None,
+        gamme: _Gamme,
     ) -> types.CallToolResult:
         ctx = self._approval_ctx
         if ctx is None:
@@ -799,7 +850,7 @@ class PolicyBackend:
         required = 2 if outcome.decision is Approval.human_dual else 1
         try:
             reponse = await self._run_approval_flow(
-                ctx, name, arguments, canonical, outcome, required, contrainte
+                ctx, name, arguments, canonical, outcome, required, gamme
             )
         except Exception:
             # Approval service unavailable. Same shared verdict as the cooperative
@@ -824,7 +875,7 @@ class PolicyBackend:
                 arguments,
                 request_id=uuid4().hex,
                 error="approval_service_unavailable",
-                constraint_reason=contrainte,
+                constraint_reason=gamme.contrainte,
             )
             if refus:
                 return _denied_result(f"'{canonical}' held: approval service unavailable")
@@ -866,7 +917,7 @@ class PolicyBackend:
         canonical: str,
         outcome: PolicyOutcome,
         required: int,
-        contrainte: str | None = None,
+        gamme: _Gamme,
     ) -> types.CallToolResult | None:
         """La décision d'approbation, **sans l'exécuter**.
 
@@ -886,14 +937,19 @@ class PolicyBackend:
                     conn, ctx, canonical, outcome, arguments, ah, required
                 )
                 summary = record.dry_run.get("summary", "")
-                _notify(ctx.notifier, record.id, summary, record.expires_at.isoformat())
+                # `notify` — « Notification des approbations en attente » — est vendue
+                # à partir de `pro` et partait pour tous les paliers. Ne pas notifier
+                # ne retient rien : l'approbation est créée, elle attend dans la
+                # console, et §4.1 est tenu. Seul le canal de prévenance est payant.
+                if gamme.droit.allows(Capability.notify):
+                    _notify(ctx.notifier, record.id, summary, record.expires_at.isoformat())
                 self._audit(
                     "hitl_pending",
                     canonical,
                     outcome,
                     arguments,
                     request_id=record.id,
-                    constraint_reason=contrainte,
+                    constraint_reason=gamme.contrainte,
                 )
                 return _requires_approval_result(record.id, summary)
 
@@ -910,7 +966,7 @@ class PolicyBackend:
                         arguments,
                         request_id=record.id,
                         user_id=record.decided_by,
-                        constraint_reason=contrainte,
+                        constraint_reason=gamme.contrainte,
                     )
                     # Approuvé et consommé. On ne relaie PAS ici : voir `_handle_hitl`.
                     return None
@@ -933,7 +989,7 @@ class PolicyBackend:
                 arguments,
                 request_id=record.id,
                 user_id=record.decided_by,
-                constraint_reason=contrainte,
+                constraint_reason=gamme.contrainte,
             )
             return _denied_result(f"'{canonical}' approval {record.status}")
 
