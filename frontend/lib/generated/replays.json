@@ -268,6 +268,15 @@
             "judge_used": false,
             "policy_rule_id": null,
             "tool_name": "mock.echo"
+          },
+          {
+            "action_class": null,
+            "args_hash": null,
+            "decision": "tool_quarantined",
+            "error": "quarantined",
+            "judge_used": false,
+            "policy_rule_id": null,
+            "tool_name": "mock.echo"
           }
         ],
         "test": "tests/test_integrity_gate.py::test_drifted_tool_is_quarantined"
