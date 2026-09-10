@@ -46,6 +46,10 @@ def _audit(
     tool: str,
     request_id: str,
     action_class: str | None,
+    # Qui a levé le HITL. Absent de cette signature jusqu'ici, donc `audit_log.user_id`
+    # était NULL sur la voie coopérative — alors que la colonne entre dans la charge
+    # hachée, si bien que la chaîne attestait une approbation sans approbateur.
+    user_id: str | None = None,
     policy_rule_id: str | None = None,
     judge_used: bool = False,
     args_hash: str | None = None,
@@ -57,6 +61,7 @@ def _audit(
             conn,
             tenant_id=tenant_id,
             decision=decision,
+            user_id=user_id,
             request_id=request_id,
             tool_name=tool,
             action_class=action_class,
@@ -364,6 +369,10 @@ def _resolve_terminal(
             tool=record.tool_name,
             request_id=record.id,
             action_class=record.action_class,
+            # L'approbateur, pas le demandeur. La colonne était NULL ici et portait
+            # `requested_by` côté passerelle : deux façons différentes d'être faux
+            # sur le seul champ qui dit qui a autorisé une action irréversible.
+            user_id=record.decided_by,
             gateway_token_id=gateway_token_id,
         )
     else:

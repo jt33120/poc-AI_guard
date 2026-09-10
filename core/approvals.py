@@ -20,7 +20,14 @@ _SENSITIVE = ("password", "secret", "token", "key", "authorization", "credential
 _MAX_PREVIEW = 200
 
 _RECORD_COLS = (
-    "id, tool_name, action_class, status, required_count, approved_by, dry_run, expires_at"
+    "id, tool_name, action_class, status, required_count, approved_by, dry_run, expires_at, "
+    # `decided_by` manquait, et la colonne `audit_log.user_id` en dépendait sans le
+    # savoir : côté passerelle la ligne `hitl_approved` portait `requested_by` — le
+    # **demandeur** —, côté `/v1/authorize` la valeur était absente de la signature
+    # d'`_audit` et donc NULL. Or `user_id` fait partie de la charge hachée : la
+    # chaîne attestait depuis toujours « approuvé par » une valeur fausse ou vide,
+    # et rien ne le disait.
+    "decided_by"
 )
 
 
@@ -34,6 +41,9 @@ class ApprovalRecord:
     approved_by: list[str]
     dry_run: dict[str, Any]
     expires_at: datetime
+    #: Qui a tranché — l'identifiant opaque du dernier signataire, `None` tant que
+    #: l'approbation est en attente.
+    decided_by: str | None = None
 
 
 def args_hash(arguments: dict[str, Any]) -> str:
@@ -85,6 +95,7 @@ def _to_record(row: tuple[Any, ...]) -> ApprovalRecord:
         approved_by=list(row[5]),
         dry_run=row[6],
         expires_at=row[7],
+        decided_by=row[8],
     )
 
 

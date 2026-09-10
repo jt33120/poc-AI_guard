@@ -609,6 +609,7 @@ class PolicyBackend:
         latency_ms: int | None = None,
         request_id: str | None = None,
         error: str | None = None,
+        user_id: str | None = None,
     ) -> bool:
         """Écrit la ligne d'audit. Rend `False` si elle n'a pas pu l'être.
 
@@ -624,7 +625,13 @@ class PolicyBackend:
                     conn,
                     tenant_id=ctx.tenant_id,
                     decision=decision,
-                    user_id=ctx.requested_by,
+                    # `requested_by` est le **demandeur**. Sur toute autre ligne c'est
+                    # la bonne valeur — l'agent est bien à l'origine de l'appel —, mais
+                    # sur `hitl_approved` elle disait que l'agent avait autorisé sa
+                    # propre action irréversible. La colonne entre dans la charge
+                    # hachée, donc la chaîne l'attestait. L'appelant qui connaît
+                    # l'approbateur le passe désormais.
+                    user_id=user_id if user_id is not None else ctx.requested_by,
                     request_id=request_id,
                     tool_name=canonical,
                     action_class=outcome.action_class.value if outcome.action_class else None,
@@ -758,7 +765,12 @@ class PolicyBackend:
                 if approvals.consume(conn, record.id):
                     conn.commit()
                     self._audit(
-                        "hitl_approved", canonical, outcome, arguments, request_id=record.id
+                        "hitl_approved",
+                        canonical,
+                        outcome,
+                        arguments,
+                        request_id=record.id,
+                        user_id=record.decided_by,
                     )
                     # Approuvé et consommé. On ne relaie PAS ici : voir `_handle_hitl`.
                     return None
@@ -770,7 +782,18 @@ class PolicyBackend:
             approvals.consume(conn, record.id)
             conn.commit()
             decision = "hitl_denied" if record.status == "denied" else "expired"
-            self._audit(decision, canonical, outcome, arguments, request_id=record.id)
+            # Sur un refus, `decided_by` nomme celui qui a refusé. Sur une expiration
+            # il vaut `None` — personne n'a rien décidé — et la ligne retombe sur le
+            # demandeur comme toutes les autres lignes de cette porte, ce qui est le
+            # comportement voulu : c'est bien sa demande qui a expiré.
+            self._audit(
+                decision,
+                canonical,
+                outcome,
+                arguments,
+                request_id=record.id,
+                user_id=record.decided_by,
+            )
             return _denied_result(f"'{canonical}' approval {record.status}")
 
     def _create_approval(

@@ -127,3 +127,51 @@ async def test_auto_tool_still_relays(db: DBHandle) -> None:
     result = await _backend(db, tenant_id).call_tool("echo", {"text": "hi"})
     assert result.isError is False
     assert "hi" in _text(result)
+
+
+async def test_the_audit_row_names_the_approver_not_the_requester(db: DBHandle) -> None:
+    """La seule colonne qui dit qui a autorisé une action irréversible était fausse.
+
+    `audit_log.user_id` portait `ApprovalContext.requested_by` — le **demandeur**. Sur
+    une ligne `hitl_approved`, cela revenait à écrire que l'agent avait autorisé sa
+    propre action irréversible. Et la colonne fait partie de la charge hachée
+    (`_INSERT_COLS`), donc la chaîne l'attestait : une preuve cryptographiquement
+    intacte d'une affirmation fausse.
+
+    Sur la voie coopérative, le défaut était l'autre moitié du même : `_audit` de
+    `core/decision.py` n'exposait pas `user_id` du tout, la colonne était donc NULL.
+    Deux façons différentes d'être faux sur le même champ.
+
+    Le contrôle exige un approbateur **distinct** du demandeur : avec les deux
+    identiques, il passerait sur l'ancien code comme sur le neuf.
+    """
+    tenant_id = _seed_tenant(db)
+    proxy = DownstreamProxy(
+        [
+            ServerSpec(
+                name="mock",
+                transport="stdio",
+                config={"command": sys.executable, "args": [str(_MOCK)]},
+            )
+        ]
+    )
+    ctx = ApprovalContext(
+        database_url=db.url,
+        tenant_id=tenant_id,
+        timeout_seconds=3600,
+        requested_by="agent-demandeur",
+    )
+    backend = PolicyBackend(_POLICY, proxy, ctx)
+
+    held = await backend.call_tool("delete_contact", {"contact_id": "c9"})
+    approvals.decide(db.conn, tenant_id, _approval_id(held), "approve", "humaine-op-7")
+    await backend.call_tool("delete_contact", {"contact_id": "c9"})
+
+    lignes = db.conn.execute(
+        "select decision, user_id from audit_log where tenant_id = %s order by id", (tenant_id,)
+    ).fetchall()
+    approuvee = [u for d, u in lignes if d == "hitl_approved"]
+    assert approuvee == ["humaine-op-7"], f"lignes : {lignes}"
+    # Et la demande, elle, reste attribuée au demandeur : le correctif ne déplace pas
+    # l'attribution de tout le reste.
+    assert [u for d, u in lignes if d == "hitl_pending"] == ["agent-demandeur"]

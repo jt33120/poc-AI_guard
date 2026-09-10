@@ -24,7 +24,16 @@ from typing import Any
 
 import psycopg
 
-from core import audit, control_plane, corpora, export, prompt_guard, shadow_ai, verdicts
+from core import (
+    approval_chain,
+    audit,
+    control_plane,
+    corpora,
+    export,
+    prompt_guard,
+    shadow_ai,
+    verdicts,
+)
 from core import usage as usage_store
 from core.audit import EnforcementMode
 from core.monitor import NEVER_OBSERVED
@@ -452,6 +461,10 @@ def build_evidence_pack(
             "tamper_evident": integrity["ok"],
             "entries": integrity["entries"],
             "first_broken_id": integrity["first_broken_id"],
+            # Une chaîne vide n'est pas une chaîne intacte : `tamper_evident` reste
+            # vrai sur zéro ligne, et c'est ce qui rendait un journal anéanti
+            # indistinguable d'un dossier sain. Publié, pas déduit.
+            "journal_missing": integrity["journal_missing"],
             "retention_floor_days": retention_floor_days,
             "log_model": "append-only, hash-chained",
             "verification": verification_independence(),
@@ -479,6 +492,17 @@ def build_evidence_pack(
             # une question de supervision, pas une obligation d'exploitant. Publie
             # des comptes et l'état de la chaîne, jamais un nom de groupe.
             "identity_federation": control_plane.assignments_section(conn),
+            # **La preuve de l'acte humain, et non son reflet.** `human_supervision`,
+            # plus haut dans le dossier, est lu depuis la table `approvals` — mutable
+            # par conception : c'est une file de travail, un `update` y écrase le
+            # décideur. Attester la supervision depuis elle était exactement la
+            # confusion que `verification_independence` s'interdit ailleurs.
+            #
+            # Cette section-ci vient d'un journal chaîné, écrit **au moment du clic**
+            # et non quand l'agent vient chercher son verdict. La distinction se voit
+            # sur les approbations qu'aucun agent n'est jamais revenu chercher : la
+            # première les perd, la seconde les a.
+            "decisions_chain": approval_chain.decisions_section(conn),
         },
         "article_26_deployer": {
             "decision_summary": base["summary"],
