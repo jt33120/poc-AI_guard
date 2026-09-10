@@ -78,6 +78,14 @@ def export_audit(
     ) as conn:
         events = audit.list_events(conn, from_ts=from_ts, to_ts=to_ts, limit=10_000)
         supervision = approvals.list_for_tenant(conn)
+        # Les mêmes bornes que la liste, comptées sans limite : cette route porte le
+        # même défaut que `/v1/compliance/export` — dix mille lignes au plus, et un
+        # `event_count` qui prétendait couvrir la période. Les deux exports le
+        # déclarent désormais, avec les mêmes trois champs.
+        totaux = (
+            audit.count_events(conn, from_ts=from_ts, to_ts=to_ts),
+            *audit.tally(conn, from_ts=from_ts, to_ts=to_ts),
+        )
 
     report = export.build_report(
         framework=framework,
@@ -86,6 +94,7 @@ def export_audit(
         range_from=from_ts,
         range_to=to_ts,
         narrator=_narrator(build_judge(request.app.state.settings)),
+        totals=totaux,
     )
     if render == "pdf":
         pdf = export.render_pdf(report)
