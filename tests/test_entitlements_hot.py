@@ -139,6 +139,38 @@ def test_an_unreadable_counter_tightens_exactly_like_an_exhausted_one(db: DBHand
     assert unknown.reason == "plan_unknown"
 
 
+def test_an_unreadable_counter_hardens_the_real_decision_path(
+    db: DBHandle, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`unknown` resserre **dans `authorize`**, et pas seulement dans `tighten`.
+
+    Le contrôle voisin éprouve la fonction ; celui-ci éprouve le site d'appel, qui
+    est là où le défaut reviendrait : il suffit d'écrire `if etat is Meter.capped`
+    pour que `unknown` redevienne tolérant, et la fonction resterait parfaite. Le
+    banc de mutation l'a montré — sans ce test, cette mutation-là ne mordait pas.
+
+    Le compteur est rendu illisible alors que le **droit**, lui, est parfaitement
+    lu : c'est l'état que `tighten` doit fermer — on sait ce que ce tenant a acheté,
+    on ne sait pas où il en est.
+    """
+    tenant = _tenant(db)
+    monkeypatch.setattr(entitlements, "lire_compteur", lambda *_a, **_k: None)
+
+    rendu = decision.authorize(
+        database_url=db.url,
+        policy=_POLICY,
+        tenant_id=tenant,
+        tool="crm.mail",  # external_send : classe risquée
+        arguments={"to": "a@b.fr"},
+    )
+
+    assert rendu["decision"] == "deny"
+    assert rendu["reason"] == "plan_unknown", (
+        "un compteur illisible doit resserrer comme un plafond atteint ; sinon une "
+        "règle `approval: auto` sur une classe risquée passe sans aucun plafond"
+    )
+
+
 def test_a_light_class_keeps_running_at_the_cap(db: DBHandle) -> None:
     """Le plafond ferme les classes dangereuses et laisse les légères continuer.
 
@@ -258,16 +290,21 @@ def test_a_failing_counter_never_loses_the_audit_row(
     trigger** : un trigger qui lève ferait avorter la transaction sans qu'aucun point
     de sauvegarde ne le rattrape.
     """
-    tenant = _tenant(db)
-
-    def boum(*_a: object, **_k: object) -> object:
-        raise RuntimeError("counter store unreachable")
-
-    monkeypatch.setattr(entitlements, "consume", boum)
+    # **L'échec doit être SQL, pas Python.** Une première version monkeypatchait
+    # `consume` pour lever : `_debiter` rattrapait l'exception avant qu'elle touche
+    # la transaction, si bien que le test prouvait que `_debiter` attrape — pas que
+    # le point de sauvegarde tient. Le banc de mutation l'a montré : en retirant le
+    # `with conn.transaction()`, le test restait vert.
+    #
+    # Ici le tenant est un UUID valide **absent de `tenants`** : `audit_log.tenant_id`
+    # est du texte sans clé étrangère, donc la preuve s'écrit ; `plan_usage_counters`
+    # en porte une, donc le débit tombe — à l'intérieur de la transaction, comme dans
+    # la vraie vie d'un tenant supprimé entre deux appels.
+    fantome = str(uuid4())
 
     audit.log_event(
         db.conn,
-        tenant_id=tenant,
+        tenant_id=fantome,
         decision="allow",
         action_class="read",
         origin=_ORIGIN,
@@ -276,10 +313,10 @@ def test_a_failing_counter_never_loses_the_audit_row(
     db.conn.commit()
 
     lignes = db.conn.execute(
-        "select decision from audit_log where tenant_id = %s", (tenant,)
+        "select decision from audit_log where tenant_id = %s", (fantome,)
     ).fetchall()
     assert [r[0] for r in lignes] == ["allow"], "la preuve a été perdue par la facturation"
-    assert audit.verify_chain(db.conn, tenant).ok is True
+    assert audit.verify_chain(db.conn, fantome).ok is True
 
 
 def test_a_successful_debit_moves_the_counter(db: DBHandle) -> None:
@@ -307,12 +344,32 @@ def test_a_refusal_is_not_billed_as_a_decision(db: DBHandle) -> None:
     qu'il achète — et lui donnerait une raison de désactiver la garde.
     """
     tenant = _tenant(db)
-    audit.log_event(
-        db.conn, tenant_id=tenant, decision="deny", action_class="irreversible", origin=_ORIGIN
-    )
-    db.conn.commit()
 
+    refuse = decision.authorize(
+        database_url=db.url,
+        policy=parse_policy(
+            "tools:\n  - {name: crm.wipe, class: irreversible, approval: deny}\n"
+            "defaults: {unknown_tool: deny}\n"
+        ),
+        tenant_id=tenant,
+        tool="crm.wipe",
+        arguments={"id": "1"},
+    )
+    assert refuse["decision"] == "deny"
+
+    # Par `authorize` et non par `log_event` : c'est le site d'appel qui décide de
+    # facturer ou non, et c'est là que la régression reviendrait.
     assert entitlements.lire_compteur(db.conn, tenant, Metric.decisions) == 0
+
+    passe = decision.authorize(
+        database_url=db.url,
+        policy=_POLICY,
+        tenant_id=tenant,
+        tool="crm.read",
+        arguments={"id": "1"},
+    )
+    assert passe["decision"] == "allow"
+    assert entitlements.lire_compteur(db.conn, tenant, Metric.decisions) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -329,24 +386,40 @@ def test_a_plan_without_the_judge_hardens_rather_than_relaxes(db: DBHandle) -> N
     plus **strict**, pas plus laxiste — l'inverse de ce que l'intuition commerciale
     suggère, et la seule forme défendable.
     """
-    tenant = _tenant(db, "free")
-    droit = entitlements.load_entitlement(db.conn, tenant)
-    assert not droit.allows(Capability.judge)
-
     policy = parse_policy(
         "tools:\n  - {name: shell.exec, classify: ambiguous, approval: auto}\n"
         "defaults: {unknown_tool: deny}\n"
     )
-    rendu = decision.authorize(
+    # **Un juge est fourni dans les deux cas**, et c'est ce qui rend le contrôle non
+    # vide : sans lui, « pas de capacité » et « pas de juge configuré » produiraient
+    # le même résultat, et retirer la condition de capacité ne ferait rien bouger.
+    # Éprouvé par mutation — la première version de ce test ne mordait pas.
+    juge = Judge(lambda _s, _u: '{"action_class": "read"}')
+
+    sans_capacite = decision.authorize(
         database_url=db.url,
         policy=policy,
-        tenant_id=tenant,
+        tenant_id=_tenant(db, "free"),
         tool="shell.exec",
         arguments={"cmd": "rm -rf /"},
+        judge=juge,
+    )
+    assert not entitlements.load_entitlement(db.conn, _tenant(db, "free")).allows(Capability.judge)
+    assert sans_capacite["decision"] == "hold"
+    assert sans_capacite["action_class"] == "irreversible", (
+        "sans la capacité, le juge ne doit pas tourner — et son absence plancherise"
     )
 
-    assert rendu["decision"] == "hold"
-    assert rendu["action_class"] == "irreversible"
+    avec_capacite = decision.authorize(
+        database_url=db.url,
+        policy=policy,
+        tenant_id=_tenant(db, "pro"),
+        tool="shell.exec",
+        arguments={"cmd": "ls"},
+        judge=Judge(lambda _s, _u: '{"action_class": "read"}'),
+    )
+    assert avec_capacite["decision"] == "allow"
+    assert avec_capacite["action_class"] == "read"
 
 
 def test_an_exhausted_judge_budget_hardens_the_same_way(db: DBHandle) -> None:
