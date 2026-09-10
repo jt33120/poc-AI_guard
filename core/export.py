@@ -177,23 +177,50 @@ def build_report(
     range_from: str | None = None,
     range_to: str | None = None,
     narrator: Narrator | None = None,
+    #: Le décompte réel de la période, agrégé en SQL — pas déduit de `events`.
+    #:
+    #: `events` est **tronqué** (`list_events` en rend au plus `limit`), et le dossier
+    #: publiait `event_count = len(events)`, `summary` et `ingress_mix` calculés
+    #: dessus, dans le même dictionnaire où l'intégrité de chaîne et la couverture de
+    #: supervision interrogent la table entière. Pour tout tenant dépassant la
+    #: tranche, le document annonçait l'historique complet et n'en résumait qu'un
+    #: bout — et rien ne le disait.
+    #:
+    #: Déclarer la troncature ne suffisait pas : il fallait aussi que les chiffres
+    #: portent sur la période, sinon `article_26.decision_summary` reste faux une fois
+    #: l'avertissement ajouté. `None` garde l'ancien comportement pour les appelants
+    #: qui n'ont pas de connexion sous la main (et le dossier le déclare alors
+    #: honnêtement comme non tronqué, ce qu'il est : la liste EST tout ce qu'il y a).
+    totals: tuple[int, dict[str, int], dict[str, int]] | None = None,
 ) -> dict[str, Any]:
     """Assemble a compliance report dict for the given framework."""
     if framework not in FRAMEWORKS:
         raise ValueError(f"unknown framework: {framework}")
-    counts: dict[str, int] = dict(Counter(e["decision"] for e in events))
+    if totals is not None:
+        total_reel, counts, portes = totals
+    else:
+        total_reel = len(events)
+        counts = dict(Counter(e["decision"] for e in events))
+        portes = dict(Counter(e.get("ingress") or "unrecorded" for e in events))
     make_narrative = narrator or default_narrative
     report: dict[str, Any] = {
         "framework": framework,
         "generated_at": datetime.now(UTC).isoformat(),
         "range": {"from": range_from, "to": range_to},
-        "event_count": len(events),
+        "event_count": total_reel,
+        # Trois nombres plutôt qu'un, parce qu'un lecteur doit pouvoir vérifier que
+        # le dossier ferme : combien la période contient, combien sont détaillés
+        # ci-dessous, et si l'écart existe. C'est la discipline que ce fichier
+        # applique déjà partout ailleurs — publier l'absence comme absence.
+        "events_total": total_reel,
+        "events_listed": len(events),
+        "events_truncated": len(events) < total_reel,
         "summary": counts,
         # The partition, published beside the raw tally so a reader can check that
         # the numbers close without re-deriving the mapping.
         "summary_by_outcome": summarise(counts),
-        "ingress_mix": dict(Counter(e.get("ingress") or "unrecorded" for e in events)),
-        "narrative": make_narrative(framework, counts, len(events)),
+        "ingress_mix": portes,
+        "narrative": make_narrative(framework, counts, total_reel),
         "events": events,
     }
     if framework == AI_ACT:

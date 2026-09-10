@@ -38,6 +38,7 @@ def _narrator(request: Request) -> Narrator | None:
 
 
 @router.get("/status", response_model=ComplianceStatus)
+@limiter.limit(export_rate_limit)
 def get_compliance_status(
     request: Request,
     user: CurrentUser = Depends(get_current_user),

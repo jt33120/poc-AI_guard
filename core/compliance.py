@@ -452,6 +452,13 @@ def build_evidence_pack(
         range_from=range_from,
         range_to=range_to,
         narrator=narrator,
+        # Le décompte réel de la période, agrégé en SQL. Sans lui, `event_count` et
+        # `summary` portaient sur la tranche que `list_events` a bien voulu rendre,
+        # dans le même dossier où l'intégrité de chaîne compte la table entière.
+        totals=(
+            audit.count_events(conn, from_ts=range_from, to_ts=range_to),
+            *audit.tally(conn, from_ts=range_from, to_ts=range_to),
+        ),
     )
     integrity = chain_integrity(conn, tenant_id)
     coverage = oversight_coverage(conn)
