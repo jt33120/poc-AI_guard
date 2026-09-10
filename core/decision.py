@@ -170,16 +170,14 @@ def authorize(
                     is not Meter.capped
                 )
                 conn.commit()
-            # Le compteur de décisions se lit **dans la même connexion**, et pas dans
-            # une seconde ouverte trois lignes plus bas. Le garde de surcoût
-            # (`scripts/measure_overhead.py`) a chiffré ce que coûtait la version
-            # naïve : deux connexions Postgres de plus par appel d'autorisation, sur
-            # le chemin que l'agent emprunte à chaque outil. Une connexion, c'est un
-            # aller-retour réseau, un handshake TLS et une place dans le pooler.
+            # Le consommé vient de la **même requête** que le droit : le garde de
+            # surcoût a chiffré ce que coûtait la version naïve — deux connexions et
+            # cinq allers-retours SQL de plus par appel d'autorisation, sur le chemin
+            # que l'agent emprunte à chaque outil. Une connexion, c'est un aller-retour
+            # réseau, un handshake TLS et une place dans le pooler ; un aller-retour,
+            # c'est la latence de la base multipliée par tout le trafic de la flotte.
             etat_compteur = entitlements.meter(
-                droit,
-                Metric.decisions,
-                consomme=entitlements.lire_compteur(conn, tenant_id, Metric.decisions),
+                droit, Metric.decisions, consomme=droit.consomme(Metric.decisions)
             )
             droit_lu = True
     except Exception:

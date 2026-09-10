@@ -3,13 +3,13 @@
   "chemins": {
     "http.autorise": {
       "designe": "`POST /v1/authorize` (coopératif) — verdict d'autorisation, audité",
-      "connexions_postgres": 3,
-      "allers_retours_sql": 6
+      "connexions_postgres": 4,
+      "allers_retours_sql": 8
     },
     "http.refuse": {
       "designe": "`POST /v1/authorize` — verdict de refus, audité",
-      "connexions_postgres": 3,
-      "allers_retours_sql": 6
+      "connexions_postgres": 4,
+      "allers_retours_sql": 7
     },
     "mcp.autorise": {
       "designe": "passerelle MCP (obligatoire) — appel autorisé, relayé, audité",

@@ -139,9 +139,7 @@ def test_an_unreadable_counter_tightens_exactly_like_an_exhausted_one(db: DBHand
     assert unknown.reason == "plan_unknown"
 
 
-def test_an_unreadable_counter_hardens_the_real_decision_path(
-    db: DBHandle, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_an_unreadable_counter_hardens_the_real_decision_path(db: DBHandle) -> None:
     """`unknown` resserre **dans `authorize`**, et pas seulement dans `tighten`.
 
     Le contrôle voisin éprouve la fonction ; celui-ci éprouve le site d'appel, qui
@@ -154,7 +152,17 @@ def test_an_unreadable_counter_hardens_the_real_decision_path(
     on ne sait pas où il en est.
     """
     tenant = _tenant(db)
-    monkeypatch.setattr(entitlements, "lire_compteur", lambda *_a, **_k: None)
+    # **Le plafond du palier est retiré**, et c'est la forme que `unknown` prend
+    # désormais sur ce chemin. Le consommé se lit dans la même requête que le droit
+    # (une seule, pour le surcoût), donc « compteur illisible » et « droit illisible »
+    # ne sont plus deux états distincts : ce qui reste, et qui est bien réel, c'est un
+    # palier dont on ne connaît pas le plafond pour cette métrique — un seed
+    # incomplet, une métrique ajoutée au catalogue et pas encore chiffrée.
+    #
+    # Ne pas savoir jusqu'où va un tenant doit fermer ce qui ne se défait pas, pas
+    # laisser passer parce qu'on n'a pas trouvé de chiffre à comparer.
+    db.conn.execute("delete from plan_limits where plan = 'pro' and metric = 'decisions'")
+    db.conn.commit()
 
     rendu = decision.authorize(
         database_url=db.url,

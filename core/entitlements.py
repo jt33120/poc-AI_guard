@@ -25,7 +25,7 @@ seule.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import date
 from enum import StrEnum
 from typing import TYPE_CHECKING
@@ -150,17 +150,31 @@ class Limite:
 
 @dataclass(frozen=True)
 class Entitlement:
-    """Ce qu'un tenant a le droit de faire, et jusqu'où."""
+    """Ce qu'un tenant a le droit de faire, jusqu'où, et où il en est.
+
+    La consommation voyage avec le droit parce qu'elle se lit dans la **même**
+    requête : `plan_usage_counters` se joint aux plafonds sur la métrique, et
+    séparer les deux lectures coûtait un aller-retour SQL de plus sur le chemin que
+    l'agent emprunte à chaque appel d'outil.
+    """
 
     plan: str
     capabilities: frozenset[Capability]
     limites: dict[Metric, Limite]
+    #: Le consommé du mois courant, par métrique. Une métrique absente vaut zéro —
+    #: aucune ligne de compteur veut dire « rien consommé cette période », et c'est
+    #: différent de « pas pu lire », qui est l'échec de la requête entière et rend
+    #: `AUCUNE`.
+    consommation: dict[Metric, int] = field(default_factory=dict)
 
     def allows(self, capability: Capability) -> bool:
         return capability in self.capabilities
 
     def limite(self, metric: Metric) -> Limite | None:
         return self.limites.get(metric)
+
+    def consomme(self, metric: Metric) -> int:
+        return self.consommation.get(metric, 0)
 
 
 #: Le repli, et il n'est **pas** `free`.
@@ -181,39 +195,57 @@ def load_entitlement(conn: psycopg.Connection, tenant_id: str) -> Entitlement:
     dans ce palier —, et un override **expiré** retombe sur le chiffre du palier
     plutôt que sur celui qu'il portait.
     """
-    row = conn.execute("select plan from tenants where id::text = %s", (tenant_id,)).fetchone()
-    if row is None or not row[0]:
+    rows = conn.execute(
+        # **Une seule requête, et c'est un choix de chemin chaud.** Trois lectures
+        # séparées — palier, capacités, plafonds — plus une quatrième pour le
+        # compteur, faisaient passer `/v1/authorize` de six à onze allers-retours
+        # SQL par appel : presque le double, sur la route que l'agent emprunte à
+        # chaque outil. `scripts/measure_overhead.py` l'a chiffré, et le dépôt en
+        # publie le résultat, donc le coût se décide, il ne se subit pas.
+        #
+        # Les capacités passent par `array_agg` dans une sous-requête scalaire
+        # plutôt que par une jointure : jointes, elles multiplieraient chaque
+        # plafond par chaque capacité — trente-sept fois dix lignes pour en lire
+        # quarante-sept.
+        "with t as (select plan from tenants where id::text = %(tid)s) "
+        "select t.plan, "
+        "       (select array_agg(capability) from plan_capabilities where plan = t.plan), "
+        "       l.metric, l.limit_value, l.grace_pct, o.limit_value, u.used "
+        "from t "
+        "left join plan_limits l on l.plan = t.plan "
+        "left join tenant_quota_overrides o "
+        "       on o.metric = l.metric and o.tenant_id::text = %(tid)s "
+        "      and (o.expires_at is null or o.expires_at > now()) "
+        "left join plan_usage_counters u "
+        "       on u.tenant_id::text = %(tid)s and u.metric = l.metric "
+        "      and u.period_start = %(periode)s",
+        {"tid": tenant_id, "periode": periode()},
+    ).fetchall()
+    if not rows or not rows[0][0]:
         return AUCUNE
-    plan = str(row[0])
+    plan = str(rows[0][0])
 
-    caps = {
-        Capability(c[0])
-        for c in conn.execute(
-            "select capability from plan_capabilities where plan = %s", (plan,)
-        ).fetchall()
-        if c[0] in _CAPS_CONNUES
-    }
+    caps = {Capability(c) for c in (rows[0][1] or []) if c in _CAPS_CONNUES}
     if not caps:
         # Un palier sans aucune capacité est un palier que la base ne connaît pas —
         # ou dont le seed a échoué. Le traiter comme `free` reviendrait à deviner.
         return AUCUNE
 
     limites: dict[Metric, Limite] = {}
-    for metric, valeur, grace, override in conn.execute(
-        "select l.metric, l.limit_value, l.grace_pct, o.limit_value "
-        "from plan_limits l "
-        "left join tenant_quota_overrides o "
-        "  on o.metric = l.metric and o.tenant_id::text = %s "
-        " and (o.expires_at is null or o.expires_at > now()) "
-        "where l.plan = %s",
-        (tenant_id, plan),
-    ).fetchall():
-        if metric not in _METRIQUES_CONNUES:
+    consommation: dict[Metric, int] = {}
+    for _plan, _caps, metric, valeur, grace, override, consomme in rows:
+        if metric is None or metric not in _METRIQUES_CONNUES:
             continue
         limites[Metric(metric)] = Limite(
             valeur=int(override if override is not None else valeur), grace_pct=int(grace)
         )
-    return Entitlement(plan=plan, capabilities=frozenset(caps), limites=limites)
+        consommation[Metric(metric)] = int(consomme or 0)
+    return Entitlement(
+        plan=plan,
+        capabilities=frozenset(caps),
+        limites=limites,
+        consommation=consommation,
+    )
 
 
 _CAPS_CONNUES = {c.value for c in Capability}
