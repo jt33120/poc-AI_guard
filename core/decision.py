@@ -150,6 +150,7 @@ def authorize(
     droit = entitlements.AUCUNE
     juge_permis = False
     droit_lu = False
+    etat_compteur = Meter.unknown
     try:
         with db.connection(database_url) as conn:
             droit = entitlements.load_entitlement(conn, tenant_id)
@@ -169,6 +170,17 @@ def authorize(
                     is not Meter.capped
                 )
                 conn.commit()
+            # Le compteur de décisions se lit **dans la même connexion**, et pas dans
+            # une seconde ouverte trois lignes plus bas. Le garde de surcoût
+            # (`scripts/measure_overhead.py`) a chiffré ce que coûtait la version
+            # naïve : deux connexions Postgres de plus par appel d'autorisation, sur
+            # le chemin que l'agent emprunte à chaque outil. Une connexion, c'est un
+            # aller-retour réseau, un handshake TLS et une place dans le pooler.
+            etat_compteur = entitlements.meter(
+                droit,
+                Metric.decisions,
+                consomme=entitlements.lire_compteur(conn, tenant_id, Metric.decisions),
+            )
             droit_lu = True
     except Exception:
         logger.warning("entitlement_unreadable", extra={"tenant": tenant_id})
@@ -226,17 +238,7 @@ def authorize(
     # « service d'approbation indisponible », « audit indisponible ». Ils rendent le
     # même verdict sur les classes risquées (`service_down_verdict`), donc rien ne
     # s'ouvre — seul le motif change, et il devient utile à qui lit l'incident.
-    etat = Meter.ok
-    if droit_lu:
-        try:
-            with db.connection(database_url) as conn:
-                etat = entitlements.meter(
-                    droit,
-                    Metric.decisions,
-                    consomme=entitlements.lire_compteur(conn, tenant_id, Metric.decisions),
-                )
-        except Exception:
-            etat = Meter.unknown
+    etat = etat_compteur if droit_lu else Meter.ok
     if etat in (Meter.capped, Meter.unknown):
         outcome = entitlements.tighten(outcome, policy, reason=etat)
     contrainte = f"plan_{etat.value}" if etat in (Meter.capped, Meter.unknown) else None
