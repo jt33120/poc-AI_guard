@@ -6,7 +6,7 @@ export const GUARD_COPY = {
     title: ["L’IA avance.", "Gardez la main."],
     intro:
       "Des collaborateurs qui créent. Des développeurs qui automatisent. Des données dont vous choisissez le chemin.",
-    explore: "Explorer les usages",
+    explore: "Voir les menaces",
     signin: "Accéder au POC",
     evidence: "Périmètre & preuves",
     heroNote:
@@ -120,6 +120,99 @@ export const GUARD_COPY = {
         body: "Consulter les décisions effectivement journalisées.",
       },
     ],
+    problemKicker: "Le problème",
+    problemTitle: "Les menaces IA se multiplient.",
+    problemIntro:
+      "Une requête IA traverse une chaîne : l’invite qu’elle reçoit, les données qu’elle lit, le modèle qui répond, les actions qu’elle déclenche, l’humain qui valide. Chaque maillon a ses propres attaques.",
+    problemPick: "Choisir un maillon",
+    problemTop: "Les plus coûteuses",
+    problemTopNote: "Le haut du classement, tous maillons confondus.",
+    problemLinkNote:
+      "Ce classement décrit le paysage. Il n’affirme aucune protection : la couverture réellement prouvée est publiée à part.",
+    problemLink: "Voir le relevé et les preuves",
+    critical: "critique",
+    whoKicker: "Vous",
+    whoTitle: "Dites-nous en plus sur vous.",
+    whoIntro: "Votre situation décide de la suite. Choisissez la vôtre.",
+    paths: {
+      company: {
+        tag: "Organisation",
+        title: "Vous avez des équipes, des données et des obligations.",
+        list: [
+          "Cartographier vos usages IA réels",
+          "Poser des règles qui tiennent devant un auditeur",
+          "Intégrer la passerelle dans votre système",
+        ],
+        action: "Écrire à xSOM",
+        note: "Nous partons de votre contexte, pas d’un catalogue.",
+      },
+      builder: {
+        tag: "Développeur",
+        title: "Vous construisez seul ou en petite équipe.",
+        list: [
+          "Brancher vos agents sans nous appeler",
+          "Encadrer les actions irréversibles",
+          "Garder une trace de ce que l’agent a fait",
+        ],
+        action: "Voir l’offre libre-service",
+        note: "Compte créé en ligne, mise en place guidée.",
+      },
+    },
+    saasKicker: "Libre-service",
+    saasTitle: "Encadrez vos agents, sans nous appeler.",
+    saasIntro:
+      "Vous créez un compte, vous branchez vos agents, vous écrivez vos règles. La passerelle refuse ce que la règle refuse, et écrit ce qu’elle a laissé passer.",
+    saasIncluded: "Ce qui est inclus",
+    saasIncludes: [
+      {
+        title: "La passerelle d’outils",
+        body: "Vos agents parlent MCP à la passerelle. Elle applique la règle avant que l’outil ne soit appelé.",
+      },
+      {
+        title: "L’attente humaine",
+        body: "Une action irréversible s’arrête et attend un clic. Sans ce clic, elle n’a pas lieu.",
+      },
+      {
+        title: "Le journal chaîné",
+        body: "Chaque décision est écrite et chaînée à la précédente. Une entrée réécrite se voit.",
+      },
+      {
+        title: "Le proxy de modèles",
+        body: "Pointez votre SDK sur une autre adresse. Les appels de modèle passent par nous, sans changer votre code.",
+      },
+      {
+        title: "L’éditeur de règles",
+        body: "Un document lisible : quel outil, quelle classe d’action, quelle décision.",
+      },
+      {
+        title: "La console",
+        body: "La file d’attente, l’explorateur du journal, la consommation.",
+      },
+    ],
+    saasStart: "Démarrer",
+    saasStartIntro: "Quatre gestes. Comptez une matinée pour le premier agent.",
+    saasSteps: [
+      {
+        title: "Créer le compte",
+        body: "Une adresse, un mot de passe, et votre organisation existe.",
+      },
+      {
+        title: "Créer un jeton d’agent",
+        body: "Dans la console. Il s’affiche une fois, il identifie l’agent dans le journal.",
+      },
+      {
+        title: "Brancher",
+        body: "Pour les outils, la passerelle MCP lit le jeton et l’adresse de la base. Pour les modèles, changez l’adresse de base de votre SDK.",
+      },
+      {
+        title: "Écrire la règle",
+        body: "Partez du modèle fourni : lecture autorisée, écriture tracée, irréversible tenu.",
+      },
+    ],
+    saasCta: "Créer un compte",
+    saasBack: "Retour à l’accueil",
+    saasNote:
+      "Le périmètre dépend de ce que vous branchez : ce qui ne passe pas par la passerelle n’est pas contrôlé.",
     limits: "Ce que le POC ne promet pas",
     limitsText:
       "Pas de protection automatique de tous les usages IA. Pas de certification de conformité. Le périmètre réel dépend du branchement, des règles et des fonctions éprouvées.",
@@ -135,7 +228,7 @@ export const GUARD_COPY = {
     title: ["AI moves forward.", "Stay in control."],
     intro:
       "People creating. Developers automating. Data with a clearly defined path.",
-    explore: "Explore the use cases",
+    explore: "See the threats",
     signin: "Open the POC",
     evidence: "Scope & evidence",
     heroNote:
@@ -245,6 +338,99 @@ export const GUARD_COPY = {
         body: "Review decisions that were actually logged.",
       },
     ],
+    problemKicker: "The problem",
+    problemTitle: "AI threats keep multiplying.",
+    problemIntro:
+      "An AI request travels a chain: the prompt it receives, the data it reads, the model that answers, the actions it triggers, the human who approves. Every link has its own attacks.",
+    problemPick: "Choose a link",
+    problemTop: "The costliest",
+    problemTopNote: "The top of the ranking, across every link.",
+    problemLinkNote:
+      "This ranking describes the landscape. It claims no protection: proven coverage is published separately.",
+    problemLink: "See the ledger and the evidence",
+    critical: "critical",
+    whoKicker: "You",
+    whoTitle: "Tell us about you.",
+    whoIntro: "Your situation decides what comes next. Pick yours.",
+    paths: {
+      company: {
+        tag: "Organisation",
+        title: "You have teams, data and obligations.",
+        list: [
+          "Map your real AI usage",
+          "Set rules that hold up in an audit",
+          "Integrate the gateway into your systems",
+        ],
+        action: "Email xSOM",
+        note: "We start from your context, not from a catalogue.",
+      },
+      builder: {
+        tag: "Developer",
+        title: "You build alone or in a small team.",
+        list: [
+          "Connect your agents without calling us",
+          "Govern irreversible actions",
+          "Keep a record of what the agent did",
+        ],
+        action: "See the self-serve offer",
+        note: "Sign up online, guided setup.",
+      },
+    },
+    saasKicker: "Self-serve",
+    saasTitle: "Govern your agents, without calling us.",
+    saasIntro:
+      "Create an account, connect your agents, write your rules. The gateway refuses what the rule refuses, and records what it let through.",
+    saasIncluded: "What is included",
+    saasIncludes: [
+      {
+        title: "The tools gateway",
+        body: "Your agents speak MCP to the gateway. It applies the rule before the tool is called.",
+      },
+      {
+        title: "Human approval",
+        body: "An irreversible action stops and waits for a click. Without that click, it does not happen.",
+      },
+      {
+        title: "The chained log",
+        body: "Every decision is written and chained to the previous one. A rewritten entry shows.",
+      },
+      {
+        title: "The model proxy",
+        body: "Point your SDK at a different base URL. Model calls go through us, with no code change.",
+      },
+      {
+        title: "The policy editor",
+        body: "A readable document: which tool, which action class, which decision.",
+      },
+      {
+        title: "The console",
+        body: "The approval queue, the log explorer, usage.",
+      },
+    ],
+    saasStart: "Get started",
+    saasStartIntro: "Four steps. Allow a morning for your first agent.",
+    saasSteps: [
+      {
+        title: "Create the account",
+        body: "An address, a password, and your organisation exists.",
+      },
+      {
+        title: "Create an agent token",
+        body: "In the console. Shown once, it identifies the agent in the log.",
+      },
+      {
+        title: "Connect",
+        body: "For tools, the MCP gateway reads the token and the database address. For models, change your SDK base URL.",
+      },
+      {
+        title: "Write the rule",
+        body: "Start from the shipped template: reads allowed, writes recorded, irreversible held.",
+      },
+    ],
+    saasCta: "Create an account",
+    saasBack: "Back to the home page",
+    saasNote:
+      "Scope depends on what you connect: anything that does not go through the gateway is not governed.",
     limits: "What the POC does not promise",
     limitsText:
       "No automatic protection for every AI use. No compliance certification. Actual scope depends on integration, policies and proven functionality.",

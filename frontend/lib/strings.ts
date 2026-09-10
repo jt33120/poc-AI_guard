@@ -87,6 +87,19 @@ export const STR = {
   },
   "triage.failed": { en: "The diagnostic could not be computed.", fr: "Le diagnostic n'a pas pu être calculé." },
   "triage.result.lines": { en: "threat lines", fr: "lignes de menace" },
+
+  // --- L'offre libre-service (page /saas) --------------------------------------
+  // Seules les métadonnées vivent ici : le corps de la page est dans `guard-copy.ts`
+  // avec le reste de la copie d'accueil, pour qu'un seul fichier porte la voix des
+  // pages publiques.
+  "saas.meta.title": {
+    en: "Self-serve offer",
+    fr: "L'offre libre-service",
+  },
+  "saas.meta.lede": {
+    en: "What the self-serve offer includes, and the four steps to connect your first agent.",
+    fr: "Ce que l'offre libre-service inclut, et les quatre gestes pour brancher votre premier agent.",
+  },
   "triage.result.applicable": { en: "concern you", fr: "vous concernent" },
   "triage.result.ours": { en: "are ours to hold", fr: "sont sur notre terrain" },
   "triage.result.blocked": { en: "we block today", fr: "nous bloquons aujourd'hui" },

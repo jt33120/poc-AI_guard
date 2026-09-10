@@ -25,36 +25,46 @@ test("the entire nested orientation copy stays illustrative, without invented co
   expect(number.test("Une liste de menaces")).toBe(false);
 });
 
-test("the POC explains people, developers and confidential data without connecting a service", async ({ page }) => {
+test("the landing answers three questions in order, without connecting a service", async ({ page }) => {
   let apiRequests = 0;
   await page.route("**/api/**", async (route) => {
     apiRequests += 1;
     await route.fulfill({ status: 503, json: { detail: "No service call belongs to this illustration" } });
   });
   await page.goto("/");
+
+  // 1. L'accueil. La scène reste illustrative, et le dit.
   await expect(page.getByText("Prototype en expérimentation", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Scénario illustratif · aucune action réelle", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: /P1a/ })).toHaveCount(0);
   const examples = page.getByRole("group", { name: "Choisir un exemple", exact: true });
   await examples.getByRole("button", { name: "Du code", exact: true }).click();
   await expect(page.locator(".guard-scene")).toHaveAttribute("data-scenario", "code");
   await expect(page.getByText("Connexion à configurer", { exact: true })).toBeVisible();
-  await examples.getByRole("button", { name: "Un document", exact: true }).click();
-  await expect(page.getByText("Données à qualifier", { exact: true })).toBeVisible();
 
-  const audiences = page.getByRole("group", { name: "Comment utilisez-vous l’IA ?", exact: true });
-  await expect(audiences.getByRole("button", { name: "Collaborateurs", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByText("ChatGPT ou Claude dans un navigateur ne passent pas, par défaut, par AI Guard.", { exact: false })).toBeVisible();
-  await audiences.getByRole("button", { name: "Développeurs", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Construire avec l’IA. Encadrer ce qu’elle peut faire.", exact: true })).toBeVisible();
-  await expect(page.locator(".guard-route__destination").getByText("OpenAI · Claude", { exact: true })).toBeVisible();
-  await page.getByRole("radio", { name: "Dans votre infrastructure", exact: true }).check();
-  await expect(page.locator(".guard-route__diagram")).toHaveAttribute("data-destination", "internal");
-  await expect(page.getByText("Modèle open-weight", { exact: true })).toBeVisible();
-  await audiences.getByRole("button", { name: "Données confidentielles", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Un document confidentiel mérite un chemin explicite.", exact: true })).toBeVisible();
-  await expect(page.getByText("Un modèle hébergé en interne est une option d’architecture, pas une certification.", { exact: false })).toBeVisible();
-  await expect(page.getByText("Ce choix ne connecte aucun service.", { exact: false })).toBeVisible();
+  // 2. Le problème, groupé. Le défaut montre le haut du classement, pas le premier
+  // maillon : un lecteur qui ne clique jamais doit voir ce qui coûte le plus.
+  const groupes = page.getByRole("group", { name: "Choisir un maillon", exact: true });
+  await expect(groupes.getByRole("button", { name: /Les plus coûteuses/ })).toHaveAttribute("aria-pressed", "true");
+  const menaces = page.locator(".guard-threat");
+  await expect(menaces).toHaveCount(5);
+  await expect(menaces.first()).toContainText("Injection de prompts indirecte");
+  await expect(menaces.first().locator(".diag")).toHaveCount(1);
+
+  // Un maillon cliqué ne montre que ses menaces. C'est ce qui empêche la section de
+  // dérouler les vingt-trois d'affilée.
+  await groupes.getByRole("button", { name: /Le modèle/ }).click();
+  await expect(page.locator(".guard-threat").first()).not.toContainText("Injection de prompts indirecte");
+  await expect(page.locator(".guard-threat").count()).resolves.toBeLessThan(23);
+
+  // La section ne revendique rien : aucun identifiant de relevé, aucun mode publié.
+  await expect(page.locator("#menaces-accueil").getByText(/\bM-\d{2}\b/)).toHaveCount(0);
+
+  // 3. L'aiguillage. Deux chemins, deux destinations différentes.
+  const chemins = page.locator(".guard-path");
+  await expect(chemins).toHaveCount(2);
+  await expect(chemins.filter({ hasText: "Organisation" }).getByRole("link")).toHaveAttribute("href", /^mailto:/);
+  await expect(chemins.filter({ hasText: "Développeur" }).getByRole("link")).toHaveAttribute("href", "/saas");
+
   expect(apiRequests).toBe(0);
 
   await page.getByRole("link", { name: "Périmètre & preuves", exact: true }).first().click();
@@ -62,17 +72,39 @@ test("the POC explains people, developers and confidential data without connecti
   await expect(page.locator("#menaces .paysage .menace")).toHaveCount(23);
 });
 
+test("the self-serve page says what is included and how to start", async ({ page }) => {
+  await page.goto("/");
+  await page.locator(".guard-path").filter({ hasText: "Développeur" }).getByRole("link").click();
+  await expect(page).toHaveURL(/\/saas$/);
+
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Encadrez vos agents");
+  // Ce qui est inclus, et le guide : les deux blocs que la page doit porter.
+  await expect(page.locator(".guard-included__list li")).toHaveCount(6);
+  await expect(page.locator(".guard-start__steps li")).toHaveCount(4);
+  await expect(page.locator(".guard-start__steps li").first()).toContainText("Créer le compte");
+
+  // Le périmètre est dit sur la page qui vend, pas seulement sur celle qui prouve.
+  await expect(page.getByText("n’est pas contrôlé", { exact: false })).toBeVisible();
+
+  // La sortie mène à la création de compte, pas à un formulaire de contact : c'est
+  // toute la différence entre ce chemin et celui du conseil.
+  await expect(page.getByRole("link", { name: /Créer un compte/ }).first()).toHaveAttribute("href", "/signup");
+});
+
 for (const width of [390, 768, 1440]) {
-  test(`the use-case landing stays contained in French and English at ${width}px`, async ({ page }) => {
+  test(`the landing stays contained in French and English at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/");
-    await page.getByRole("button", { name: "Données confidentielles", exact: true }).click();
-    await page.getByRole("radio", { name: "Dans votre infrastructure", exact: true }).check();
-    await expect(page.getByText("Modèle open-weight", { exact: true })).toBeVisible();
+    await page.getByRole("group", { name: "Choisir un maillon", exact: true })
+      .getByRole("button", { name: /Ses actions/ })
+      .click();
+    await expect(page.locator(".guard-threat").first()).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.getByRole("button", { name: "EN", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Confidential documents need an explicit path.", exact: true })).toBeVisible();
-    await expect(page.getByText("Open-weight model", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Tell us about you.", exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+
+    await page.goto("/saas");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
 }

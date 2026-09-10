@@ -4,12 +4,12 @@ import Link from "next/link";
 import { useState } from "react";
 import { Wordmark, XsomMark } from "@/components/brand";
 import { GUARD_COPY } from "@/components/guard-copy";
+import { MenacesLanding } from "@/components/MenacesLanding";
+import { Orientation } from "@/components/Orientation";
 import { SignalPreferences } from "@/design-system/react";
 import { LanguageToggle, useT } from "@/lib/i18n";
 
 type Scenario = "document" | "code" | "action";
-type Audience = "people" | "developers" | "data";
-type Destination = "cloud" | "internal";
 type Copy = (typeof GUARD_COPY)[keyof typeof GUARD_COPY];
 
 function Arrow({ vertical = false }: { vertical?: boolean }) {
@@ -105,118 +105,6 @@ function ControlScene({ copy }: { copy: Copy }) {
   );
 }
 
-function UsageExplorer({ copy }: { copy: Copy }) {
-  const [audience, setAudience] = useState<Audience>("people");
-  const [destination, setDestination] = useState<Destination>("cloud");
-  const detail = copy.details[audience];
-  return (
-    <section
-      id="usages"
-      className="guard-usage guard-wrap"
-      aria-labelledby="usage-heading"
-    >
-      <div className="guard-section-heading">
-        <p className="guard-kicker">{copy.usageKicker}</p>
-        <h2 id="usage-heading">{copy.usageTitle}</h2>
-        <p>{copy.usageIntro}</p>
-      </div>
-      <div
-        className="guard-audiences"
-        role="group"
-        aria-label={copy.usageTitle}
-      >
-        {(["people", "developers", "data"] as const).map((id, index) => (
-          <button
-            type="button"
-            key={id}
-            aria-pressed={audience === id}
-            onClick={() => setAudience(id)}
-          >
-            <span aria-hidden="true">0{index + 1}</span>
-            {copy.audiences[id]}
-            <span aria-hidden="true">↗</span>
-          </button>
-        ))}
-      </div>
-      <div className="guard-usage__body">
-        <div className="guard-usage__copy" aria-live="polite">
-          <h3>{detail.title}</h3>
-          <ul>
-            {detail.list.map((item) => (
-              <li key={item}>
-                <span aria-hidden="true">↗</span>
-                {item}
-              </li>
-            ))}
-          </ul>
-          <p className="guard-scope-note">{detail.note}</p>
-        </div>
-        <div className="guard-route">
-          <fieldset className="guard-destinations">
-            <legend>{copy.destination}</legend>
-            <div>
-              {(["cloud", "internal"] as const).map((id) => (
-                <label key={id}>
-                  <input
-                    type="radio"
-                    name="model-destination"
-                    value={id}
-                    checked={destination === id}
-                    onChange={() => setDestination(id)}
-                  />
-                  <span>{id === "cloud" ? copy.cloud : copy.internal}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          <div
-            className="guard-route__diagram"
-            data-destination={destination}
-            aria-live="polite"
-          >
-            <span className="guard-route__caption">{copy.routeLabel}</span>
-            <div className="guard-route__origin">
-              <span>{detail.source}</span>
-              <Arrow />
-              <strong>{detail.middle}</strong>
-            </div>
-            <Arrow vertical />
-            <div className="guard-route__gate">
-              <strong>AI Guard</strong>
-              <span>{copy.policy}</span>
-            </div>
-            <Arrow vertical />
-            <div className="guard-route__destination" key={destination}>
-              <div className="guard-model-stack" aria-hidden="true">
-                <i />
-                <i />
-                <i />
-              </div>
-              <div>
-                <strong>
-                  {destination === "cloud"
-                    ? copy.cloudNames
-                    : copy.internalNames}
-                </strong>
-                <span>
-                  {destination === "cloud"
-                    ? copy.cloudDetail
-                    : copy.internalDetail}
-                </span>
-              </div>
-            </div>
-          </div>
-          <p className="guard-route__scope">{copy.routeScope}</p>
-        </div>
-      </div>
-      <Link href="/triage" className="guard-link">
-        {copy.next}
-        <span aria-hidden="true">↗</span>
-      </Link>
-    </section>
-  );
-}
-
 export function GuardLanding() {
   const { lang } = useT();
   const copy = GUARD_COPY[lang];
@@ -233,7 +121,8 @@ export function GuardLanding() {
               lang === "fr" ? "Navigation principale" : "Main navigation"
             }
           >
-            <a href="#usages">{copy.explore}</a>
+            <a href="#menaces-accueil">{copy.problemKicker}</a>
+            <a href="#vous">{copy.whoKicker}</a>
             <Link href="/evidence">{copy.evidence}</Link>
             <LanguageToggle />
             <Link href="/login" className="guard-button guard-button--small">
@@ -253,7 +142,7 @@ export function GuardLanding() {
             <span>{copy.title[1]}</span>
           </h1>
           <p className="guard-hero__intro">{copy.intro}</p>
-          <a href="#usages" className="guard-button">
+          <a href="#menaces-accueil" className="guard-button">
             {copy.explore}
             <span aria-hidden="true">↓</span>
           </a>
@@ -264,52 +153,12 @@ export function GuardLanding() {
         </div>
         <ControlScene copy={copy} />
       </section>
-      <UsageExplorer copy={copy} />
-      <section className="guard-principles">
-        <div className="guard-wrap">
-          <div className="guard-section-heading">
-            <h2>{copy.whyTitle}</h2>
-            <p>{copy.whyIntro}</p>
-          </div>
-          <ol>
-            {copy.steps.map((step, index) => (
-              <li key={step.title}>
-                <span className="guard-step-number">0{index + 1}</span>
-                <div>
-                  <h3>{step.title}</h3>
-                  <p>{step.body}</p>
-                </div>
-                {index < 2 && <Arrow />}
-              </li>
-            ))}
-          </ol>
-          <details className="guard-limits">
-            <summary>
-              {copy.limits}
-              <span aria-hidden="true">+</span>
-            </summary>
-            <p>{copy.limitsText}</p>
-            <Link className="guard-link" href="/evidence">
-              {copy.evidence}
-              <span aria-hidden="true">↗</span>
-            </Link>
-          </details>
-        </div>
-      </section>
-      <section className="guard-contact guard-wrap">
-        <div>
-          <p className="guard-kicker">{copy.poc}</p>
-          <h2>{copy.finalTitle}</h2>
-          <p>{copy.finalBody}</p>
-        </div>
-        <a
-          href="mailto:julian.talou@xsom.fr?subject=xSOM%20AI%20Guard%20%3A%20cas%20d%E2%80%99usage"
-          className="guard-button"
-        >
-          {copy.contact}
-          <span aria-hidden="true">↗</span>
-        </a>
-      </section>
+      {/* La trame de la page, et c'est tout son objet : d'où vient le problème,
+          puis qui vous êtes, puis où cela vous mène. L'ancienne suite (usages,
+          principes, contact) posait trois fois la même question sans jamais aiguiller,
+          si bien qu'on lisait la page sans savoir ce qu'on était censé en faire. */}
+      <MenacesLanding copy={copy} />
+      <Orientation copy={copy} />
       <footer className="guard-footer">
         <div className="guard-wrap">
           <div className="brand">
