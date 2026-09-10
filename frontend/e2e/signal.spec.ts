@@ -295,12 +295,13 @@ test("theme and reduced motion persist, and operating-system motion always wins"
   const preferences = page.locator("signal-preferences").first();
   const html = page.locator("html");
 
-  await preferences.getByRole("button", { name: "Thème clair", exact: true }).click();
   await expect(html).toHaveAttribute("data-theme", "light");
+  await preferences.getByRole("button", { name: "Thème clair", exact: true }).click();
+  await expect(html).toHaveAttribute("data-theme", "dark");
   await preferences.getByRole("button", { name: "Réduire les animations", exact: true }).click();
   await expect(html).toHaveAttribute("data-motion", "off");
   await page.reload();
-  await expect(html).toHaveAttribute("data-theme", "light");
+  await expect(html).toHaveAttribute("data-theme", "dark");
   await expect(html).toHaveAttribute("data-motion", "off");
 
   await preferences.getByRole("button", { name: "Réduire les animations", exact: true }).click();
@@ -323,6 +324,40 @@ for (const width of [390, 768, 1440]) {
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       const excess = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       expect(excess, `${route} overflows the ${width}px viewport by ${excess}px`).toBeLessThanOrEqual(1);
+      if (route === "/onboarding") {
+        await page.getByRole("button", { name: "Suivant", exact: true }).click();
+        const selected = page.getByRole("button", { name: "Utiliser un modèle", exact: true });
+        await expect(selected).toHaveAttribute("aria-pressed", "true");
+        for (const theme of ["light", "dark"]) {
+          if (theme === "dark") {
+            const themeButton = page.locator('signal-preferences [data-action="theme"]').first();
+            const menu = page.getByRole("button", { name: "Menu", exact: true });
+            const openMenu = !(await themeButton.isVisible());
+            if (openMenu) await menu.click();
+            await themeButton.click();
+            if (openMenu) await menu.click();
+          }
+          await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+          // Measure the selected state, not interpolated colors during the theme transition.
+          await selected.evaluate(async element => {
+            await Promise.all(element.getAnimations().map(animation => animation.finished.catch(() => undefined)));
+          });
+          const contrast = await selected.evaluate(element => {
+            const style = getComputedStyle(element);
+            const luminance = (color: string) => {
+              const channels = color.match(/[\d.]+/g)!.slice(0, 3).map(value => {
+                const channel = Number(value) / 255;
+                return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+              });
+              return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+            };
+            const foreground = luminance(style.color);
+            const background = luminance(style.backgroundColor);
+            return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
+          });
+          expect(contrast, `onboarding step 2 ${theme} selected mode contrast`).toBeGreaterThanOrEqual(4.5);
+        }
+      }
     }
   });
 }

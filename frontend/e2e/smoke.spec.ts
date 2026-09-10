@@ -20,6 +20,21 @@ async function authed(context: BrowserContext) {
 test("landing page renders", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "xSOM AI Guard" })).toBeVisible();
+  const fonts = await page.evaluate(async () => {
+    await document.fonts.ready;
+    const root = getComputedStyle(document.documentElement);
+    const family = (token: string) => root.getPropertyValue(token).split(",")[0].trim().replace(/["']/g, "");
+    const display = family("--signal-font-display");
+    const body = family("--signal-font-body");
+    const loaded = [...document.fonts].filter(face => face.status === "loaded").map(face => face.family.replace(/["']/g, ""));
+    return { display, body, loaded, headingStyle: getComputedStyle(document.querySelector("h1")!).fontFamily, bodyStyle: getComputedStyle(document.body).fontFamily };
+  });
+  expect(fonts.display.toLowerCase()).toContain("manrope");
+  expect(fonts.body.toLowerCase()).toContain("sourcesans");
+  expect(fonts.loaded).toContain(fonts.display);
+  expect(fonts.loaded).toContain(fonts.body);
+  expect(fonts.headingStyle).toContain(fonts.display);
+  expect(fonts.bodyStyle).toContain(fonts.body);
 });
 
 // --- Le paysage des menaces (L4) ------------------------------------------------
@@ -29,7 +44,7 @@ test("landing page renders", async ({ page }) => {
 // tient la frontière côté source. Ici on vérifie ce que le source ne peut pas dire,
 // à savoir que la section arrive **rendue** et complète.
 test("le relevé publie le classement en entier", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/evidence");
   const paysage = page.locator("#menaces .paysage");
 
   // Vingt-trois rangées, et le compte est le contrôle : une liste tronquée par une
@@ -60,7 +75,7 @@ test("le relevé publie le classement en entier", async ({ page }) => {
 // leur balisage, mais seul un navigateur dit si elles arrivent RENDUES, avec leurs
 // têtes de flèche résolues et leur nom accessible.
 test("chaque menace porte son diagramme, nommé et fléché", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/evidence");
   const figures = page.locator("#menaces .paysage .diag");
 
   // Vingt-trois figures, une par rangée. Une seule manquante laisserait un trou dans
@@ -196,6 +211,29 @@ test("a prospect with no account gets a diagnostic after giving an e-mail", asyn
   expect(sent.profiles).toEqual(["P1a"]);
 });
 
+test("a diagnostic network failure keeps the answers and permits an explicit retry", async ({ page }) => {
+  let attempts = 0;
+  await page.route("**/api/triage", async (route) => {
+    attempts += 1;
+    expect(route.request().postDataJSON()).toEqual({ profiles: ["P1a"], email: "retry@example.invalid" });
+    if (attempts === 1) await route.abort("failed");
+    else await route.fulfill({ json: DIAGNOSTIC });
+  });
+  await page.goto("/triage");
+  await page.getByRole("checkbox").first().check();
+  await page.getByLabel(/E-mail|Professional/).fill("retry@example.invalid");
+  const submit = page.getByRole("button", { name: /diagnostic|Voir mon/i });
+  await submit.click();
+  await expect(page.getByRole("main").getByRole("alert")).toHaveText("Le diagnostic n'a pas pu être calculé.");
+  await expect(submit).toBeEnabled();
+  await expect(page.getByLabel(/E-mail|Professional/)).toHaveValue("retry@example.invalid");
+  await expect(page.getByRole("checkbox").first()).toBeChecked();
+  expect(attempts).toBe(1);
+  await submit.click();
+  await expect(page.getByTestId("triage-statement")).toContainText(DIAGNOSTIC.statement);
+  expect(attempts).toBe(2);
+});
+
 // --- Langue et métadonnées (L2) ------------------------------------------------
 //
 // Ces quatre affirmations tenaient toutes au même défaut : le dictionnaire vivait
@@ -212,15 +250,17 @@ test("un visiteur sans cookie reçoit le français, et le document le déclare",
   // lecteur d'écran lisait de l'anglais avec une voix française. Vérifier l'un sans
   // l'autre laisserait ce désaccord passer.
   await expect(page.locator("html")).toHaveAttribute("lang", "fr");
-  await expect(page.getByText("Déployez vos agents IA en production.")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("L’IA avance.");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Gardez la main.");
 
   // Le titre et la description existent, et sont français. Sans ce lot il n'y avait
   // ni l'un ni l'autre : une page cliente ne peut pas en exporter.
-  await expect(page).toHaveTitle(/Le contrôle des actions de vos agents IA/);
+  await expect(page).toHaveTitle(/Un POC expérimental pour encadrer les usages IA/);
   const description = await page
     .locator('head meta[name="description"]')
     .getAttribute("content");
-  expect(description).toContain("gateway MCP");
+  expect(description).toContain("le prototype de xSOM");
+  expect(description).toContain("données confidentielles");
 
   // Le français est dans la **première réponse**, pas posé après coup. Avant ce lot,
   // le serveur rendait l'anglais — il ne pouvait pas lire `localStorage` — et le
@@ -228,7 +268,8 @@ test("un visiteur sans cookie reçoit le français, et le document le déclare",
   // l'anglais. (Que la page soit devenue un composant serveur ne se lit pas ici mais
   // dans le poids du bundle : 2,56 ko de JS de page avant, 187 o après.)
   const html = (await reponse?.text()) ?? "";
-  expect(html).toContain("Déployez vos agents IA en production.");
+  expect(html).toContain("L’IA avance.");
+  expect(html).toContain("Gardez la main.");
 });
 
 test("basculer en anglais tient au rechargement", async ({ page }) => {
@@ -238,14 +279,16 @@ test("basculer en anglais tient au rechargement", async ({ page }) => {
   // (« Empoisonnement », « Agents », « entraînons »). Le sélecteur était juste tant que
   // la page était courte, ce qui est la définition d'un sélecteur fragile.
   await page.getByRole("button", { name: "EN", exact: true }).click();
-  await expect(page.getByText("Ship AI agents to production.")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("AI moves forward.");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Stay in control.");
 
   // Le rechargement est le point : la préférence tient dans un cookie que le serveur
   // relit, elle ne vit pas seulement dans l'état d'un composant.
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
-  await expect(page.getByText("Ship AI agents to production.")).toBeVisible();
-  await expect(page).toHaveTitle(/Action control for your AI agents/);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("AI moves forward.");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Stay in control.");
+  await expect(page).toHaveTitle(/An experimental AI governance POC/);
 });
 
 test("les écrans d'authentification et la console refusent l'indexation", async ({ page }) => {
@@ -302,7 +345,7 @@ const RELEVE_P1A = {
 test("le relevé des seize lignes est rendu par le serveur, sans JavaScript", async ({
   page,
 }) => {
-  const reponse = await page.goto("/");
+  const reponse = await page.goto("/evidence");
   const html = (await reponse?.text()) ?? "";
 
   for (const id of ["M-01", "M-08", "M-16"]) {
@@ -323,7 +366,7 @@ test("la page relaie les comptes du moteur au lieu de les recalculer", async ({ 
     await route.fulfill({ json: RELEVE_P1A });
   });
 
-  await page.goto("/");
+  await page.goto("/evidence");
   await page.getByRole("button", { name: /P1a/ }).click();
 
   // L'énoncé du moteur, mot pour mot. Une page qui le recomposerait écrirait le sien.
@@ -337,7 +380,7 @@ test("une ligne positionnée ne mêle pas la preuve d'une facette qu'on n'a pas"
     await route.fulfill({ json: RELEVE_P1A });
   });
 
-  await page.goto("/");
+  await page.goto("/evidence");
   await page.getByRole("button", { name: /P1a/ }).click();
 
   // `M-07` est applicable à `P1a` par sa seule facette « réception », qui ne porte ni
@@ -357,7 +400,7 @@ test("sans le moteur, le relevé se montre sans se prétendre positionné", asyn
     await route.fulfill({ status: 503, json: { detail: "Relevé momentanément indisponible" } });
   });
 
-  await page.goto("/");
+  await page.goto("/evidence");
   await page.getByRole("button", { name: /P3/ }).click();
 
   // Il le dit, et les seize lignes restent là. Se vider se lirait « aucune menace »,
@@ -373,7 +416,7 @@ test("sans le moteur, le relevé se montre sans se prétendre positionné", asyn
 test("ouvrir une ligne hors périmètre affiche la raison publiée dans la carte", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/evidence");
   await page.getByRole("button", { name: /Vol de modèle/ }).click();
 
   // La raison vient de `coverage/map.json`, pas d'une rédaction de la page : `FR-144`
@@ -389,7 +432,7 @@ test("ouvrir une ligne hors périmètre affiche la raison publiée dans la carte
 test("le rejeu montre deux traces réelles, et le même appel des deux côtés", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/evidence");
   await page.getByRole("button", { name: /Injection de prompts indirecte/ }).click();
 
   const panneau = page.locator("#menaces").getByText("Le même appel, joué deux fois");
@@ -410,7 +453,7 @@ test("le rejeu montre deux traces réelles, et le même appel des deux côtés",
 });
 
 test("une ligne sans rejeu publie sa raison plutôt qu'un cadre vide", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/evidence");
   await page.getByRole("button", { name: /Fuite du system prompt/ }).click();
 
   // `M-14` ne peut pas être rejouée : sa preuve est qu'un argument secret n'atteint
@@ -455,7 +498,7 @@ test("un seul sélecteur de profil pilote les deux sections", async ({ page }) =
     });
   });
 
-  await page.goto("/");
+  await page.goto("/evidence");
   // Un seul bouton `P1a` sur toute la page : deux sélecteurs poseraient au visiteur
   // une question à laquelle il a déjà répondu, avec deux réponses possibles.
   await expect(page.getByRole("button", { name: /P1a/ })).toHaveCount(1);
@@ -468,7 +511,7 @@ test("un seul sélecteur de profil pilote les deux sections", async ({ page }) =
 });
 
 test("un maillon de la chaîne filtre le relevé, et se relâche", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/evidence");
   const rangees = page.locator("#menaces .menace");
   const total = await rangees.count();
   expect(total).toBeGreaterThan(10);
@@ -532,7 +575,7 @@ test("ce que l'instantané ne montre pas est dit, avec sa raison", async ({ page
   await expect(page.getByText(/Une file est vivante ou n'est pas/)).toBeVisible();
 });
 
-// La section « comment ça marche » (`L9`), désormais sur la page d'accueil. Les
+// La section « comment ça marche » (`L9`), sur la page publique de preuves. Les
 // gardes Python de `tests/test_integration_snippets.py` prouvent que les extraits
 // n'ont **qu'une** définition, partagée avec l'assistant d'intégration. Ce qu'ils ne
 // peuvent pas atteindre : que cette définition ait réellement produit du texte, et que
@@ -541,12 +584,12 @@ test("ce que l'instantané ne montre pas est dit, avec sa raison", async ({ page
 // `L8` s'est répétée trois fois : regarder la page rendue trouve ce que les types, les
 // tests et le build ne trouvent pas.
 //
-// Les trois contrôles sont portés sur `#how` et non sur la page entière : la section a
-// fondu dans l'accueil, où d'autres sections ont leurs propres titres et leurs propres
+// Les trois contrôles sont portés sur `#how` et non sur la page entière : les autres
+// sections de preuves ont leurs propres titres et leurs propres
 // `<details>`. Un sélecteur non porté attraperait les leurs.
 
 test("la section d'intégration livre un extrait MCP réellement rendu", async ({ page }) => {
-  const reponse = await page.goto("/");
+  const reponse = await page.goto("/evidence");
   const html = (await reponse?.text()) ?? "";
 
   // Rendu par le serveur : un lecteur sans JavaScript, et un robot, voient l'extrait.
@@ -557,7 +600,7 @@ test("la section d'intégration livre un extrait MCP réellement rendu", async (
 });
 
 test("les trois voies apparaissent dans l'ordre décroissant de garantie", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/evidence");
   // L'ordre du DOM, et non celui du fichier source : c'est celui que le lecteur subit.
   const titres = await page.locator("#how h4").allInnerTexts();
   const rangs = ["Passerelle MCP", "/v1/authorize", "Proxy du fournisseur LLM"].map((t) =>
@@ -573,7 +616,7 @@ test("les trois voies apparaissent dans l'ordre décroissant de garantie", async
 });
 
 test("aucun jeton de la section publique ne peut se lire comme un vrai", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/evidence");
 
   // Les extraits sont repliés : `innerText` ne rend PAS le contenu d'un `<details>`
   // fermé, et sans cette ouverture le contrôle passerait au vert en ne lisant rien.
@@ -600,6 +643,13 @@ test("aucun jeton de la section publique ne peut se lire comme un vrai", async (
 // interdite dans un commentaire XML. Seul un rendu réel l'a montré.
 
 test("le favicon est servi, déclaré, et décodable par le navigateur", async ({ page }) => {
+  for (const asset of ["xsom-mark.svg", "xsom-mark-light.svg"]) {
+    const logo = await page.request.get(`/${asset}`);
+    expect(logo.status()).toBe(200);
+    expect(logo.url()).toContain(`/${asset}`);
+    expect(logo.headers()["content-type"]).toContain("image/svg+xml");
+    expect(await logo.text()).toContain("<svg");
+  }
   const reponse = await page.goto("/icon.svg");
   expect(reponse?.status()).toBe(200);
   expect(reponse?.headers()["content-type"]).toContain("image/svg+xml");
