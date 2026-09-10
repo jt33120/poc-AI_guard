@@ -162,6 +162,18 @@ def test_the_deployment_healthcheck_probes_readiness_not_liveness() -> None:
     La sonde qui lit les portes existe — c'est `/health/ready`, et elle n'était
     câblée que dans `docker-compose.yml`. Le contrôle voisin l'exigeait déjà là ;
     celui-ci l'exige là où ça compte.
+
+    **Et ce contrôle-ci ne suffit pas, constaté sur le déploiement réel.** Railway a
+    déprécié la configuration par fichier (`railway.json` / `railway.toml`) au profit
+    de `.railway/railway.ts` : le fichier de ce dépôt n'est plus lu, et le service de
+    production tournait donc avec le défaut du tableau de bord — `/health`, la sonde
+    statique, exactement celle que ce test existe pour interdire. Un fichier qui
+    déclare une garantie que personne ne lit est pire qu'une absence de fichier :
+    il fait croire la question réglée.
+
+    Le fichier est gardé parce qu'il documente l'intention et sert les hôtes qui le
+    lisent encore ; ce qui a changé est ce que `docs/DEPLOY.md` en dit — la sonde se
+    règle **sur le service**, et le fichier ne la règle pas.
     """
     railway = json.loads((_REPO / "railway.json").read_text(encoding="utf-8"))
     assert railway["deploy"]["healthcheckPath"] == "/health/ready", (
