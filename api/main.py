@@ -198,6 +198,11 @@ def create_app(settings: Settings | None = None, *, plane: Plane = Plane.ALL) ->
 
     # Shared state read by dependencies (settings, verifier, DB url, limiter).
     app.state.settings = settings
+    # Le plan servi, pour que la sonde de disponibilité sache ce que CE service a
+    # besoin de savoir faire. `health_router` est dans le socle, donc les trois plans
+    # servaient jusqu'ici le même verdict — et un plan qui échoue sur une dépendance
+    # qu'il n'appelle jamais sort de la rotation pour rien.
+    app.state.plane = plane
     app.state.verifier = build_verifier(settings)
     # `FR-196` : construite au démarrage, pour qu'une correspondance groupe→rôle
     # malformée refuse de démarrer au lieu de 500 au premier login.

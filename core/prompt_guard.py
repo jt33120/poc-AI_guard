@@ -121,7 +121,9 @@ class PromptGuard:
         return Verdict(flagged=flagged, categories=categories, prompt_digest=digest)
 
 
-def litellm_completer(model: str, api_key: str) -> Completer:  # pragma: no cover - réseau
+def litellm_completer(
+    model: str, api_key: str, timeout: float = 8.0
+) -> Completer:  # pragma: no cover - réseau
     """Appel Mistral via LiteLLM — le même fournisseur que le juge, à dessein.
 
     `QO-3` a tranché sur la **dépendance opérationnelle**, pas sur la nationalité de
@@ -143,6 +145,10 @@ def litellm_completer(model: str, api_key: str) -> Completer:  # pragma: no cove
             ],
             temperature=0.0,
             max_tokens=200,
+            # Même borne que le juge, et pour la même raison : ce garde est appelé
+            # avant chaque complétion relayée par le proxy. Non borné, un point de
+            # terminaison qui accepte sans répondre gèle le trafic de l'agent.
+            timeout=timeout,
         )
         content: str = response.choices[0].message.content or ""
         return content
@@ -160,7 +166,9 @@ def build_guard(settings: Any) -> PromptGuard | None:
     """
     if not settings.prompt_guard_enabled or not settings.mistral_api_key:
         return None
-    completer = litellm_completer(settings.mistral_model, settings.mistral_api_key)
+    completer = litellm_completer(
+        settings.mistral_model, settings.mistral_api_key, settings.judge_timeout_seconds
+    )
     return PromptGuard(completer, max_calls=settings.prompt_guard_max_calls)
 
 

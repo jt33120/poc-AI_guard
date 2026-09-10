@@ -8,6 +8,7 @@ against an unmigrated database.
 
 from __future__ import annotations
 
+import json
 import re
 from fnmatch import fnmatch
 from pathlib import Path, PurePosixPath
@@ -147,3 +148,23 @@ def test_compose_states_that_it_ships_no_identity_provider(compose: dict[str, An
     header = _COMPOSE.read_text(encoding="utf-8")
     assert "NO identity provider" in header
     assert "auth" not in compose["services"], "an auth service needs its own story first"
+
+
+def test_the_deployment_healthcheck_probes_readiness_not_liveness() -> None:
+    """La sonde de déploiement ne pouvait pas dire non, et c'est celle qui décide.
+
+    `railway.json` pointait sur `/health`, qui rend `{"status": "ok"}` **en dur**,
+    sans toucher ni la base ni les migrations. Un conteneur avec un `DATABASE_URL`
+    faux, une base en pause ou des migrations en retard passait donc le contrôle,
+    était promu, et restait en rotation : `restartPolicyType: ON_FAILURE` ne se
+    déclenche jamais, puisque le processus est parfaitement vivant.
+
+    La sonde qui lit les portes existe — c'est `/health/ready`, et elle n'était
+    câblée que dans `docker-compose.yml`. Le contrôle voisin l'exigeait déjà là ;
+    celui-ci l'exige là où ça compte.
+    """
+    railway = json.loads((_REPO / "railway.json").read_text(encoding="utf-8"))
+    assert railway["deploy"]["healthcheckPath"] == "/health/ready", (
+        "le contrôle de déploiement doit interroger la sonde qui peut répondre non ;\n"
+        "  `/health` est statique et vert quoi qu'il arrive."
+    )

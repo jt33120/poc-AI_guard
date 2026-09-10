@@ -88,6 +88,17 @@ class Settings(BaseSettings):
     mistral_api_key: str | None = Field(default=None, max_length=255)
     mistral_model: str = Field(default="mistral/mistral-small-latest", max_length=120)
     judge_max_calls: int = Field(default=200, ge=1, le=100_000)
+    # La SEULE sortie réseau du dépôt qui n'était pas bornée, et elle est dans la
+    # boucle de décision de `/v1/authorize` et de la passerelle. Toutes les autres
+    # portent un délai (`core/notify.py` 10 s, `core/signup.py` 15 s,
+    # `core/egress.py` 30/300 s, `api/llm_proxy.py` 120 s, `api/security.py` 5 s,
+    # `api/health.py` 3 s). Un point de terminaison qui accepte la connexion sans
+    # répondre gelait la décision pour toute la flotte du plan.
+    #
+    # Une expiration compte comme un échec de classification, donc `irreversible`
+    # (`AD-34`) : mieux vaut une file d'approbation qui se remplit qu'une flotte
+    # arrêtée ou, pire, une action risquée laissée passer faute de verdict.
+    judge_timeout_seconds: float = Field(default=8.0, ge=0.5, le=120.0)
 
     # --- Garde-prompt tiers (`FR-193`) — LiteLLM -> Mistral, opt-in ------------
     #

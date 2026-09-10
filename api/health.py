@@ -16,6 +16,7 @@ anonymous database or JWKS amplifier.
 
 from __future__ import annotations
 
+import threading
 import time
 from dataclasses import dataclass
 
@@ -35,6 +36,28 @@ router = APIRouter(tags=["meta"])
 _CACHE_TTL_SECONDS = 5.0
 _DB_CONNECT_TIMEOUT = 3  # seconds; psycopg takes an int
 _JWKS_TIMEOUT = 3.0
+
+#: Borne côté serveur sur la requête de la sonde, en millisecondes.
+#:
+#: `connect_timeout` ne borne que **l'établissement** de la connexion. Une base qui
+#: accepte la connexion puis ne répond plus — le mode de panne le plus courant d'un
+#: Postgres saturé — laissait la sonde attendre indéfiniment dans un thread du pool,
+#: et la sonde est ce sur quoi Railway décide de redémarrer. `grep statement_timeout`
+#: sur `core/`, `api/` et `gateway/` ne rendait rien, nulle part.
+_DB_STATEMENT_TIMEOUT_MS = 2000
+
+#: Un seul calcul à la fois. La mémoïsation lisait puis écrivait `state.readiness`
+#: sans verrou, dans une fonction synchrone donc exécutée dans le pool de threads :
+#: N requêtes simultanées sur une route anonyme et non limitée ouvraient N connexions
+#: sur le DSN qu'utilise aussi le chemin de décision. Le docstring du module promet
+#: pourtant que la sonde ne peut pas servir d'amplificateur.
+_VERROU = threading.Lock()
+
+#: Les plans dont une route lit un JWT. Nommés en dur plutôt que déduits de
+#: `api.main`, pour ne pas créer d'import circulaire : `api/main.py` importe déjà ce
+#: module. `tests/test_health.py` confronte cette liste aux plans réels, donc elle ne
+#: peut pas dériver en silence.
+_PLANS_QUI_VERIFIENT_UN_JETON = frozenset({"all", "console"})
 
 
 class Readiness(BaseModel):
@@ -61,7 +84,11 @@ def _database_gates(dsn: str | None) -> tuple[bool, bool]:
     if not dsn:
         return False, False
     try:
-        with psycopg.connect(dsn, connect_timeout=_DB_CONNECT_TIMEOUT) as conn:
+        with psycopg.connect(
+            dsn,
+            connect_timeout=_DB_CONNECT_TIMEOUT,
+            options=f"-c statement_timeout={_DB_STATEMENT_TIMEOUT_MS}",
+        ) as conn:
             return True, not migrate.pending(conn)
     except (psycopg.Error, OSError):
         return False, False
@@ -80,8 +107,24 @@ def _issuer_resolves(url: str | None) -> bool:
     return bool(isinstance(payload, dict) and payload.get("keys"))
 
 
-def evaluate(settings: Settings) -> Readiness:
-    """Run every gate and decide the single boolean a probe keys on."""
+def evaluate(settings: Settings, plane: str = "all") -> Readiness:
+    """Run every gate and decide the single boolean a probe keys on.
+
+    **Le plan compte, et il ne comptait pas.** `health_router` est dans le socle, donc
+    les trois services — `décision`, `proxy LLM`, `console` — servaient exactement le
+    même verdict. Or le plan `décision` ne vérifie aucun JWT : `api/authorize.py`
+    authentifie par `X-Gateway-Token`, et `api/decision.py` dit explicitement que ce
+    plan n'a besoin ni de la clé `service_role` ni des identifiants de fournisseurs.
+
+    Conséquence : une panne JWKS, ou un projet Supabase en pause, sortait
+    `/v1/authorize` de la rotation pour une dépendance qu'il n'appelle jamais — et un
+    agent coopératif privé de verdict refuse tout en fail-closed. C'est exactement la
+    cascade que le découpage en plans existe pour empêcher, réintroduite par la sonde.
+
+    Le booléen `issuer` reste dans la charge pour **tous** les plans : il est
+    informatif, et le retirer rendrait le diagnostic plus pauvre. Seul le rollup
+    change.
+    """
     database, schema_current = _database_gates(settings.database_url)
     # Deux conditions, pas une. Que le JWKS résolve dit seulement qu'un émetteur
     # répond ; qu'il serve *nos* revendications dit qu'un jeton pourra autoriser
@@ -93,7 +136,9 @@ def evaluate(settings: Settings) -> Readiness:
     # configured at all is only fatal in prod — the control-plane-only stack
     # (gateway tokens, /v1/authorize, migrations, audit) genuinely works without
     # one, and a probe that can never go green is a probe operators switch off.
-    issuer_required = settings.is_prod or settings.jwks_url is not None
+    issuer_required = (
+        settings.is_prod or settings.jwks_url is not None
+    ) and plane in _PLANS_QUI_VERIFIENT_UN_JETON
     return Readiness(
         ok=database and schema_current and (issuer or not issuer_required),
         database=database,
@@ -102,15 +147,28 @@ def evaluate(settings: Settings) -> Readiness:
     )
 
 
+def _frais(state: State) -> Readiness | None:
+    """Le verdict mémoïsé s'il est encore valable, sinon ``None``."""
+    cached: _Cached | None = getattr(state, "readiness", None)
+    if cached is not None and time.monotonic() - cached.at < _CACHE_TTL_SECONDS:
+        return cached.verdict
+    return None
+
+
 def _cached_verdict(state: State) -> Readiness:
     """Memoise per app instance (not per process: tests build many apps)."""
-    cached: _Cached | None = getattr(state, "readiness", None)
-    now = time.monotonic()
-    if cached is not None and now - cached.at < _CACHE_TTL_SECONDS:
-        return cached.verdict
-    verdict = evaluate(state.settings)
-    state.readiness = _Cached(verdict=verdict, at=now)
-    return verdict
+    if (verdict := _frais(state)) is not None:
+        return verdict
+    # Le verrou n'est pris qu'au **défaut de cache**, et l'entrée est relue une fois
+    # dedans : le chemin chaud reste sans verrou, et les N requêtes qui arrivent
+    # pendant un calcul en cours attendent celui-ci au lieu d'en lancer N autres.
+    with _VERROU:
+        if (verdict := _frais(state)) is not None:
+            return verdict
+        plan: str = getattr(state, "plane", "all")
+        verdict = evaluate(state.settings, plan)
+        state.readiness = _Cached(verdict=verdict, at=time.monotonic())
+        return verdict
 
 
 @router.get("/health/ready")
