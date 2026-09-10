@@ -160,6 +160,27 @@ def pg_cluster() -> Iterator[pgcluster.EphemeralPostgres]:
         cluster.stop()
 
 
+#: Dans la SUITE seulement, un tenant naît `entreprise`.
+#:
+#: En production le défaut est `free` (`0030_saas_plans.sql`), et
+#: `tests/test_entitlements.py::test_the_production_default_plan_is_free` refuse que
+#: cette bascule dérive jusqu'au produit.
+#:
+#: **Pourquoi ici plutôt que dans chaque test.** Les quelque quarante fichiers de la
+#: suite éprouvent du RBAC, de l'isolation et de la logique métier — pas de la
+#: facturation. Leur faire déclarer un palier ajouterait une ligne de bruit par test
+#: et une chose à oublier à chaque nouveau, pour ne rien prouver de plus : le verrou
+#: de gamme a ses propres contrôles, et ils sont exhaustifs par construction
+#: (`tests/test_entitlements_map.py` refuse la construction si un routeur d'`api/`
+#: n'a pas déclaré sa capacité, `None` compris).
+#:
+#: Ce que cette bascule coûte, énoncé plutôt que tu : une capacité **mal attribuée**
+#: à un routeur ne se verrait pas dans le reste de la suite. C'est exactement ce que
+#: la table de `api/main.py` rend relisible d'un coup d'œil, et c'est pour ça qu'elle
+#: est écrite en un seul bloc avec ses raisons.
+_PALIER_DE_TEST = "alter table tenants alter column plan set default 'entreprise'"
+
+
 @pytest.fixture
 def db(pg_cluster: pgcluster.EphemeralPostgres) -> Iterator[DBHandle]:
     """A fresh database with the auth shim + product migrations applied."""
@@ -171,6 +192,8 @@ def db(pg_cluster: pgcluster.EphemeralPostgres) -> Iterator[DBHandle]:
     for migration in sorted(_MIGRATIONS_DIR.glob("*.sql")):
         pg_cluster.psql_apply(url, migration)
     conn = psycopg.connect(url)
+    conn.execute(_PALIER_DE_TEST)
+    conn.commit()
     try:
         yield DBHandle(url=url, conn=conn)
     finally:

@@ -165,7 +165,19 @@ def test_usage_and_agents_are_tenant_isolated(
     client = _client(db.url, test_verifier)
     stranger = make_token(tenant_id=str(uuid4()), role="viewer")
 
-    assert client.get("/v1/usage", headers=_auth(stranger)).json()["calls"] == 0
-    overview = client.get("/v1/agents", headers=_auth(stranger)).json()
+    # Un tenant que la base ne connaît pas n'a aucune capacité (`load_entitlement`
+    # retombe sur `AUCUNE`, jamais sur `free`), donc il est arrêté avant la route.
+    # C'est plus tôt et plus fort que « RLS lui rend zéro ligne », qui restait vrai.
+    assert client.get("/v1/usage", headers=_auth(stranger)).status_code == 402
+    assert client.get("/v1/agents", headers=_auth(stranger)).status_code == 402
+
+    # Et l'isolation d'origine, sur un tenant qui EXISTE et porte le bon palier :
+    # c'est RLS qui répond, et il rend zéro.
+    voisin = str(uuid4())
+    db.conn.execute("insert into tenants (id, name) values (%s, 'voisin')", (voisin,))
+    db.conn.commit()
+    jeton = make_token(tenant_id=voisin, role="viewer")
+    assert client.get("/v1/usage", headers=_auth(jeton)).json()["calls"] == 0
+    overview = client.get("/v1/agents", headers=_auth(jeton)).json()
     assert overview["agents"] == []
     assert overview["agent_count"] == 0

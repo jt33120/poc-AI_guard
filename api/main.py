@@ -29,6 +29,7 @@ from api.clients import router as clients_router
 from api.compliance import router as compliance_router
 from api.corpora import router as corpora_router
 from api.credentials import router as credentials_router
+from api.deps import requires
 from api.dlp import router as dlp_router
 from api.errors import register_exception_handlers
 from api.gateway_tokens import router as gateway_tokens_router
@@ -50,6 +51,7 @@ from api.trust import router as trust_router
 from api.usage import router as usage_router
 from api.verdicts import router as verdicts_router
 from core.config import Settings, get_settings
+from core.entitlements import Capability
 from core.logging import configure_logging
 from core.observability import init_observability
 from core.prompt_guard import build_guard
@@ -132,6 +134,51 @@ _PLANS: dict[Plane, tuple[APIRouter, ...]] = {
 }
 
 
+#: La capacité de gamme qu'un routeur exige, ou `None` s'il est libre.
+#:
+#: **Écrite routeur par routeur, `None` compris.** Un routeur absent de cette table
+#: fait échouer la construction (`tests/test_entitlements_map.py`), parce que le mode
+#: de panne est silencieux dans les deux sens : un `requires` oublié laisse une
+#: fonctionnalité payante gratuite pour tout le monde, indéfiniment, sans que rien ne
+#: casse — et aucun test écrit après coup ne le trouve, puisqu'il n'y a rien à
+#: trouver : le code fait ce qu'il a toujours fait.
+#:
+#: **Le routeur et pas la route.** Une route ajoutée demain dans `api/dlp.py` est
+#: verrouillée par construction, pas parce que quelqu'un s'en est souvenu.
+#:
+#: Les `None` sont des décisions, pas des oublis, et chacun porte sa raison.
+_CAPACITE_PAR_ROUTEUR: tuple[tuple[APIRouter, Capability | None], ...] = (
+    # --- Le socle qui ne se vend pas ---------------------------------------------
+    (health_router, None),  # une sonde derrière un paywall ne sert à rien
+    (signup_router, None),  # on ne peut pas exiger un palier avant d'avoir un tenant
+    (threats_router, None),  # contenu public : c'est le site
+    (authorize_router, None),  # §4.1 — le verdict est la garantie, il ne se facture pas
+    (approvals_router, None),  # §4.1 — tenir un humain dans la boucle non plus
+    (audit_router, None),  # §4.2 — le journal prouve ; le facturer serait vendre le risque
+    (policy_router, None),  # sans policy éditable, le produit ne fait rien
+    (trust_router, None),  # lecture du capital de confiance, adossée à l'audit
+    # --- Les capacités de gamme ---------------------------------------------------
+    (llm_proxy_router, Capability.llm_proxy),
+    (gateway_tokens_router, Capability.agents_inventory),
+    (agents_router, Capability.agents_inventory),
+    (servers_router, Capability.agents_inventory),
+    (usage_router, Capability.usage_billing),
+    (triage_router, Capability.triage),
+    (credentials_router, Capability.credentials),
+    (clients_router, Capability.clients),
+    (dlp_router, Capability.dlp_config),
+    (ai_router, Capability.ai_summary),
+    (read_tokens_router, Capability.read_tokens),
+    (compliance_router, Capability.compliance_pack),
+    (integrity_router, Capability.integrity_admin),
+    (monitor_router, Capability.monitor_admin),
+    (promotion_router, Capability.promotion),
+    (corpora_router, Capability.corpora),
+    (verdicts_router, Capability.verdicts_ingest),
+    (shadow_ai_router, Capability.shadow_ai),
+)
+
+
 #: Ce qu'un plan chaud a le **droit** de servir, préfixe par préfixe.
 #:
 #: Énoncé en liste blanche, et non par comparaison avec la console : un routeur
@@ -146,6 +193,21 @@ _PREFIXES_CHAUDS: dict[Plane, tuple[str, ...]] = {
 
 #: Servi par tous les plans : les deux sondes, et le principal authentifié.
 _CHEMINS_SOCLE: frozenset[str] = frozenset({"/health", "/health/ready", "/v1/me"})
+
+
+def _capacite_de(router: APIRouter) -> Capability | None:
+    """La capacité qu'un routeur exige, cherchée par **identité**.
+
+    Une table `dict[APIRouter, ...]` serait plus naturelle et ne compile pas :
+    `APIRouter` n'est pas hachable. `_PLANS` contourne déjà la même limite avec des
+    tuples, et `tests/test_api_planes.py` compare par `id()` pour la même raison.
+    Vingt-six entrées parcourues une fois au montage : le coût est nul, et l'écriture
+    reste une table qu'on lit d'un coup d'œil.
+    """
+    for declare, capacite in _CAPACITE_PAR_ROUTEUR:
+        if declare is router:
+            return capacite
+    return None
 
 
 def routers_for(plane: Plane) -> tuple[APIRouter, ...]:
@@ -236,7 +298,8 @@ def create_app(settings: Settings | None = None, *, plane: Plane = Plane.ALL) ->
         }
 
     for router in routers_for(plane):
-        app.include_router(router)
+        capacite = _capacite_de(router)
+        app.include_router(router, dependencies=[Depends(requires(capacite))] if capacite else [])
 
     return app
 

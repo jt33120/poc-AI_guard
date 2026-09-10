@@ -109,8 +109,15 @@ def test_status_is_tenant_isolated(
     client = _client(db.url, test_verifier)
     other = make_token(tenant_id=str(uuid4()), role="viewer")
 
-    body = client.get("/v1/compliance/status", headers=_auth(other)).json()
-    assert body["entries"] == 0  # RLS: another tenant sees none of these events
+    reponse = client.get("/v1/compliance/status", headers=_auth(other))
+
+    # **L'isolation est désormais tenue plus tôt, et plus fort.** Ce contrôle
+    # vérifiait que RLS rendait zéro ligne à un porteur étranger. Depuis la gamme
+    # (`0030`), un tenant que la base ne connaît pas n'a **aucune capacité** — le
+    # repli de `load_entitlement` est `AUCUNE` et jamais `free` — donc il n'atteint
+    # plus la route du tout. La propriété d'origine tient toujours par en dessous ;
+    # celle-ci est simplement celle qui s'exprime en premier.
+    assert reponse.status_code == 402, reponse.text
 
 
 def test_export_json_and_pdf(
