@@ -1,4 +1,4 @@
-/* xSOM Signal 1.0. Dependency-free progressive web components, shared verbatim. */
+/* xSOM Signal 2.0. Dependency-free progressive web components, shared verbatim. */
 const esc = (value) =>
   String(value ?? "").replace(
     /[&<>"']/g,
@@ -51,7 +51,7 @@ export const normalizeVerdict = (value) => {
 };
 const validVerdict = normalizeVerdict;
 const key = "xsom-signal-preferences";
-let preferences = { theme: "dark", reduced: false, sound: false };
+let preferences = { theme: "light", reduced: false, sound: false };
 let initialized = false;
 let audioContext;
 
@@ -109,7 +109,7 @@ export function initSignal() {
   initialized = true;
   try {
     const stored = JSON.parse(localStorage.getItem(key) || "{}");
-    preferences.theme = stored.theme === "light" ? "light" : "dark";
+    preferences.theme = stored.theme === "dark" ? "dark" : "light";
     preferences.reduced = stored.reduced === true;
     // Sound is opt-in for each visit, never resumed without a current gesture.
     preferences.sound = false;

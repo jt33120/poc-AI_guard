@@ -341,7 +341,7 @@ export default function OnboardingPage() {
                 aria-pressed={mode === m}
                 className={`rounded-pill px-3.5 py-1 transition ${
                   mode === m
-                    ? "bg-brand text-white"
+                    ? "onboarding-mode-selected"
                     : "text-white/55 hover:text-white"
                 }`}
               >

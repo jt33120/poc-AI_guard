@@ -771,3 +771,9 @@ signal-preferences {
     transform: none;
   }
 }
+/* Original blue/grey logo variants, without filters or recolouring. */
+.xsom-brand-mark { display: inline-grid; place-items: center; }
+.xsom-brand-mark img { width: 100%; height: 100%; object-fit: contain; grid-area: 1 / 1; }
+.xsom-brand-mark .xsom-brand-mark__dark { display: none; }
+:root[data-theme="dark"] .xsom-brand-mark .xsom-brand-mark__dark { display: block; }
+:root[data-theme="dark"] .xsom-brand-mark .xsom-brand-mark__light { display: none; }

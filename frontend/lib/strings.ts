@@ -40,40 +40,40 @@ export const STR = {
 
   // Public profile diagnostic (QO-7)
   "triage.title": {
-    en: "What of this actually concerns you?",
-    fr: "Qu'est-ce qui vous concerne vraiment ?",
+    en: "Start with your AI use cases.",
+    fr: "Partons de vos usages de l’IA.",
   },
   "triage.lede": {
-    en: "The market shows you a list of AI threats. Most of them are not yours. Tick how your organisation uses AI and see which lines apply, which are ours to hold, and which we block today.",
-    fr: "Le marché vous montre une liste de menaces IA. La plupart ne sont pas les vôtres. Cochez la façon dont votre organisation utilise l'IA, et voyez quelles lignes vous concernent, lesquelles sont sur notre terrain, et lesquelles nous bloquons aujourd'hui.",
+    en: "Select your team's uses. The diagnostic compares them with the POC’s published scope. It does not certify your deployment or connect a service.",
+    fr: "Sélectionnez les usages de votre équipe. Le diagnostic les compare au périmètre publié du POC. Il ne certifie pas votre déploiement et ne connecte aucun service.",
   },
   "triage.profiles": { en: "How do you use AI?", fr: "Comment utilisez-vous l'IA ?" },
-  "triage.p1a": { en: "We call a hyperscaler API", fr: "Nous appelons une API hyperscaler" },
+  "triage.p1a": { en: "Our developers integrate an AI model", fr: "Nos développeurs intègrent un modèle IA" },
   "triage.p1a.hint": {
-    en: "Azure OpenAI, Bedrock and the like, from our own code.",
-    fr: "Azure OpenAI, Bedrock et similaires, depuis notre propre code.",
+    en: "OpenAI, Claude or another hosted model, called from our application.",
+    fr: "OpenAI, Claude ou un autre modèle hébergé, appelé depuis notre application.",
   },
-  "triage.p1b": { en: "AI embedded in a SaaS suite", fr: "IA embarquée dans une suite SaaS" },
+  "triage.p1b": { en: "Our employees use an AI assistant", fr: "Nos collaborateurs utilisent un assistant IA" },
   "triage.p1b.hint": {
-    en: "Copilot, Gemini in Workspace and the like.",
-    fr: "Copilot, Gemini dans Workspace et similaires.",
+    en: "ChatGPT, Claude, Copilot or an office suite. Web use is not automatically covered by the POC.",
+    fr: "ChatGPT, Claude, Copilot ou une suite bureautique. Les usages web ne sont pas automatiquement couverts par le POC.",
   },
-  "triage.p2": { en: "Internal RAG over our documents", fr: "RAG interne sur nos documents" },
+  "triage.p2": { en: "AI searches our internal documents", fr: "L’IA consulte nos documents internes" },
   "triage.p2.hint": {
-    en: "The AI reads our own corpora to answer.",
-    fr: "L'IA lit nos propres corpus pour répondre.",
+    en: "An internal knowledge base, client files or confidential information.",
+    fr: "Base de connaissances, dossiers clients ou informations confidentielles.",
   },
-  "triage.p3": { en: "Tooled agents that act", fr: "Agents outillés qui agissent" },
+  "triage.p3": { en: "Our AI can take actions", fr: "Notre IA peut effectuer des actions" },
   "triage.p3.hint": {
     en: "The AI sends, writes, pays or deploys. It does not only answer.",
     fr: "L'IA envoie, écrit, paie ou déploie. Elle ne fait pas que répondre.",
   },
-  "triage.p4": { en: "Self-hosted open weights", fr: "Poids ouverts auto-hébergés" },
+  "triage.p4": { en: "We host the model internally", fr: "Nous hébergeons le modèle en interne" },
   "triage.p4.hint": {
-    en: "We run the model ourselves.",
-    fr: "Nous exécutons le modèle nous-mêmes.",
+    en: "An open-weight model, run on our own servers or private infrastructure.",
+    fr: "Un modèle open-weight, exécuté sur nos serveurs ou notre infrastructure privée.",
   },
-  "triage.p5": { en: "We train or fine-tune", fr: "Nous entraînons ou affinons" },
+  "triage.p5": { en: "We adapt a model to our business", fr: "Nous adaptons un modèle à notre métier" },
   "triage.p5.hint": {
     en: "Our own training or fine-tuning pipelines.",
     fr: "Nos propres chaînes d'entraînement ou d'affinage.",
@@ -450,12 +450,12 @@ export const STR = {
   // 58 caractères et le sous-titre 350 : repris tels quels, un moteur de recherche
   // tronque les deux. Ces deux clés-ci sont taillées pour la place réellement offerte.
   "meta.tagline": {
-    en: "Action control for your AI agents",
-    fr: "Le contrôle des actions de vos agents IA",
+    en: "An experimental AI governance POC",
+    fr: "Un POC expérimental pour encadrer les usages IA",
   },
   "meta.description": {
-    en: "An MCP gateway that checks every agent action against your policy, holds irreversible ones for human approval, and logs all of it.",
-    fr: "Un gateway MCP qui vérifie chaque action de vos agents selon votre politique, suspend l'irréversible pour validation humaine, et journalise tout.",
+    en: "Explore xSOM’s AI Guard prototype: employee, developer and confidential-data use cases, with explicit integration boundaries and published evidence.",
+    fr: "Explorez AI Guard, le prototype de xSOM : usages collaborateurs, développeurs et données confidentielles, avec un périmètre d’intégration explicite et des preuves publiées.",
   },
   "land.hero.title": {
     en: "Ship AI agents to production. Without losing control.",

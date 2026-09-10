@@ -65,13 +65,15 @@ test("Both themes meet AAA body and AA semantic/text contrast", () => {
     }
     assert.ok(
       contrast(t["signal-accent-ink"], t["signal-accent"]) >= 4.5,
-      "Copper button text AA",
+      "Primary button text AA",
     );
   }
 });
 test("Brand accent, local typography, spacing and readable state names are stable", () => {
-  assert.equal(tokens.dark["signal-accent"], "#e2603a");
-  assert.equal(tokens.light["signal-accent"], "#e2603a");
+  assert.equal(tokens.dark["signal-accent"], "#3f93ff");
+  assert.equal(tokens.light["signal-accent"], "#195dad");
+  assert.match(tokens.tokens["signal-font-display"], /Manrope/);
+  assert.match(tokens.tokens["signal-font-body"], /Source Sans 3/);
   assert.equal(tokens.tokens["signal-touch"], "44px");
   for (const [key, value] of Object.entries(tokens.tokens).filter(([key]) =>
     key.startsWith("sp-"),
