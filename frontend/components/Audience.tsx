@@ -32,51 +32,6 @@ import { useT } from "@/lib/i18n";
  * `core/profiles.py`, et une seconde liste côté page finirait par en différer le jour
  * où un profil s'ajoute.
  */
-function Plafond() {
-  const { t } = useT();
-  const { positionne } = useProfils();
-  // **Toujours affiché**, et pas seulement quand le visiteur a coché le profil
-  // concerné. La section s'intitule « et, tout aussi clairement, pour qui ce n'est
-  // pas » : cacher la réponse derrière une case à cocher la réserverait à ceux qui
-  // ont déjà deviné, et c'est l'affirmation la plus crédible de la page. Elle se
-  // souligne quand elle devient le cas du lecteur, elle n'apparaît pas à ce
-  // moment-là.
-  const leur_cas = Boolean(positionne?.cap);
-  return (
-    // Le filet est **présent dans les deux états**, et c'est ce qui change.
-    // `border-white/20` valait 1.86:1 : le lecteur ne voyait pas qu'il y avait un
-    // filet, donc il n'avait rien à quoi comparer le filet cuivre. Sur
-    // `--text-faint` (4.93:1) le rail est toujours là et c'est sa **teinte** qui
-    // dit l'état, jamais sa présence.
-    //
-    // Les deux états ne peuvent pas se distinguer l'un de l'autre à 3:1 : sur
-    // `--ink-900`, un filet à 3:1 du fond a une luminance de .124, et l'autre
-    // devrait alors atteindre .471 — au-dessus de `--copper-sheen` (.463), la
-    // teinte la plus claire de la charte. La contrainte est géométrique, pas un
-    // choix. WCAG 1.4.11 demande d'ailleurs 3:1 contre les **couleurs
-    // adjacentes**, donc contre le fond : les deux états y satisfont (4.93:1 et
-    // 5.15:1), et l'état lui-même est en outre porté par du texte — la couleur du
-    // libellé et le suffixe « · votre cas » ci-dessous — ce qui satisfait 1.4.1
-    // sans dépendre de la teinte du filet.
-    <div
-      className={`mt-6 border-l-2 pl-4 ${
-        leur_cas ? "border-[color:var(--copper-text)]" : "border-[color:var(--text-faint)]"
-      }`}
-    >
-      <p className={`label ${leur_cas ? "text-brand-bright" : "text-[color:var(--text-low)]"}`}>
-        {t("pourqui.plafond")}
-        {leur_cas && (
-          <span className="text-[color:var(--copper-text)]">
-            {" · "}
-            {t("pourqui.plafond.vous")}
-          </span>
-        )}
-      </p>
-      <p className="muted mt-1.5 max-w-2xl text-sm leading-relaxed">{t("pourqui.plafond.b")}</p>
-    </div>
-  );
-}
-
 /** Ce qui n'est pas encore la vôtre, et la condition qui la ferait basculer. */
 function Bascules() {
   const { t } = useT();
@@ -153,13 +108,6 @@ export function Audience() {
         {t("pourqui.title")}
       </h3>
       <p className="lead mt-4">{t("pourqui.lede")}</p>
-
-        <div className="mt-10">
-          <hr className="rule mb-8" />
-          <h4 className="t-h3">{t("pourqui.tri.t")}</h4>
-          <p className="muted mt-2 max-w-2xl text-sm leading-relaxed">{t("pourqui.tri.b")}</p>
-          <Plafond />
-        </div>
 
       <Bascules />
     </div>

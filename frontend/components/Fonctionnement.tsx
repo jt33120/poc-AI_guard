@@ -1,8 +1,3 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
-import Link from "next/link";
-
 import { ShieldMark } from "@/components/brand";
 import { mcpConfig, snippet } from "@/lib/integration";
 import { serverT } from "@/lib/lang";
@@ -18,8 +13,7 @@ import type { StrKey } from "@/lib/strings";
  * question se pose vraiment :
  *
  * 1. **le principe** — où la passerelle se place, et ce qu'elle fait de chaque appel ;
- * 2. **la preuve** — le rejeu d'une exécution réelle, pas une maquette ;
- * 3. **le branchement** — les trois voies d'entrée, dans l'ordre de garantie.
+ * 2. **le branchement** — les trois voies d'entrée, dans l'ordre de garantie.
  *
  * **Sur la bande claire.** La page d'origine était sombre et écrivait ses teintes en
  * dur (`border-white/10`, `bg-black/30`, `text-white/75`). Portées telles quelles
@@ -27,22 +21,6 @@ import type { StrKey } from "@/lib/strings";
  * jetons contextuels, que `.section--light` réécrit : la section bascule avec sa
  * bande au lieu de dépendre de celle où elle a été dessinée.
  */
-
-/**
- * La transcription de `make demo`, lue à la construction depuis l'artefact que
- * `scripts/record_demo.py` produit en même temps que la capture animée.
- *
- * Lecture au build et non `fetch` au rendu : les deux fichiers sortent de la même
- * exécution, et les séparer dans le temps laisserait la page afficher une capture
- * d'un run et le texte d'un autre. L'absence du fichier fait échouer la
- * construction, ce qui est le bon comportement — `AD-26` retire la capture quand
- * la démonstration casse, et une page qui se construirait quand même annoncerait
- * une preuve qu'elle n'a pas.
- */
-const TRANSCRIPTION_DEMO = readFileSync(
-  join(process.cwd(), "public", "demo-replay.txt"),
-  "utf8",
-).trimEnd();
 
 /**
  * Les valeurs fictives des extraits publics.
@@ -202,44 +180,7 @@ export function Fonctionnement() {
         </div>
       </div>
 
-      {/* 2 — La preuve. La capture est le seul endroit du site où l'on voit le
-          produit s'exécuter ; elle mérite la pleine largeur, pas une vignette. */}
-      <div className="wrap wrap--wide mt-24">
-        <figure className="card p-6 sm:p-8">
-          <figcaption>
-            <h3 className="t-h3">{t("mise.demo.t")}</h3>
-            <p className="lead mt-2 max-w-3xl">{t("mise.demo.b")}</p>
-          </figcaption>
-          {/* `<img>` et non un SVG inline : le fichier est servi une fois, mis en
-              cache, et reste isolé du document — ses règles d'animation ne peuvent
-              pas fuir dans la page, ni la page les écraser. Le SVG porte sa propre
-              neutralisation sous `prefers-reduced-motion`.
-              `next/image` ne peut pas optimiser un SVG (même motif que
-              `components/brand.tsx`) : la règle est levée ici aussi. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/demo-replay.svg"
-            alt={t("mise.demo.t")}
-            className="mt-6 w-full overflow-x-auto rounded"
-          />
-          <details className="mt-4">
-            <summary className="label cursor-pointer text-[color:var(--copper-text)]">
-              {t("mise.demo.txt")}
-            </summary>
-            <pre className="mt-3 overflow-x-auto rounded border border-[color:var(--border)] bg-[color:var(--surface-up)] p-4 font-mono text-xs leading-relaxed text-[color:var(--text-mid)]">
-              {TRANSCRIPTION_DEMO}
-            </pre>
-          </details>
-          {/* La suite naturelle de la capture : le lecteur vient de voir l'exécution,
-              voici le rapport qu'elle produit. C'est la place de ce lien depuis que le
-              hero ne garde que deux portes — le libre-service et le cabinet. */}
-          <Link href="/executive-preview" className="btn btn-ghost mt-6">
-            {t("land.exec.link")}
-          </Link>
-        </figure>
-      </div>
-
-      {/* 3 — Le branchement. L'ordre est le propos : la passerelle exécute ou
+      {/* 2 — Le branchement. L'ordre est le propos : la passerelle exécute ou
           n'exécute pas, `/v1/authorize` rend un verdict que l'agent décide
           d'honorer. Les présenter comme équivalentes vendrait la voie coopérative
           au prix de la contraignante, et `tests/test_integration_snippets.py`

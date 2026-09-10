@@ -338,16 +338,21 @@ export const STR = {
   // faits générés depuis la carte.
   "ledger.kicker": { en: "The ledger", fr: "Le relevé" },
   "ledger.title": {
-    en: "The threats, ranked. What we hold, and what we do not.",
-    fr: "Les menaces, classées. Ce que nous tenons, et ce que nous ne tenons pas.",
+    en: "The main AI cyber threats",
+    fr: "Les principales menaces cyber IA",
   },
   "ledger.lede": {
-    en: "The market hands you a list and sells you all of it. This one is ranked by what a threat actually costs: how likely it is, times what cannot be undone afterwards. {lignes} rows carry a ledger number and are generated from the test suite, with their coverage mode, the ingress path they were proven on, and the scenario that proves it. The rest are not assessed yet, and the right-hand column says so.",
-    fr: "Le marché vous tend une liste et vous la vend en entier. Celle-ci est classée par ce qu'une menace coûte vraiment : la probabilité qu'elle arrive, multipliée par ce qu'on ne peut plus défaire ensuite. {lignes} rangées portent un numéro de relevé et sont générées depuis la suite de tests, avec leur mode de couverture, le chemin d'entrée sur lequel elles sont prouvées, et le scénario qui le prouve. Les autres ne sont pas encore évaluées, et la colonne de droite le dit.",
+    en: "A request travels a chain: the prompt it receives, the data it reads, the model that answers, the actions it takes, the human who validates. A threat exists at every link, and it is the link that decides what it can cost. Click a link to see its threats.",
+    fr: "Une requête parcourt une chaîne : l'invite qu'elle reçoit, les données qu'elle lit, le modèle qui répond, les actions qu'elle déclenche, l'humain qui valide. Une menace existe à chaque maillon, et c'est le maillon qui décide de ce qu'elle peut coûter. Cliquez un maillon pour voir ses menaces.",
   },
   "ledger.chaine": {
-    en: "The places an attack gets in. This gateway holds the stage where the agent acts. Each row below lights the point it enters at.",
-    fr: "Les endroits par où une attaque entre. Cette passerelle tient l'étape où l'agent agit. Chaque rangée ci-dessous allume le point par lequel elle entre.",
+    en: "This gateway holds the link where the agent acts.",
+    fr: "Cette passerelle tient le maillon où l'agent agit.",
+  },
+  "ledger.chaine.toutes": { en: "All links", fr: "Tous les maillons" },
+  "ledger.chaine.filtre": {
+    en: "Showing the threats that enter at this link.",
+    fr: "Les menaces qui entrent par ce maillon.",
   },
   "ledger.horscarte": { en: "not assessed yet", fr: "pas encore évaluée" },
   "ledger.note": {
@@ -693,10 +698,7 @@ export const STR = {
   },
 
   "land.offre.kicker": { en: "How you get it", fr: "Comment on l'obtient" },
-  "land.offre.title": {
-    en: "Two offers. The difference is technical before it is commercial.",
-    fr: "Deux offres. La différence est technique avant d'être commerciale.",
-  },
+  "land.offre.title": { en: "Two offers", fr: "Deux offres" },
   "land.offre.saas.t": { en: "The SaaS offer", fr: "L'offre SaaS" },
   "land.offre.saas.q": {
     en: "For developers and small teams: sign up, plug in, nothing to install.",

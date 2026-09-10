@@ -30,7 +30,6 @@ import pytest
 _REPO = Path(__file__).resolve().parent.parent
 _SVG = _REPO / "frontend" / "public" / "demo-replay.svg"
 _TXT = _REPO / "frontend" / "public" / "demo-replay.txt"
-_PAGE = _REPO / "frontend" / "components" / "Fonctionnement.tsx"
 _RECORD = _REPO / "scripts" / "record_demo.py"
 
 #: Ce que `scripts/demo.py` imprime en dernier quand tous les invariants tiennent.
@@ -95,17 +94,6 @@ def test_the_capture_stops_moving_under_reduced_motion(svg: str) -> None:
         "sous reduced-motion la capture doit rendre les lignes visibles, pas seulement "
         "arrêter l'animation"
     )
-
-
-def test_the_page_serves_both_the_capture_and_its_transcript() -> None:
-    """Une capture animée n'est pas lisible par un lecteur d'écran.
-
-    Le SVG annonce la transcription dans son `aria-label` ; ne pas la livrer
-    rendrait cette annonce fausse, ce qui est pire que de ne rien annoncer.
-    """
-    page = _PAGE.read_text(encoding="utf-8")
-    assert "demo-replay.svg" in page, "la page n'ouvre pas sur la capture"
-    assert "demo-replay.txt" in page, "la page ne sert pas la transcription promise par l'alt"
 
 
 def test_the_recorder_writes_nothing_when_the_demo_fails(tmp_path: Path) -> None:
