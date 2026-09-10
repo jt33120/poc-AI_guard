@@ -161,7 +161,14 @@ def test_a_hot_plane_serves_only_its_declared_prefixes(chaud: Plane) -> None:
 #: passer `_PREFIXES_CHAUDS[DECISION]` de `/v1/authorize` à `/v1` ouvre le plan chaud
 #: à toute la console sans qu'aucun préfixe ne paraisse suspect, et seul un compte
 #: gelé le voit.
-_BUDGET_CHAUD: dict[Plane, int] = {Plane.DECISION: 5, Plane.LLM: 9}
+#:
+#: +1 chacun depuis le relevé : `/v1/ops/metrics` entre dans `_SOCLE`, donc sur les
+#: **trois** plans. C'est le geste écrit que ce cliquet demande, et la raison tient en
+#: une phrase : les compteurs vivent dans le processus qui répond, si bien qu'un
+#: relevé monté sur la seule console ne dirait rien des deux chemins chauds — ceux
+#: dont on veut précisément voir le volume et la latence. La route ne lit aucune base
+#: et exige son propre jeton (`OPS_METRICS_TOKEN`) ; sans lui elle répond 404.
+_BUDGET_CHAUD: dict[Plane, int] = {Plane.DECISION: 6, Plane.LLM: 10}
 
 
 @pytest.mark.parametrize("chaud", [Plane.DECISION, Plane.LLM])

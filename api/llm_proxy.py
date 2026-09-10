@@ -42,8 +42,12 @@ from starlette.background import BackgroundTask
 from starlette.concurrency import run_in_threadpool
 
 from api.deps import database_url
-from api.gateway_auth import GatewayPrincipal, get_gateway_principal, resolve_gateway_principal
-from api.ratelimit import limiter, llm_proxy_rate_limit
+from api.gateway_auth import (
+    GatewayPrincipal,
+    get_gateway_principal,
+    get_gateway_principal_from_path,
+)
+from api.ratelimit import limiter, proxy_rpm_limit
 from core import (
     approvals,
     audit,
@@ -265,7 +269,12 @@ def _inspect(
     observing: bool,
     latency_ms: float | None = None,
     judge: Judge | None = None,
+    #: Ce que la garde a déjà coûté **avant** que la requête ne parte chez le
+    #: fournisseur : quota, capacités, DLP, garde-prompt, fenêtre d'observation.
+    #: La classification qui suit s'y ajoute ; l'aller-retour du fournisseur, non.
+    cout_amont_ms: int = 0,
 ) -> None:
+    depuis = time.monotonic()
     with db.connection(url) as conn:
         policy = policy_store.load_policy(conn, tenant_id)
     audited = _process(style, data, policy, observing, judge)
@@ -283,6 +292,11 @@ def _inspect(
     # server-minted id, one per inspected response so the tool calls of a single
     # completion still group, and keeps the provider's own id beside it, labelled.
     request_id = uuid4().hex
+    # **Les deux segments, et rien entre les deux.** Sur cette porte le verdict se
+    # rend en deux temps : ce qui précède l'appel du modèle, et la classification de
+    # ce qu'il a répondu. Le fournisseur est au milieu, et il peut durer des
+    # secondes — le compter ferait publier comme surcoût de xSOM le temps d'OpenAI.
+    cout = cout_amont_ms + audit.cout_de_garde(depuis)
     raw_model = data.get("model")
     model_name = raw_model if isinstance(raw_model, str) else None
     # Fresh connection: each log_event is then a top-level, committed transaction.
@@ -301,6 +315,7 @@ def _inspect(
                 # `observing` was read from the control plane in `_observing`, never
                 # from this request -- which is the whole of FR-160 on this path.
                 origin=audit.Origin.llm_proxy(observing=observing),
+                decision_ms=cout,
             )
         if usage is not None:
             model, prompt_tokens, completion_tokens = usage
@@ -502,7 +517,13 @@ def _base_url(settings: Settings, provider: str) -> str:
 
 
 def _audit_streamed(
-    url: str | None, tenant_id: str, gateway_token_id: str, provider: str, *, observing: bool
+    url: str | None,
+    tenant_id: str,
+    gateway_token_id: str,
+    provider: str,
+    *,
+    observing: bool,
+    decision_ms: int | None = None,
 ) -> None:
     """`G-26` option B — inscrire qu'une complétion a été streamée, donc non inspectée.
 
@@ -532,6 +553,7 @@ def _audit_streamed(
                 gateway_token_id=gateway_token_id,
                 error=f"provider={provider}",
                 origin=audit.Origin.llm_proxy(observing=observing),
+                decision_ms=decision_ms,
             )
             conn.commit()
     except Exception:  # l'audit est best-effort ; il ne casse jamais le relais
@@ -539,7 +561,13 @@ def _audit_streamed(
 
 
 def _audit_unparsed(
-    url: str | None, tenant_id: str, gateway_token_id: str, provider: str, *, observing: bool
+    url: str | None,
+    tenant_id: str,
+    gateway_token_id: str,
+    provider: str,
+    *,
+    observing: bool,
+    decision_ms: int | None = None,
 ) -> None:
     """Le second angle mort du proxy : un 200 dont le corps n'est pas exploitable.
 
@@ -567,6 +595,7 @@ def _audit_unparsed(
                 gateway_token_id=gateway_token_id,
                 error=f"provider={provider}",
                 origin=audit.Origin.llm_proxy(observing=observing),
+                decision_ms=decision_ms,
             )
             conn.commit()
     except Exception:  # l'audit est best-effort ; il ne casse jamais le relais
@@ -602,6 +631,10 @@ def _debiter_un_appel(url: str, tenant_id: str) -> tuple[Entitlement, Meter]:
 
 
 async def _forward(request: Request, principal: GatewayPrincipal, provider: str) -> Response:
+    # Le chronomètre de la garde, premier segment. Il court jusqu'à l'envoi chez le
+    # fournisseur, s'arrête pendant l'aller-retour, et repart dans `_inspect` : sur
+    # cette porte le verdict se rend en deux temps, de part et d'autre du modèle.
+    depuis = time.monotonic()
     settings: Settings = request.app.state.settings
     url = database_url(request)
 
@@ -700,6 +733,9 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
     if provider == "openrouter" and not streaming:
         body = _augment_openrouter(body)
 
+    # Fin du segment amont : tout ce qui suit est le fournisseur, puis l'inspection.
+    cout_amont = audit.cout_de_garde(depuis)
+
     client = _http()
     if streaming:
         # Écrit **avant** le relais, pas dans le `BackgroundTask` de fermeture. La note
@@ -716,6 +752,7 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
             principal.token_id,
             provider,
             observing=observing,
+            decision_ms=cout_amont,
         )
         upstream_req = client.build_request("POST", upstream, content=body, headers=fwd_headers)
         upstream_resp = await client.send(upstream_req, stream=True)
@@ -761,6 +798,7 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
                 observing,
                 latency_ms,
                 build_judge(settings),
+                cout_amont,
             )
             # The response is rewritten in every mode: under observation `_process`
             # keeps what a window may cover, so the payload only differs where the
@@ -774,6 +812,7 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
             principal.token_id,
             provider,
             observing=observing,
+            decision_ms=cout_amont,
         )
     return Response(
         content=upstream_resp.content,
@@ -782,8 +821,13 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
     )
 
 
+# `shared_limit` et une portée **nommée** pour les six routes, et non `limit`.
+# slowapi range ses compartiments par chemin (`key_style="url"`) : avec `limit`, un
+# agent obtenait six quotas au lieu d'un et multipliait son débit par six en changeant
+# de fournisseur — ou simplement en passant du jeton en en-tête au jeton dans l'URL.
+# `proxy_rpm` est **un** quota vendu, il lui faut **un** compartiment.
 @router.post("/openai/v1/chat/completions")
-@limiter.limit(llm_proxy_rate_limit)
+@limiter.shared_limit(proxy_rpm_limit, scope="proxy_rpm")
 async def openai_chat_completions(
     request: Request, principal: GatewayPrincipal = Depends(get_gateway_principal)
 ) -> Response:
@@ -791,7 +835,7 @@ async def openai_chat_completions(
 
 
 @router.post("/mistral/v1/chat/completions")
-@limiter.limit(llm_proxy_rate_limit)
+@limiter.shared_limit(proxy_rpm_limit, scope="proxy_rpm")
 async def mistral_chat_completions(
     request: Request, principal: GatewayPrincipal = Depends(get_gateway_principal)
 ) -> Response:
@@ -799,7 +843,7 @@ async def mistral_chat_completions(
 
 
 @router.post("/openrouter/v1/chat/completions")
-@limiter.limit(llm_proxy_rate_limit)
+@limiter.shared_limit(proxy_rpm_limit, scope="proxy_rpm")
 async def openrouter_chat_completions(
     request: Request, principal: GatewayPrincipal = Depends(get_gateway_principal)
 ) -> Response:
@@ -807,7 +851,7 @@ async def openrouter_chat_completions(
 
 
 @router.post("/anthropic/v1/messages")
-@limiter.limit(llm_proxy_rate_limit)
+@limiter.shared_limit(proxy_rpm_limit, scope="proxy_rpm")
 async def anthropic_messages(
     request: Request, principal: GatewayPrincipal = Depends(get_gateway_principal)
 ) -> Response:
@@ -824,16 +868,23 @@ _OPENAI_PATH_PROVIDERS = {"openai", "mistral", "openrouter"}
 
 
 @router.post("/{provider}/{token}/v1/chat/completions")
-@limiter.limit(llm_proxy_rate_limit)
-async def openai_style_token_path(provider: str, token: str, request: Request) -> Response:
+@limiter.shared_limit(proxy_rpm_limit, scope="proxy_rpm")
+async def openai_style_token_path(
+    provider: str,
+    token: str,
+    request: Request,
+    principal: GatewayPrincipal = Depends(get_gateway_principal_from_path),
+) -> Response:
     if provider not in _OPENAI_PATH_PROVIDERS:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown provider")
-    principal = resolve_gateway_principal(request, token)
     return await _forward(request, principal, provider)
 
 
 @router.post("/anthropic/{token}/v1/messages")
-@limiter.limit(llm_proxy_rate_limit)
-async def anthropic_token_path(token: str, request: Request) -> Response:
-    principal = resolve_gateway_principal(request, token)
+@limiter.shared_limit(proxy_rpm_limit, scope="proxy_rpm")
+async def anthropic_token_path(
+    token: str,
+    request: Request,
+    principal: GatewayPrincipal = Depends(get_gateway_principal_from_path),
+) -> Response:
     return await _forward(request, principal, "anthropic")

@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from api.deps import database_url, require_tenant
 from api.gateway_auth import GatewayPrincipal, get_gateway_principal
-from api.ratelimit import limiter, llm_proxy_rate_limit
+from api.ratelimit import ai_traces_rate_limit, limiter
 from api.security import get_ai_reader
 from core import ai_summary, db, otlp_genai
 from core import usage as usage_store
@@ -27,7 +27,7 @@ router = APIRouter(prefix="/v1", tags=["ai-observability"])
 
 
 @router.post("/ai-traces", response_model=AiIngestResult)
-@limiter.limit(llm_proxy_rate_limit)
+@limiter.limit(ai_traces_rate_limit)
 async def ingest_ai_traces(
     request: Request,
     principal: GatewayPrincipal = Depends(get_gateway_principal),

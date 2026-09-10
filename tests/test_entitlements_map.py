@@ -235,12 +235,6 @@ NON_CABLEES: dict[str, str] = {
         "admin dans le même geste, donc le plafond ne peut pas être atteint par "
         "un chemin qui existe. Câbler `enforce_stock` ici serait du code mort."
     ),
-    "authorize_rpm": (
-        "débit par palier : `api/ratelimit.py` résout ses limites depuis la "
-        "configuration, pas depuis le plan. Le résolveur par palier est un lot "
-        "en soi — il touche slowapi et les quatre plans de service."
-    ),
-    "proxy_rpm": "idem `authorize_rpm` : même résolveur, même lot.",
 }
 
 #: `core/entitlements.py` définit l'énumération : y trouver `Metric.x` ne prouve rien.

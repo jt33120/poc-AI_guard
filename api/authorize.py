@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from api.deps import database_url
 from api.gateway_auth import GatewayPrincipal, get_gateway_principal
-from api.ratelimit import authorize_rate_limit, limiter
+from api.ratelimit import authorize_rpm_limit, limiter
 from core import db, decision, policy_store
 from core.config import Settings
 from core.judge import build_judge
@@ -26,7 +26,12 @@ router = APIRouter(prefix="/v1/authorize", tags=["authorize"])
 
 
 @router.post("", response_model=AuthorizeResponse)
-@limiter.limit(authorize_rate_limit)
+# `shared_limit` avec une portée nommée, et non `limit` : slowapi range par défaut
+# les compartiments par **chemin** (`key_style="url"`), si bien que deux routes du même
+# quota s'en partageraient deux. Ici il n'y en a qu'une — mais le quota s'appelle
+# `authorize_rpm`, pas « ce chemin-ci », et le nommer maintenant évite d'y revenir le
+# jour où une seconde route le rejoint.
+@limiter.shared_limit(authorize_rpm_limit, scope="authorize_rpm")
 def request_authorization(
     payload: AuthorizeRequest,
     request: Request,

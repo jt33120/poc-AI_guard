@@ -18,6 +18,7 @@ from typing import Any
 
 from core import dlp
 from core.approvals import redact
+from core.metrics import registre
 from core.policy import ActionClass, PolicyOutcome, escalate_for_class
 
 #: (system_prompt, user_prompt) -> raw model text (expected JSON).
@@ -92,6 +93,11 @@ class Judge:
         chez un client ce qu'il laisse filer vers son propre juge.
         """
         if self._over_budget():
+            # Les quatre issues sont comptées séparément parce qu'`audit_log.judge_used`
+            # les confond toutes en `False` : « le juge n'a pas servi » et « le juge a
+            # échoué » se lisent pareil dans la preuve, et ne demandent pas du tout la
+            # même réaction d'exploitation.
+            registre.compter("xsom_judge_calls_total", outcome="over_budget")
             return ActionClass.irreversible
         self._calls += 1
         user = json.dumps({"tool": tool_name, "arguments": arguments}, sort_keys=True)
@@ -104,11 +110,14 @@ class Judge:
             # `RateLimitError` demandent des réactions opposées, et rien dans le
             # dépôt ne les distinguait — l'échec était silencieux.
             logger.warning("judge_call_failed", extra={"error_type": type(exc).__name__})
+            registre.compter("xsom_judge_calls_total", outcome="failed")
             return ActionClass.irreversible
         if value in _VALID:
             self._classifications += 1
+            registre.compter("xsom_judge_calls_total", outcome="classified")
             return ActionClass(value)
         logger.warning("judge_call_unusable", extra={"error_type": "unparsable_class"})
+        registre.compter("xsom_judge_calls_total", outcome="unusable")
         return ActionClass.irreversible
 
     def narrate(self, framework: str, counts: dict[str, int], total: int) -> str:

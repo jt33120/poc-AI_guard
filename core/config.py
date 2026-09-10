@@ -27,6 +27,24 @@ Env = Literal["dev", "staging", "prod"]
 #:   nommée par ``ISSUER_TENANT_CLAIM``.
 IssuerClaims = Literal["supabase_gotrue", "oidc_groups"]
 
+#: Où vit la clé privée qui signe les témoins de la chaîne d'audit (`FR-169`).
+#:
+#: Vocabulaire **fermé**, et **déclaratif** : aucune ligne de code ne peut constater
+#: où un opérateur range un secret. C'est précisément ce que FR-169 demande — que le
+#: système *déclare* la garde plutôt qu'il ne la suggère — et
+#: `core/compliance.verification_independence` ne présente la vérification comme
+#: indépendante que pour les deux valeurs qui mettent la clé hors de l'hôte de la base.
+#:
+#: - ``same_host`` : la graine est dans l'environnement du processus, sur la machine
+#:   qui héberge aussi la base. Qui prend l'hôte prend les deux : le témoin protège
+#:   de l'accident, de l'injection et de la restauration ratée, pas de l'administrateur.
+#: - ``separate_host`` : la graine est injectée depuis une machine distincte.
+#: - ``kms`` : la signature est déléguée à un service de gestion de clés.
+#:
+#: Non déclarée, la garde est **inconnue**, et l'inconnu se lit comme `same_host`
+#: côté attestation : c'est la seule direction qui ne surpromet pas.
+CheckpointCustody = Literal["same_host", "separate_host", "kms"]
+
 
 class Settings(BaseSettings):
     """Validated runtime configuration."""
@@ -110,8 +128,17 @@ class Settings(BaseSettings):
     prompt_guard_max_calls: int = Field(default=500, ge=1, le=100_000)
     # slowapi limit string for the costly export endpoint.
     export_rate_limit: str = Field(default="30/minute", max_length=40)
-    # slowapi limit string for the agent authorization endpoint (machine-to-machine).
-    authorize_rate_limit: str = Field(default="120/minute", max_length=40)
+    # **Plafond d'INFRASTRUCTURE de `/v1/authorize`, pas la limite commerciale.**
+    #
+    # Ce que ce processus accepte d'un seul compartiment, quel que soit le palier. La
+    # limite vendue vient de `plan_limits.authorize_rpm` (60 / 600 / 3000 selon le
+    # palier) et se compose avec celle-ci — voir `api/ratelimit.py`.
+    #
+    # Le défaut est donc calé sur le plus haut palier publié, et pas plus bas : à
+    # 120/minute il bridait à 120 un client `entreprise` qui a payé 3000, en silence,
+    # puisqu'une limite qui s'applique ne casse rien. `xsom doctor` refuse une valeur
+    # sous le plus haut palier.
+    authorize_rate_limit: str = Field(default="3000/minute", max_length=40)
 
     # --- LLM provider proxy (zero-code monitoring) -----------------------
     # Upstream provider base; the agent points its OpenAI base_url at xSOM.
@@ -119,7 +146,16 @@ class Settings(BaseSettings):
     anthropic_base_url: str = Field(default="https://api.anthropic.com", max_length=300)
     mistral_base_url: str = Field(default="https://api.mistral.ai", max_length=300)
     openrouter_base_url: str = Field(default="https://openrouter.ai/api", max_length=300)
-    llm_proxy_rate_limit: str = Field(default="240/minute", max_length=40)
+    # Même lecture que `authorize_rate_limit` : plafond d'infrastructure, calé sur le
+    # plus haut `plan_limits.proxy_rpm` publié (6000/minute pour `entreprise`).
+    llm_proxy_rate_limit: str = Field(default="6000/minute", max_length=40)
+    # **L'ingestion OTLP a son propre réglage, et ce n'est pas du rangement.**
+    # `POST /v1/ai-traces` partageait `llm_proxy_rate_limit`. Remonter ce dernier de
+    # 240 à 6000 pour ne plus brider un palier `entreprise` aurait multiplié par 25 la
+    # **seule** garde d'une route d'ingestion — qui n'est ni un appel de modèle, ni
+    # plafonnée par `proxy_rpm`, ni servie par le même plan. Deux besoins, deux
+    # réglages ; le défaut est celui qui s'appliquait jusqu'ici.
+    ai_traces_rate_limit: str = Field(default="240/minute", max_length=40)
     # slowapi limit for the natural-language policy assistant (LLM-backed).
     policy_draft_rate_limit: str = Field(default="20/minute", max_length=40)
 
@@ -146,6 +182,22 @@ class Settings(BaseSettings):
     # Base64 32-byte key-encryption key for the local provider (NEVER in prod).
     secrets_local_kek: str | None = Field(default=None, max_length=128)
 
+    # --- Attestation de la chaîne d'audit (témoins signés, FR-169) --------
+    # Graine Ed25519 en base64 (32 octets). Elle ne va JAMAIS en base : le schéma de
+    # `audit_checkpoints` n'a aucune colonne où elle pourrait tomber, et seule la clé
+    # publique dérivée est écrite. Absente ⇒ aucun témoin n'est posé, et l'Evidence
+    # Pack continue de dire ce qu'il dit aujourd'hui.
+    checkpoint_signing_key: str | None = Field(default=None, max_length=128)
+    # Où cette graine est gardée. Voir `CheckpointCustody` : non déclarée, elle est
+    # tenue pour partager l'hôte de la base.
+    checkpoint_key_custody: CheckpointCustody | None = None
+
+    # --- Point de scrutation opérationnel (/v1/ops/metrics) ---------------
+    # Jeton porteur que le scrutateur présente. Absent ⇒ la route répond 404 : un
+    # relevé de trafic derrière rien du tout dit à un anonyme quel déploiement vaut
+    # la peine d'être attaqué, et §4.8 refuse déjà cette divulgation sur la sonde.
+    ops_metrics_token: str | None = Field(default=None, max_length=200)
+
     # --- HITL approval notifications (M4, optional) ----------------------
     smtp_host: str | None = Field(default=None, max_length=255)
     smtp_port: int = Field(default=587, ge=1, le=65535)
@@ -165,7 +217,7 @@ class Settings(BaseSettings):
     sentry_dsn: str | None = None
     sentry_traces_sample_rate: float = Field(default=0.0, ge=0.0, le=1.0)
 
-    @field_validator("issuer_claims", mode="before")
+    @field_validator("issuer_claims", "checkpoint_key_custody", mode="before")
     @classmethod
     def _blank_is_undeclared(cls, value: object) -> object:
         """``ISSUER_CLAIMS=`` vide se lit « non déclaré », pas « valeur invalide ».

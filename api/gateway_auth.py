@@ -19,6 +19,7 @@ from dataclasses import dataclass
 
 from fastapi import Depends, Header, HTTPException, Request, status
 
+from api import ratelimit
 from core import db, tenant_tokens
 
 logger = logging.getLogger(__name__)
@@ -50,14 +51,37 @@ def resolve_gateway_principal(request: Request, raw_token: str | None) -> Gatewa
         )
     try:
         with db.connection(url) as conn:
-            token_id, tenant_id = tenant_tokens.authenticate_gateway_principal(conn, raw_token)
+            token_id, tenant_id, authorize_rpm, proxy_rpm = (
+                tenant_tokens.authenticate_gateway_principal(conn, raw_token)
+            )
             conn.commit()
     except PermissionError:
         _refus("rejected", raw_token)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid gateway token"
         ) from None
+    _publier_le_debit(request, tenant_id, authorize_rpm, proxy_rpm)
     return GatewayPrincipal(tenant_id=tenant_id, token_id=token_id)
+
+
+def _publier_le_debit(
+    request: Request, tenant_id: str, authorize_rpm: int | None, proxy_rpm: int | None
+) -> None:
+    """Faire connaître au limiteur le tenant, puis ce que son palier lui accorde.
+
+    **L'ordre des deux gestes est la seule chose délicate ici.** Poser le tenant change
+    la clé de compartiment que `client_key` calcule ; les débits doivent être déposés
+    sous *cette* clé-là, celle que slowapi relira quelques microsecondes plus tard.
+    Publier avant de poser le tenant déposerait sous l'ancienne clé — `ip:` ou
+    `jeton:` — et le résolveur retomberait silencieusement sur le plafond
+    d'infrastructure, c'est-à-dire sur le comportement d'avant ce lot.
+
+    Cette dépendance s'exécute **avant** le limiteur : FastAPI résout les dépendances,
+    puis appelle la fonction de route, qui est l'enveloppe posée par
+    `@limiter.shared_limit`, et c'est elle qui vérifie la limite avant de déléguer.
+    """
+    setattr(request.state, ratelimit.ETAT_TENANT, tenant_id)
+    ratelimit.publier_debits(ratelimit.client_key(request), authorize_rpm, proxy_rpm)
 
 
 def _refus(motif: str, raw_token: str | None) -> None:
@@ -85,6 +109,21 @@ def get_gateway_principal(
 ) -> GatewayPrincipal:
     """FastAPI dependency: resolve the agent from the ``X-Gateway-Token`` header."""
     return resolve_gateway_principal(request, x_gateway_token)
+
+
+def get_gateway_principal_from_path(
+    request: Request,
+    token: str,
+) -> GatewayPrincipal:
+    """Le principal des routes du proxy qui portent le jeton dans le **chemin**.
+
+    Une dépendance et non un appel dans le corps, et ce n'est pas cosmétique : les
+    dépendances sont résolues **avant** que le limiteur ne calcule son compartiment.
+    Résolu dans le corps, le tenant arrivait trop tard, et ces deux routes-là restaient
+    compartimentées sur la clé fournisseur de l'agent pendant que les quatre autres
+    passaient au palier — deux comportements pour une seule limite vendue.
+    """
+    return resolve_gateway_principal(request, token)
 
 
 def get_gateway_tenant(

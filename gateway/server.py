@@ -38,6 +38,7 @@ from core.config import Settings
 from core.entitlements import Capability, Entitlement, Meter, Metric
 from core.judge import Judge, resolve_ambiguous
 from core.logging import configure_logging
+from core.metrics import registre
 from core.notify import Notifier
 from core.observability import init_observability
 from core.policy import (
@@ -201,6 +202,10 @@ class PolicyBackend:
         return await self._screen_tools(tools)
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> types.CallToolResult:
+        # Le chronomètre de la garde démarre ici, avant la résolution du nom : résoudre
+        # est déjà du travail que l'agent paie parce que xSOM est sur le chemin. Il
+        # s'arrête au verdict, jamais à l'écriture — voir `audit.cout_de_garde`.
+        depuis = time.monotonic()
         resolved = await self._proxy.resolve(name)
         canonical = f"{resolved[0]}.{resolved[1]}" if resolved else name
 
@@ -219,7 +224,9 @@ class PolicyBackend:
             blocked = await self._integrity_blocks(name)
             if blocked is not None:
                 logger.info("tool_quarantined", extra={"tool": canonical, "reason": blocked})
-                self._audit_gate(canonical, "tool_quarantined", blocked)
+                self._audit_gate(
+                    canonical, "tool_quarantined", blocked, audit.cout_de_garde(depuis)
+                )
                 return _denied_result(f"'{canonical}' quarantined by integrity guard: {blocked}")
 
         # Per-tool RBAC / confused-deputy guard: an agent outside a tool's client
@@ -227,7 +234,7 @@ class PolicyBackend:
         rbac = self._rbac_blocks(canonical)
         if rbac is not None:
             logger.info("tool_rbac_denied", extra={"tool": canonical, "reason": rbac})
-            self._audit_gate(canonical, "rbac_denied", rbac)
+            self._audit_gate(canonical, "rbac_denied", rbac, audit.cout_de_garde(depuis))
             return _denied_result(f"'{canonical}' denied: agent not authorized ({rbac})")
 
         outcome = evaluate(self._policy, canonical, arguments)
@@ -261,7 +268,7 @@ class PolicyBackend:
         stopped = self._stop_blocks(outcome)
         if stopped is not None:
             logger.info("agent_stopped", extra={"tool": canonical, "reason": stopped})
-            self._audit_gate(canonical, stopped, self._stop_reason)
+            self._audit_gate(canonical, stopped, self._stop_reason, audit.cout_de_garde(depuis))
             return _denied_result(f"'{canonical}' denied: {self._stop_reason}")
 
         # Graduated autonomy (M11): risk-score an `auto` outcome and tighten it.
@@ -270,7 +277,9 @@ class PolicyBackend:
         # Indirect-injection guard (M12): a risky action in a tainted session is
         # escalated to a human or denied, before anything runs.
         if self._taint_blocks(outcome, arguments):
-            self._audit_gate(canonical, "tainted_action", self._taint_reason)
+            self._audit_gate(
+                canonical, "tainted_action", self._taint_reason, audit.cout_de_garde(depuis)
+            )
             if self._policy.defaults.taint_policy == "deny":
                 logger.info("tainted_action_denied", extra={"tool": canonical})
                 return _denied_result(
@@ -300,6 +309,9 @@ class PolicyBackend:
             # hachent à l'identique et le vérificateur autonome ne les sépare pas.
             recorded = f"monitor_{'deny' if outcome.decision is Approval.deny else 'hold'}"
             logger.info("monitor_observed", extra={"tool": canonical, "decision": recorded})
+            # Le verdict est atteint ici : ce qui suit est l'outil aval, que la fenêtre
+            # relaie. Mesurer après l'aurait compté comme surcoût de la garde.
+            cout = audit.cout_de_garde(depuis)
             start = time.monotonic()
             result = await self._proxy.call_tool(name, arguments)
             self._audit(
@@ -311,6 +323,7 @@ class PolicyBackend:
                 request_id=uuid4().hex,
                 error="downstream_error" if result.isError else None,
                 constraint_reason=gamme.contrainte,
+                decision_ms=cout,
             )
             # Le marquage de taint est un état post-appel, pas un palier : un résultat
             # porteur d'injection teinte la session que l'appel ait été observé ou non.
@@ -333,6 +346,13 @@ class PolicyBackend:
         # perd pas la lecture — il perd l'irréversible que personne ne tient.
         if gamme.plafonne:
             outcome = entitlements.tighten(outcome, self._policy, reason=gamme.etat)
+
+        # **Le verdict est définitif : le chronomètre de la garde s'arrête ici.** Tout
+        # ce qui suit est de l'exécution ou de l'attente d'un humain, et aucun des deux
+        # n'est un coût que xSOM ajoute. Une seule mesure pour les quatre issues, plutôt
+        # qu'un appel par site : deux sites mesureraient sinon deux instants différents
+        # du même verdict, et l'histogramme deviendrait un mélange de deux grandeurs.
+        cout = audit.cout_de_garde(depuis)
 
         if outcome.decision in (Approval.auto, Approval.notify):
             # notify-and-proceed (M11) relays like auto but is recorded distinctly.
@@ -363,6 +383,7 @@ class PolicyBackend:
                     arguments,
                     request_id=request_id,
                     constraint_reason=gamme.contrainte,
+                    decision_ms=cout,
                 ):
                     logger.warning(
                         "denied_audit_unavailable",
@@ -382,6 +403,7 @@ class PolicyBackend:
                     request_id=request_id,
                     error="downstream_error" if result.isError else None,
                     constraint_reason=gamme.contrainte,
+                    decision_ms=cout,
                 )
             self._mark_taint(canonical, result)
             return result
@@ -397,9 +419,10 @@ class PolicyBackend:
                 arguments,
                 request_id=uuid4().hex,
                 constraint_reason=gamme.contrainte,
+                decision_ms=cout,
             )
             return _denied_result(f"'{canonical}' not permitted by policy: deny ({outcome.reason})")
-        return await self._handle_hitl(name, arguments, canonical, outcome, gamme)
+        return await self._handle_hitl(name, arguments, canonical, outcome, gamme, cout)
 
     def _lire_le_droit(self, ambigu: bool) -> _Gamme:
         """Le droit du tenant, lu par appel et **jamais mis en cache**.
@@ -732,7 +755,9 @@ class PolicyBackend:
             # range en `guard_recorded` pour un régulateur.
             self._audit_gate(canonical, "taint_marked", reason)
 
-    def _audit_gate(self, tool_name: str, decision: str, reason: str | None) -> None:
+    def _audit_gate(
+        self, tool_name: str, decision: str, reason: str | None, decision_ms: int | None = None
+    ) -> None:
         """Best-effort audit of a pre-policy gate decision (integrity / rbac)."""
         ctx = self._approval_ctx
         if ctx is None:  # pragma: no cover - gate audits only fire with a context
@@ -749,9 +774,15 @@ class PolicyBackend:
                     # obligatoire est anonyme — voir la note de `_audit`.
                     gateway_token_id=ctx.gateway_token_id,
                     origin=audit.Origin.mcp_gateway(),
+                    decision_ms=decision_ms,
                 )
         except Exception:  # audit is best-effort; never break the call path
             logger.warning("gate_audit_failed", extra={"tool": tool_name})
+            registre.compter(
+                "xsom_audit_failures_total",
+                ingress=audit.Ingress.mcp_gateway.value,
+                stage="gate",
+            )
 
     def _audit(
         self,
@@ -765,6 +796,7 @@ class PolicyBackend:
         error: str | None = None,
         user_id: str | None = None,
         constraint_reason: str | None = None,
+        decision_ms: int | None = None,
     ) -> bool:
         """Écrit la ligne d'audit. Rend `False` si elle n'a pas pu l'être.
 
@@ -828,9 +860,19 @@ class PolicyBackend:
                     # dans la même transaction. C'est le bon sens de l'échec — on ne
                     # facture pas une décision dont il ne reste aucune trace.
                     usage_metric=Metric.decisions.value,
+                    decision_ms=decision_ms,
                 )
         except Exception:
             logger.warning("audit_write_failed", extra={"tool": canonical, "decision": decision})
+            # Voir `core/decision.py` : la perte de preuve est la seule panne qui touche
+            # la revendication centrale du produit, et elle ne laissait qu'une ligne de
+            # journal applicatif. Sur cette porte-ci, les classes risquées y répondent
+            # par un refus — encore faut-il qu'un exploitant puisse le voir venir.
+            registre.compter(
+                "xsom_audit_failures_total",
+                ingress=audit.Ingress.mcp_gateway.value,
+                stage="decision",
+            )
             return False
         return True
 
@@ -841,6 +883,10 @@ class PolicyBackend:
         canonical: str,
         outcome: PolicyOutcome,
         gamme: _Gamme,
+        #: Ce que la garde a coûté avant d'entrer ici. Mesuré par l'appelant, parce
+        #: qu'ici l'attente d'un humain a déjà commencé — et une attente d'humain
+        #: n'est pas un surcoût de la garde.
+        decision_ms: int,
     ) -> types.CallToolResult:
         ctx = self._approval_ctx
         if ctx is None:
@@ -850,7 +896,7 @@ class PolicyBackend:
         required = 2 if outcome.decision is Approval.human_dual else 1
         try:
             reponse = await self._run_approval_flow(
-                ctx, name, arguments, canonical, outcome, required, gamme
+                ctx, name, arguments, canonical, outcome, required, gamme, decision_ms
             )
         except Exception:
             # Approval service unavailable. Same shared verdict as the cooperative
@@ -876,6 +922,7 @@ class PolicyBackend:
                 request_id=uuid4().hex,
                 error="approval_service_unavailable",
                 constraint_reason=gamme.contrainte,
+                decision_ms=decision_ms,
             )
             if refus:
                 return _denied_result(f"'{canonical}' held: approval service unavailable")
@@ -918,6 +965,7 @@ class PolicyBackend:
         outcome: PolicyOutcome,
         required: int,
         gamme: _Gamme,
+        decision_ms: int,
     ) -> types.CallToolResult | None:
         """La décision d'approbation, **sans l'exécuter**.
 
@@ -950,6 +998,7 @@ class PolicyBackend:
                     arguments,
                     request_id=record.id,
                     constraint_reason=gamme.contrainte,
+                    decision_ms=decision_ms,
                 )
                 return _requires_approval_result(record.id, summary)
 
@@ -967,6 +1016,7 @@ class PolicyBackend:
                         request_id=record.id,
                         user_id=record.decided_by,
                         constraint_reason=gamme.contrainte,
+                        decision_ms=decision_ms,
                     )
                     # Approuvé et consommé. On ne relaie PAS ici : voir `_handle_hitl`.
                     return None
@@ -990,6 +1040,7 @@ class PolicyBackend:
                 request_id=record.id,
                 user_id=record.decided_by,
                 constraint_reason=gamme.contrainte,
+                decision_ms=decision_ms,
             )
             return _denied_result(f"'{canonical}' approval {record.status}")
 

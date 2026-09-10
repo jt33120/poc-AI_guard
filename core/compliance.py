@@ -27,6 +27,7 @@ import psycopg
 from core import (
     approval_chain,
     audit,
+    checkpoints,
     control_plane,
     corpora,
     export,
@@ -36,6 +37,7 @@ from core import (
 )
 from core import usage as usage_store
 from core.audit import EnforcementMode
+from core.config import Settings
 from core.monitor import NEVER_OBSERVED
 
 #: EU AI Act art. 12 mandates high-risk logs be retained at least 6 months.
@@ -113,15 +115,33 @@ def chain_integrity(conn: psycopg.Connection, tenant_id: str | None = None) -> d
     # Un tenant neuf a zéro ligne ET zéro approbation : ce n'est pas une anomalie,
     # c'est un lundi matin. L'anomalie est un journal vide qu'une autre table dément.
     journal_manquant = result.count == 0 and _has_approvals(conn, tenant_id)
+    # **Et l'heuristique ci-dessus n'est qu'une heuristique.** Elle ne voit un
+    # effacement que s'il est *total* et qu'une autre table le dément ; une
+    # suppression de queue lui échappe entièrement. Le témoin signé, lui, tranche :
+    # il a écrit combien d'entrées existaient et laquelle finissait la chaîne
+    # (`FR-169`). Absent, on le dit — `witnessed: False` n'est pas une panne, c'est
+    # l'aveu qu'il n'y a rien à confronter.
+    temoin = (
+        checkpoints.verify(conn, tenant_id)
+        if tenant_id is not None
+        else checkpoints.Verification(checkpoints=0, ok=True, truncated=False)
+    )
     return {
         "ok": result.ok,
         "entries": result.count,
         "first_broken_id": result.broken_id,
         "journal_missing": journal_manquant,
+        "witnessed": temoin.attested,
+        "witness_ok": temoin.ok,
+        "entries_lost": temoin.truncated,
+        "witness_detail": temoin.detail,
     }
 
 
-def verification_independence() -> dict[str, Any]:
+def verification_independence(
+    settings: Settings | None = None,
+    witness: checkpoints.Verification | None = None,
+) -> dict[str, Any]:
     """What the Article 12 check actually proves — and what it does not (FR-169 / INV-12).
 
     `chain_integrity` recomputes the chain **from the same rows, over the same
@@ -143,17 +163,61 @@ def verification_independence() -> dict[str, Any]:
     *absence*, exactly as an unconfigured dependency contributes its failure tier
     (`AD-34`).
     """
+    if settings is None or settings.checkpoint_signing_key is None:
+        return {
+            "method": "recomputed_in_place",
+            "independent": False,
+            "witness": None,
+            "checkpoint_signature": None,
+            "signing_key_location": None,
+            "statement": (
+                "The audit chain was recomputed by the system that wrote it, from its own "
+                "database. This proves internal consistency and detects an edited row. It "
+                "is not independent verification: no external witness, signed checkpoint "
+                "or third-party anchor is configured for this deployment."
+            ),
+        }
+
+    # **Un signeur existe. Ce qu'il change, et ce qu'il ne change pas.**
+    #
+    # Ce qu'il change : les témoins sont datés et signés Ed25519, leur clé publique
+    # voyage avec eux, et n'importe qui peut recalculer l'empreinte depuis `audit_log`
+    # et vérifier — sans nous. Une suppression de queue, qu'aucun trigger ne pouvait
+    # empêcher contre le propriétaire des tables, cesse d'être silencieuse.
+    #
+    # Ce qu'il ne change pas : l'indépendance ne se déduit pas de l'algorithme, mais
+    # de la GARDE de la clé privée. Rangée sur l'hôte de la base, elle tombe avec lui,
+    # et `independent` reste `false` — c'est la moitié déclarative de `FR-169`, et
+    # elle est déclarative parce qu'aucun code ne peut constater où un opérateur range
+    # un secret. Publier `true` sur la foi d'un champ que personne n'a rempli serait
+    # exactement la faute que cette fonction existe pour empêcher.
+    garde = checkpoints.custody(settings)
+    atteste = witness is not None and witness.attested and witness.ok
+    independant = checkpoints.independent(settings) and atteste
     return {
-        "method": "recomputed_in_place",
-        "independent": False,
-        "witness": None,
-        "checkpoint_signature": None,
-        "signing_key_location": None,
+        "method": "recomputed_in_place+signed_checkpoints",
+        "independent": independant,
+        "witness": (
+            {"checkpoints": witness.checkpoints, "agrees": witness.ok, "detail": witness.detail}
+            if witness is not None
+            else None
+        ),
+        "checkpoint_signature": checkpoints.ALGORITHM,
+        "signing_key_location": garde,
         "statement": (
-            "The audit chain was recomputed by the system that wrote it, from its own "
-            "database. This proves internal consistency and detects an edited row. It "
-            "is not independent verification: no external witness, signed checkpoint "
-            "or third-party anchor is configured for this deployment."
+            "The audit chain was recomputed in place, and confronted with "
+            f"{witness.checkpoints if witness else 0} signed checkpoint(s): each records how "
+            "many entries this tenant's chain held at a point in time and which hash ended "
+            "it, signed with a key whose private half is never stored in this database. "
+            "Anyone holding the published public key can repeat that check without us. "
+            + (
+                "The signing key is declared to be held away from the database host, so "
+                "this verification does not depend on the same custodian."
+                if independant
+                else "The signing key is declared to share the database host, so whoever "
+                "controls that host controls both the journal and its witnesses: this is "
+                "tamper-evidence, not independent verification."
+            )
         ),
     }
 
@@ -285,6 +349,9 @@ def status(
         "entries": integrity["entries"],
         "first_broken_id": integrity["first_broken_id"],
         "journal_missing": integrity["journal_missing"],
+        "witnessed": integrity["witnessed"],
+        "witness_ok": integrity["witness_ok"],
+        "entries_lost": integrity["entries_lost"],
         "oversight_gated": coverage["gated"],
         "oversight_auto_allowed": coverage["auto_allowed"],
         "oversight_coverage_ok": coverage["coverage_ok"],
@@ -295,9 +362,16 @@ def status(
         # bien cohérente, c'est la base de preuve qui a disparu. Un dossier prêt ne
         # peut pas reposer sur zéro ligne alors que d'autres tables attestent
         # l'activité.
+        # Et `entries_lost` y entre aussi, pour la même raison exactement : la chaîne
+        # restante est cohérente — `chain_ok` reste vrai — mais un témoin signé
+        # affirme qu'elle comptait davantage. Un dossier ne peut pas être « prêt »
+        # quand la preuve a rétréci depuis qu'on l'a attestée. `witnessed` n'y entre
+        # PAS : n'avoir pas encore de témoin est l'état de tout déploiement qui n'a
+        # pas configuré de clé, et rendre `ready` faux pour tous serait crier au loup.
         "ready": (
             integrity["ok"]
             and not integrity["journal_missing"]
+            and not integrity["entries_lost"]
             and coverage["coverage_ok"]
             and retention_ok
         ),
@@ -473,8 +547,16 @@ def build_evidence_pack(
             # indistinguable d'un dossier sain. Publié, pas déduit.
             "journal_missing": integrity["journal_missing"],
             "retention_floor_days": retention_floor_days,
+            # Les deux états qu'aucune garantie interne à la base ne pouvait rendre :
+            # personne n'avait jamais attesté cette chaîne, ou bien elle a perdu des
+            # entrées qu'un témoin avait comptées.
+            "witnessed": integrity["witnessed"],
+            "entries_lost": integrity["entries_lost"],
             "log_model": "append-only, hash-chained",
-            "verification": verification_independence(),
+            "verification": verification_independence(
+                settings,
+                checkpoints.verify(conn, tenant_id) if tenant_id is not None else None,
+            ),
         },
         "article_14_human_oversight": {
             **coverage,
@@ -533,7 +615,16 @@ def build_evidence_pack(
             "shadow_ai": _shadow_ai_section(conn),
         },
     }
+    # `entries_lost` y entre comme dans `status`, et pour la même raison : la chaîne
+    # restante est cohérente — `integrity["ok"]` reste vrai — mais un témoin signé
+    # affirme qu'elle comptait davantage. Un dossier ne peut pas s'annoncer conforme
+    # quand la preuve a rétréci depuis qu'on l'a attestée, et les deux verdicts du
+    # produit doivent tomber du même côté : un `status` non prêt et un pack conforme
+    # seraient une contradiction publiée.
     base["compliant"] = (
-        integrity["ok"] and coverage["coverage_ok"] and retention_floor_days >= MIN_RETENTION_DAYS
+        integrity["ok"]
+        and not integrity["entries_lost"]
+        and coverage["coverage_ok"]
+        and retention_floor_days >= MIN_RETENTION_DAYS
     )
     return base
