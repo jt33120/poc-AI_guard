@@ -50,20 +50,16 @@ _MOTIF = re.compile(
     r"-(?:brand|navy|ink|paper|accent)[a-z-]*/\d+"
 )
 
-#: Inventaire gelé, relevé sur `ae57cb4`. Une entrée peut baisser — le test dira
+#: Inventaire relevé sur `ae57cb4`, réduit par la refonte xSOM Signal.
+#: Une entrée peut baisser — le test dira
 #: alors de la mettre à jour — mais aucune ne peut monter, et aucun fichier
 #: absent d'ici ne peut en introduire.
 _CONNU: dict[str, int] = {
-    "app/(app)/admin/page.tsx": 1,
-    "app/(app)/approvals/page.tsx": 2,
-    "app/(app)/costs/page.tsx": 2,
-    "app/(app)/home/page.tsx": 2,
     "app/(app)/onboarding/page.tsx": 8,
     "app/auth/reset/page.tsx": 2,
     "app/executive-preview/page.tsx": 3,
     "app/forgot-password/page.tsx": 2,
     "components/ApiKeys.tsx": 3,
-    "components/AppShell.tsx": 2,
     "components/ClientScope.tsx": 3,
     "components/ClientsManager.tsx": 1,
     "components/DlpSettings.tsx": 1,

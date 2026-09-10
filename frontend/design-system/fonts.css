@@ -1,0 +1,22 @@
+/* Existing xSOM font files, SIL Open Font License 1.1. No third-party request. */
+@font-face {
+  font-family: "Saira";
+  font-style: normal;
+  font-weight: 600 800;
+  font-display: swap;
+  src: url("./assets/saira-600-800.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/inter-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./assets/jetbrains-mono-500.woff2") format("woff2");
+}

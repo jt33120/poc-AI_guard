@@ -54,7 +54,7 @@ export default function ResetPasswordPage() {
       <div className="absolute right-6 top-6">
         <LanguageToggle />
       </div>
-      <main className="flex min-h-screen items-center justify-center p-6">
+      <main className="console-shell signal-auth flex min-h-screen items-center justify-center p-6">
         <div className="w-full max-w-sm animate-fade-up">
           <div className="mb-6 flex items-center gap-2.5">
             <XsomMark className="h-9 w-9" />
@@ -89,10 +89,18 @@ export default function ResetPasswordPage() {
                   className="input"
                   required
                 />
-                <button type="submit" disabled={busy} className="btn btn-primary mt-1 w-full">
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="btn btn-primary mt-1 w-full"
+                >
                   {busy ? t("reset.saving") : t("reset.submit")}
                 </button>
-                {error ? <p className="text-sm text-red-300">{error}</p> : null}
+                {error ? (
+                  <p role="alert" className="text-sm text-red-300">
+                    {error}
+                  </p>
+                ) : null}
               </form>
             )}
           </div>

@@ -31,14 +31,15 @@ _RACINE = Path(__file__).resolve().parent.parent
 _SOURCE = _RACINE / "frontend" / "lib" / "mark.ts"
 _ICONE = _RACINE / "frontend" / "app" / "icon.svg"
 _LOGO = _RACINE / "frontend" / "public" / "xsom-mark.svg"
+_SIGNAL = _RACINE / "frontend" / "design-system" / "assets" / "mark.svg"
 _COMPOSANT = _RACINE / "frontend" / "components" / "brand.tsx"
 _MIDDLEWARE = _RACINE / "frontend" / "middleware.ts"
 
 _SVG = "{http://www.w3.org/2000/svg}"
 
-# Les deux bornes du dégradé cuivre, telles que le site les publie
-# (`assets/logo/README.md`, section Palette). Elles ne sont pas choisies ici.
-_CUIVRE = ("#d0905f", "#5e3216")
+# Les trois couleurs de la marque Signal générée pour le site et la console :
+# cuivre historique, bronze, neutre. Le tracé original reste inchangé.
+_SIGNAL_PALETTE = frozenset({"#e2603a", "#ba7758", "#a6ac9b"})
 
 
 def _constantes() -> dict[str, str]:
@@ -128,31 +129,32 @@ def test_the_favicon_is_the_brand_and_not_the_interface_icon() -> None:
 
 
 def test_the_favicon_stands_alone_in_the_copper_variant() -> None:
-    """Pas de boîte, et la teinte qui tient sur les deux barres d'onglets.
+    """La marque détourée porte la palette partagée, sans fond ajouté.
 
-    Un favicon transparent disparaît, oui — mais la parade du site n'est pas un fond
-    opaque, c'est la variante cuivre : la barre d'onglets suit le thème du système,
-    `moderne-dark` y perd sa flèche gris clair sur fond clair, `gradient` sa flèche
-    graphite sur fond sombre, et le cuivre a la luminance intermédiaire qui tient des
-    deux côtés — vérifié en rendu réel à 32 px (`assets/logo/README.md`). Le site ne
-    met jamais son signe dans une boîte, et le produit ne le fait plus non plus.
+    La refonte Signal harmonise le favicon et la marque affichée sur une source
+    générée unique. Le cuivre historique reste l'accent, le bronze et le neutre
+    distinguent les deux autres flèches sans introduire un bleu de produit tiers.
     """
     racine = ET.parse(_ICONE).getroot()  # noqa: S314 - fichier du dépôt, cf. plus bas
+    couleurs: set[str] = set()
     for enfant in racine:
         if enfant.tag == f"{_SVG}defs":
             continue  # les `rect` des masques découpent le tracé, ils ne le cadrent pas
         for noeud in enfant.iter():
+            couleurs.update(
+                couleur
+                for attribut in ("fill", "stroke")
+                if (couleur := noeud.get(attribut)) not in (None, "none")
+            )
             assert noeud.tag != f"{_SVG}rect", (
                 "le favicon remet le signe dans une boîte — le site sert le sien "
                 "détouré, et la lisibilité vient de la teinte, pas d'un cadre"
             )
 
-    svg = _sans_commentaires(_ICONE)
-    for borne in _CUIVRE:
-        assert borne in svg, (
-            f"la borne cuivre {borne} a disparu du favicon — c'est elle qui le fait "
-            "tenir sur une barre d'onglets claire comme sur une sombre"
-        )
+    assert couleurs == _SIGNAL_PALETTE, f"la palette du favicon diverge : {couleurs}"
+    assert _sans_commentaires(_ICONE) == _sans_commentaires(_SIGNAL), (
+        "le favicon ne provient plus de la marque générée par le design system"
+    )
 
 
 def test_the_icon_route_is_excluded_from_the_auth_middleware() -> None:
@@ -167,11 +169,17 @@ def test_the_icon_route_is_excluded_from_the_auth_middleware() -> None:
     l'icône sans corriger le matcher rétablirait le défaut en silence.
     """
     matcher = _MIDDLEWARE.read_text(encoding="utf-8")
-    ligne = next(ligne for ligne in matcher.splitlines() if "matcher:" in ligne)
+    bloc = re.search(r"\bmatcher:\s*\[([\s\S]*?)\]", matcher)
+    assert bloc, "le tableau matcher est introuvable"
+    motifs = re.findall(r'"([^"\n]+)"', bloc.group(1))
+    assert motifs, "le tableau matcher ne contient aucun motif"
     for nom in (_ICONE.name, _LOGO.name):
-        assert nom in ligne, (
-            f"{nom} n'est pas exclu du matcher ({ligne.strip()}) — chaque requête "
+        assert nom in bloc.group(1), (
+            f"{nom} n'est pas exclu du matcher — chaque requête "
             "d'image traverserait l'authentification"
+        )
+        assert not any(re.match(motif, f"/{nom}") for motif in motifs), (
+            f"/{nom} traverse encore le matcher d'authentification"
         )
 
 

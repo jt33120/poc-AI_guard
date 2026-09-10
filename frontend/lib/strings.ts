@@ -957,10 +957,10 @@ export const STR = {
   },
   "onb.copy": { en: "Copy", fr: "Copier" },
   "onb.copied": { en: "Copied", fr: "Copié" },
-  "onb.done.t": { en: "You're connected 🎉", fr: "Vous êtes connecté 🎉" },
+  "onb.done.t": { en: "Key created. Complete the integration.", fr: "Clé créée. Intégration à terminer." },
   "onb.done.d": {
-    en: "Watch actions in the Inspector and approve the risky ones in Approvals.",
-    fr: "Suivez les actions dans l'Inspecteur et validez les sensibles dans Approbations.",
+    en: "Configure your agent with the snippet below. Make a test call, then check its first recorded event in the audit trail.",
+    fr: "Configurez votre agent avec l’extrait ci-dessous. Lancez un appel de test, puis vérifiez son premier événement dans le journal d’audit.",
   },
   "onb.error": { en: "Setup failed", fr: "Échec de la configuration" },
 

@@ -51,6 +51,8 @@ export const CONTROL_ROUTES: readonly Route[] = [
   { pattern: new RegExp(`^v1/read-tokens/${SEG}$`), methods: ["DELETE"] },
   { pattern: new RegExp("^v1/servers$"), methods: ["GET"] },
   { pattern: new RegExp("^v1/tools$"), methods: ["GET"] },
+  { pattern: new RegExp("^v1/tools/integrity$"), methods: ["GET"] },
+  { pattern: new RegExp("^v1/trust$"), methods: ["GET"] },
   { pattern: new RegExp("^v1/usage$"), methods: ["GET"] },
 ];
 
@@ -70,7 +72,10 @@ function segmentSain(segment: string): boolean {
  * Fail-closed (`CLAUDE.md` §4.4) : tout ce qui n'est pas explicitement listé est
  * refusé, y compris une route que l'API expose parfaitement.
  */
-export function routeAllowed(method: string, segments: readonly string[]): boolean {
+export function routeAllowed(
+  method: string,
+  segments: readonly string[],
+): boolean {
   if (segments.length === 0 || !segments.every(segmentSain)) {
     return false;
   }

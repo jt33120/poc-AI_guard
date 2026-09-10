@@ -2,22 +2,36 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
-
+import { createContext, useContext, useEffect, useState } from "react";
 import { Wordmark, XsomMark } from "@/components/brand";
-import { LanguageToggle, type StrKey, useT } from "@/lib/i18n";
+import { SignalPreferences } from "@/design-system/react";
+import { LanguageToggle, useT } from "@/lib/i18n";
 
-const LINKS: { href: string; key: StrKey }[] = [
-  { href: "/home", key: "nav.home" },
-  { href: "/executive", key: "nav.exec" },
-  { href: "/inspector", key: "nav.inspector" },
-  { href: "/approvals", key: "nav.approvals" },
-  { href: "/audit", key: "nav.audit" },
-  { href: "/costs", key: "nav.costs" },
+const RoleContext = createContext<string | null>(null);
+export const useConsoleRole = () => useContext(RoleContext);
+const LINKS = [
+  { href: "/home", fr: "Vue d’ensemble", en: "Overview", code: "01" },
+  { href: "/inspector", fr: "Inspecteur", en: "Inspector", code: "02" },
+  { href: "/approvals", fr: "Approbations", en: "Approvals", code: "03" },
+  { href: "/audit", fr: "Journal d’audit", en: "Audit trail", code: "04" },
+  {
+    href: "/risk",
+    fr: "Risque & intégrité",
+    en: "Risk & integrity",
+    code: "05",
+  },
+  { href: "/costs", fr: "Coûts & usage", en: "Cost & usage", code: "06" },
+  { href: "/executive", fr: "Synthèse", en: "Executive", code: "07" },
 ];
-const ADMIN_LINKS: { href: string; key: StrKey }[] = [
-  { href: "/onboarding", key: "nav.onboard" },
-  { href: "/admin", key: "nav.admin" },
+const ADMIN_LINKS = [
+  { href: "/policy", fr: "Policies", en: "Policies", code: "08" },
+  {
+    href: "/onboarding",
+    fr: "Connecter un agent",
+    en: "Connect an agent",
+    code: "09",
+  },
+  { href: "/admin", fr: "Administration", en: "Administration", code: "10" },
 ];
 
 export function AppShell({
@@ -27,111 +41,142 @@ export function AppShell({
   role: string | null;
   children: React.ReactNode;
 }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [logoutError, setLogoutError] = useState(false);
   const links = role === "admin" ? [...LINKS, ...ADMIN_LINKS] : LINKS;
-
+  const active = links.find((link) => pathname.startsWith(link.href));
+  useEffect(() => {
+    const close = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, []);
   async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-    router.refresh();
+    setLeaving(true);
+    setLogoutError(false);
+    try {
+      const response = await fetch("/api/auth/logout", { method: "POST" });
+      if (!response.ok) throw new Error("logout");
+      router.push("/login");
+      router.refresh();
+    } catch {
+      setLogoutError(true);
+      setLeaving(false);
+    }
   }
-
   return (
-    <div className="min-h-screen">
-      <header className="sticky top-0 z-30 border-b border-white/10 bg-navy/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <div className="flex items-center gap-6">
-            <Link href="/home" className="flex items-center gap-2.5" onClick={() => setOpen(false)}>
-              <XsomMark />
-              <Wordmark className="text-[15px]" />
-            </Link>
-            <nav className="hidden items-center gap-1 md:flex">
-              {links.map((link) => {
-                const active = pathname.startsWith(link.href);
-                return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={`rounded-pill px-3 py-1.5 text-sm transition ${
-                      active
-                        ? "bg-white/10 text-white"
-                        : "text-white/55 hover:bg-white/[0.05] hover:text-white"
-                    }`}
-                  >
-                    {t(link.key)}
-                  </Link>
-                );
-              })}
-            </nav>
+    <RoleContext.Provider value={role}>
+      <div className="console-shell">
+        <a className="console-skip" href="#console-main">
+          {lang === "fr" ? "Aller au contenu" : "Skip to content"}
+        </a>
+        <header className="console-topbar">
+          <Link
+            href="/home"
+            className="console-brand"
+            onClick={() => setOpen(false)}
+          >
+            <XsomMark className="console-mark" />
+            <Wordmark />
+          </Link>
+          <div className="console-breadcrumb">
+            <span>Control plane</span>
+            <span aria-hidden="true">/</span>
+            <strong>
+              {active?.[lang] ?? (lang === "fr" ? "Réglages" : "Settings")}
+            </strong>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="console-topbar-actions">
             <LanguageToggle />
-            <span className="badge badge-blue hidden capitalize sm:inline-flex">
-              {role ?? t("nav.norole")}
-            </span>
+            <span className="console-role">{role ?? t("nav.norole")}</span>
             <button
               type="button"
-              onClick={logout}
-              className="btn btn-ghost hidden px-4 py-1.5 md:inline-flex"
-            >
-              {t("nav.signout")}
-            </button>
-            {/* Mobile menu toggle */}
-            <button
-              type="button"
+              className="console-menu btn btn-ghost"
               aria-label="Menu"
+              aria-controls="console-navigation"
               aria-expanded={open}
-              onClick={() => setOpen((v) => !v)}
-              className="grid h-9 w-9 place-items-center rounded-xl border border-white/15 bg-white/[0.04] text-white md:hidden"
+              onClick={() => setOpen(!open)}
             >
-              <svg
-                viewBox="0 0 24 24"
-                className="h-5 w-5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                aria-hidden="true"
-              >
-                {open ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}
-              </svg>
+              {open ? "×" : "☰"}
             </button>
           </div>
-        </div>
-
-        {/* Mobile dropdown menu */}
-        {open ? (
-          <nav className="border-t border-white/10 bg-navy/95 px-4 py-3 md:hidden">
-            <div className="flex flex-col gap-1">
-              {links.map((link) => {
-                const active = pathname.startsWith(link.href);
-                return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    onClick={() => setOpen(false)}
-                    className={`rounded-xl px-3 py-2.5 text-sm transition ${
-                      active ? "bg-white/10 text-white" : "text-white/70 hover:bg-white/[0.05]"
-                    }`}
-                  >
-                    {t(link.key)}
-                  </Link>
-                );
-              })}
-            </div>
-            <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3">
-              <span className="badge badge-blue capitalize">{role ?? t("nav.norole")}</span>
-              <button type="button" onClick={logout} className="btn btn-ghost px-4 py-1.5">
-                {t("nav.signout")}
-              </button>
-            </div>
+        </header>
+        <aside
+          className="console-sidebar"
+          data-open={open}
+          id="console-navigation"
+        >
+          <div className="console-sidebar-head">
+            <span className="console-kicker">AI OPERATIONS</span>
+            <span className="console-sidebar-line" />
+          </div>
+          <nav
+            aria-label={lang === "fr" ? "Console principale" : "Main console"}
+          >
+            {links.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                aria-current={
+                  pathname.startsWith(link.href) ? "page" : undefined
+                }
+                onClick={() => setOpen(false)}
+              >
+                <span className="console-nav-code" aria-hidden="true">
+                  {link.code}
+                </span>
+                <span>{link[lang]}</span>
+              </Link>
+            ))}
           </nav>
-        ) : null}
-      </header>
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">{children}</main>
-    </div>
+          <div className="console-sidebar-bottom">
+            <Link
+              className="console-settings-link"
+              href="/settings"
+              onClick={() => setOpen(false)}
+              aria-current={pathname === "/settings" ? "page" : undefined}
+            >
+              {lang === "fr" ? "Réglages" : "Settings"}
+              <span aria-hidden="true">↗</span>
+            </Link>
+            <SignalPreferences lang={lang} />
+            <button
+              type="button"
+              disabled={leaving}
+              onClick={logout}
+              className="btn btn-ghost console-logout"
+            >
+              {leaving ? t("common.loading") : t("nav.signout")}
+            </button>
+            {logoutError && (
+              <p role="alert" className="console-error-text">
+                {lang === "fr"
+                  ? "Déconnexion impossible. Réessayez."
+                  : "Could not sign out. Try again."}
+              </p>
+            )}
+            <a className="console-house" href="https://www.xsom.fr">
+              xSOM Consulting <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+        </aside>
+        {open && (
+          <button
+            type="button"
+            className="console-nav-backdrop"
+            aria-label={lang === "fr" ? "Fermer le menu" : "Close menu"}
+            onClick={() => setOpen(false)}
+          />
+        )}
+        <main id="console-main" className="console-canvas" tabIndex={-1}>
+          {children}
+        </main>
+      </div>
+    </RoleContext.Provider>
   );
 }

@@ -41,12 +41,15 @@ export default function SignupPage() {
   return (
     <>
       {redirecting ? (
-        <FullScreenLoader label={t("login.securing")} slowLabel={t("common.waking")} />
+        <FullScreenLoader
+          label={t("login.securing")}
+          slowLabel={t("common.waking")}
+        />
       ) : null}
       <div className="absolute right-6 top-6">
         <LanguageToggle />
       </div>
-      <main className="flex min-h-screen items-center justify-center p-6">
+      <main className="console-shell signal-auth flex min-h-screen items-center justify-center p-6">
         <div className="w-full max-w-sm animate-fade-up">
           <div className="mb-6 flex items-center gap-2.5">
             <XsomMark className="h-9 w-9" />
@@ -83,10 +86,18 @@ export default function SignupPage() {
                 minLength={8}
                 required
               />
-              <button type="submit" disabled={busy} className="btn btn-primary mt-1 w-full">
+              <button
+                type="submit"
+                disabled={busy}
+                className="btn btn-primary mt-1 w-full"
+              >
                 {busy ? t("signup.submitting") : t("signup.submit")}
               </button>
-              {error ? <p className="text-sm text-red-300">{error}</p> : null}
+              {error ? (
+                <p role="alert" className="text-sm text-red-300">
+                  {error}
+                </p>
+              ) : null}
             </form>
             <p className="mt-4 text-center text-sm">
               <span className="muted">{t("signup.haveaccount")} </span>

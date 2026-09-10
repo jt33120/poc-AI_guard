@@ -43,7 +43,9 @@ function watchReveal(): () => void {
 }
 
 function watchTitleSheen(): () => void {
-  const titles = Array.from(document.querySelectorAll<HTMLElement>("[data-sheen]"));
+  const titles = Array.from(
+    document.querySelectorAll<HTMLElement>("[data-sheen]"),
+  );
   if (titles.length === 0) return () => {};
 
   let pointerX = 0;
@@ -79,7 +81,8 @@ function watchTitleSheen(): () => void {
 export function Motion(): null {
   useEffect(() => {
     // Posé par le script d'amorce, et seulement hors `prefers-reduced-motion`.
-    if (!document.documentElement.hasAttribute("data-motion")) return;
+    if (document.documentElement.dataset.motion !== "on") return;
+    if (document.querySelector(".console-shell")) return;
 
     const stopReveal = watchReveal();
     // Un survol n'a pas de sens au doigt : sans pointeur fin la variable garde ses

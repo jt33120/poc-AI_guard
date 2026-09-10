@@ -8,6 +8,7 @@
     "start": "next start -p 3000",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "pretest:e2e": "npm --prefix design-system run check",
     "test:e2e": "playwright test"
   },
   "dependencies": {

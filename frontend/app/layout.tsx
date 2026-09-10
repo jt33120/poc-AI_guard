@@ -5,6 +5,11 @@ import { Motion } from "@/components/Motion";
 import { LanguageProvider } from "@/lib/i18n";
 import { getLang, translate } from "@/lib/lang";
 import "./globals.css";
+import "@/design-system/tokens.css";
+import "@/design-system/components.css";
+import "./signal-console.css";
+import { SignalBootstrap } from "@/design-system/react";
+import { SIGNAL_BOOTSTRAP_SCRIPT } from "@/design-system/bootstrap";
 
 // Les trois voix du système xSOM, reprises de `xsom.fr`. Elles ont des rôles
 // distincts, et c'est le système à trois voix qui fait l'identité — pas une police
@@ -20,7 +25,7 @@ import "./globals.css";
 // Saira descend de la DIN : la lettre de la signalétique technique, des plans
 // d'infrastructure et de l'étiquetage industriel. Fichier variable, 600 à 800.
 const saira = localFont({
-  src: "../public/fonts/saira-600-800.woff2",
+  src: "../design-system/assets/saira-600-800.woff2",
   weight: "600 800",
   style: "normal",
   variable: "--font-display",
@@ -29,7 +34,7 @@ const saira = localFont({
 });
 
 const inter = localFont({
-  src: "../public/fonts/inter-400.woff2",
+  src: "../design-system/assets/inter-400.woff2",
   weight: "400",
   style: "normal",
   variable: "--font-body",
@@ -38,7 +43,7 @@ const inter = localFont({
 });
 
 const mono = localFont({
-  src: "../public/fonts/jetbrains-mono-500.woff2",
+  src: "../design-system/assets/jetbrains-mono-500.woff2",
   weight: "500",
   style: "normal",
   variable: "--font-mono",
@@ -80,7 +85,11 @@ const MOTION_BOOTSTRAP =
   "if(!matchMedia('(prefers-reduced-motion: reduce)').matches&&'IntersectionObserver' in window)" +
   "document.documentElement.setAttribute('data-motion','on')";
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   // `<html lang>` était écrit en dur à `fr` pendant que la page rendait l'anglais par
   // défaut : l'attribut contredisait le texte qu'il qualifiait. Un lecteur d'écran
   // lisait donc de l'anglais avec une voix française. Résolu, il ne peut plus mentir
@@ -99,7 +108,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body className="min-h-screen font-sans antialiased">
         <script dangerouslySetInnerHTML={{ __html: MOTION_BOOTSTRAP }} />
+        <script dangerouslySetInnerHTML={{ __html: SIGNAL_BOOTSTRAP_SCRIPT }} />
         <Motion />
+        <SignalBootstrap />
         <LanguageProvider initial={lang}>{children}</LanguageProvider>
       </body>
     </html>

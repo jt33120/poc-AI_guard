@@ -1,9 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import { apiGet } from "@/lib/client";
+import { ConsoleError } from "@/components/ConsoleUI";
 import { useT } from "@/lib/i18n";
 
 export interface Client {
@@ -35,6 +43,7 @@ interface ScopeValue {
   clients: Client[];
   agents: Agent[];
   loading: boolean;
+  error: unknown;
   /** Selected client id, or "all". */
   selected: string;
   setSelected: (v: string) => void;
@@ -46,6 +55,7 @@ const ScopeContext = createContext<ScopeValue>({
   clients: [],
   agents: [],
   loading: true,
+  error: null,
   selected: "all",
   setSelected: () => {},
   reload: () => {},
@@ -63,24 +73,44 @@ export function formatTokens(n: number): string {
   return n.toLocaleString("en-US");
 }
 
-export function ClientScopeProvider({ children }: { children: React.ReactNode }) {
+export function ClientScopeProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [customer, setCustomer] = useState<string | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<unknown>(null);
   const [selected, setSelectedState] = useState("all");
 
   const reload = useCallback(() => {
-    Promise.allSettled([apiGet<Client[]>("v1/clients"), apiGet<AgentsOverview>("v1/agents")])
+    setLoading(true);
+    setError(null);
+    Promise.allSettled([
+      apiGet<Client[]>("v1/clients"),
+      apiGet<AgentsOverview>("v1/agents"),
+    ])
       .then(([cl, ov]) => {
-        const clientList = cl.status === "fulfilled" && Array.isArray(cl.value) ? cl.value : [];
+        const clientList =
+          cl.status === "fulfilled" && Array.isArray(cl.value) ? cl.value : [];
+        if (cl.status === "rejected") setError(cl.reason);
+        else if (ov.status === "rejected") setError(ov.reason);
         setClients(clientList);
         if (ov.status === "fulfilled") {
           setCustomer(ov.value?.customer ?? null);
           setAgents(Array.isArray(ov.value?.agents) ? ov.value.agents : []);
         }
-        const saved = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
-        if (saved && saved !== "all" && clientList.some((c) => c.id === saved)) {
+        const saved =
+          typeof window !== "undefined"
+            ? localStorage.getItem(STORAGE_KEY)
+            : null;
+        if (
+          saved &&
+          saved !== "all" &&
+          clientList.some((c) => c.id === saved)
+        ) {
           setSelectedState(saved);
         }
       })
@@ -95,11 +125,22 @@ export function ClientScopeProvider({ children }: { children: React.ReactNode })
   }, []);
 
   const value = useMemo(
-    () => ({ customer, clients, agents, loading, selected, setSelected, reload }),
-    [customer, clients, agents, loading, selected, setSelected, reload],
+    () => ({
+      customer,
+      clients,
+      agents,
+      loading,
+      error,
+      selected,
+      setSelected,
+      reload,
+    }),
+    [customer, clients, agents, loading, error, selected, setSelected, reload],
   );
 
-  return <ScopeContext.Provider value={value}>{children}</ScopeContext.Provider>;
+  return (
+    <ScopeContext.Provider value={value}>{children}</ScopeContext.Provider>
+  );
 }
 
 export function useClientScope(): ScopeValue {
@@ -114,9 +155,11 @@ export function clientSuffix(selected: string): string {
 /** The monitored-client header: name + website + live rollup + selector. */
 export function ClientScopeBar() {
   const { t } = useT();
-  const { clients, loading, selected, setSelected } = useClientScope();
+  const { clients, loading, error, selected, setSelected, reload } =
+    useClientScope();
 
-  const sel = selected === "all" ? null : clients.find((c) => c.id === selected);
+  const sel =
+    selected === "all" ? null : clients.find((c) => c.id === selected);
   const roll = sel
     ? {
         agents: sel.agents,
@@ -139,6 +182,8 @@ export function ClientScopeBar() {
   const title = sel ? sel.name : t("scope.allclients");
   const initial = (sel ? sel.name : "*").slice(0, 1).toUpperCase();
 
+  if (error != null) return <ConsoleError error={error} retry={reload} />;
+
   return (
     <div className="card flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-center gap-3">
@@ -146,8 +191,12 @@ export function ClientScopeBar() {
           {initial}
         </span>
         <div className="min-w-0">
-          <div className="label text-brand-bright">{t("scope.clientlabel")}</div>
-          <div className="truncate text-lg font-bold leading-tight">{title}</div>
+          <div className="label text-brand-bright">
+            {t("scope.clientlabel")}
+          </div>
+          <div className="truncate text-lg font-bold leading-tight">
+            {title}
+          </div>
           {sel?.website ? (
             <a
               href={sel.website}
@@ -166,15 +215,30 @@ export function ClientScopeBar() {
       </div>
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-        <Stat label={t("scope.actions")} value={roll.actions.toLocaleString("en-US")} />
-        <Stat label={t("scope.billed")} value={formatUsd(roll.billed)} />
-        <Stat label={t("scope.spend")} value={formatUsd(roll.est)} />
-        <Stat label={t("scope.tokens")} value={formatTokens(roll.tokens)} />
+        <Stat
+          label={t("scope.actions")}
+          value={loading ? "…" : roll.actions.toLocaleString("en-US")}
+        />
+        <Stat
+          label={t("scope.billed")}
+          value={loading ? "…" : formatUsd(roll.billed)}
+        />
+        <Stat
+          label={t("scope.spend")}
+          value={loading ? "…" : formatUsd(roll.est)}
+        />
+        <Stat
+          label={t("scope.tokens")}
+          value={loading ? "…" : formatTokens(roll.tokens)}
+        />
       </div>
 
       <div className="flex items-center gap-2">
         {clients.length === 0 && !loading ? (
-          <Link href="/admin" className="text-sm font-semibold text-brand-bright hover:underline">
+          <Link
+            href="/admin"
+            className="text-sm font-semibold text-brand-bright hover:underline"
+          >
             {t("scope.manage")} →
           </Link>
         ) : (
@@ -200,7 +264,9 @@ export function ClientScopeBar() {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="text-right">
-      <div className="text-base font-bold leading-tight text-white">{value}</div>
+      <div className="text-base font-bold leading-tight text-white">
+        {value}
+      </div>
       <div className="muted text-[11px] uppercase tracking-wide">{label}</div>
     </div>
   );

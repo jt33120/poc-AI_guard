@@ -12,12 +12,17 @@ const PROTECTED = [
   "/costs",
   "/admin",
   "/onboarding",
+  "/policy",
+  "/risk",
+  "/settings",
 ];
 
 export async function middleware(request: NextRequest) {
   // Segment-aware match so e.g. /executive-preview (public) is NOT caught by /executive.
   const path = request.nextUrl.pathname;
-  const isProtected = PROTECTED.some((p) => path === p || path.startsWith(`${p}/`));
+  const isProtected = PROTECTED.some(
+    (p) => path === p || path.startsWith(`${p}/`),
+  );
 
   // Hermetic E2E mode: gate on a marker cookie instead of a real session.
   if (appConfig.e2e) {
@@ -28,24 +33,30 @@ export async function middleware(request: NextRequest) {
   }
 
   const response = NextResponse.next({ request });
-  const supabase = createServerClient(appConfig.supabaseUrl, appConfig.supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll(toSet: { name: string; value: string; options: CookieOptions }[]) {
-        for (const { name, value, options } of toSet) {
-          response.cookies.set(name, value, {
-            ...options,
-            httpOnly: true,
-            sameSite: "lax",
-            secure: process.env.NODE_ENV === "production",
-            path: "/",
-          });
-        }
+  const supabase = createServerClient(
+    appConfig.supabaseUrl,
+    appConfig.supabaseAnonKey,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(
+          toSet: { name: string; value: string; options: CookieOptions }[],
+        ) {
+          for (const { name, value, options } of toSet) {
+            response.cookies.set(name, value, {
+              ...options,
+              httpOnly: true,
+              sameSite: "lax",
+              secure: process.env.NODE_ENV === "production",
+              path: "/",
+            });
+          }
+        },
       },
     },
-  });
+  );
 
   const {
     data: { user },
@@ -63,5 +74,7 @@ export const config = {
   // chaque chargement de page, y compris pour un visiteur non connecté. `xsom-mark.svg`
   // tombe sous la même règle : le logo est demandé sur chaque page, y compris par un
   // visiteur non connecté.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|xsom-mark.svg).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|icon.svg|xsom-mark.svg|signal-media/|fonts/).*)",
+  ],
 };

@@ -1,0 +1,17 @@
+{
+  "name": "@xsom/signal",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "xSOM shared identity, functional diagrams and accessible interaction primitives",
+  "exports": {
+    "./react": "./react.tsx",
+    "./tokens.css": "./tokens.css",
+    "./components.css": "./components.css",
+    "./signal.js": "./signal.js"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "node build.mjs --check && node --test tokens.test.mjs"
+  }
+}
