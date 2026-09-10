@@ -24,7 +24,7 @@ from fastapi import Depends, HTTPException, Request, status
 from api.deps import database_url, require_tenant
 from api.security import get_current_user
 from core import db, entitlements
-from core.entitlements import Capability, Metric
+from core.entitlements import Capability, Meter, Metric
 from core.schemas import CurrentUser
 
 logger = logging.getLogger("xsom.api")
@@ -111,4 +111,42 @@ def enforce_stock(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"plan limit reached: {plafond} {etiquette} (used {actuel})",
+        )
+
+
+def enforce_flux(url: str, tenant_id: str, metric: Metric, *, etiquette: str) -> None:
+    """Refuser un acte payant à l'unité quand l'allocation de la période est épuisée.
+
+    Jumeau d':func:`enforce_stock` pour les métriques de **flux**, et il rend le même
+    409 : dans les deux cas la fonctionnalité *est* dans le palier, c'est le nombre
+    qui est atteint. Un 402 dirait « pas à ce prix » et enverrait la console sur
+    l'écran d'offre alors que le client a déjà payé ; un 429 se confondrait avec le
+    limiteur de débit, qui vit à côté et veut dire tout autre chose — « réessayez
+    dans un instant » plutôt que « votre mois est consommé ».
+
+    Le débit vit dans :func:`core.entitlements.flux_allows`, qui lit avant de
+    débiter : un appel refusé ne se facture pas.
+
+    Raises:
+        HTTPException: 409 quand l'allocation est épuisée, 503 si elle est illisible.
+    """
+    try:
+        with db.connection(url) as conn:
+            etat = entitlements.flux_allows(conn, tenant_id, metric)
+    except Exception:
+        logger.warning("flux_unreadable", extra={"tenant_id": tenant_id, "metric": metric.value})
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Quota store unavailable",
+        ) from None
+    if etat is Meter.unknown:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Quota store unavailable",
+        )
+    if etat is Meter.capped:
+        logger.info("flux_exhausted", extra={"tenant_id": tenant_id, "metric": metric.value})
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"plan limit reached: {etiquette} for this period",
         )

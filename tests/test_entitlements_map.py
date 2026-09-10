@@ -18,13 +18,15 @@ from __future__ import annotations
 
 import importlib
 import pkgutil
+import re
+from pathlib import Path
 
 import pytest
 from fastapi import APIRouter
 
 import api
 from api.main import _CAPACITE_PAR_ROUTEUR, _capacite_de
-from core.entitlements import PLANCHER, Capability
+from core.entitlements import PLANCHER, Capability, Metric
 from tests.conftest import DBHandle
 
 
@@ -213,4 +215,104 @@ def test_a_gated_router_authenticates_with_the_token_the_gate_reads() -> None:
     assert examinees >= 20, (
         f"seulement {examinees} routes examinées — le contrôle ci-dessus ne compare "
         "presque rien, et passerait quoi qu'on mette dans la table"
+    )
+
+
+#: Les métriques que `metric_catalog` publie et que le produit ne compte pas encore,
+#: chacune avec la raison qui rend l'absence défendable. Une entrée ici est une
+#: **limite affichée qui ne s'applique pas** : elle a le coût commercial d'une
+#: promesse et l'effet technique de rien.
+#:
+#: Le garde ci-dessous refuse les deux directions. Une métrique publiée qui n'est
+#: nommée nulle part et qui manque à cette table fait échouer la suite ; une
+#: métrique câblée qui y traîne encore la fait échouer aussi, sinon la liste
+#: pourrit et finit par excuser ce qui marche.
+NON_CABLEES: dict[str, str] = {
+    "seats": (
+        "aucun site de croissance : le produit n'a pas de route d'invitation. "
+        "`core/signup.py::provision_account` crée le tenant ET son unique siège "
+        "admin dans le même geste, donc le plafond ne peut pas être atteint par "
+        "un chemin qui existe. Câbler `enforce_stock` ici serait du code mort."
+    ),
+    "authorize_rpm": (
+        "débit par palier : `api/ratelimit.py` résout ses limites depuis la "
+        "configuration, pas depuis le plan. Le résolveur par palier est un lot "
+        "en soi — il touche slowapi et les quatre plans de service."
+    ),
+    "proxy_rpm": "idem `authorize_rpm` : même résolveur, même lot.",
+}
+
+#: `core/entitlements.py` définit l'énumération : y trouver `Metric.x` ne prouve rien.
+_HORS_PREUVE = ("core/entitlements.py",)
+
+
+def _metriques_nommees_par_le_produit() -> set[str]:
+    """Les métriques que le code de production nomme, hors module de définition."""
+    racine = Path(__file__).resolve().parent.parent
+    vues: set[str] = set()
+    for paquet in ("api", "core", "gateway"):
+        for fichier in (racine / paquet).rglob("*.py"):
+            relatif = fichier.relative_to(racine).as_posix()
+            if relatif in _HORS_PREUVE:
+                continue
+            vues.update(re.findall(r"\bMetric\.([a-z_]+)", fichier.read_text(encoding="utf-8")))
+    return vues
+
+
+def test_the_enum_and_the_catalogue_name_the_same_metrics(db: DBHandle) -> None:
+    """`Metric` et `metric_catalog` sont deux listes ; elles doivent être la même.
+
+    Sans ce contrôle, une métrique ajoutée d'un seul côté est soit une limite que
+    le code ne sait pas lire, soit un compteur qu'aucun palier ne borne.
+    """
+    rows = db.conn.execute("select metric from metric_catalog").fetchall()
+    catalogue = {str(r[0]) for r in rows}
+    enum = {m.value for m in Metric}
+    assert catalogue == enum, (
+        f"catalogue seul : {sorted(catalogue - enum)} · énumération seule : "
+        f"{sorted(enum - catalogue)}\n"
+        "  fix : `core/entitlements.py::Metric` et l'insert de `metric_catalog` "
+        "dans `supabase/migrations/0030_saas_plans.sql` se modifient ensemble."
+    )
+
+
+def test_every_published_metric_is_either_counted_or_declared_uncounted(db: DBHandle) -> None:
+    """Une limite publiée que rien ne compte est une promesse sans effet.
+
+    **C'est le défaut qui ne casse rien**, donc celui qu'aucun test écrit après
+    coup ne trouve : le plan affiche « 10 000 appels de proxy », le produit n'en
+    compte aucun, et tout le monde est content jusqu'à la facture. Le seul moment
+    où l'oubli est visible est celui où on écrit la table — d'où un contrôle qui
+    part de ce que la base **publie**, pas de ce que le code croit câbler.
+
+    Le contrôle est statique à dessein : il demande que le produit **nomme** la
+    métrique hors de son module de définition. Un site nommé mais mort resterait
+    invisible ici — c'est le banc de mutation qui répond de celui-là, et il n'a
+    rien à répondre tant que le nom n'apparaît nulle part.
+    """
+    rows = db.conn.execute("select metric from metric_catalog").fetchall()
+    publiees = {str(r[0]) for r in rows}
+    nommees = _metriques_nommees_par_le_produit()
+
+    muettes = sorted(publiees - nommees - set(NON_CABLEES))
+    assert not muettes, (
+        f"ces métriques sont publiées dans `metric_catalog` et `plan_limits`, et "
+        f"aucun fichier d'`api/`, `core/` ou `gateway/` ne les nomme : {muettes}\n"
+        "  le plafond s'affiche au client et ne s'applique jamais.\n"
+        "  fix : comptez-les au site qui les produit, ou déclarez-les dans "
+        "`NON_CABLEES` avec la raison — jamais en silence."
+    )
+
+    perimees = sorted(set(NON_CABLEES) & nommees)
+    assert not perimees, (
+        f"ces métriques sont déclarées non câblées et le produit les nomme "
+        f"pourtant : {perimees}\n"
+        "  fix : retirez-les de `NON_CABLEES` — une liste d'exceptions qui "
+        "excuse du code vivant n'arrête plus rien."
+    )
+
+    inconnues = sorted(set(NON_CABLEES) - publiees)
+    assert not inconnues, (
+        f"`NON_CABLEES` nomme des métriques que le catalogue ne publie pas : "
+        f"{inconnues}"
     )

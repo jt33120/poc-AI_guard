@@ -51,6 +51,7 @@ from core import (
     db,
     dlp,
     dlp_config,
+    entitlements,
     monitor,
     policy_store,
     pricing,
@@ -59,6 +60,7 @@ from core import (
 )
 from core import usage as usage_store
 from core.config import Settings
+from core.entitlements import Meter, Metric
 from core.judge import Judge, build_judge, resolve_ambiguous
 from core.policy import ActionClass, Approval, Policy, evaluate
 
@@ -562,9 +564,44 @@ def _audit_unparsed(
         logger.warning("unparsed_audit_failed", extra={"tenant_id": tenant_id})
 
 
+def _debiter_un_appel(url: str, tenant_id: str) -> Meter:
+    """Débiter `proxy_calls` avant que l'appel ne coûte quoi que ce soit.
+
+    `proxy_calls` était publiée par `metric_catalog`, plafonnée par `plan_limits`
+    dans les trois paliers, affichée au client — et **comptée nulle part**. Une
+    limite qui ne s'applique pas a le coût commercial d'une promesse et l'effet
+    technique de rien : le client paie pour un plafond qu'il ne peut pas atteindre,
+    et nous facturons un volume que nous ne mesurons pas.
+
+    Placé en tête de `_forward`, avant la DLP et avant le garde-prompt : les deux
+    coûtent du calcul et une lecture de base, et un appel qu'on va refuser n'a pas à
+    les payer. Une base injoignable rend `unknown`, que l'appelant lit comme une
+    indisponibilité — jamais comme une permission.
+    """
+    try:
+        with db.connection(url) as conn:
+            return entitlements.flux_allows(conn, tenant_id, Metric.proxy_calls)
+    except Exception:
+        logger.warning("proxy_quota_unreadable", extra={"tenant_id": tenant_id})
+        return Meter.unknown
+
+
 async def _forward(request: Request, principal: GatewayPrincipal, provider: str) -> Response:
     settings: Settings = request.app.state.settings
     url = database_url(request)
+
+    etat = await run_in_threadpool(_debiter_un_appel, url, principal.tenant_id)
+    if etat is Meter.capped:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="plan limit reached: proxy calls for this period",
+        )
+    if etat is Meter.unknown:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Quota store unavailable",
+        )
+
     body = await request.body()
 
     # Egress data-loss guard: scan the outbound prompt for secrets/PII BEFORE it

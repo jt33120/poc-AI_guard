@@ -350,6 +350,32 @@ def consume(conn: psycopg.Connection, tenant_id: str, metric: Metric, n: int = 1
     return int(row[0]) if row else None
 
 
+def flux_allows(conn: psycopg.Connection, tenant_id: str, metric: Metric) -> Meter:
+    """Autoriser un acte payant à l'unité, et le débiter — dans cet ordre.
+
+    **Lire puis débiter, jamais débiter puis lire.** L'ordre inverse est plus court
+    d'une ligne et compte les refus : le client voit alors, sur sa facture, les appels
+    qu'on lui a refusés. Un compteur qui grossit pendant qu'on rend 409 n'est pas
+    défendable, et il est irréparable — `plan_usage_counters` n'a pas de crédit.
+
+    Ne débite pas sur `Meter.capped` ; débite sur `grace`, qui est une tolérance
+    au-dessus du plafond et pas une exemption. `unknown` ne débite pas non plus :
+    on ne facture pas ce qu'on n'a pas su mesurer, et l'appelant le lit comme une
+    indisponibilité, jamais comme une permission.
+
+    À distinguer de :func:`tighten`, qui vit sur le chemin de décision et **resserre
+    un verdict**. Ici il n'y a pas de verdict de sécurité à resserrer : l'acte est
+    payant, il passe ou il ne passe pas.
+    """
+    droit = load_entitlement(conn, tenant_id)
+    etat = meter(droit, metric, consomme=droit.consomme(metric))
+    if etat in (Meter.ok, Meter.grace):
+        if consume(conn, tenant_id, metric) is None:
+            return Meter.unknown
+        conn.commit()
+    return etat
+
+
 def tighten(outcome: PolicyOutcome, policy: Policy, *, reason: Meter) -> PolicyOutcome:
     """Resserrer un verdict parce que le plan est au plafond. **Jamais l'inverse.**
 
