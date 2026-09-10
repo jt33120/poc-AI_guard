@@ -33,8 +33,11 @@ from core import (
     tenant_tokens,
     trust,
 )
+from core.config import Settings
 from core.judge import Judge, resolve_ambiguous
+from core.logging import configure_logging
 from core.notify import Notifier
+from core.observability import init_observability
 from core.policy import (
     ActionClass,
     Approval,
@@ -761,6 +764,28 @@ def _build_backend(
     return PolicyBackend(policy, DownstreamProxy(specs), ctx, build_judge(settings))
 
 
+def prepare_runtime(settings: Settings) -> None:
+    """Installe les journaux et Sentry pour une session de passerelle.
+
+    **Ce qui manquait, et ce que ça coûtait.** `run_stdio` n'appelait ni
+    `configure_logging` ni `init_observability` — un `grep` du dépôt ne trouvait
+    ces deux fonctions qu'à un seul endroit, `api/main.py`. Le résultat, mesuré :
+    racine sans handler, niveau `WARNING`. Vingt des quarante points de
+    journalisation du dépôt vivent ici, sur la seule voie **contraignante**, et
+    aucun n'existait en production. Tous les `logger.info` du chemin d'exécution
+    — outil mis en quarantaine, refus RBAC, agent stoppé, action teintée refusée,
+    outil refusé, approbation créée — n'émettaient rien du tout. Les alarmes
+    sortaient nues par `logging.lastResort` : `audit_write_failed` arrivait sans
+    tenant, sans outil, sans date, non parsable. Et aucun plantage ne remontait.
+
+    Extraite de `run_stdio` pour être testable : `run_stdio` ouvre un transport
+    stdio réel et porte `# pragma: no cover`, si bien que tout ce qu'on y écrit
+    échappe à la suite.
+    """
+    configure_logging(settings.log_level)
+    init_observability(settings)
+
+
 async def run_stdio() -> None:  # pragma: no cover - exercised via real MCP transport
     """Run the gateway over stdio (how an agent launches it).
 
@@ -771,6 +796,7 @@ async def run_stdio() -> None:  # pragma: no cover - exercised via real MCP tran
     from core.config import get_settings
 
     settings = get_settings()
+    prepare_runtime(settings)
     if not settings.database_url:
         raise RuntimeError("DATABASE_URL is required to authenticate the gateway session")
     raw_token = os.environ.get(TENANT_TOKEN_ENV, "")
