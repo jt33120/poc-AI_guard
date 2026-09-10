@@ -13,18 +13,18 @@
     },
     "mcp.autorise": {
       "designe": "passerelle MCP (obligatoire) — appel autorisé, relayé, audité",
-      "connexions_postgres": 1,
-      "allers_retours_sql": 3
-    },
-    "mcp.premiere_attente": {
-      "designe": "passerelle MCP — irréversible mis en attente pour la **première** fois (une reprise d'approbation coûte moins)",
       "connexions_postgres": 2,
       "allers_retours_sql": 5
     },
+    "mcp.premiere_attente": {
+      "designe": "passerelle MCP — irréversible mis en attente pour la **première** fois (une reprise d'approbation coûte moins)",
+      "connexions_postgres": 3,
+      "allers_retours_sql": 7
+    },
     "mcp.refuse": {
       "designe": "passerelle MCP — appel refusé par la policy, jamais relayé",
-      "connexions_postgres": 1,
-      "allers_retours_sql": 3
+      "connexions_postgres": 2,
+      "allers_retours_sql": 5
     }
   },
   "non_mesure": [
