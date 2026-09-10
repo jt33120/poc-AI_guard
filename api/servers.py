@@ -13,8 +13,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from psycopg import errors as pg_errors
 
 from api.deps import database_url as _database_url
-from api.deps import enforce_stock
 from api.deps import require_tenant as _require_tenant
+from api.entitlement_guard import enforce_stock
 from api.security import get_current_user, require_role
 from core import db, servers
 from core.entitlements import Metric

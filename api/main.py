@@ -29,8 +29,8 @@ from api.clients import router as clients_router
 from api.compliance import router as compliance_router
 from api.corpora import router as corpora_router
 from api.credentials import router as credentials_router
-from api.deps import requires
 from api.dlp import router as dlp_router
+from api.entitlement_guard import requires
 from api.errors import register_exception_handlers
 from api.gateway_tokens import router as gateway_tokens_router
 from api.health import router as health_router
@@ -157,17 +157,29 @@ _CAPACITE_PAR_ROUTEUR: tuple[tuple[APIRouter, Capability | None], ...] = (
     (audit_router, None),  # §4.2 — le journal prouve ; le facturer serait vendre le risque
     (policy_router, None),  # sans policy éditable, le produit ne fait rien
     (trust_router, None),  # lecture du capital de confiance, adossée à l'audit
+    # --- Ceux qui n'authentifient PAS par JWT, et que ce garde ne peut pas tenir ----
+    #
+    # `requires` résout un jeton **console** (`get_current_user`). Ces trois-là
+    # n'en présentent aucun : le proxy et l'ingestion AI s'authentifient par jeton de
+    # passerelle, la lecture AI par jeton de lecture serveur-à-serveur, et le triage
+    # est public. Les verrouiller ici ne les aurait pas facturés — cela les aurait
+    # **cassés**, en exigeant un porteur qu'ils ne portent pas. Mesuré : quarante et
+    # un tests de la suite l'ont dit d'un coup.
+    #
+    # Leur plafond n'est pas perdu, il est ailleurs : `proxy_calls` se débite sur le
+    # chemin chaud, là où le principal EST résolu (lot 9). Un quota se compte où
+    # l'identité existe, pas où le montage est commode.
+    (llm_proxy_router, None),  # X-Gateway-Token → plafonné par `proxy_calls`
+    (ai_router, None),  # jeton de passerelle (ingestion) et de lecture (console)
+    (triage_router, None),  # public : il n'y a pas encore de tenant à facturer
     # --- Les capacités de gamme ---------------------------------------------------
-    (llm_proxy_router, Capability.llm_proxy),
     (gateway_tokens_router, Capability.agents_inventory),
     (agents_router, Capability.agents_inventory),
     (servers_router, Capability.agents_inventory),
     (usage_router, Capability.usage_billing),
-    (triage_router, Capability.triage),
     (credentials_router, Capability.credentials),
     (clients_router, Capability.clients),
     (dlp_router, Capability.dlp_config),
-    (ai_router, Capability.ai_summary),
     (read_tokens_router, Capability.read_tokens),
     (compliance_router, Capability.compliance_pack),
     (integrity_router, Capability.integrity_admin),

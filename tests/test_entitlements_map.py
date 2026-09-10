@@ -153,3 +153,64 @@ def test_no_plan_grants_the_mcp_gateway(db: DBHandle, palier: str) -> None:
     ).fetchone()
     db.conn.commit()
     assert tenant is not None and tenant[0] is False
+
+
+def _dependances(route: object) -> set[object]:
+    """Toutes les fonctions dont une route dépend, sous-dépendances comprises."""
+    vues: set[object] = set()
+    pile = list(getattr(getattr(route, "dependant", None), "dependencies", []))
+    while pile:
+        dep = pile.pop()
+        appel = getattr(dep, "call", None)
+        if appel is not None:
+            vues.add(appel)
+        pile.extend(getattr(dep, "dependencies", []))
+    return vues
+
+
+def test_a_gated_router_authenticates_with_the_token_the_gate_reads() -> None:
+    """Le garde lit un jeton console : le verrouiller ailleurs **casse** la route.
+
+    `requires` appelle `get_current_user`, qui exige un `Authorization: Bearer` de
+    la console. Trois routeurs n'en présentent aucun — le proxy LLM et l'ingestion
+    AI s'authentifient par jeton de passerelle, la lecture AI par jeton de lecture,
+    et le triage est public. Les verrouiller ne les aurait pas facturés : cela leur
+    aurait fait exiger un porteur qu'ils ne portent pas.
+
+    Mesuré plutôt que déduit : la première version de la table les incluait, et
+    **quarante et un tests** de la suite l'ont dit d'un coup. Ce contrôle-ci le dit
+    en une seconde, et il le dira avant le prochain routeur.
+
+    **Et il a fallu deux essais.** La première version de ce test passait par
+    `app.routes` : depuis FastAPI 0.137 l'inclusion est différée et on n'y trouve
+    que des marqueurs sans `dependant`, si bien que la boucle ne parcourait **rien**
+    et que la mutation ne la faisait pas broncher. Le contrôle de non-vacuité en bas
+    est ce qui l'empêche de redevenir muet — c'est le même piège que celui déjà
+    documenté dans `tests/test_api_planes.py`.
+    """
+    from api.security import get_current_user
+
+    fautifs: list[str] = []
+    examinees = 0
+    for routeur, capacite in _CAPACITE_PAR_ROUTEUR:
+        if capacite is None:
+            continue
+        for route in routeur.routes:
+            if not hasattr(route, "dependant"):
+                continue
+            examinees += 1
+            if get_current_user not in _dependances(route):
+                fautifs.append(f"{getattr(route, 'path', '?')} (capacité {capacite.value})")
+
+    assert not fautifs, (
+        "ces routes sont verrouillées par un garde qui lit un jeton console, alors "
+        "qu'elles n'en demandent pas :\n  "
+        + "\n  ".join(sorted(fautifs))
+        + "\n  le verrou ne les facturera pas, il les rendra inappelables.\n"
+        "  fix : passez le routeur à `None` dans `_CAPACITE_PAR_ROUTEUR` et comptez "
+        "son quota là où son identité est résolue."
+    )
+    assert examinees >= 20, (
+        f"seulement {examinees} routes examinées — le contrôle ci-dessus ne compare "
+        "presque rien, et passerait quoi qu'on mette dans la table"
+    )

@@ -11,7 +11,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
-from api.deps import database_url, enforce_stock, require_tenant
+from api.deps import database_url, require_tenant
+from api.entitlement_guard import enforce_stock
 from api.security import get_current_user, require_role
 from core import clients, db
 from core.entitlements import Metric
