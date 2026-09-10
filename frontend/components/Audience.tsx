@@ -142,25 +142,26 @@ export function Audience() {
   const { t } = useT();
 
   return (
-    <section id="pour-qui" className="section scroll-mt-20">
-      <div className="wrap">
-        <p className="eyebrow" data-num="04">
-          {t("pourqui.kicker")}
-        </p>
-        <h2 className="t-h2 mt-2 max-w-3xl" data-sheen>
-          {t("pourqui.title")}
-        </h2>
-        <p className="lead mt-4">{t("pourqui.lede")}</p>
+    // Un bloc du relevé, et non plus une section à part. Les deux posaient la même
+    // question — qui est concerné — avec le même sélecteur et le même état ; les
+    // séparer faisait répondre deux fois. Ici l'aveu « voici où nous ne pouvons pas
+    // bloquer » tombe juste après les revendications de couverture, ce qui est sa
+    // place. `id` conservé : deux tests de navigateur le visent.
+    <div id="pour-qui" className="mt-20 scroll-mt-20">
+      <hr className="rule mb-10" />
+      <h3 className="t-h2 max-w-3xl" data-sheen>
+        {t("pourqui.title")}
+      </h3>
+      <p className="lead mt-4">{t("pourqui.lede")}</p>
 
         <div className="mt-10">
           <hr className="rule mb-8" />
-          <h3 className="t-h3">{t("pourqui.tri.t")}</h3>
+          <h4 className="t-h3">{t("pourqui.tri.t")}</h4>
           <p className="muted mt-2 max-w-2xl text-sm leading-relaxed">{t("pourqui.tri.b")}</p>
           <Plafond />
         </div>
 
-        <Bascules />
-      </div>
-    </section>
+      <Bascules />
+    </div>
   );
 }
