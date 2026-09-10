@@ -29,6 +29,7 @@ import { useState } from "react";
 import { useT, type StrKey } from "@/lib/i18n";
 import { FAITS_PUBLIES } from "@/lib/facts";
 import { Diagramme, DiagrammeDefs } from "@/components/Diagramme";
+import { Audience } from "@/components/Audience";
 import { PROFILS, useProfils } from "@/components/ProfilContext";
 import { ReplayPanel } from "@/components/ReplayPanel";
 import { rejeuDe } from "@/lib/replays";
@@ -489,7 +490,7 @@ export function ThreatLedger() {
     <section id="menaces" className="section section--light scroll-mt-20">
       <div className="wrap wrap--wide">
         <DiagrammeDefs />
-        <p className="eyebrow" data-num="05">
+        <p className="eyebrow" data-num="04">
           {t("ledger.kicker")}
         </p>
         <h2 className="t-h2 mt-2 max-w-3xl" data-sheen>
@@ -597,6 +598,8 @@ export function ThreatLedger() {
         <p className="muted mt-3 font-mono text-[length:var(--fs-label)]">
           {t("ledger.stamp", { date: RELEVE.genere_le, commit: RELEVE.commit })}
         </p>
+
+        <Audience />
       </div>
     </section>
   );

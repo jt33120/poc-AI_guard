@@ -161,13 +161,32 @@ def authenticate_gateway_session(conn: psycopg.Connection, raw_token: str) -> tu
     observation windows (`G-25`) are both keyed on it, so an agent cannot mint
     itself a clean one by reconnecting or by declaring a new session.
 
+    **La passerelle est une capacité accordée, pas un droit de l'inscription.**
+    C'est la seule voie contraignante — elle exécute ou elle n'exécute pas — et elle
+    demande une installation chez le client. Un jeton valide ne suffit donc pas : le
+    tenant doit porter `mcp_gateway_enabled`. Le contrôle est ici et non dans
+    `authenticate_gateway_principal`, qui sert les voies coopératives : `/v1/authorize`
+    et le proxy restent en libre-service, et c'est voulu.
+
     Raises:
-        PermissionError: if the token is missing, unknown, or revoked.
+        PermissionError: if the token is missing, unknown, revoked, or if the tenant
+            has not been granted the gateway.
     """
     principal = resolve_principal(conn, raw_token)
     if principal is None:
         raise PermissionError("invalid or missing tenant token")
     token_id, tenant_id = principal
+    accorde = conn.execute(
+        "select mcp_gateway_enabled from tenants where id = %s",
+        (tenant_id,),
+    ).fetchone()
+    # `not accorde` autant que `not accorde[0]` : un tenant introuvable est refusé
+    # comme un tenant non accordé. Le verrou ne peut pas s'ouvrir sur une absence.
+    if not accorde or not accorde[0]:
+        raise PermissionError(
+            "the MCP gateway is not enabled for this tenant — it ships with the "
+            "service offer, which installs it with you"
+        )
     conn.execute(
         "update gateway_tokens set last_used_at = now() where token_hash = %s",
         (hash_token(raw_token),),

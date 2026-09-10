@@ -1,7 +1,6 @@
 import Link from "next/link";
 
 import { ShieldMark, Wordmark, XsomMark } from "@/components/brand";
-import { Audience } from "@/components/Audience";
 import { Fonctionnement } from "@/components/Fonctionnement";
 import { ProfilProvider } from "@/components/ProfilContext";
 import { ThreatLedger } from "@/components/ThreatLedger";
@@ -126,11 +125,12 @@ export default function LandingPage() {
           d'honorer ; la passerelle exécute ou n'exécute pas. La copie le dit au lieu
           de le cacher, parce que c'est ce qui sépare les deux offres.
 
-          La passerelle n'est PAS réservée au service : `lib/integration.ts` la livre
-          dans l'assistant d'intégration, et `Fonctionnement` la présente en voie
-          numéro un. Ce que le service ajoute, c'est l'installation, la politique
-          écrite sur vos obligations, et l'audit tenu. Prétendre l'inverse ferait
-          mentir cette page contre elle-même. */}
+          La passerelle est accordée, pas vendue à l'inscription. Elle l'était en
+          droit — n'importe quel jeton valide ouvrait une session — alors qu'elle ne
+          l'était pas en fait : sa configuration exige un `DATABASE_URL` qu'un inscrit
+          n'a pas. `tenants.mcp_gateway_enabled` ferme l'écart, fail-closed, et
+          `authenticate_gateway_session` le vérifie. Les voies coopératives ne sont pas
+          touchées : elles passent par `authenticate_gateway_principal`. */}
       <section className="section section--light">
         <div className="wrap">
           <div className="text-center">
@@ -172,14 +172,13 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 04 et 05 — Le relevé et son sélecteur, sous un seul `ProfilProvider`.
+      {/* 04 — Le relevé, son sélecteur de profil et le plafond, en une section.
           Un seul sélecteur, donc un seul état, et un seul appel au moteur — deux
           sélecteurs poseraient au visiteur une question à laquelle il a répondu.
           Les lignes restent rendues côté serveur : un robot les voit sans exécuter
           de JavaScript. Ils viennent en dernier parce qu'ils répondent à la question
           que les trois sections précédentes ont posée. */}
       <ProfilProvider>
-        <Audience />
         <ThreatLedger />
       </ProfilProvider>
 
