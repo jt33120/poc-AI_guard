@@ -61,10 +61,55 @@ def enforce_retention_purge(
     return usage_store.purge_older_than(conn, days=days)
 
 
+def _has_approvals(conn: psycopg.Connection, tenant_id: str | None) -> bool:
+    """Le tenant a-t-il des approbations ? Le témoin d'activité hors `audit_log`.
+
+    Choisi parce que le lien est **mécanique** : toute approbation naît d'un
+    `hitl_pending` écrit dans `audit_log` par la même transaction logique. Des
+    approbations sans une seule ligne de journal n'est pas un état que le produit
+    sait produire — c'est un journal qui a disparu.
+    """
+    if tenant_id is None:
+        # Sans tenant explicite, RLS filtre déjà : l'appelant passe par
+        # `db.tenant_reader` (`api/compliance.py`).
+        row = conn.execute("select exists (select 1 from approvals)").fetchone()
+    else:
+        # `::text` et non un `uuid` lié : `audit_log.tenant_id` est du texte alors
+        # que `approvals.tenant_id` est un `uuid`, et cette fonction reçoit ce que
+        # l'appelant a — y compris, dans la suite, des identifiants qui ne sont pas
+        # des UUID. Comparer en texte évite qu'un contrôle d'intégrité échoue sur
+        # une erreur de conversion, ce qui serait le comble.
+        row = conn.execute(
+            "select exists (select 1 from approvals where tenant_id::text = %s)", (tenant_id,)
+        ).fetchone()
+    return bool(row and row[0])
+
+
 def chain_integrity(conn: psycopg.Connection, tenant_id: str | None = None) -> dict[str, Any]:
-    """Article 12 proof: recompute the audit hash-chain and report its integrity."""
+    """Article 12 proof: recompute the audit hash-chain and report its integrity.
+
+    **Une chaîne vide n'est pas une chaîne intacte, et les deux se ressemblaient.**
+    `verify_chain` sur zéro ligne ne parcourt rien, donc ne trouve aucune rupture et
+    rend `ok=True`. C'est honnête pris isolément, et faux là où c'était lu : jusqu'ici
+    `/v1/compliance/status` répondait `chain_ok: true` et `ready: true` sur un journal
+    **anéanti** — la preuve détruite, et l'attestation qui dit que tout va bien. Le
+    trou TRUNCATE que `0028_no_truncate.sql` referme rendait cet état atteignable en
+    une commande.
+
+    `ok` reste ce qu'il dit — la chaîne est cohérente — et l'anomalie sort dans son
+    propre champ. Faire mentir `ok` rendrait le démarrage de tout nouveau client
+    indistinguable d'un effacement, ce qui est l'erreur symétrique.
+    """
     result = audit.verify_chain(conn, tenant_id)
-    return {"ok": result.ok, "entries": result.count, "first_broken_id": result.broken_id}
+    # Un tenant neuf a zéro ligne ET zéro approbation : ce n'est pas une anomalie,
+    # c'est un lundi matin. L'anomalie est un journal vide qu'une autre table dément.
+    journal_manquant = result.count == 0 and _has_approvals(conn, tenant_id)
+    return {
+        "ok": result.ok,
+        "entries": result.count,
+        "first_broken_id": result.broken_id,
+        "journal_missing": journal_manquant,
+    }
 
 
 def verification_independence() -> dict[str, Any]:
@@ -230,13 +275,23 @@ def status(
         "chain_ok": integrity["ok"],
         "entries": integrity["entries"],
         "first_broken_id": integrity["first_broken_id"],
+        "journal_missing": integrity["journal_missing"],
         "oversight_gated": coverage["gated"],
         "oversight_auto_allowed": coverage["auto_allowed"],
         "oversight_coverage_ok": coverage["coverage_ok"],
         "retention_floor_days": retention_floor_days,
         "oldest_entry_age_days": oldest_entry_age_days(conn),
         "retention_ok": retention_ok,
-        "ready": integrity["ok"] and coverage["coverage_ok"] and retention_ok,
+        # `journal_missing` entre dans `ready` et pas dans `chain_ok` : la chaîne est
+        # bien cohérente, c'est la base de preuve qui a disparu. Un dossier prêt ne
+        # peut pas reposer sur zéro ligne alors que d'autres tables attestent
+        # l'activité.
+        "ready": (
+            integrity["ok"]
+            and not integrity["journal_missing"]
+            and coverage["coverage_ok"]
+            and retention_ok
+        ),
     }
 
 
