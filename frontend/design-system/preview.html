@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>xSOM Signal — atelier</title>
+    <link rel="stylesheet" href="fonts.css" />
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="components.css" />
+    <style>
+      body {
+        margin: 0;
+        background: var(--signal-bg);
+        color: var(--signal-text);
+        font-family: var(--signal-font-body);
+      }
+      a {
+        color: var(--signal-accent-text);
+      }
+    </style>
+    <script type="module" src="signal.js"></script>
+  </head>
+  <body>
+    <main class="signal-preview">
+      <a href="/">← xSOM Consulting</a>
+      <p class="signal-eyebrow">Design system / 1.0</p>
+      <h1>Le signal fait système.</h1>
+      <signal-preferences lang="fr">Préférences d’affichage</signal-preferences>
+      <div class="signal-preview__grid">
+        <signal-flow
+          class="signal-preview__wide"
+          lang="fr"
+          mode="demo"
+          interactive
+          verdict="hitl"
+          >Agent → Guard → Policy → Outil.</signal-flow
+        ><signal-audit class="signal-preview__wide" lang="fr" mode="demo"
+          >Chaîne d’événements illustrative.</signal-audit
+        ><signal-risk lang="fr" mode="demo" score="68" trust="42"
+          >Risque et confiance illustratifs.</signal-risk
+        ><signal-risk lang="fr" mode="live">Mesures non fournies.</signal-risk
+        ><signal-poles class="signal-preview__wide" lang="fr"
+          >Trois pôles activables ensemble.</signal-poles
+        ><signal-sovereignty class="signal-preview__wide" lang="fr"
+          >Résidence, clés et sorties.</signal-sovereignty
+        ><signal-timeline class="signal-preview__wide" lang="fr"
+          >Cadrage, build, production, run.</signal-timeline
+        ><signal-video class="signal-preview__wide" lang="fr" variant="guarded"
+          >Séquence illustrative de contrôle d’action.</signal-video
+        >
+        <section class="signal-card">
+          <p class="signal-label">Primitives</p>
+          <button class="signal-button signal-button--primary">
+            Envoyer une demande</button
+          ><button class="signal-button" disabled>Indisponible</button>
+          <p>
+            <span class="signal-tag" data-verdict="allow">allow</span>
+            <span class="signal-tag" data-verdict="hitl">hitl</span>
+            <span class="signal-tag" data-verdict="deny">deny</span>
+          </p>
+          <label
+            >Identifiant<input class="signal-input" placeholder="tenant_id"
+          /></label>
+        </section>
+        <section class="signal-card">
+          <p class="signal-label">État d’erreur</p>
+          <p class="signal-toast" data-verdict="deny">
+            L’action reste bloquée. Le service ne répond pas.
+          </p>
+          <label
+            >Policy<input
+              class="signal-input"
+              aria-invalid="true"
+              value="Règle à vérifier"
+          /></label>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>
