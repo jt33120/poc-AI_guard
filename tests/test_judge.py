@@ -123,3 +123,40 @@ def test_resolve_redacts_arguments_before_the_model_sees_them() -> None:
     # La forme traverse — c'est elle qui porte la classification.
     assert "mock.mail" in seen[0]
     assert "to" in seen[0]
+
+
+def test_a_completer_that_raises_is_classified_irreversible() -> None:
+    """Le mode de panne le plus probable du juge n'était exercé nulle part.
+
+    Les seize constructions de `Judge` de la suite passent toutes un completer qui
+    *retourne* une chaîne — mal formée parfois, mais qui retourne. Or un juge tombe
+    par timeout, par 429 ou par coupure réseau, pas par JSON invalide : c'est le
+    chemin que Mistral prendra un mardi matin, et le seul que personne ne jouait.
+
+    La direction est la seule tenable : ne pas avoir pu classer se lit comme la
+    classe la plus lourde, jamais comme une absence de risque.
+    """
+
+    def completer_qui_tombe(_s: str, _u: str) -> str:
+        raise TimeoutError("upstream timed out")
+
+    judge = Judge(completer_qui_tombe)
+    assert judge.classify("shell.exec", {"cmd": "ls"}) is ActionClass.irreversible
+
+
+def test_a_failed_call_still_counts_against_the_budget() -> None:
+    """Et il consomme le budget, sinon un endpoint en panne devient une boucle.
+
+    `self._calls += 1` précède le `try`, donc un fournisseur qui refuse toutes les
+    requêtes ne peut pas faire dépenser plus que `max_calls` appels. C'est écrit ici
+    parce que « ne compter que les succès » est le geste naturel de quelqu'un qui
+    voudrait rendre le budget plus juste — et qui ouvrirait une facture non bornée.
+    """
+
+    def completer_qui_tombe(_s: str, _u: str) -> str:
+        raise TimeoutError("upstream timed out")
+
+    judge = Judge(completer_qui_tombe, max_calls=2)
+    for _ in range(5):
+        judge.classify("shell.exec", {"cmd": "ls"})
+    assert judge.calls == 2

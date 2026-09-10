@@ -10,12 +10,17 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
 import psycopg
+
+from core.export import is_summarised
+
+logger = logging.getLogger("xsom.audit")
 
 GENESIS = "GENESIS"
 
@@ -226,6 +231,16 @@ def log_event(
     called it) and `upstream_request_id` (what the LLM provider called it) are
     declared values and are kept apart from it — see the note above `log_event`.
     """
+    # **Une décision que le récit de conformité ne sait pas ranger s'annonce ici.**
+    #
+    # Elle n'est pas refusée : §4.2 dit que rien d'accessoire ne casse une écriture
+    # d'audit, et `summarise` la compte déjà honnêtement en `unclassified`. Mais elle
+    # cesse d'être silencieuse — et `tests/conftest.py` fait échouer tout test qui en
+    # écrit une, ce qui rend le garde complet par construction : il voit toutes les
+    # décisions réellement écrites, y compris celles qu'aucun scan du code ne
+    # retrouve parce qu'elles sont calculées ou lues dans une table.
+    if not is_summarised(decision):
+        logger.warning("decision_not_summarised", extra={"decision": decision})
     ts = datetime.now(UTC)
     # `FR-163` : borner AVANT le hachage, et hacher exactement ce qui sera stocké.
     tool_name = _bounded(tool_name)

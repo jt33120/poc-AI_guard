@@ -59,6 +59,7 @@ from core import (
 )
 from core import usage as usage_store
 from core.config import Settings
+from core.judge import Judge, build_judge, resolve_ambiguous
 from core.policy import ActionClass, Approval, Policy, evaluate
 
 logger = logging.getLogger("xsom.llm_proxy")
@@ -174,14 +175,31 @@ def _extract_usage(style: str, data: dict[str, Any]) -> tuple[str | None, int, i
     return (model, prompt, completion)
 
 
-def _verdict(policy: Policy, name: str, args: dict[str, Any]) -> tuple[str | None, str]:
-    outcome = evaluate(policy, name, args)
+def _verdict(
+    policy: Policy, name: str, args: dict[str, Any], judge: Judge | None
+) -> tuple[str | None, str]:
+    """Le verdict de cette porte — **la même étape de classification que les deux autres.**
+
+    `resolve_ambiguous` manquait ici, et son propre docstring affirme pourtant être
+    « shared by every ingress path, so the classification step cannot drift between
+    them ». Deux appelants seulement l'invoquaient : `core/decision.py` et
+    `gateway/server.py`. Conséquence exacte, pour un même tenant et une même policy :
+    une règle `{classify: ambiguous, approval: auto}` était honorée **telle quelle**
+    par le proxy — l'appel d'outil partait — là où les deux autres portes la
+    plancherisent à `irreversible`, donc à une approbation humaine.
+
+    Et la ligne d'audit écrite par cette porte portait `action_class` à NULL : rien,
+    dans la chaîne, ne signalait que l'action n'avait pas été classée. Un juge absent
+    ne coûte aucun appel de modèle et rend `irreversible` (`AD-34`), donc le correctif
+    est gratuit pour les déploiements sans clé.
+    """
+    outcome = resolve_ambiguous(evaluate(policy, name, args), judge, name, args)
     action_class = outcome.action_class.value if outcome.action_class else None
     return action_class, _VERDICT.get(outcome.decision, outcome.decision.value)
 
 
 def _process(
-    style: str, data: dict[str, Any], policy: Policy, observing: bool
+    style: str, data: dict[str, Any], policy: Policy, observing: bool, judge: Judge | None
 ) -> list[tuple[str, str | None, str, str]]:
     """Audit rows [(tool, class, decision, args_hash)]; drop the calls that must not stand.
 
@@ -194,7 +212,7 @@ def _process(
 
     def drop(name: str, args: dict[str, Any]) -> bool:
         """Whether this tool call must be removed from the relayed response."""
-        raw_class, decision = _verdict(policy, name, args)
+        raw_class, decision = _verdict(policy, name, args, judge)
         action_class = ActionClass(raw_class) if raw_class else None
         blocked = decision != "allow"
         relaxed = blocked and observing and monitor.observes(action_class)
@@ -244,10 +262,11 @@ def _inspect(
     data: dict[str, Any],
     observing: bool,
     latency_ms: float | None = None,
+    judge: Judge | None = None,
 ) -> None:
     with db.connection(url) as conn:
         policy = policy_store.load_policy(conn, tenant_id)
-    audited = _process(style, data, policy, observing)
+    audited = _process(style, data, policy, observing, judge)
     usage = _extract_usage(style, data)
     billed = _extract_billed(provider, data)
     if not audited and usage is None and billed is None:
@@ -508,6 +527,41 @@ def _audit_streamed(
         logger.warning("streamed_audit_failed", extra={"tenant_id": tenant_id})
 
 
+def _audit_unparsed(
+    url: str | None, tenant_id: str, gateway_token_id: str, provider: str, *, observing: bool
+) -> None:
+    """Le second angle mort du proxy : un 200 dont le corps n'est pas exploitable.
+
+    Le fournisseur a répondu `200`, mais `upstream_resp.json()` lève ou ne rend pas
+    un objet : la réponse est relayée **telle quelle**, sans qu'aucun appel d'outil
+    soit examiné. C'est exactement la situation que `_audit_streamed` déclare pour le
+    streaming — et ce jumeau-ci ne déclarait rien, alors que ce module argumente
+    lui-même que « le silence était indiscernable d'une absence de trafic ».
+
+    La différence compte : un fournisseur qui change de format de réponse, ou une
+    passerelle intermédiaire qui réécrit le corps, ouvre cette branche pour **tout**
+    le trafic d'un agent, et l'enforcement disparaît sans qu'aucune ligne ne bouge.
+
+    Métadonnées seules, comme pour le streaming : nous n'avons pas lu le corps, et en
+    inventer un contenu serait pire que de n'en pas écrire.
+    """
+    if not url:
+        return
+    try:
+        with db.connection(url) as conn:
+            audit.log_event(
+                conn,
+                tenant_id=tenant_id,
+                decision="relayed_unparsed",
+                gateway_token_id=gateway_token_id,
+                error=f"provider={provider}",
+                origin=audit.Origin.llm_proxy(observing=observing),
+            )
+            conn.commit()
+    except Exception:  # l'audit est best-effort ; il ne casse jamais le relais
+        logger.warning("unparsed_audit_failed", extra={"tenant_id": tenant_id})
+
+
 async def _forward(request: Request, principal: GatewayPrincipal, provider: str) -> Response:
     settings: Settings = request.app.state.settings
     url = database_url(request)
@@ -641,11 +695,21 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
                 data,
                 observing,
                 latency_ms,
+                build_judge(settings),
             )
             # The response is rewritten in every mode: under observation `_process`
             # keeps what a window may cover, so the payload only differs where the
             # window does not reach.
             return Response(content=json.dumps(data).encode(), media_type="application/json")
+        # 200, mais illisible : relayé sans inspection, et désormais écrit.
+        await run_in_threadpool(
+            _audit_unparsed,
+            url,
+            principal.tenant_id,
+            principal.token_id,
+            provider,
+            observing=observing,
+        )
     return Response(
         content=upstream_resp.content,
         status_code=upstream_resp.status_code,

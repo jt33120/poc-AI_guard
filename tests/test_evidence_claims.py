@@ -18,6 +18,8 @@ from __future__ import annotations
 from typing import Any
 from uuid import uuid4
 
+import pytest
+
 from core import audit, compliance, export, monitor, tenant_tokens
 from tests.conftest import DBHandle
 
@@ -48,6 +50,13 @@ _VOCABULARY = {
     "redacted": 1,  # idem
     "monitor_hold": 2,  # api/llm_proxy.py::_process under an open window
     "monitor_deny": 1,  # idem
+    # Les deux angles morts déclarés du proxy. `streamed_uninspected` manquait à
+    # CETTE liste **et** à `_BUCKETS` depuis son introduction : il était compté dans
+    # le total et rapporté nulle part. C'est ce qui a montré qu'un inventaire écrit
+    # à la main, comparé à une autre liste écrite à la main, ne garde rien — d'où le
+    # garde de `tests/conftest.py`, qui écoute le point d'écriture.
+    "streamed_uninspected": 1,  # api/llm_proxy.py::_audit_streamed (`G-26`)
+    "relayed_unparsed": 1,  # api/llm_proxy.py::_audit_unparsed
 }
 
 
@@ -150,3 +159,76 @@ def test_an_unenforced_period_is_disclosed_with_the_supervision_figures(db: DBHa
     # The bound travels with the disclosure: the exposure was never unlimited.
     assert disclosed["never_relaxed"] == ["external_send", "irreversible"]
     assert "excluded from the oversight figures" in disclosed["statement"]
+
+
+def test_a_relayed_but_uninspected_completion_is_never_reported_as_allowed() -> None:
+    """Le trafic qu'on n'a pas regardé a sa propre case, et ce n'est pas « autorisé ».
+
+    Même faute que compter `monitor_*` comme un allow, et le fichier la refuse déjà
+    pour celui-là. Une complétion streamée, ou un corps que le proxy n'a pas su lire,
+    n'est pas une action que nous avons approuvée : c'est une action que nous
+    n'avons pas vue.
+    """
+    buckets = export.summarise({"allow": 1, "streamed_uninspected": 4, "relayed_unparsed": 2})
+    assert buckets["auto_allowed"] == 1
+    assert buckets["not_inspected"] == 6
+    assert buckets["unclassified"] == 0
+    assert "without inspection" in export.default_narrative(
+        export.AI_ACT, {"streamed_uninspected": 4}, 4
+    )
+
+
+@pytest.mark.vocabulaire_libre
+def test_the_write_path_itself_reports_a_decision_the_summary_cannot_place(
+    db: DBHandle, caplog: Any
+) -> None:
+    """Le garde qui remplace l'inventaire écrit à la main.
+
+    Il écoute `log_event`, donc il voit ce que le produit **écrit** — y compris les
+    décisions qu'aucun scan du code ne retrouverait, parce qu'elles arrivent par une
+    table (`_INTEGRITY_DECISION`) ou calculées (`f"monitor_{...}"`). L'inventaire
+    ci-dessus reste utile comme documentation ; il n'est plus ce qui tient.
+
+    L'écriture n'est pas refusée : §4.2 dit que rien d'accessoire ne casse une
+    écriture d'audit, et `summarise` la compte honnêtement en `unclassified`.
+    """
+    import logging
+
+    tenant = str(uuid4())
+    db.conn.execute("insert into tenants (id, name) values (%s, 'V')", (tenant,))
+    db.conn.commit()
+
+    with caplog.at_level(logging.WARNING, logger="xsom.audit"):
+        audit.log_event(
+            db.conn,
+            tenant_id=tenant,
+            decision="une_decision_inventee_plus_tard",
+            origin=audit.Origin.authorize_api(),
+        )
+        db.conn.commit()
+
+    alarme = next(r for r in caplog.records if r.getMessage() == "decision_not_summarised")
+    assert alarme.decision == "une_decision_inventee_plus_tard"  # type: ignore[attr-defined]
+
+    # Et l'écriture a bien eu lieu : le garde avertit, il ne casse pas la preuve.
+    ligne = db.conn.execute(
+        "select decision from audit_log where tenant_id = %s", (tenant,)
+    ).fetchone()
+    assert ligne is not None and ligne[0] == "une_decision_inventee_plus_tard"
+
+
+def test_a_known_decision_raises_no_alarm(db: DBHandle, caplog: Any) -> None:
+    """Non-vacuité : une alarme qui sonne toujours ne dit rien."""
+    import logging
+
+    tenant = str(uuid4())
+    db.conn.execute("insert into tenants (id, name) values (%s, 'W')", (tenant,))
+    db.conn.commit()
+
+    with caplog.at_level(logging.WARNING, logger="xsom.audit"):
+        audit.log_event(
+            db.conn, tenant_id=tenant, decision="monitor_hold", origin=audit.Origin.authorize_api()
+        )
+        db.conn.commit()
+
+    assert not [r for r in caplog.records if r.getMessage() == "decision_not_summarised"]

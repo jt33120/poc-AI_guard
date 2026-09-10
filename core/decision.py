@@ -110,8 +110,26 @@ def authorize(
 
     # Graduated autonomy (M11): risk-score an `auto` outcome and tighten it (opt-in).
     if policy.defaults.risk_bands is not None and outcome.decision is Approval.auto:
-        with db.connection(database_url) as conn:
-            seen, streak = trust.observed(conn, tenant_id=tenant_id, tool=tool)
+        # **Une lecture de confiance injoignable ne doit pas devenir une erreur HTTP.**
+        #
+        # `db.connection` vivait hors de tout `try` : une base momentanément absente
+        # remontait en 500, c'est-à-dire en *erreur* et non en *verdict*, sur un contrat
+        # dont toute la prémisse est que l'agent honore le verdict — la faute que le
+        # `except` d'`_hold_for_humans` corrige trente lignes plus bas. Et elle ne se
+        # produisait que chez les tenants ayant activé l'autonomie graduée, si bien que
+        # les trois tests de panne du fichier, tous écrits sur des policies sans
+        # `risk_bands`, ne pouvaient pas la voir.
+        #
+        # Le repli est l'entrée la plus stricte que `escalate_by_risk` accepte :
+        # `seen_before=False` ajoute les 10 points de nouveauté, `clean_streak=0`
+        # n'accorde aucune remise. Ne pas savoir si un agent a mérité la confiance se
+        # lit donc comme « il ne l'a pas méritée » (`AD-10`).
+        try:
+            with db.connection(database_url) as conn:
+                seen, streak = trust.observed(conn, tenant_id=tenant_id, tool=tool)
+        except Exception:
+            logger.warning("trust_lookup_failed", extra={"tool": tool, "tenant_id": tenant_id})
+            seen, streak = False, 0
         tier = risk.escalate_by_risk(
             outcome.decision,
             outcome.action_class,
@@ -212,7 +230,7 @@ def authorize(
             _audit(
                 database_url,
                 tenant_id=tenant_id,
-                decision="deny" if verdict is Approval.deny else "allow",
+                decision="deny" if verdict is not Approval.auto else "allow",
                 tool=tool,
                 request_id=uuid4().hex,
                 action_class=_class(outcome),
@@ -224,7 +242,9 @@ def authorize(
             )
         except Exception:  # the audit store may be the thing that is down
             logger.warning("audit_write_failed", extra={"tool": tool})
-        if verdict is Approval.deny:
+        # `is not auto`, comme sur la passerelle : les deux portes se réclament du
+        # même `AD-37`, elles doivent tomber du même côté sur une valeur inattendue.
+        if verdict is not Approval.auto:
             return {"decision": "deny", "action_class": _class(outcome), "reason": reason}
         return {"decision": "allow", "action_class": _class(outcome), "reason": reason}
 

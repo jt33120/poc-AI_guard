@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
@@ -283,6 +284,63 @@ _SEQUENCE_COLONNES = (
     "error",
 )
 
+
+class _GuetteurDeVocabulaire(logging.Handler):
+    """Retient les décisions que le récit de conformité ne saurait pas ranger."""
+
+    def __init__(self) -> None:
+        super().__init__(level=logging.WARNING)
+        self.inconnues: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if record.getMessage() == "decision_not_summarised":
+            self.inconnues.append(str(getattr(record, "decision", "?")))
+
+
+@pytest.fixture(autouse=True)
+def _refuser_une_decision_hors_vocabulaire(request: pytest.FixtureRequest) -> Iterator[None]:
+    """Échouer tout test qui écrit une décision d'audit que `summarise` ignore.
+
+    **Pourquoi au point d'écriture et pas dans un inventaire.** Le garde qui existait
+    — `_VOCABULARY` dans `tests/test_evidence_claims.py` — était une liste écrite à la
+    main, confrontée à `_BUCKETS`, une autre liste écrite à la main. Les deux se
+    mettent à jour dans le même geste, donc elles omettent dans le même geste :
+    `streamed_uninspected` manquait aux deux depuis son introduction, et la décision
+    était comptée dans le total du récit de conformité tout en n'étant rapportée
+    nulle part.
+
+    Un scan statique n'aurait pas refermé le trou : les décisions arrivent tantôt en
+    littéral, tantôt par une table (`_INTEGRITY_DECISION`), tantôt calculées
+    (`f"monitor_{...}"`). Ce garde-ci n'énumère rien — il écoute `log_event`, donc il
+    voit exactement ce que le produit écrit, sur les chemins que la suite exerce.
+
+    Il ne casse pas l'écriture elle-même (§4.2) : `log_event` se contente d'avertir,
+    et c'est le test qui refuse.
+    """
+    if request.node.get_closest_marker("vocabulaire_libre"):
+        # L'exemption existe pour **un** usage : le test qui prouve que ce garde
+        # mord, en écrivant délibérément une décision inconnue. Sans elle, il
+        # échouerait par le garde qu'il vérifie.
+        yield
+        return
+    guetteur = _GuetteurDeVocabulaire()
+    journal = logging.getLogger("xsom.audit")
+    journal.addHandler(guetteur)
+    try:
+        yield
+    finally:
+        journal.removeHandler(guetteur)
+    if guetteur.inconnues:
+        pytest.fail(
+            "décisions écrites que `core/export.summarise` ne sait pas ranger : "
+            f"{sorted(set(guetteur.inconnues))}\n"
+            "  elles seraient comptées dans le total du récit de conformité et\n"
+            "  rapportées nulle part. Ajoutez-les à `_BUCKETS` dans core/export.py,\n"
+            "  dans la case qui dit la vérité — jamais `auto_allowed` pour du trafic\n"
+            "  qu'on n'a pas inspecté."
+        )
+
+
 #: Rempli au démontage de chaque test marqué, relu par `pytest_sessionfinish`.
 _sequences: dict[str, dict[str, Any]] = {}
 
@@ -326,6 +384,12 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers",
         "covers(row, facet, ingress=..., sens=...): coverage facet this test proves (AD-26)",
+    )
+    config.addinivalue_line(
+        "markers",
+        "vocabulaire_libre: ce test écrit délibérément une décision d'audit que "
+        "`core/export.summarise` ne sait pas ranger — il prouve le garde, il en est donc "
+        "exempté. Aucun autre usage.",
     )
     config.stash[_scenarios_key] = []
 

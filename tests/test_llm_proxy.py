@@ -790,3 +790,63 @@ def test_the_providers_completion_id_never_becomes_the_audit_entrys_identity(
     assert len(minted) == 1
     assert {r[1] for r in rows} == {"../../../etc/passwd"}
     assert {r[2] for r in rows} == {None}
+
+
+class _RespIllisible:
+    """Un 200 dont le corps n'est pas un objet JSON exploitable.
+
+    Ni un cas tordu ni un cas rare : une passerelle d'entreprise qui réécrit la
+    réponse, un fournisseur qui renvoie une liste ou une chaîne, un proxy qui
+    intercale une page. La branche existe déjà dans `_forward` — elle relayait,
+    simplement, sans rien écrire.
+    """
+
+    status_code = 200
+
+    def __init__(self) -> None:
+        self.content = b'"pas un objet"'
+        self.headers = {"content-type": "application/json"}
+
+    def json(self) -> Any:
+        return "pas un objet"
+
+
+def test_an_unparsable_200_is_relayed_but_no_longer_in_silence(
+    db: DBHandle,
+    test_verifier: TokenVerifier,
+    make_token: Callable[..., str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Le second angle mort du proxy, désormais déclaré.
+
+    Le jumeau streaming écrit `streamed_uninspected` et ce module argumente
+    lui-même pourquoi : « le silence était indiscernable d'une absence de trafic ».
+    Cette branche-ci ne disait rien. Un fournisseur qui change de format de réponse
+    ouvre donc, pour tout le trafic d'un agent, un chemin où l'enforcement
+    disparaît sans qu'aucune ligne ne bouge — et la console affiche un agent
+    tranquille.
+
+    Le relais n'est pas remis en cause : nous n'avons pas lu le corps, nous ne
+    pouvons rien en retirer. Ce qui change est qu'on l'écrit.
+    """
+    tid = _tenant(db)
+    client = _client(db.url, test_verifier)
+    admin = make_token(tenant_id=tid, role="admin")
+    raw = client.post(
+        "/v1/gateway-tokens", headers={"Authorization": f"Bearer {admin}"}, json={"name": "bot"}
+    ).json()["token"]
+
+    monkeypatch.setattr(llm_proxy, "_http", lambda: _FakeClient(_RespIllisible()))  # type: ignore[arg-type]
+
+    resp = client.post(
+        "/proxy/openai/v1/chat/completions",
+        headers={"X-Gateway-Token": raw, "Authorization": "Bearer sk-agentkey"},
+        json={"model": "gpt-4o", "messages": [{"role": "user", "content": "salut"}]},
+    )
+    assert resp.status_code == 200
+    assert resp.content == b'"pas un objet"', "le corps doit être relayé tel quel"
+
+    lignes = db.conn.execute(
+        "select decision, error from audit_log where tenant_id = %s", (tid,)
+    ).fetchall()
+    assert [(d, e) for d, e in lignes] == [("relayed_unparsed", "provider=openai")]

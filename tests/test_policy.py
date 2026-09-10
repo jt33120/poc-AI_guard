@@ -332,3 +332,42 @@ def test_service_down_verdict_treats_an_unknown_class_as_the_worst_case() -> Non
     assert service_down_verdict(policy, ActionClass.external_send) is Approval.deny
     assert service_down_verdict(policy, ActionClass.write) is Approval.auto
     assert service_down_verdict(_policy(), ActionClass.write) is Approval.deny  # default
+
+
+@pytest.mark.parametrize(
+    "yaml_defaut",
+    [
+        "defaults: {unknown_tool: auto}",
+        "defaults: {unknown_tool: notify}",
+        "defaults: {on_approval_service_down: human_in_the_loop}",
+        "defaults: {on_approval_service_down: human_dual}",
+        "defaults: {on_approval_service_down: notify}",
+    ],
+)
+def test_a_default_that_contradicts_the_fail_closed_rule_is_refused_at_parse(
+    yaml_defaut: str,
+) -> None:
+    """§4.4 devient un refus de la base de code, pas une recommandation de docstring.
+
+    Les deux champs étaient déclarés sur l'`Approval` complet, sans validateur, alors
+    que leurs consommateurs ne testent que `is deny`. Vérifié avant le correctif :
+    `parse_policy("defaults: {unknown_tool: auto}")` passait, et
+    `evaluate(p, "rm_rf", {})` rendait `Approval.auto` — un outil que personne n'a
+    nommé, exécuté sans un regard. `core/policy_assistant.py` offrait littéralement
+    `auto` dans le schéma qu'il donne au modèle.
+
+    `on_approval_service_down: human_in_the_loop` est le plus retors des cinq : c'est
+    la valeur qui se **lit** comme la plus prudente, et c'est celle qui donnait
+    l'exécution de l'action — puisqu'on ne peut, par construction, tenir personne
+    quand le service d'approbation est tombé.
+    """
+    with pytest.raises(ValueError):
+        parse_policy(yaml_defaut)
+
+
+def test_the_safe_values_of_those_defaults_still_parse() -> None:
+    """Non-vacuité : une borne qui refuse tout refuserait aussi les policies valides."""
+    for valeur in ("deny", "human_in_the_loop", "human_dual"):
+        assert parse_policy(f"defaults: {{unknown_tool: {valeur}}}") is not None
+    for valeur in ("deny", "auto"):
+        assert parse_policy(f"defaults: {{on_approval_service_down: {valeur}}}") is not None

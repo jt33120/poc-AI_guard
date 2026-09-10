@@ -476,8 +476,17 @@ class PolicyBackend:
         ctx = self._approval_ctx
         if bands is None or ctx is None or outcome.decision is not Approval.auto:
             return outcome
-        with db.connection(ctx.database_url) as conn:
-            seen, streak = trust.observed(conn, tenant_id=ctx.tenant_id, tool=canonical)
+        # Même repli que `core/decision.py` : ici l'exception ne devenait pas un 500
+        # mais un résultat d'erreur MCP, ce qui revient au même pour l'agent — on lui
+        # doit un verdict, pas une panne. `(False, 0)` est l'entrée la plus stricte.
+        try:
+            with db.connection(ctx.database_url) as conn:
+                seen, streak = trust.observed(conn, tenant_id=ctx.tenant_id, tool=canonical)
+        except Exception:
+            logger.warning(
+                "trust_lookup_failed", extra={"tool": canonical, "tenant_id": ctx.tenant_id}
+            )
+            seen, streak = False, 0
         tier = risk.escalate_by_risk(
             outcome.decision,
             outcome.action_class,
@@ -666,7 +675,11 @@ class PolicyBackend:
             # jumeau coopératif le fait et que les deux se réclament du même `AD-37` :
             # la décision la plus discutable du produit — relayer sans avoir pu tenir
             # l'humain — était la seule à ne pas être écrite.
-            refus = verdict is Approval.deny
+            # `is not auto` et non `is deny` : toute valeur future ajoutée à l'enum
+            # tombe du côté fermé. `on_approval_service_down` est désormais borné à
+            # deux valeurs au parse, donc ce test est redondant aujourd'hui — et c'est
+            # exactement la propriété qu'on veut garder le jour où la borne bouge.
+            refus = verdict is not Approval.auto
             self._audit(
                 "deny" if refus else "allow",
                 canonical,

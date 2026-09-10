@@ -56,6 +56,9 @@ _BUCKETS: dict[str, str] = {
     "tool_quarantined": "guard_recorded",
     "flag": "guard_recorded",
     "redacted": "guard_recorded",
+    # Voir `_NOT_INSPECTED` : relayé sans être examiné, et déclaré comme tel.
+    "streamed_uninspected": "not_inspected",
+    "relayed_unparsed": "not_inspected",
 }
 
 # `monitor_x` means: an observation window was open, and an action the policy would
@@ -63,6 +66,21 @@ _BUCKETS: dict[str, str] = {
 # counting it as such is the single most misleading thing this summary could do.
 _MONITOR_PREFIX = "monitor_"
 _OBSERVED = "observed_not_enforced"
+
+#: Le trafic que le produit a relayé **sans le regarder**, et qui le dit.
+#:
+#: Deux cas, tous deux sur le proxy LLM : une complétion en `stream: true`, relayée
+#: telle quelle sans qu'aucun appel d'outil soit examiné, et une réponse 200 dont le
+#: corps n'est pas un objet JSON exploitable. Ce n'est ni un verdict ni un garde :
+#: c'est un angle mort **déclaré**, et il lui fallait sa propre case.
+#:
+#: Le ranger en `auto_allowed` dirait « nous avons autorisé » là où il faut lire
+#: « nous n'avons pas regardé » — la même faute que compter `monitor_*` comme un
+#: allow, que ce fichier refuse déjà explicitement. Le laisser en `unclassified`
+#: était l'état antérieur pour `streamed_uninspected` : compté dans le total,
+#: rapporté nulle part, et invisible au garde de vocabulaire parce que celui-ci
+#: comparait une liste écrite à la main avec elle-même.
+_NOT_INSPECTED = "not_inspected"
 _UNCLASSIFIED = "unclassified"
 
 BUCKETS: tuple[str, ...] = (
@@ -73,8 +91,30 @@ BUCKETS: tuple[str, ...] = (
     "refused",
     "guard_recorded",
     _OBSERVED,
+    _NOT_INSPECTED,
     _UNCLASSIFIED,
 )
+
+
+def is_summarised(decision: str) -> bool:
+    """Cette décision tombe-t-elle ailleurs que dans `unclassified` ?
+
+    Posée ici parce que la réponse doit être **une seule**, et posée depuis
+    `core/audit.py` au moment de l'écriture parce que c'est le seul endroit qui voit
+    toutes les décisions réellement écrites, quelle que soit leur forme.
+
+    Le garde qui existait était un inventaire écrit à la main dans
+    `tests/test_evidence_claims.py`, comparé à `_BUCKETS` — c'est-à-dire une liste
+    comparée à une autre liste, toutes deux entretenues par la même personne dans le
+    même geste. `streamed_uninspected` manquait aux **deux** depuis son ajout : la
+    décision était écrite par `api/llm_proxy.py`, comptée dans le total du récit de
+    conformité, et rapportée nulle part. Aucun test ne pouvait le voir.
+
+    Un scan statique du code ne l'aurait pas vu non plus : les décisions arrivent
+    tantôt en littéral, tantôt par une table (`_INTEGRITY_DECISION`), tantôt
+    calculées (`f"monitor_{...}"`). Seul le point d'écriture les voit toutes.
+    """
+    return decision.startswith(_MONITOR_PREFIX) or decision in _BUCKETS
 
 
 def summarise(counts: dict[str, int]) -> dict[str, int]:
@@ -102,6 +142,14 @@ def default_narrative(framework: str, counts: dict[str, int], total: int) -> str
         tail += (
             f" {b[_OBSERVED]} action(s) were let through under an open observation "
             f"window and recorded rather than enforced."
+        )
+    if b[_NOT_INSPECTED]:
+        # Énoncé, jamais fondu dans « autorisé » : le produit a relayé sans regarder,
+        # et un évaluateur qui le découvre seul le lit comme une omission plutôt que
+        # comme un choix.
+        tail += (
+            f" {b[_NOT_INSPECTED]} completion(s) were relayed without inspection "
+            f"(streamed, or a response body this proxy could not parse)."
         )
     if b[_UNCLASSIFIED]:
         tail += f" {b[_UNCLASSIFIED]} decision(s) are of a kind this summary does not classify."

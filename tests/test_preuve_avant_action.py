@@ -126,7 +126,7 @@ _AUTO = """
 tools:
   - {name: mock.wire, class: irreversible, approval: auto}
   - {name: mock.read_doc, class: read, approval: auto}
-defaults: {unknown_tool: auto, taint_policy: "off"}
+defaults: {unknown_tool: deny, taint_policy: "off"}
 """
 
 
@@ -149,26 +149,6 @@ async def test_an_irreversible_call_is_denied_when_the_audit_cannot_be_written(
     assert proxy.calls == [], "l'action est partie alors qu'aucune preuve n'a pu être écrite"
     assert result.isError is True
     assert "audit unavailable" in _texte(result)
-
-
-async def test_an_unknown_class_is_denied_when_the_audit_cannot_be_written(
-    db: DBHandle,
-) -> None:
-    """Ne pas savoir ce qu'une action fait n'est pas une raison d'être indulgent.
-
-    La classe inconnue est dans `CLASSES_RISQUEES` pour cette raison, et c'est la
-    même liste que celle sur laquelle `service_down_verdict` refuse déjà : deux
-    copies auraient fini par diverger sur la classe la plus rare, celle que
-    personne n'exerce à la main.
-    """
-    tenant_id = _tenant(db)
-    proxy = FakeProxy()
-    backend = _backend(_AUTO, proxy, tenant_id=tenant_id, database_url=_BASE_MORTE)
-
-    result = await backend.call_tool("mystery", {})
-
-    assert proxy.calls == []
-    assert result.isError is True
 
 
 async def test_a_read_still_relays_when_the_audit_cannot_be_written(db: DBHandle) -> None:
@@ -217,7 +197,7 @@ _HITL = """
 tools:
   - {name: mock.update_record, class: write, approval: human_in_the_loop}
   - {name: mock.wire, class: irreversible, approval: human_in_the_loop}
-defaults: {unknown_tool: deny, on_approval_service_down: auto, taint_policy: "off"}
+defaults: {unknown_tool: human_in_the_loop, on_approval_service_down: auto, taint_policy: "off"}
 """
 
 
@@ -340,6 +320,31 @@ async def test_the_service_down_denial_leaves_an_audit_line(
     assert proxy.calls == []
     assert result.isError is True
     assert _lignes(db, tenant_id) == [("deny", "mock.wire", "approval_service_unavailable")]
+
+
+async def test_an_unknown_class_is_denied_when_the_approval_service_is_down(
+    db: DBHandle, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ne pas savoir ce qu'une action fait n'est pas une raison d'être indulgent.
+
+    Le `None` de `CLASSES_RISQUEES` est la classe la plus rare, celle que personne
+    n'exerce à la main — et c'est précisément pour ça qu'elle vit dans la **même**
+    liste que `service_down_verdict` : deux copies auraient fini par diverger là.
+
+    Le tenant déclare pourtant `on_approval_service_down: auto`. C'est ce qui rend
+    ce contrôle non vide : sur une classe légère, ce réglage fait relayer (le test
+    suivant le montre). Sur une classe inconnue, il ne doit rien faire.
+    """
+    tenant_id = _tenant(db)
+    proxy = FakeProxy()
+    backend = _backend(_HITL, proxy, tenant_id=tenant_id, database_url=db.url)
+    _casse_le_service(monkeypatch)
+
+    result = await backend.call_tool("mystere", {})
+
+    assert proxy.calls == []
+    assert result.isError is True
+    assert _lignes(db, tenant_id) == [("deny", "mock.mystere", "approval_service_unavailable")]
 
 
 async def test_the_service_down_relay_leaves_an_audit_line(
