@@ -44,11 +44,43 @@ _I18N = _RACINE / "frontend" / "lib" / "strings.ts"
 #: cadratin, et montrait les trois au lecteur — le garde ne la lisait pas.
 _REJEUX = _RACINE / "frontend" / "lib" / "generated" / "replays.json"
 
+#: La copie de l'accueil et de `/saas` ne passe PAS par le dictionnaire : elle vit
+#: dans son propre module, structuré par sections plutôt que par clés plates, et le
+#: garde ne la lisait pas. Elle portait six tirets cadratins — dont deux sur les
+#: pages que lit un prospect — pendant que le contrôle rendait vert sur le seul
+#: fichier qu'il connaissait. Un garde qui ne couvre qu'une des deux portes de la
+#: copie visible n'en tient aucune.
+_ACCUEIL = _RACINE / "frontend" / "components" / "guard-copy.ts"
+
 
 def _chaines() -> list[tuple[str, str]]:
-    """Les chaînes traduites du dictionnaire, avec leur langue."""
+    """Toute la copie visible écrite à la main, avec sa provenance.
+
+    Deux formes, parce que les deux fichiers ne sont pas construits pareil : le
+    dictionnaire étiquette chaque chaîne par sa langue (`fr: "…"`), le module de
+    l'accueil range la sienne sous deux blocs et n'étiquette rien. On lit donc les
+    littéraux du second tels quels : tout ce qu'il contient est destiné à l'écran, à
+    l'exception de l'adresse de contact, qui ne dit rien qu'un garde de style
+    puisse trouver.
+    """
     texte = _I18N.read_text(encoding="utf-8")
-    return [(m.group(1), m.group(2)) for m in re.finditer(r'\b(en|fr): "((?:[^"\\]|\\.)*)"', texte)]
+    chaines = [
+        (m.group(1), m.group(2)) for m in re.finditer(r'\b(en|fr): "((?:[^"\\]|\\.)*)"', texte)
+    ]
+    accueil = _sans_commentaires(_ACCUEIL.read_text(encoding="utf-8"))
+    chaines += [("accueil", m.group(1)) for m in re.finditer(r'"((?:[^"\\]|\\.)*)"', accueil)]
+    return chaines
+
+
+def _sans_commentaires(source: str) -> str:
+    """Le code seul. Un commentaire explique la règle, il ne s'y soumet pas.
+
+    Les modules de ce dépôt documentent leurs choix en prose, tirets compris, et
+    faire porter un garde de style rédactionnel sur cette prose reviendrait à
+    interdire d'écrire *pourquoi* la règle existe.
+    """
+    sans_bloc = re.sub(r"/\*.*?\*/", "", source, flags=re.DOTALL)
+    return re.sub(r"^\s*//.*$", "", sans_bloc, flags=re.MULTILINE)
 
 
 def test_no_em_dash_survives_in_the_dictionary() -> None:

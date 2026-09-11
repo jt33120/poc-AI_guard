@@ -94,17 +94,24 @@ def provision_account(
     """Create user + tenant + admin membership + app_metadata. Rolls back on failure."""
     user_id = admin.create_user(email, password)  # raises AccountExists
     try:
-        row = conn.execute("insert into tenants (name) values (%s) returning id", (org,)).fetchone()
+        row = conn.execute(
+            "insert into tenants (name) values (%s) returning id, plan", (org,)
+        ).fetchone()
         if row is None:  # pragma: no cover - INSERT ... RETURNING always yields a row
             raise SignupError("tenant insert returned no row")
-        tenant_id = str(row[0])
+        tenant_id, palier = str(row[0]), str(row[1])
         conn.execute(
             "insert into memberships (user_id, tenant_id, role) values (%s, %s, 'admin')",
             (user_id, tenant_id),
         )
-        # Le palier est celui de la colonne (`free`, `0030`) : on ne le passe pas ici,
-        # pour qu'il n'existe qu'un seul endroit qui décide du palier d'entrée. Ce
-        # qu'on écrit, c'est l'**entrée dans la gamme** — sans elle, l'histoire des
+        # Le palier est celui de la colonne : on ne le passe pas à l'`insert`, pour
+        # qu'il n'existe qu'un seul endroit qui décide du palier d'entrée — et on
+        # écrit dans la chaîne **celui que la base vient d'attribuer**, pas un nom en
+        # dur. Un littéral ici rendrait la phrase ci-dessus fausse au premier
+        # changement de défaut (`0033` l'a fait passer de `free` à `entreprise`), et
+        # l'histoire décrirait alors un palier que le tenant n'a jamais eu.
+        #
+        # Ce qu'on écrit, c'est l'**entrée dans la gamme** — sans elle, l'histoire des
         # paliers d'un tenant commence à sa première rétrogradation, c'est-à-dire au
         # moment précis où elle est contestée. Dans la même transaction que le tenant
         # et l'appartenance : une inscription à moitié inscrite n'existe pas.
@@ -112,7 +119,7 @@ def provision_account(
             conn,
             tenant_id=tenant_id,
             from_tier=None,
-            to_tier="free",
+            to_tier=palier,
             reason=plan_changes.Raison.signup,
         )
         conn.commit()

@@ -1,3 +1,14 @@
+/**
+ * La porte « parlez-nous », et il n'y en a qu'une.
+ *
+ * Deux endroits y mènent — le chemin « organisation » de l'accueil et la passerelle
+ * contraignante sur `/saas` — et une seconde copie de cette adresse finirait par
+ * diverger de la première sans que personne ne le remarque, puisque rien ne teste une
+ * chaîne de caractères recopiée.
+ */
+export const CONTACT_MAILTO =
+  "mailto:julian.talou@xsom.fr?subject=xSOM%20AI%20Guard%20%3A%20cas%20d%E2%80%99usage";
+
 /** Concrete orientation copy; none of these illustrative paths claims live coverage. */
 export const GUARD_COPY = {
   fr: {
@@ -100,7 +111,7 @@ export const GUARD_COPY = {
     internalNames: "Modèle open-weight",
     cloudDetail: "Via une application intégrée",
     internalDetail: "Hébergé par votre organisation",
-    routeLabel: "Architecture à étudier — pas une connexion active",
+    routeLabel: "Architecture à étudier, pas une connexion active",
     routeScope:
       "AI Guard intervient uniquement sur les flux intégrés. Ce choix ne connecte aucun service.",
     next: "Étudier ce parcours",
@@ -161,34 +172,80 @@ export const GUARD_COPY = {
     saasKicker: "Libre-service",
     saasTitle: "Encadrez vos agents, sans nous appeler.",
     saasIntro:
-      "Vous créez un compte, vous branchez vos agents, vous écrivez vos règles. La passerelle refuse ce que la règle refuse, et écrit ce qu’elle a laissé passer.",
-    saasIncluded: "Ce qui est inclus",
-    saasIncludes: [
+      "Vous créez un compte, vous branchez vos agents, vous écrivez vos règles. L’action refusée par la règle n’a pas lieu, et ce qui passe est écrit.",
+    saasOpen:
+      "Tout est ouvert à l’inscription, rien n’est facturé : on montre ce que le produit sait faire.",
+    saasIncluded: "Ce que ça sait faire",
+    saasFamilies: [
       {
-        title: "La passerelle d’outils",
-        body: "Vos agents parlent MCP à la passerelle. Elle applique la règle avant que l’outil ne soit appelé.",
+        title: "Décider avant d’agir",
+        body: "Le moteur est déterministe. Le modèle n’est consulté que sur les cas ambigus, et son silence compte comme un refus.",
+        list: [
+          "Classes d’action et règles par outil",
+          "Score de risque sur quatre facteurs, autonomie graduée",
+          "Juge LLM sur les seuls cas ambigus",
+          "Contamination de session : ce qui a lu une source douteuse perd des droits",
+        ],
       },
       {
-        title: "L’attente humaine",
-        body: "Une action irréversible s’arrête et attend un clic. Sans ce clic, elle n’a pas lieu.",
+        title: "Tenir l’humain dans la boucle",
+        body: "L’attente est tenue par le contrôle lui-même, jamais déléguée au modèle.",
+        list: [
+          "File d’approbation, aperçu avant exécution, expiration",
+          "Double approbation sur les actes les plus lourds",
+          "Chaîne d’approbation : qui a approuvé quoi, inaltérable",
+          "Notification des demandes en attente",
+        ],
       },
       {
-        title: "Le journal chaîné",
-        body: "Chaque décision est écrite et chaînée à la précédente. Une entrée réécrite se voit.",
+        title: "Surveiller les modèles",
+        body: "Une adresse de base à changer, et chaque appel est vu.",
+        list: [
+          "Proxy de surveillance : votre clé fournisseur est transmise, jamais stockée",
+          "Inspection DLP de la sortie, réglable par organisation",
+          "Garde-prompt tiers orchestré et attesté : il ne bloque pas, et c’est écrit",
+          "Détection de fuite du prompt système et des secrets",
+          "Fenêtres d’observation : regarder sans contraindre, pour une durée bornée",
+        ],
       },
       {
-        title: "Le proxy de modèles",
-        body: "Pointez votre SDK sur une autre adresse. Les appels de modèle passent par nous, sans changer votre code.",
+        title: "Prouver ce qui s’est passé",
+        body: "Le journal n’accepte que des ajouts. Une entrée réécrite se voit ; une entrée disparue aussi.",
+        list: [
+          "Journal hash-chaîné, vérifiable à la demande",
+          "Témoins signés Ed25519 : une troncature se voit, même par un tiers",
+          "Export brut CSV et JSON",
+          "Attestation AI Act art. 12 et 14, échafaudage FRIA art. 26",
+          "Empreintes d’outils, quarantaine, verdicts d’outils tiers chaînés",
+        ],
       },
       {
-        title: "L’éditeur de règles",
-        body: "Un document lisible : quel outil, quelle classe d’action, quelle décision.",
+        title: "Écrire la règle, et la faire évoluer",
+        body: "Un document lisible, pas une grille de cases à cocher.",
+        list: [
+          "Éditeur : quel outil, quelle classe d’action, quelle décision",
+          "Assistant : la règle rédigée depuis une phrase",
+          "Promotion de la règle, du bac à sable à la production",
+          "Inventaire des agents, de leurs jetons, des serveurs en aval",
+          "Regroupement par client, jetons de lecture serveur-à-serveur",
+        ],
       },
       {
-        title: "La console",
-        body: "La file d’attente, l’explorateur du journal, la consommation.",
+        title: "Voir",
+        body: "Une console, et ce qu’elle montre vient du journal, pas d’un compteur tenu à côté.",
+        list: [
+          "Inspecteur, file d’approbation, explorateur du journal, vue de direction",
+          "Consommation et coût, calculés sur vos propres clés fournisseurs",
+          "Synthèses rédigées, inventaire des IA non déclarées",
+          "Corpus déclarés, triage selon votre profil de déploiement",
+        ],
       },
     ],
+    saasProof: "Ce qui est bloqué, orchestré ou seulement attesté, ligne par ligne",
+    saasGatewayTitle: "La seule chose qui ne s’ouvre pas toute seule",
+    saasGatewayBody:
+      "La passerelle MCP contraignante s’installe chez vous et demande un accès direct à la base. Elle s’accorde à la main, pas à l’inscription. Le reste de cette page marche sans elle : vos agents appellent la décision avant d’exécuter, et les modèles passent par le proxy.",
+    saasGatewayCta: "Demander la passerelle",
     saasStart: "Démarrer",
     saasStartIntro: "Quatre gestes. Comptez une matinée pour le premier agent.",
     saasSteps: [
@@ -202,7 +259,7 @@ export const GUARD_COPY = {
       },
       {
         title: "Brancher",
-        body: "Pour les outils, la passerelle MCP lit le jeton et l’adresse de la base. Pour les modèles, changez l’adresse de base de votre SDK.",
+        body: "Un appel à la décision juste avant que l’agent exécute un outil, et l’adresse de base de votre SDK pour les modèles. La console vous donne les deux, prêts à coller.",
       },
       {
         title: "Écrire la règle",
@@ -212,7 +269,7 @@ export const GUARD_COPY = {
     saasCta: "Créer un compte",
     saasBack: "Retour à l’accueil",
     saasNote:
-      "Le périmètre dépend de ce que vous branchez : ce qui ne passe pas par la passerelle n’est pas contrôlé.",
+      "Le périmètre dépend de ce que vous branchez : ce qui ne passe pas par nous n’est pas contrôlé.",
     limits: "Ce que le POC ne promet pas",
     limitsText:
       "Pas de protection automatique de tous les usages IA. Pas de certification de conformité. Le périmètre réel dépend du branchement, des règles et des fonctions éprouvées.",
@@ -321,7 +378,7 @@ export const GUARD_COPY = {
     internalNames: "Open-weight model",
     cloudDetail: "Through an integrated application",
     internalDetail: "Hosted by your organisation",
-    routeLabel: "Architecture to explore — not an active connection",
+    routeLabel: "Architecture to explore, not an active connection",
     routeScope:
       "AI Guard only acts on integrated traffic. This selection does not connect a service.",
     next: "Discuss this path",
@@ -379,34 +436,80 @@ export const GUARD_COPY = {
     saasKicker: "Self-serve",
     saasTitle: "Govern your agents, without calling us.",
     saasIntro:
-      "Create an account, connect your agents, write your rules. The gateway refuses what the rule refuses, and records what it let through.",
-    saasIncluded: "What is included",
-    saasIncludes: [
+      "Create an account, connect your agents, write your rules. An action the rule refuses does not happen, and whatever passes is recorded.",
+    saasOpen:
+      "Everything is open on sign-up and nothing is billed: we are showing what the product can do.",
+    saasIncluded: "What it can do",
+    saasFamilies: [
       {
-        title: "The tools gateway",
-        body: "Your agents speak MCP to the gateway. It applies the rule before the tool is called.",
+        title: "Decide before acting",
+        body: "The engine is deterministic. The model is only consulted on ambiguous cases, and its silence counts as a refusal.",
+        list: [
+          "Action classes and per-tool rules",
+          "Risk score on four factors, graduated autonomy",
+          "LLM judge on ambiguous cases only",
+          "Session taint: whatever read an untrusted source loses rights",
+        ],
       },
       {
-        title: "Human approval",
-        body: "An irreversible action stops and waits for a click. Without that click, it does not happen.",
+        title: "Keep a human in the loop",
+        body: "The wait is held by the control itself, never delegated to the model.",
+        list: [
+          "Approval queue, preview before execution, expiry",
+          "Dual approval on the heaviest acts",
+          "Approval chain: who approved what, tamper-evident",
+          "Notification of pending requests",
+        ],
       },
       {
-        title: "The chained log",
-        body: "Every decision is written and chained to the previous one. A rewritten entry shows.",
+        title: "Watch the models",
+        body: "One base URL to change, and every call is seen.",
+        list: [
+          "Monitoring proxy: your provider key is forwarded, never stored",
+          "DLP inspection of egress, tunable per organisation",
+          "Third-party prompt guard orchestrated and attested: it does not block, and we say so",
+          "System-prompt and secret leak detection",
+          "Observation windows: watch without enforcing, for a bounded time",
+        ],
       },
       {
-        title: "The model proxy",
-        body: "Point your SDK at a different base URL. Model calls go through us, with no code change.",
+        title: "Prove what happened",
+        body: "The log only accepts additions. A rewritten entry shows; so does a missing one.",
+        list: [
+          "Hash-chained log, verifiable on demand",
+          "Ed25519-signed witnesses: a truncation shows, even to a third party",
+          "Raw CSV and JSON export",
+          "AI Act art. 12 and 14 attestation, art. 26 FRIA scaffold",
+          "Tool fingerprints, quarantine, chained third-party verdicts",
+        ],
       },
       {
-        title: "The policy editor",
-        body: "A readable document: which tool, which action class, which decision.",
+        title: "Write the rule, and move it",
+        body: "A readable document, not a grid of checkboxes.",
+        list: [
+          "Editor: which tool, which action class, which decision",
+          "Assistant: the rule drafted from a sentence",
+          "Promotion from sandbox to production",
+          "Inventory of agents, their tokens, downstream servers",
+          "Grouping by client, server-to-server read tokens",
+        ],
       },
       {
-        title: "The console",
-        body: "The approval queue, the log explorer, usage.",
+        title: "See",
+        body: "A console, and what it shows comes from the log, not from a counter kept on the side.",
+        list: [
+          "Inspector, approval queue, log explorer, executive view",
+          "Usage and cost, computed on your own provider keys",
+          "Written summaries, inventory of undeclared AI",
+          "Declared corpora, triage against your deployment profile",
+        ],
       },
     ],
+    saasProof: "What is blocked, orchestrated or merely attested, row by row",
+    saasGatewayTitle: "The one thing that does not open on its own",
+    saasGatewayBody:
+      "The binding MCP gateway installs on your side and needs direct database access. It is granted by hand, not on sign-up. The rest of this page works without it: your agents call the decision before executing, and models go through the proxy.",
+    saasGatewayCta: "Ask for the gateway",
     saasStart: "Get started",
     saasStartIntro: "Four steps. Allow a morning for your first agent.",
     saasSteps: [
@@ -420,7 +523,7 @@ export const GUARD_COPY = {
       },
       {
         title: "Connect",
-        body: "For tools, the MCP gateway reads the token and the database address. For models, change your SDK base URL.",
+        body: "One call to the decision right before your agent runs a tool, and your SDK base URL for models. The console hands you both, ready to paste.",
       },
       {
         title: "Write the rule",
@@ -430,7 +533,7 @@ export const GUARD_COPY = {
     saasCta: "Create an account",
     saasBack: "Back to the home page",
     saasNote:
-      "Scope depends on what you connect: anything that does not go through the gateway is not governed.",
+      "Scope depends on what you connect: anything that does not go through us is not governed.",
     limits: "What the POC does not promise",
     limitsText:
       "No automatic protection for every AI use. No compliance certification. Actual scope depends on integration, policies and proven functionality.",

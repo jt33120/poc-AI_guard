@@ -31,7 +31,17 @@ import psycopg
 from pydantic import ValidationError
 from pydantic_settings import SettingsError
 
-from core import checkpoints, db, migrate, secrets, shadow_ai, signup, tenant_tokens, triage
+from core import (
+    checkpoints,
+    db,
+    migrate,
+    plan_changes,
+    secrets,
+    shadow_ai,
+    signup,
+    tenant_tokens,
+    triage,
+)
 from core.config import Settings, get_settings
 from core.notify import SmtpNotifier, build_notifier
 from core.schemas import SignupRequest
@@ -436,6 +446,58 @@ def cmd_checkpoint(settings: Settings, args: argparse.Namespace) -> int:
             print(f"\ncheckpoint: {rompus} tenant(s) BROKEN — the journal lost attested entries")
             return 1
         print("\ncheckpoint: every witness agrees with the journal")
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# plan
+# ---------------------------------------------------------------------------
+def cmd_plan(settings: Settings, args: argparse.Namespace) -> int:
+    """Lire ou déplacer le palier d'un tenant, en écrivant l'histoire avec l'état.
+
+    Le seul écrivain de `tenant_plan_changes` était l'inscription, donc le seul
+    mouvement racontable était la naissance. Déplacer un tenant se faisait alors par
+    un `update` à la main, qui laisse un palier sans raison ni auteur — et c'est
+    précisément la question d'un litige, celle à laquelle la table existe pour
+    répondre.
+
+    `0033` rend le geste courant : les tenants inscrits avant lui sont restés au
+    palier d'alors, et il faut pouvoir les amener au palier de démonstration sans
+    casser la chaîne.
+
+    L'ordre des deux écritures n'a pas d'importance — la transaction est la même —
+    mais leur atomicité, si : un palier sans entrée, ou une entrée sans palier,
+    seraient tous deux des états que personne ne sait relire.
+    """
+    with _connect(settings) as conn, _db_errors(f"plan {args.action} failed"):
+        tenant_id = _uuid(args.tenant, "tenant")
+        row = conn.execute("select plan from tenants where id = %s", (tenant_id,)).fetchone()
+        if row is None:
+            raise CliError(f"no such tenant: {tenant_id}")
+        actuel = str(row[0])
+
+        if args.action == "show":
+            print(f"{tenant_id}  {actuel}")
+            return 0
+
+        if actuel == args.tier:
+            print(f"{tenant_id}  already {actuel} — nothing written")
+            return 0
+
+        plan_changes.record(
+            conn,
+            tenant_id=tenant_id,
+            from_tier=actuel,
+            to_tier=args.tier,
+            reason=plan_changes.Raison.admin,
+            actor=args.actor,
+        )
+        conn.execute(
+            "update tenants set plan = %s, plan_since = now() where id = %s",
+            (args.tier, tenant_id),
+        )
+        conn.commit()
+        print(f"{tenant_id}  {actuel} -> {args.tier}")
     return 0
 
 
@@ -972,6 +1034,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     verify_cmd.add_argument("--tenant", help="one tenant; omit for every tenant")
 
+    plan_cmd = sub.add_parser("plan", help="read or move a tenant's self-serve tier")
+    plan_sub = plan_cmd.add_subparsers(dest="action", required=True)
+    plan_show = plan_sub.add_parser("show", help="print the tier this tenant is on")
+    plan_show.add_argument("tenant", help="tenant id")
+    plan_set = plan_sub.add_parser(
+        "set", help="move the tenant, writing the chained record in the same transaction"
+    )
+    plan_set.add_argument("tenant", help="tenant id")
+    plan_set.add_argument("tier", choices=("free", "pro", "entreprise"), help="the target tier")
+    plan_set.add_argument("--actor", help="who asked, for the record")
+
     triage_cmd = sub.add_parser(
         "triage", help="position a client on the usage profiles and print what concerns them"
     )
@@ -1058,6 +1131,7 @@ _COMMANDS = {
     "bootstrap": cmd_bootstrap,
     "token": cmd_token,
     "doctor": cmd_doctor,
+    "plan": cmd_plan,
     "triage": cmd_triage,
     "shadow-ai": cmd_shadow_ai,
     "checkpoint": cmd_checkpoint,
