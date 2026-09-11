@@ -1,10 +1,10 @@
-# Secret Guard V0
+# Secret Guard V0.2
 
 Secret Guard is the local prompt-protection prototype of xSOM AI Guard. It is
 distinct from the existing MCP action gateway and server-side egress DLP.
 
 ```text
-VS Code owned participant / explicit scan / Preview hook configuration
+Native pre-submit hooks / owned participant / explicit scan
                               │
                               ▼
                    @xsom/secret-guard-core
@@ -13,19 +13,24 @@ VS Code owned participant / explicit scan / Preview hook configuration
                        ALLOW / WARN / BLOCK
 ```
 
-The delivered V0 is **VS Code-only**:
+The delivered V0.2 uses the assistants' native pre-submit hooks:
 
 - `@xsom/secret-guard-core`: synchronous TypeScript detector and risk engine,
   with no runtime dependency, network access, filesystem access, telemetry, or
   logging;
-- `@xsom/secret-guard-cli`: file/stdin scanner and the command process used by
-  the VS Code Preview hook;
-- `xsom-secret-guard-vscode`: VS Code extension with `@secretguard`, explicit
-  scan commands, and an installer for the Preview `UserPromptSubmit` hook.
+- `@xsom/secret-guard-cli`: file/stdin scanner and one fail-closed hook process
+  compatible with VS Code/Copilot `UserPromptSubmit`, Claude Code
+  `UserPromptSubmit`, Codex `UserPromptSubmit`, and Windsurf Cascade
+  `pre_user_prompt`;
+- `xsom-secret-guard-vscode`: VS Code extension with automatic multi-host hook
+  installation, a persistent lock status, `@secretguard` as a diagnostic owned
+  flow, and explicit scan commands.
 
-Claude Code and Codex integrations are future work. The hook process contract has
-not been certified against either host and must not be presented as protection
-for them.
+Once **Secret Guard: Activer la protection automatique** has completed, typing
+`@secretguard` is not required. Every text prompt submitted through a configured
+native host hook is scanned before the assistant processes it. Clean prompts pass
+without interaction; WARN/BLOCK and scanner failures stop the prompt with exit
+code 2 and a non-sensitive reason.
 
 ## Development
 
@@ -53,7 +58,8 @@ VSIX content inspection, latency gates, and `npm audit`.
 - `secret-guard scan` exits `0` for ALLOW, `1` for WARN and `2` for BLOCK.
   The `hook` process exits `0` with `{ "continue": true }` for ALLOW and exits
   `2` with a non-sensitive reason on stderr for WARN/BLOCK or invalid input.
-- A BLOCK cannot be overridden in the owned `@secretguard` flow. An unredacted
+- A BLOCK cannot be overridden by the automatic hooks or in the owned
+  `@secretguard` flow. An unredacted
   WARN can be sent only after explicit per-request confirmation there.
 - A redacted prompt is eligible for sending only after rescanning the exact
   redacted string to `complete: true`, `decision: "ALLOW"`. The dispatch enforces
@@ -61,23 +67,25 @@ VSIX content inspection, latency gates, and `npm audit`.
   initial scan or any final verdict other than ALLOW.
 - “No secret detected” is not a guarantee that content is safe.
 
-## Coverage boundary
+## Native host coverage and boundary
 
-The VS Code hook mechanism is Preview. Activation copies the bundled runner,
-checks its bytes, and executes clean/blocking local canaries. **Preview validated**
-therefore proves only that this managed local runner currently obeys its process
-contract. It does not prove that VS Code loaded or invoked the hook for a real
-prompt. Workspace Trust, workspace configuration, administrator policy,
-Remote/WSL/Container topology, host version, or another hook layer may ignore or
-pre-empt the user hook. Invalid, foreign, missing, modified, or failing managed
-configuration is reported as degraded; absence is reported as manual mode.
+Activation copies the bundled runner, checks its bytes, runs clean and blocking
+canaries for both supported wire protocols, then transactionally merges one
+marked entry into each user configuration. Existing settings and hooks are
+preserved; disable removes only the exact Secret Guard entries. The lock is red
+or open when configuration, bytes, or canaries no longer match.
 
-The hook therefore carries no universal interception guarantee. It does not cover
-arbitrary third-party webviews, terminal input, attachments, automatically-added
-context, repository reads, later tool output, Claude Code, or Codex. The owned
-`@secretguard` participant is the only send path whose routing is controlled by
-this V0; explicit scan commands only report or copy a result and do not intercept
-another assistant.
+VS Code agent hooks remain Preview. User-level hooks can be removed by the user
+and are not an enterprise tamper boundary. Windsurf documents system-level or
+cloud-distributed hooks for mandatory fleet enforcement; Codex and Claude Code
+also support managed policy layers. A local administrator can always remove a
+user-level install.
+
+The protection covers the documented text prompt field only. It does not scan
+attachments, automatically-added context, files read later by the agent, tool
+output, terminal input, a ChatGPT browser tab, or any client without a compatible
+native hook. A visual overlay on another extension's Send button would not add a
+security boundary and is intentionally not used.
 
 ## Implemented verification budgets
 
