@@ -132,17 +132,17 @@ exhaustive ; aucune règle GCP dédiée n’est livrée.
 
 ## 4. Frontières d’interception
 
-| Surface                                          | Ce qu’une extension standard voit                     | Intégration robuste                       | Garantie honnête                                                                              |
-| ------------------------------------------------ | ----------------------------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Participant de chat Secret Guard                 | Requête adressée à `@secretguard`                     | Chat Participant API                      | Routage contrôlé pour cette requête uniquement ; rescan redacted obligatoirement ALLOW        |
-| Commandes scan sélection/document/presse-papiers | Texte explicitement lu                                | Commandes VS Code                         | Scan local seulement ; aucune interception d’un envoi tiers                                   |
-| VS Code Agent / Copilot compatible               | Champ `prompt` de `UserPromptSubmit`                  | Fichier de hook + runner local            | Livré, Preview, non attesté côté hôte                                                         |
-| Claude Code CLI et extension IDE                 | Champ `prompt` de `UserPromptSubmit`                  | Fusion dans `~/.claude/settings.json`     | Livré au niveau contrat utilisateur, non attesté côté hôte                                    |
-| Codex CLI et extension IDE                       | Champ `prompt` de `UserPromptSubmit`                  | Fusion dans `~/.codex/hooks.json`         | Livré au niveau contrat utilisateur, confiance hôte encore requise                            |
-| Windsurf Cascade                                 | `tool_info.user_prompt` de `pre_user_prompt`          | Fusion dans le hooks utilisateur          | Livré au niveau contrat utilisateur ; exit 2 bloque selon la documentation                    |
-| Modèle ou gateway fourni par Secret Guard        | Non livré                                             | Provider/gateway futur                    | Hors V0                                                                                       |
-| Assistant tiers sans hook                        | Rien de garanti                                       | Accord d’intégration du fournisseur       | Aucune                                                                                        |
-| Agent lisant un fichier ensuite                  | Pas couvert par UserPromptSubmit                      | Hook PreToolUse ou gateway d’egress futur | Hors V0                                                                                       |
+| Surface                                          | Ce qu’une extension standard voit            | Intégration robuste                       | Garantie honnête                                                                       |
+| ------------------------------------------------ | -------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------- |
+| Participant de chat Secret Guard                 | Requête adressée à `@secretguard`            | Chat Participant API                      | Routage contrôlé pour cette requête uniquement ; rescan redacted obligatoirement ALLOW |
+| Commandes scan sélection/document/presse-papiers | Texte explicitement lu                       | Commandes VS Code                         | Scan local seulement ; aucune interception d’un envoi tiers                            |
+| VS Code Agent / Copilot compatible               | Champ `prompt` de `UserPromptSubmit`         | Fichier de hook + runner local            | Livré, Preview, non attesté côté hôte                                                  |
+| Claude Code CLI et extension IDE                 | Champ `prompt` de `UserPromptSubmit`         | Fusion dans `~/.claude/settings.json`     | Livré au niveau contrat utilisateur, non attesté côté hôte                             |
+| Codex CLI et extension IDE                       | Champ `prompt` de `UserPromptSubmit`         | Fusion dans `~/.codex/hooks.json`         | Livré au niveau contrat utilisateur, confiance hôte encore requise                     |
+| Windsurf Cascade                                 | `tool_info.user_prompt` de `pre_user_prompt` | Fusion dans le hooks utilisateur          | Livré au niveau contrat utilisateur ; exit 2 bloque selon la documentation             |
+| Modèle ou gateway fourni par Secret Guard        | Non livré                                    | Provider/gateway futur                    | Hors V0                                                                                |
+| Assistant tiers sans hook                        | Rien de garanti                              | Accord d’intégration du fournisseur       | Aucune                                                                                 |
+| Agent lisant un fichier ensuite                  | Pas couvert par UserPromptSubmit             | Hook PreToolUse ou gateway d’egress futur | Hors V0                                                                                |
 
 ### 4.1 VS Code UserPromptSubmit : utile mais Preview
 
@@ -498,8 +498,9 @@ hook WARN/BLOCK/erreur     -> exit 2 + stdout vide + raison sur stderr
 La fonction interne de contrat représente un refus par `continue:false` et
 `stopReason`, sans valeur détectée. Le processus ne sérialise pas cet objet en cas
 de refus : le code `2` porte la décision de blocage conformément au contrat VS
-Code Preview. Cette convention n’est pas certifiée pour Claude Code ou Codex ;
-une ressemblance de champs n’est pas un test de contrat.
+Code Preview, Claude Code et Codex. Les canaris valident localement les deux
+enveloppes acceptées par le runner ; ils n’attestent toutefois pas que chaque
+hôte charge et invoque effectivement sa configuration.
 
 Un crash avant que le runtime Node ne produise une sortie ne peut pas être
 transformé en blocage par le programme lui-même. Les canaris locaux peuvent
@@ -535,7 +536,7 @@ Preview reste conditionnel, jamais une garantie universelle.
 - messages modaux et Markdown sans contenu brut ;
 - action **Copier la version redacted** ;
 - commandes explicites d’installation et de retrait du hook ;
-- barre de statut à trois états fondés sur la configuration gérée, son intégrité
+- barre de statut à quatre états fondés sur la configuration gérée, son intégrité
   et le canari local.
 
 ### 9.2 États de couverture
