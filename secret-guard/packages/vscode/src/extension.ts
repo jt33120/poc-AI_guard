@@ -150,22 +150,28 @@ async function updateStatus(
   try {
     health = await manager.getHealth();
   } catch {
-    health = { state: "degraded", reason: "canary_failed" };
+    health = { state: "degraded", reason: "canary_failed", hosts: [] };
   }
-  if (health.state === "preview") {
-    item.text = "$(shield) Secret Guard: Preview validée";
-    item.tooltip =
-      "Le runner local a passé ses canaris. L’API VS Code reste en Preview et un hook workspace ou une politique peut prévaloir.";
+  const configured = health.hosts
+    .filter((host) => host.configured)
+    .map((host) => host.label);
+  if (health.state === "active") {
+    item.text = "$(lock) Secret Guard: actif";
+    item.tooltip = `Hooks bloquants configurés et canaris locaux validés : ${configured.join(", ")}. Redémarrez les assistants après une première activation.`;
     item.command = "secretGuard.disableHook";
+  } else if (health.state === "partial") {
+    item.text = "$(lock) Secret Guard: partiel";
+    item.tooltip = `Protection automatique active pour ${configured.join(", ")}. Cliquez pour compléter l’installation.`;
+    item.command = "secretGuard.enableHook";
   } else if (health.state === "degraded") {
-    item.text = "$(warning) Secret Guard: dégradé";
+    item.text = "$(unlock) Secret Guard: dégradé";
     item.tooltip =
-      "La configuration ou le canari local du hook est invalide. @secretguard et les scans manuels restent disponibles.";
+      "La configuration, l’intégrité ou un canari local est invalide. La protection automatique ne doit pas être considérée active.";
     item.command = "secretGuard.enableHook";
   } else {
-    item.text = "$(shield) Secret Guard: mode manuel";
+    item.text = "$(unlock) Secret Guard: désactivé";
     item.tooltip =
-      "Les commandes et @secretguard sont disponibles, mais aucun hook utilisateur n’est configuré.";
+      "Aucun hook automatique n’est configuré. Cliquez pour protéger VS Code/Copilot, Claude Code, Codex et Windsurf.";
     item.command = "secretGuard.enableHook";
   }
   item.show();
@@ -224,7 +230,7 @@ export async function activate(
         await manager.enable(configuredWarnMode());
         await updateStatus(status, manager);
         await vscode.window.showInformationMessage(
-          "Canaris locaux validés et hook UserPromptSubmit configuré. L’API est en Preview et un hook workspace ou une politique peut prévaloir.",
+          "Hooks automatiques configurés : VS Code/Copilot, Claude Code, Codex et Windsurf scanneront le champ texte de chaque prompt sans @secretguard. Redémarrez les assistants déjà ouverts.",
         );
       } catch {
         await updateStatus(status, manager);
@@ -237,7 +243,9 @@ export async function activate(
       try {
         await manager.disable();
         await updateStatus(status, manager);
-        await vscode.window.showInformationMessage("Hook Secret Guard retiré.");
+        await vscode.window.showInformationMessage(
+          "Hooks automatiques Secret Guard retirés sans modifier les autres hooks.",
+        );
       } catch {
         await updateStatus(status, manager);
         await vscode.window.showErrorMessage(

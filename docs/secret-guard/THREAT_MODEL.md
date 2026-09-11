@@ -1,6 +1,6 @@
 # Secret Guard — Threat model
 
-**Statut :** modèle de menace de l’implémentation V0 livrée, avec gaps de release explicites
+**Statut :** modèle de menace de l’implémentation V0.2 livrée, avec gaps de release explicites
 
 **Référence :** SG-TM-001
 
@@ -13,8 +13,9 @@
 ## 1. Objectif de sécurité
 
 Le core Secret Guard analyse localement une chaîne et rend un verdict sans inclure
-la valeur détectée. Dans le V0, la seule surface qui contrôle elle-même un envoi
-LLM est le participant VS Code `@secretguard`.
+la valeur détectée. Dans le V0.2, les hooks natifs configurés contrôlent le champ
+prompt texte avant son traitement par VS Code/Copilot, Claude Code, Codex ou
+Windsurf ; le participant `@secretguard` reste une surface possédée de diagnostic.
 
 La propriété recherchée est :
 
@@ -23,12 +24,11 @@ La propriété recherchée est :
 > l’utilisateur pour cette requête. Une version expurgée n’est routée que si son
 > rescan exact retourne `complete:true` et `ALLOW`.
 
-Le hook VS Code est un mécanisme **Preview**. Le V0 vérifie localement le runner
-copié avec un prompt sain et un secret synthétique, mais ce canari de processus ne
-prouve pas que l’hôte a intercepté un prompt réel. Workspace Trust, la
-configuration workspace, les politiques gérées, la version de l’hôte et un
-Extension Host distant peuvent préempter le fichier utilisateur. Le V0 n’offre
-aucune intégration certifiée Claude Code ou Codex et aucune promesse universelle.
+Le hook VS Code est un mécanisme **Preview**. Le V0.2 vérifie localement le runner
+copié avec un prompt sain et un secret synthétique sur deux enveloppes, mais ces
+canaris ne prouvent pas qu’un hôte a intercepté un prompt réel. Les politiques
+gérées, la version de l’hôte et un Extension Host distant peuvent préempter les
+fichiers utilisateur. Le V0.2 n’offre aucune promesse universelle.
 
 ## 2. Périmètre de confiance
 
@@ -38,7 +38,7 @@ aucune intégration certifiée Claude Code ou Codex et aucune promesse universel
 - credentials présents dans une sélection ou un fichier explicitement scanné ;
 - prompt redacted avant transmission ;
 - règles, validateurs et politiques de décision ;
-- configuration du hook VS Code Preview ;
+- configurations utilisateur des quatre hooks natifs ;
 - intégrité des sources, du bundle CLI et du VSIX.
 
 ### 2.2 Composants de confiance
@@ -51,7 +51,7 @@ aucune intégration certifiée Claude Code ou Codex et aucune promesse universel
 ### 2.3 Composants semi-fiables
 
 - VS Code et son Extension Host ;
-- VS Code et son mécanisme UserPromptSubmit Preview ;
+- les quatre hôtes et leurs mécanismes pre-submit documentés ;
 - fichiers de configuration utilisateur/projet ;
 - environnement Remote SSH, WSL, Container ou Codespaces ;
 - parsers de formats et dépendances tierces ;
@@ -185,13 +185,11 @@ autres cas, `content` vaut `""`.
 
 ### SG-INV-08 — Couverture explicite
 
-Le V0 affiche « Preview validée » seulement si la configuration gérée est exacte,
-le runner installé correspond au bundle et les canaris locaux réussissent. Il
-affiche « dégradé » pour une configuration étrangère/invalide, un runner
-absent/modifié ou un canari en échec, et « mode manuel » quand le fichier est
-absent. Aucun de ces états n’est PROTECTED : ils n’attestent ni le chargement ni
-l’exécution par VS Code. Un futur état protégé devra être fondé sur une preuve
-hôte de bout en bout.
+Le V0.2 affiche « actif » seulement si les quatre entrées gérées sont exactes, le
+runner installé correspond au bundle et les canaris locaux réussissent. Il
+affiche « partiel », « dégradé » ou « désactivé » dans les autres cas. Le cadenas
+est un témoin local : il n’atteste ni le chargement effectif par chaque hôte, ni
+une politique système/MDM, ni une couverture des pièces jointes.
 
 ## 6. Cas d’abus et contrôles
 
@@ -217,9 +215,9 @@ hôte de bout en bout.
 | SG-T18 | Regex hostile / ReDoS                   | Gel avant envoi                       | Patterns statiques bornés, tests hostiles ciblés et smoke fuzz déterministe de 100 000 cas                                         | Pas de fuzz coverage-guided ni preuve générale de complexité                         |
 | SG-T19 | JSON de hook malformé                   | Bypass par parser                     | `JSON.parse`, objet non nul et `prompt` string requis ; sinon stdout vide et exit 2                                                | Champs inconnus acceptés ; contrat hôte Preview non certifié                         |
 | SG-T20 | Injection shell via prompt              | Exécution locale                      | Prompt uniquement sur stdin, jamais interpolé dans commande/args/env                                                               | Mauvaise configuration manuelle externe                                              |
-| SG-T21 | Hook absent/désactivé/non fiable        | Fausse impression de protection       | États off/Preview/dégradé fondés sur config, intégrité et canari local                                                             | Aucune attestation que l’hôte invoque ou respecte le hook                            |
+| SG-T21 | Hook absent/désactivé/non fiable        | Fausse impression de protection       | États off/actif/partiel/dégradé fondés sur config, intégrité et canaris locaux                                                      | Aucune attestation que l’hôte invoque ou respecte le hook                            |
 | SG-T22 | Timeout du hook                         | Prompt transmis sans verdict          | Timeout hôte configuré à 30 s et canari local borné à 5 s par appel                                                                | Comportement de timeout de l’hôte non attesté                                        |
-| SG-T23 | Hook Claude/Codex indisponible          | Opération non bloquée                 | Hors périmètre déclaré                                                                                                             | Intégrations futures seulement                                                       |
+| SG-T23 | Hook Claude/Codex absent ou préempté    | Opération non bloquée                 | Installation native pré-submit, fusion conservatrice des configurations et état par hôte                                           | Hook utilisateur supprimable ; politique gérée requise pour une obligation d’entreprise |
 | SG-T24 | Remote Extension Host différent         | Runtime/runner absent sur l’hôte réel | Runner copié dans le stockage global de l’Extension Host actif ; limite documentée                                                 | Aucune attestation de topologie ou du lieu utilisé pour le prompt                    |
 | SG-T25 | Agent lit .env après le prompt          | Secret exposé sans être tapé          | Hors promesse V0 ; avertissement clair                                                                                             | PreToolUse/gateway V1 requis                                                         |
 | SG-T26 | Pièce jointe native tierce              | Contenu non visible par hook prompt   | Hors promesse V0 ; état de surface explicite                                                                                       | Provider ou intégration directe V1                                                   |
@@ -241,8 +239,9 @@ Les hooks VS Code sont Preview et configurables. Le contrat documenté traite le
 - utilise exit `2`, stdout vide et une raison non sensible sur stderr pour tout
   refus du processus `hook`; la commande `secret-guard scan` utilise elle aussi
   exit `2` pour BLOCK ;
-- cible VS Code 1.137 mais ne possède pas encore un test d’interception hôte de
-  bout en bout ;
+- cible VS Code 1.136 pour l’extension et le contrat Agent Hooks disponible à
+  partir de VS Code 1.137 Preview, sans encore posséder un test d’interception
+  hôte de bout en bout ;
 - ne s’appuie pas sur une API proposed pour le Marketplace ;
 - ne prétend pas protéger une webview tierce ;
 - écrit une configuration utilisateur dédiée, sans pouvoir garantir sa priorité
@@ -253,20 +252,23 @@ copié. L’extension compare le hook installé au bundle et teste son contrat l
 mais cela n’atteste ni le binaire Node lui-même ni l’ordre effectif des hooks côté
 hôte.
 
-### 7.2 Claude Code — étude future
+### 7.2 Claude Code
 
 Le [contrat UserPromptSubmit Claude](https://code.claude.com/docs/en/hooks#userpromptsubmit)
-est documenté ici pour la roadmap. Aucun hook Claude, champ
-`suppressOriginalPrompt`, test de timeout ou canari Claude n’est livré. Le V0 ne
-revendique aucune protection de Claude Code.
+est installé dans `~/.claude/settings.json`. Secret Guard ajoute uniquement son
+entrée marquée, conserve les autres réglages/hooks et valide localement les cas
+sain et bloqué avant activation. Ce contrôle ne prouve pas que Claude a chargé
+la configuration ni qu’un administrateur local ne l’a pas retirée.
 
-### 7.3 Codex — étude future
+### 7.3 Codex
 
 Les [Hooks Codex](https://learn.chatgpt.com/fr-FR/docs/hooks) fournissent UserPromptSubmit et un blocage par JSON ou code 2. Les hooks non gérés exigent une revue de confiance ; les hooks projet sont ignorés dans un projet non fiable. Les hooks MCP ne bloquent pas sur erreur/absence.
 
-Ces éléments définissent les tests d’une intégration future. Aucun installateur,
-configuration gérée, test de confiance ou contrat Codex n’est livré au V0 ; le
-pont JSON générique ne suffit pas à prouver la compatibilité.
+Secret Guard ajoute son entrée marquée dans `~/.codex/hooks.json`, préserve les
+hooks existants et utilise le même runner fail-closed. La confiance, la priorité
+des configurations et l’invocation réelle restent du ressort de l’hôte ; une
+configuration gérée par l’organisation est nécessaire pour rendre le hook non
+désactivable par l’utilisateur.
 
 ### 7.4 Provider/gateway
 

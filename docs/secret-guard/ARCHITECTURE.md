@@ -1,26 +1,30 @@
 # Secret Guard — Architecture de référence
 
-**Statut :** photographie de l’implémentation V0 livrée et trajectoire future
+**Statut :** photographie de l’implémentation V0.2 livrée et trajectoire future
 
 **Référence :** SG-ADR-001
 
 **Date de vérification des API :** 11 septembre 2026
 
-**Cible V0 :** VS Code 1.137 ; Node.js 22.13 ou plus récent pour le workspace et le CLI autonome
+**Cible V0.2 :** VS Code 1.136 ou plus récent ; Node.js 22.13 ou plus récent pour le workspace et le CLI autonome
 
 Les paragraphes marqués **Futur** décrivent une direction et non une capacité
-livrée. En particulier, aucune intégration Claude Code ou Codex n’est certifiée
-dans le V0.
+livrée. Les intégrations utilisateur sont testées au niveau de leur contrat de
+processus ; elles ne constituent pas une attestation d’exécution hôte ni un
+déploiement administrateur non contournable.
 
 ## 1. Décision
 
-Secret Guard V0 est composé de trois artefacts :
+Secret Guard V0.2 est composé de trois artefacts :
 
 1. **secret-guard-core** : bibliothèque TypeScript locale, déterministe et indépendante de VS Code ;
 2. **secret-guard-cli** : scanner Node.js et processus de hook qui lit un
    événement JSON sur stdin, autorise par JSON/exit 0 et refuse par exit 2 sans
    valeur détectée ;
-3. **secret-guard-vscode** : extension VS Code avec le participant de chat coopératif `@secretguard`, trois commandes de scan, une barre d’état et deux commandes explicites de gestion du hook.
+3. **secret-guard-vscode** : extension VS Code avec un installateur
+   transactionnel des hooks utilisateur VS Code/Copilot, Claude Code, Codex et
+   Windsurf, un cadenas d’état, le participant de diagnostic `@secretguard` et
+   trois commandes de scan.
 
 Le V0 n’embarque **aucun modèle ML ou SLM**. Le moteur combine des signatures
 structurées, un parseur textuel d’affectations, une entropie bornée par token, des
@@ -32,9 +36,10 @@ complexité de toutes les expressions.
 
 Le produit ne revendique pas une interception universelle. La garantie est annoncée **surface par surface** :
 
-- contrôle du routage seulement pour le participant `@secretguard` possédé ;
-- configuration conditionnelle du hook VS Code Preview avec contrôle d’intégrité
-  du runner et canaris locaux, sans preuve que l’hôte l’a chargé ou exécuté ;
+- blocage automatique du champ prompt documenté sur les quatre hôtes configurés ;
+- contrôle d’intégrité du runner, fusion non destructive des configurations et
+  canaris locaux sur les deux enveloppes de protocole, sans preuve que l’hôte a
+  chargé ou exécuté le hook ;
 - provider ou gateway contrôlé reporté à une phase future ;
 - aucune garantie pour une vue tierce sans hook ni intégration officielle.
 
@@ -90,11 +95,12 @@ Secret Guard V0 est un **garde du prompt utilisateur**, pas encore un DLP comple
 
 ### Inclus
 
-- chaîne du prompt saisie dans l’interface Secret Guard ;
+- champ texte du prompt fourni aux hooks natifs configurés ;
 - texte du presse-papiers uniquement après une commande explicite ;
 - contenu de sélection ou de fichier explicitement demandé à Secret Guard ;
 - texte .env, .txt, .md et snippets de code lorsqu’il entre par l’un de ces chemins ;
-- installateur d’un fichier UserPromptSubmit pour le mécanisme VS Code Preview ;
+- installateur utilisateur pour VS Code/Copilot `UserPromptSubmit`, Claude Code
+  `UserPromptSubmit`, Codex `UserPromptSubmit` et Windsurf `pre_user_prompt` ;
 - détection locale des mots de passe, tokens, JWT, clés privées, URL de base de données, credentials cloud et secrets génériques contextualisés ;
 - proposition de redaction dans l’interface possédée par Secret Guard ;
 - sorties de scan sans valeur ni extrait du secret.
@@ -109,7 +115,7 @@ Secret Guard V0 est un **garde du prompt utilisateur**, pas encore un DLP comple
 - validation réseau d’un secret auprès de son fournisseur ;
 - protection d’un poste compromis ou d’un secret déjà envoyé ;
 - apprentissage sur des données utilisateur.
-- installation, contrat ou attestation Claude Code/Codex ;
+- attestation de chargement hôte, déploiement système/MDM ou résistance à root ;
 - audit, télémétrie, allowlist persistante ou règles administrateur.
 
 Dans V0, « prise en charge de .env/.md/source » signifie **scan de leur texte via une commande possédée par Secret Guard**. Cela ne signifie pas interception des pièces jointes natives d’un assistant. Cette dernière capacité appartient à V1.
@@ -130,9 +136,10 @@ exhaustive ; aucune règle GCP dédiée n’est livrée.
 | ------------------------------------------------ | ----------------------------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------- |
 | Participant de chat Secret Guard                 | Requête adressée à `@secretguard`                     | Chat Participant API                      | Routage contrôlé pour cette requête uniquement ; rescan redacted obligatoirement ALLOW        |
 | Commandes scan sélection/document/presse-papiers | Texte explicitement lu                                | Commandes VS Code                         | Scan local seulement ; aucune interception d’un envoi tiers                                   |
-| VS Code Agent / Copilot compatible               | Champ prompt si UserPromptSubmit est réellement actif | Fichier de hook + runner local            | Preview, non attestée ; intégrité et canaris locaux ne prouvent pas l’interception par l’hôte |
-| Claude Code CLI et extension IDE                 | Non testé dans ce V0                                  | Intégration native future                 | Hors V0, aucune garantie                                                                      |
-| Codex CLI et extension IDE                       | Non testé dans ce V0                                  | Intégration native future                 | Hors V0, aucune garantie                                                                      |
+| VS Code Agent / Copilot compatible               | Champ `prompt` de `UserPromptSubmit`                  | Fichier de hook + runner local            | Livré, Preview, non attesté côté hôte                                                         |
+| Claude Code CLI et extension IDE                 | Champ `prompt` de `UserPromptSubmit`                  | Fusion dans `~/.claude/settings.json`     | Livré au niveau contrat utilisateur, non attesté côté hôte                                    |
+| Codex CLI et extension IDE                       | Champ `prompt` de `UserPromptSubmit`                  | Fusion dans `~/.codex/hooks.json`         | Livré au niveau contrat utilisateur, confiance hôte encore requise                            |
+| Windsurf Cascade                                 | `tool_info.user_prompt` de `pre_user_prompt`          | Fusion dans le hooks utilisateur          | Livré au niveau contrat utilisateur ; exit 2 bloque selon la documentation                    |
 | Modèle ou gateway fourni par Secret Guard        | Non livré                                             | Provider/gateway futur                    | Hors V0                                                                                       |
 | Assistant tiers sans hook                        | Rien de garanti                                       | Accord d’intégration du fournisseur       | Aucune                                                                                        |
 | Agent lisant un fichier ensuite                  | Pas couvert par UserPromptSubmit                      | Hook PreToolUse ou gateway d’egress futur | Hors V0                                                                                       |
@@ -181,7 +188,7 @@ Le participant :
 
 Il n’est pas présenté comme un intercepteur global.
 
-### 4.3 Claude Code — Futur, non certifié au V0
+### 4.3 Claude Code — hook utilisateur livré, hôte non attesté
 
 Le [hook UserPromptSubmit de Claude Code](https://code.claude.com/docs/en/hooks#userpromptsubmit) s’exécute avant traitement, reçoit prompt et peut répondre avec decision: block. Depuis la documentation vérifiée :
 
@@ -191,9 +198,9 @@ Le [hook UserPromptSubmit de Claude Code](https://code.claude.com/docs/en/hooks#
 - leur timeout laisse néanmoins le prompt atteindre Claude ;
 - seul un callback Agent SDK expiré est fail-closed depuis Claude Code 2.1.208.
 
-Ces propriétés éclairent une future intégration. Le V0 livré n’installe aucun hook
-Claude, ne teste aucun contrat Claude et ne revendique donc aucune protection de
-Claude Code ou de son extension IDE.
+Le V0.2 fusionne une entrée marquée dans la configuration utilisateur, sans
+écraser les hooks existants, et teste ALLOW/BLOCK sur le runner. L’exécution par
+l’hôte et le déploiement géré restent à attester séparément.
 
 L’extension VS Code de Claude partage la configuration dans ~/.claude/settings.json avec la CLI, selon la documentation des [intégrations IDE Claude Code](https://code.claude.com/docs/en/ide-integrations). La distribution robuste passe par :
 
@@ -203,7 +210,7 @@ L’extension VS Code de Claude partage la configuration dans ~/.claude/settings
 
 Les [emplacements et règles des hooks Claude](https://code.claude.com/docs/en/hooks#hook-locations) restent l’autorité. Une extension VS Code générique ne modifie jamais silencieusement ces réglages.
 
-### 4.4 Codex — Futur, non certifié au V0
+### 4.4 Codex — hook utilisateur livré, hôte non attesté
 
 La documentation officielle [Hooks Codex](https://learn.chatgpt.com/fr-FR/docs/hooks) cite explicitement l’analyse des prompts pour bloquer des clés API. UserPromptSubmit reçoit le prompt sur stdin et accepte decision: block ou le code de sortie 2.
 
@@ -215,9 +222,9 @@ Les [principes de configuration Codex](https://learn.chatgpt.com/fr-FR/docs/conf
 - un hook projet est ignoré dans un projet non fiable ;
 - requirements.toml peut imposer des hooks gérés et allow_managed_hooks_only.
 
-Ces propriétés éclairent une future intégration. Le V0 livré n’installe aucune
-configuration Codex et ne possède aucun test de contrat Codex. Le pont JSON
-générique ne suffit pas à revendiquer une compatibilité. Un futur gate devra aussi
+Le V0.2 fusionne une entrée marquée dans `~/.codex/hooks.json` et teste le contrat
+ALLOW/exit 2. Codex exige encore la confiance explicite pour les hooks non gérés.
+Un futur gate devra aussi
 prouver que Workspace Trust et les politiques actives n’ont pas préempté le hook.
 
 ### 4.5 Provider ou proxy : la seule couverture complète d’un chemin choisi
@@ -534,12 +541,13 @@ Preview reste conditionnel, jamais une garantie universelle.
 ### 9.2 États de couverture
 
 ```text
-Preview validée : configuration gérée exacte, runner identique au bundle et canaris locaux réussis
-dégradé         : configuration étrangère/invalide, runner absent/modifié ou canari local en échec
-mode manuel     : fichier utilisateur Secret Guard absent
+actif    : les quatre configurations sont présentes, le runner est intact et les canaris locaux réussissent
+partiel  : certains hôtes seulement sont configurés
+dégradé  : configuration invalide, runner absent/modifié ou canari local en échec
+désactivé: aucune entrée Secret Guard n'est installée
 ```
 
-« Preview validée » n’équivaut pas à PROTECTED. Le chargement par VS Code, la
+« Actif » n’équivaut pas à une attestation PROTECTED. Le chargement par l’hôte, la
 confiance, l’ordre des configurations, le Remote Extension Host et la politique
 de l’organisation ne sont pas attestés. Un futur état protégé nécessiterait une
 preuve hôte de bout en bout ; les deux appels locaux sain/bloquant ne suffisent
@@ -548,16 +556,17 @@ pas.
 ### 9.3 Installation des hooks
 
 L’utilisateur déclenche explicitement la commande d’activation. L’implémentation
-copie le hook embarqué, puis écrit par renommage atomique son fichier dédié
-`~/.copilot/hooks/xsom-secret-guard.json` avec un mode demandé de `0600`. La
-désactivation supprime ce fichier dédié.
+copie le hook embarqué, puis fusionne par renommage atomique une entrée marquée
+dans les configurations utilisateur VS Code/Copilot, Claude Code, Codex et
+Windsurf, avec un mode demandé de `0600`. Elle conserve les réglages et hooks
+étrangers. La désactivation retire uniquement les entrées marquées Secret Guard.
 
-Le V0 ne fusionne pas le contenu préexistant de ce même fichier et ne crée pas de
-backup. Il refuse d’écraser ou de supprimer un fichier qu’il ne reconnaît pas
-comme exactement géré par lui. Il compare le runner installé au bundle et lance
-les canaris locaux avant écriture, mais ne détecte pas le lieu réel d’exécution et
-ne lance pas de canari hôte. Une configuration workspace ou gérée peut prendre la
-priorité sur la configuration utilisateur.
+L’installation est transactionnelle : une erreur restaure les snapshots pris
+avant modification. Elle refuse une configuration qui usurpe le marqueur sans
+correspondre à une forme gérée connue. Elle compare le runner installé au bundle
+et lance les canaris locaux avant écriture, mais ne détecte pas le lieu réel
+d’exécution et ne lance pas de canari hôte. Une configuration workspace ou gérée
+peut prendre la priorité sur la configuration utilisateur.
 
 Pour Remote SSH, WSL, Dev Container ou Codespaces, le runtime et le runner copié
 doivent exister **là où le hook s’exécute**. L’installateur utilise actuellement
@@ -572,10 +581,10 @@ Elle n’est actuellement ni signée ni publiée. Marketplace et les autres cana
 décrits dans [Publishing Extensions](https://code.visualstudio.com/api/working-with-extensions/publishing-extension)
 restent des options de distribution futures.
 
-Cette installation concerne uniquement le mécanisme VS Code Preview. Elle
-n’installe rien pour Claude Code ou Codex. Une politique d’entreprise peut bloquer,
-remplacer ou forcer des hooks ; un VSIX installé manuellement n’a pas
-nécessairement l’auto-update activé.
+Cette installation couvre les hooks utilisateur VS Code/Copilot, Claude Code,
+Codex et Windsurf. Une politique d’entreprise peut bloquer, remplacer ou forcer
+des hooks ; un VSIX installé manuellement n’a pas nécessairement l’auto-update
+activé et un utilisateur local peut retirer ses propres configurations.
 
 ## 10. Confidentialité et observabilité
 

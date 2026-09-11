@@ -1,8 +1,8 @@
 {
   "name": "xsom-secret-guard-vscode",
   "displayName": "xSOM Secret Guard",
-  "version": "0.1.0",
-  "description": "Local-first scanning for @secretguard prompts and the VS Code Preview hook when active",
+  "version": "0.2.0",
+  "description": "Automatic local-first prompt protection for VS Code/Copilot, Claude Code, Codex and Windsurf",
   "publisher": "xsom",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     "directory": "secret-guard/packages/vscode"
   },
   "engines": {
-    "vscode": "^1.137.0"
+    "vscode": "^1.136.0"
   },
   "preview": true,
   "categories": [
@@ -63,11 +63,11 @@
       },
       {
         "command": "secretGuard.enableHook",
-        "title": "Secret Guard: Activer le hook natif (Preview)"
+        "title": "Secret Guard: Activer la protection automatique"
       },
       {
         "command": "secretGuard.disableHook",
-        "title": "Secret Guard: Désactiver le hook natif"
+        "title": "Secret Guard: Désactiver la protection automatique"
       },
       {
         "command": "secretGuard.copyRedacted",

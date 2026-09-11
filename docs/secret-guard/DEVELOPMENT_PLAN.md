@@ -14,33 +14,33 @@ explicite contraire. Elles ne valent pas inventaire de capacités présentes.
 
 ## 0. État réellement livré
 
-Le dépôt contient un **prototype V0 VS Code**, pas encore un contrôle de sécurité
-certifié :
+Le dépôt contient un **prototype V0.2 multi-hôte**, pas encore un contrôle de
+sécurité certifié :
 
 - core TypeScript synchrone, local, sans dépendance runtime, avec limite de 1 MiB
   UTF-8, scores ALLOW/WARN/BLOCK, offsets, union/redaction et rescan fail-closed ;
 - CLI de scan stdin/fichier et processus de hook ; `scan` utilise les codes
   0/1/**2** pour ALLOW/WARN/BLOCK ; `hook` sort 0 avec JSON pour ALLOW et **2**
   avec stdout vide pour WARN/BLOCK/entrée invalide ;
-- participant `@secretguard`, commandes de scan et installateur du hook VS Code
-  UserPromptSubmit **Preview** ;
-- statut « Preview validée », « dégradé » ou « mode manuel », fondé sur la
-  configuration gérée, l’intégrité du runner et deux canaris locaux ;
+- participant `@secretguard`, commandes de scan et installateur transactionnel
+  des hooks utilisateur VS Code/Copilot, Claude Code, Codex et Windsurf ;
+- statut cadenas « actif », « partiel », « dégradé » ou « désactivé », fondé sur
+  les quatre configurations, l’intégrité du runner et deux protocoles de canari ;
 - tests unitaires et hostiles, contrats subprocess, smoke Extension Host,
   inspection structurelle du VSIX, évaluation synthétique de 1 150 positifs et
   50 000 négatifs, fuzz smoke déterministe de 100 000 entrées, dogfood et
   benchmarks bornés.
 
-Ne sont pas livrés : intégrations certifiées Claude Code/Codex, preuve
-d’interception hôte, canari de bout en bout, gestion de Workspace Trust/policies,
-topologie Remote, merge/backup des configurations, corpus public représentatif
+Ne sont pas livrés : preuve d’interception hôte de bout en bout, déploiement
+système/MDM, gestion complète de Workspace Trust/policies, topologie Remote,
+corpus public représentatif
 annoté, fuzz coverage-guided ou exhaustif, SBOM/checksums de release/signature,
 règles gérées, audit ou télémétrie.
 
-Les canaris actuels exécutent directement le runner local. Ils ne prouvent pas que
-VS Code a chargé ou invoqué le hook. Workspace Trust, une configuration
-workspace, une policy administrateur, la version de l’hôte ou un Extension Host
-distant peuvent préempter la configuration utilisateur.
+Les canaris actuels exécutent directement le runner local avec les enveloppes
+`UserPromptSubmit` et `pre_user_prompt`. Ils ne prouvent pas que chaque hôte a
+chargé ou invoqué son hook. Une policy administrateur, la version de l’hôte ou un
+Extension Host distant peuvent préempter la configuration utilisateur.
 
 ## 1. Résultat visé
 
@@ -420,7 +420,7 @@ Remote Extension Host et le canari de bout en bout restent à implémenter.
 - WARN brut dans `@secretguard` exige une confirmation explicite par requête ;
 - la version redacted n’est envoyée qu’après un rescan complet ALLOW ; WARN,
   BLOCK, exception et scan incomplet sont refusés ;
-- le statut « Preview validée » atteste uniquement le runner local, jamais un
+- le statut « actif » atteste uniquement le runner et les configurations locales, jamais un
   état PROTECTED de l’hôte ;
 - modification de configuration après déclenchement explicite de la commande ;
 - chemins absolus vers le runtime et le runner copié, contrôlés par canari local,
@@ -432,8 +432,8 @@ Remote Extension Host et le canari de bout en bout restent à implémenter.
 - VSIX de développement ;
 - CLI de scan et processus hook du prototype VS Code Preview ;
 - intégration VS Code de développement ;
-- documentation des limites. Les adaptateurs Claude/Codex, l’onboarding attesté,
-  la matrice de versions, le rollback et Remote/WSL/Container restent futurs.
+- documentation des limites. L’onboarding attesté, la matrice de versions et la
+  couverture Remote/WSL/Container restent futurs.
 
 ### Tests
 
@@ -449,7 +449,7 @@ Remote Extension Host et le canari de bout en bout restent à implémenter.
 
 #### Hooks
 
-- snapshot du contrat VS Code Preview ; snapshots Claude/Codex futurs ;
+- snapshots des contrats VS Code, Claude Code, Codex et Windsurf ;
 - merge avec configurations vides, inconnues et multiples ;
 - JSON malformé : aucune écriture ;
 - backup/rollback ;
@@ -1123,13 +1123,14 @@ publiée.
 
 ### 5. Jusqu’où protéger Claude Code, Codex et Copilot depuis VS Code ?
 
-- **Participant `@secretguard` :** seule route d’envoi possédée par le V0 ; WARN
+- **Participant `@secretguard` :** route UI historique encore disponible ; WARN
   brut confirmé explicitement ou redaction rescannée ALLOW.
 - **VS Code/Copilot Agent compatible hooks :** fichier UserPromptSubmit Preview
   configurable, mais interception non attestée. Workspace Trust, workspace,
   policies et Remote peuvent le préempter.
-- **Claude Code CLI/IDE et Codex CLI/IDE :** futurs, non installés, non testés et
-  non certifiés.
+- **Claude Code CLI/IDE, Codex CLI/IDE et Windsurf :** hooks utilisateur
+  pré-submit installés et canaris locaux validés, sans attestation d’invocation
+  par l’hôte ni résistance à un utilisateur qui les retire.
 - **Autres assistants :** seulement avec participant, intégration directe, provider ou proxy.
 
 L’extension seule ne suffit pas.
@@ -1139,7 +1140,8 @@ L’extension seule ne suffit pas.
 - core V0 déterministe ;
 - participant `@secretguard` ;
 - scan explicite du presse-papiers, sélection et document texte ;
-- CLI de scan et processus hook utilisé par le prototype VS Code Preview ;
+- CLI de scan et processus hook partagé par VS Code/Copilot, Claude Code, Codex
+  et Windsurf ;
 - HIGH/CRITICAL bloqués dans la route possédée ; MEDIUM envoyé brut uniquement
   après confirmation explicite, et bloqué par défaut dans le hook ;
 - redaction + rescan fail-closed ; `content` vide et aucun envoi si le verdict

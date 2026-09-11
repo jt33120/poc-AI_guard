@@ -23,6 +23,25 @@ describe("hook bridge", () => {
     expect(serialized).not.toContain(fakeToken);
   });
 
+  it("accepts the native Windsurf pre_user_prompt envelope", () => {
+    const clean = runHook(
+      JSON.stringify({
+        agent_action_name: "pre_user_prompt",
+        tool_info: { user_prompt: "explain this" },
+      }),
+    );
+    const blocked = runHook(
+      JSON.stringify({
+        agent_action_name: "pre_user_prompt",
+        tool_info: { user_prompt: `use ${fakeToken}` },
+      }),
+    );
+
+    expect(clean).toEqual({ continue: true });
+    expect(blocked.continue).toBe(false);
+    expect(JSON.stringify(blocked)).not.toContain(fakeToken);
+  });
+
   it("fails closed for malformed and missing prompt inputs", () => {
     expect(runHook("{").continue).toBe(false);
     expect(
@@ -36,6 +55,14 @@ describe("hook bridge", () => {
     );
 
     expect(response).toMatchObject({ continue: false });
+    expect(
+      runHook(
+        JSON.stringify({
+          agent_action_name: "post_cascade_response",
+          tool_info: { user_prompt: "clean" },
+        }),
+      ).continue,
+    ).toBe(false);
   });
 
   it("can explicitly surface a warning without blocking", () => {
