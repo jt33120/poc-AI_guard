@@ -72,14 +72,39 @@ test("the landing answers three questions in order, without connecting a service
   await expect(page.locator("#menaces .paysage .menace")).toHaveCount(23);
 });
 
-test("the self-serve page says what is included and how to start", async ({ page }) => {
+test("the self-serve page says what the product does, and where that stops", async ({ page }) => {
   await page.goto("/");
   await page.locator(".guard-path").filter({ hasText: "Développeur" }).getByRole("link").click();
   await expect(page).toHaveURL(/\/saas$/);
 
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Encadrez vos agents");
-  // Ce qui est inclus, et le guide : les deux blocs que la page doit porter.
-  await expect(page.locator(".guard-included__list li")).toHaveCount(6);
+
+  // L'inventaire : six familles, et chacune porte des lignes concrètes. Le compte
+  // par famille est ce qui distingue cette page de celle d'avant, qui tenait en six
+  // phrases vagues — sans lui, six titres vides passeraient le test.
+  const familles = page.locator(".guard-included__list > li");
+  await expect(familles).toHaveCount(6);
+  for (let i = 0; i < 6; i++) {
+    await expect(familles.nth(i).locator("ul > li").count()).resolves.toBeGreaterThanOrEqual(4);
+  }
+  await expect(familles.first()).toContainText("Juge LLM sur les seuls cas ambigus");
+
+  // La nuance que l'inventaire ne porte pas vit sur la page qui la prouve.
+  await expect(page.locator(".guard-included").getByRole("link")).toHaveAttribute("href", "/evidence");
+
+  // La borne, et c'est la raison d'être de cette section : la passerelle
+  // contraignante ne s'obtient pas en s'inscrivant. La page le dit, et elle donne
+  // la porte — un courriel, comme le chemin du conseil.
+  const passerelle = page.locator(".guard-gateway");
+  await expect(passerelle).toContainText("accès direct à la base");
+  await expect(passerelle.getByRole("link")).toHaveAttribute("href", /^mailto:/);
+
+  // Le geste « Brancher » décrit les deux voies qu'un inscrit obtient vraiment.
+  // Promettre la passerelle ici apprendrait à faire ce qui ne marchera pas.
+  const brancher = page.locator(".guard-start__steps li").nth(2);
+  await expect(brancher).toContainText("adresse de base");
+  await expect(brancher).not.toContainText("passerelle");
+
   await expect(page.locator(".guard-start__steps li")).toHaveCount(4);
   await expect(page.locator(".guard-start__steps li").first()).toContainText("Créer le compte");
 
@@ -106,5 +131,17 @@ for (const width of [390, 768, 1440]) {
 
     await page.goto("/saas");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+
+    if (width === 390) {
+      // Une grille à quatre colonnes tient dans 390 px sans déborder : le contrôle
+      // de débordement ci-dessus la laisse passer, à deux mots par ligne. Ce qu'on
+      // veut, c'est qu'elle soit EMPILÉE, et deux étapes empilées ne partagent pas
+      // la même ordonnée. (C'est ce qui manquait quand la requête de média perdait
+      // en spécificité contre sa propre règle de base.)
+      const etapes = page.locator(".guard-start__steps li");
+      const premiere = await etapes.nth(0).boundingBox();
+      const seconde = await etapes.nth(1).boundingBox();
+      expect(seconde!.y).toBeGreaterThan(premiere!.y);
+    }
   });
 }

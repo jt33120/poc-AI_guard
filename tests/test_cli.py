@@ -597,3 +597,82 @@ def test_a_non_numeric_port_is_refused_rather_than_ignored() -> None:
         del os.environ["XSOM_DB_PORT"]
     assert db_check.level == "FAIL"
     assert "not a port number" in db_check.message
+
+
+# ---------------------------------------------------------------------------
+# plan
+# ---------------------------------------------------------------------------
+def _tenant(db: DBHandle, plan: str = "free") -> str:
+    tid = uuid4()
+    db.conn.execute("insert into tenants (id, name, plan) values (%s, 'A', %s)", (tid, plan))
+    db.conn.commit()
+    return str(tid)
+
+
+def test_moving_a_tenant_writes_the_tier_and_its_history_together(
+    db: DBHandle, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Le palier et son explication sont écrits dans la même transaction.
+
+    C'est toute la raison d'être de la commande. `0033` a changé le palier d'entrée,
+    donc les tenants inscrits avant lui doivent être déplacés : le faire par un
+    `update` à la main laisserait un palier sans auteur ni raison, et la question
+    « depuis quand, par qui, pourquoi ? » resterait sans réponse mécanique.
+    """
+    settings = _settings(db)
+    tenant = _tenant(db, "free")
+
+    code, out = _run(["plan", "set", tenant, "entreprise", "--actor", "julian"], settings, capsys)
+
+    assert code == 0
+    assert "free -> entreprise" in out
+    with psycopg.connect(db.url) as c:
+        assert c.execute("select plan from tenants where id = %s", (tenant,)).fetchone()[0] == (
+            "entreprise"
+        )
+        mouvement = c.execute(
+            "select from_tier, to_tier, reason, actor from tenant_plan_changes "
+            "where tenant_id = %s order by id desc limit 1",
+            (tenant,),
+        ).fetchone()
+    assert mouvement == ("free", "entreprise", "admin", "julian")
+
+
+def test_moving_a_tenant_to_the_tier_it_already_has_writes_nothing(
+    db: DBHandle, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Une entrée « entreprise -> entreprise » raconterait un mouvement qui n'a pas eu lieu.
+
+    Rejouer la commande sur toute une base est le geste normal après `0033` : sans
+    ce court-circuit, chaque passage allongerait la chaîne d'autant de non-événements.
+    """
+    settings = _settings(db)
+    tenant = _tenant(db, "entreprise")
+
+    code, out = _run(["plan", "set", tenant, "entreprise"], settings, capsys)
+
+    assert code == 0 and "already entreprise" in out
+    with psycopg.connect(db.url) as c:
+        lignes = c.execute(
+            "select count(*) from tenant_plan_changes where tenant_id = %s", (tenant,)
+        ).fetchone()[0]
+    assert lignes == 0
+
+
+def test_reading_a_tier_prints_it_without_touching_anything(
+    db: DBHandle, capsys: pytest.CaptureFixture[str]
+) -> None:
+    tenant = _tenant(db, "pro")
+
+    code, out = _run(["plan", "show", tenant], _settings(db), capsys)
+
+    assert code == 0 and "pro" in out
+
+
+def test_moving_an_unknown_tenant_says_so_rather_than_inventing_one(
+    db: DBHandle, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Un `update` sur zéro ligne réussit en silence. La commande, non."""
+    code, out = _run(["plan", "set", str(uuid4()), "pro"], _settings(db), capsys)
+
+    assert code != 0 and "no such tenant" in out

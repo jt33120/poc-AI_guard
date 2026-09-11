@@ -18,12 +18,9 @@
 
 import Link from "next/link";
 
-import type { GUARD_COPY } from "@/components/guard-copy";
+import { CONTACT_MAILTO, type GUARD_COPY } from "@/components/guard-copy";
 
 type Copy = (typeof GUARD_COPY)[keyof typeof GUARD_COPY];
-
-const MAILTO =
-  "mailto:julian.talou@xsom.fr?subject=xSOM%20AI%20Guard%20%3A%20cas%20d%E2%80%99usage";
 
 export function Orientation({ copy }: { copy: Copy }) {
   return (
@@ -54,7 +51,7 @@ export function Orientation({ copy }: { copy: Copy }) {
                 ))}
               </ul>
               {id === "company" ? (
-                <a className="guard-button" href={MAILTO}>
+                <a className="guard-button" href={CONTACT_MAILTO}>
                   {path.action}
                   <span aria-hidden="true">↗</span>
                 </a>

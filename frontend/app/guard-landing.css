@@ -527,20 +527,30 @@
   line-height: var(--guard-line-leading);
   font-weight: 600;
 }
+.guard-landing .guard-saas-open {
+  color: var(--signal-accent-text);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  max-width: 62ch;
+}
 .guard-included,
+.guard-gateway,
 .guard-start {
   padding-block: var(--sp-12);
   border-top: var(--signal-border) solid var(--signal-line);
 }
+/* `auto-fit` plutôt que trois colonnes fixes : les familles portent désormais une
+   sous-liste, donc une carte est haute. À 1100 px, trois colonnes donneraient des
+   lignes de six mots. La grille retombe d'elle-même à deux, puis à une. */
 .guard-landing .guard-included__list {
   list-style: none;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--sp-6);
-  margin-top: var(--sp-8);
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: var(--sp-8) var(--sp-6);
+  margin-block: var(--sp-8);
 }
-.guard-included__list li {
+.guard-included__list > li {
   padding-top: var(--sp-4);
   border-top: var(--signal-border) solid var(--signal-line-strong);
 }
@@ -552,6 +562,32 @@
   margin-top: var(--sp-2);
   color: var(--signal-muted);
   font-size: var(--fs-sm);
+}
+.guard-landing .guard-included__list ul {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-2);
+  margin-top: var(--sp-4);
+}
+.guard-included__list ul li {
+  display: flex;
+  gap: var(--sp-3);
+  color: var(--signal-faint);
+  font-size: var(--fs-xs);
+  line-height: var(--signal-leading);
+}
+.guard-included__list ul li > span {
+  color: var(--signal-accent-text);
+}
+.guard-gateway h2 {
+  font-size: var(--fs-h3);
+  font-weight: 600;
+}
+.guard-landing .guard-gateway p {
+  margin-block: var(--sp-4);
+  color: var(--signal-muted);
+  max-width: 70ch;
 }
 .guard-landing .guard-start__steps {
   list-style: none;
@@ -594,9 +630,14 @@
   max-width: 70ch;
 }
 @media (max-width: 900px) {
+  /* `.guard-landing` en préfixe, et ce n'est pas un ornement : les règles de base
+     de ces deux grilles sont elles-mêmes préfixées (0,2,0), et une requête de média
+     ne pèse rien dans le calcul de spécificité. Sans le préfixe, `.guard-start__steps`
+     vaut (0,1,0) et perd — les quatre étapes restaient sur quatre colonnes à 390 px,
+     à un ou deux mots par ligne. */
   .guard-paths,
-  .guard-included__list,
-  .guard-start__steps {
+  .guard-landing .guard-included__list,
+  .guard-landing .guard-start__steps {
     grid-template-columns: minmax(0, 1fr);
   }
   .guard-threat {

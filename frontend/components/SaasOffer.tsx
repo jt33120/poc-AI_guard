@@ -6,20 +6,28 @@
  * C'est la destination du chemin « développeur » de l'accueil. Le chemin « conseil »,
  * lui, reste un courriel : une prestation se discute, elle ne s'achète pas au clic.
  *
- * **Ce que cette page promet est borné à ce qui est branché.** La note de bas de page
- * n'est pas une réserve juridique posée après coup : elle dit la seule chose qui
- * détermine le périmètre réel, et un lecteur qui la manque installera la passerelle en
- * croyant couvrir des flux qui ne passent pas par elle.
+ * **La page dit ce que le produit sait faire, pas ce qu'un palier accorde.** Les six
+ * familles couvrent l'inventaire réel — chaque ligne a son module et ses tests — et
+ * `0033` fait naître un inscrit au palier le plus large pour que la page reste vraie
+ * à l'inscription. Le jour où la facturation revient, c'est cette page qu'il faudra
+ * rabattre en même temps que le défaut de palier, et pas l'une sans l'autre.
+ *
+ * **Trois bornes, et elles sont sur la page plutôt qu'en bas de page** : la passerelle
+ * contraignante ne s'ouvre pas toute seule (elle s'installe) ; ce qui ne passe pas par
+ * nous n'est pas contrôlé ; et ce qui est *bloqué* se distingue de ce qui est
+ * *orchestré* ou seulement *attesté* — cette distinction-là vit sur `/evidence`, qui
+ * la prouve ligne par ligne, et le lien y mène depuis l'inventaire.
  *
  * Les quatre gestes sont ceux de l'assistant d'intégration de la console, dans le même
  * ordre et avec les mêmes noms. Une page publique qui décrirait une autre suite
- * apprendrait à faire ce qui ne marchera pas.
+ * apprendrait à faire ce qui ne marchera pas — c'est pourquoi « Brancher » parle de
+ * l'appel de décision et du proxy, les deux voies qu'un inscrit obtient vraiment.
  */
 
 import Link from "next/link";
 
 import { Wordmark, XsomMark } from "@/components/brand";
-import { GUARD_COPY } from "@/components/guard-copy";
+import { CONTACT_MAILTO, GUARD_COPY } from "@/components/guard-copy";
 import { SignalPreferences } from "@/design-system/react";
 import { LanguageToggle, useT } from "@/lib/i18n";
 
@@ -54,6 +62,7 @@ export function SaasOffer() {
         <p className="guard-kicker">{copy.saasKicker}</p>
         <h1>{copy.saasTitle}</h1>
         <p className="guard-hero__intro">{copy.saasIntro}</p>
+        <p className="guard-saas-open">{copy.saasOpen}</p>
         <Link href="/signup" className="guard-button">
           {copy.saasCta}
           <span aria-hidden="true">↗</span>
@@ -68,13 +77,40 @@ export function SaasOffer() {
           <h2 id="included-heading">{copy.saasIncluded}</h2>
         </div>
         <ul className="guard-included__list">
-          {copy.saasIncludes.map((item) => (
-            <li key={item.title}>
-              <h3>{item.title}</h3>
-              <p>{item.body}</p>
+          {copy.saasFamilies.map((famille) => (
+            <li key={famille.title}>
+              <h3>{famille.title}</h3>
+              <p>{famille.body}</p>
+              <ul>
+                {famille.list.map((ligne) => (
+                  <li key={ligne}>
+                    <span aria-hidden="true">↗</span>
+                    {ligne}
+                  </li>
+                ))}
+              </ul>
             </li>
           ))}
         </ul>
+        {/* Le relevé prouve la nuance que l'inventaire ne porte pas : une ligne
+            « garde-prompt » y est publiée `Orchestré`, pas `Bloqué`. Sans ce lien,
+            l'inventaire se lirait comme une liste de garanties. */}
+        <a className="guard-link" href="/evidence">
+          {copy.saasProof}
+          <span aria-hidden="true">↗</span>
+        </a>
+      </section>
+
+      <section
+        className="guard-gateway guard-wrap"
+        aria-labelledby="gateway-heading"
+      >
+        <h2 id="gateway-heading">{copy.saasGatewayTitle}</h2>
+        <p>{copy.saasGatewayBody}</p>
+        <a className="guard-link" href={CONTACT_MAILTO}>
+          {copy.saasGatewayCta}
+          <span aria-hidden="true">↗</span>
+        </a>
       </section>
 
       <section

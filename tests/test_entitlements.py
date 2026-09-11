@@ -26,9 +26,9 @@ from core.config import Settings
 from core.entitlements import AUCUNE, Capability, Meter, Metric
 from tests.conftest import DBHandle
 
-_MIGRATION = (
-    Path(__file__).resolve().parent.parent / "supabase" / "migrations" / "0030_saas_plans.sql"
-)
+_MIGRATIONS = Path(__file__).resolve().parent.parent / "supabase" / "migrations"
+_MIGRATION = _MIGRATIONS / "0030_saas_plans.sql"
+_DEMONSTRATION = _MIGRATIONS / "0033_palier_de_demonstration.sql"
 
 
 def _tenant(db: DBHandle, plan: str = "pro") -> str:
@@ -128,16 +128,40 @@ def test_a_plan_with_no_capabilities_is_treated_as_unknown(db: DBHandle) -> None
     assert entitlements.load_entitlement(db.conn, tenant) is AUCUNE
 
 
-def test_the_production_default_plan_is_free_not_the_test_default() -> None:
-    """La bascule de la suite ne doit jamais atteindre le produit.
+def test_the_entry_tier_is_the_demonstration_one_and_reverting_is_one_statement() -> None:
+    """Le palier d'entrée est celui de la démonstration, et il se referme d'une ligne.
 
-    `tests/conftest.py` fait naître les tenants `entreprise` pour que quarante
-    fichiers n'aient pas à déclarer un palier qu'ils n'éprouvent pas. Ce contrôle
-    lit la **migration** : en production, un tenant naît `free`, le palier le plus
-    restreint, ce qui est ici la direction fail-closed.
+    `0030` déclarait `free` — le palier le plus restreint, donc la direction
+    fail-closed. `0033` l'ouvre en grand pendant la démonstration : le produit n'est
+    pas facturé, et un inscrit qui découvre neuf capacités sur trente-sept les
+    découvre par un 402, pas par la page qui l'a fait venir.
+
+    Ce que ce contrôle tient n'est pas la valeur — c'est la **forme du retour
+    arrière**. `0030` garde sa déclaration intacte, `0033` ne fait que déplacer le
+    défaut, et remettre `free` reste donc un seul `alter`. Une bascule qui aurait
+    réécrit les vingt-huit lignes de la grille coûterait, elle, une migration de
+    restauration.
     """
-    sql = _MIGRATION.read_text(encoding="utf-8")
-    assert "add column if not exists plan text not null default 'free'" in sql
+    grille = _MIGRATION.read_text(encoding="utf-8")
+    demo = _DEMONSTRATION.read_text(encoding="utf-8")
+    # Les commentaires NOMMENT `mcp_gateway_enabled` — c'est là qu'il faut en parler.
+    # Ce qu'on interdit, c'est de le toucher, donc on lit les seules instructions.
+    instructions = "\n".join(
+        ligne for ligne in demo.splitlines() if not ligne.lstrip().startswith("--")
+    )
+
+    assert "add column if not exists plan text not null default 'free'" in grille, (
+        "la gamme garde son propre défaut : c'est lui qu'on remet quand la facturation arrive"
+    )
+    assert "alter table tenants alter column plan set default 'entreprise'" in instructions
+    assert "plan_capabilities" not in instructions and "plan_limits" not in instructions, (
+        "la démonstration déplace le palier d'entrée, elle ne redéfinit aucun palier"
+    )
+    assert "update tenants" not in instructions.lower(), (
+        "déplacer les tenants déjà inscrits passe par `cli plan set`, qui écrit "
+        "l'entrée chaînée dans la même transaction ; un update en masse laisserait "
+        "un palier que `tenant_plan_changes` ne raconte pas"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -412,8 +436,15 @@ def test_signing_up_writes_the_entry_into_the_plan_history(db: DBHandle) -> None
     """L'histoire d'un palier commence à l'inscription, pas à la première contestation.
 
     Sans cette ligne, `tenant_plan_changes` d'un tenant est vide jusqu'au jour où on
-    le rétrograde — et la première entrée de son histoire est celle qu'il conteste.
+    le rétrograde, et la première entrée de son histoire est celle qu'il conteste.
     « Depuis quand suis-je sur ce palier ? » n'a alors pas de réponse.
+
+    **Le palier attendu est relu, pas écrit ici**, et c'est ce que `0033` a mis au
+    jour. L'inscription laisse la colonne décider du palier puis écrivait `free` en
+    dur dans la chaîne ; ce contrôle écrivait le même littéral, si bien que les deux
+    s'accordaient sur une valeur que la base ne donnait déjà plus — la fixture fait
+    naître les tenants `entreprise`. Un test qui recopie la constante du code ne
+    vérifie que la constante.
     """
     from core import plan_changes, signup
     from tests.test_signup import FakeAuthAdmin
@@ -426,9 +457,12 @@ def test_signing_up_writes_the_entry_into_the_plan_history(db: DBHandle) -> None
         password="s3cretpw!",  # court à dessein : `audit_security` flaire un littéral long
     )
 
+    palier = db.conn.execute(
+        "select plan from tenants where id = %s", (compte["tenant_id"],)
+    ).fetchone()[0]
     histoire = plan_changes.history(db.conn, compte["tenant_id"])
     assert [(h["from_tier"], h["to_tier"], h["reason"]) for h in histoire] == [
-        (None, "free", "signup")
+        (None, palier, "signup")
     ]
     assert plan_changes.verify_chain(db.conn, compte["tenant_id"]).ok is True
 
