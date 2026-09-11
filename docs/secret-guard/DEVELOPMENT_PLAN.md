@@ -430,7 +430,7 @@ Remote Extension Host et le canari de bout en bout restent à implémenter.
 
 - package xsom-secret-guard-vscode ;
 - VSIX de développement ;
-- CLI de scan et processus hook du prototype VS Code Preview ;
+- CLI de scan et processus hook partagé par les quatre hôtes pris en charge ;
 - intégration VS Code de développement ;
 - documentation des limites. L’onboarding attesté, la matrice de versions et la
   couverture Remote/WSL/Container restent futurs.
