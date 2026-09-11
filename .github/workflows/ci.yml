@@ -18,13 +18,13 @@ jobs:
     name: lint · types · tests · audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Ensure PostgreSQL server binaries (ephemeral test cluster)
         run: sudo apt-get update && sudo apt-get install -y postgresql
 
       - name: Set up uv + Python 3.12
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
         with:
           python-version: "3.12"
           enable-cache: true
@@ -78,12 +78,12 @@ jobs:
     name: secret scan (trufflehog)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
       - name: TruffleHog
-        uses: trufflesecurity/trufflehog@main
+        uses: trufflesecurity/trufflehog@363923b901c911a9164f50b6c423f47c15372b1c # v3.97.4
         with:
           extra_args: --only-verified
 
@@ -94,8 +94,8 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20"
       - name: Install dependencies
@@ -108,3 +108,22 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Playwright smoke
         run: npm run test:e2e
+
+  secret-guard:
+    name: secret guard (lint · unit · hook · VSIX · latency)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: secret-guard
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: secret-guard/package-lock.json
+      - name: Install pinned dependencies
+        run: npm ci
+      - name: Static checks, unit coverage, hook contracts, VSIX and latency
+        run: xvfb-run -a npm run verify

@@ -9,6 +9,13 @@ xSOM, which on every tool-call:
 
 The differentiator: we control what the agent **does**, not just what it is told.
 
+The repository also contains **Secret Guard V0**, a separate local-first layer
+that detects credentials in prompts on explicitly protected paths before an LLM
+request. It complements the action gateway; it is not advertised as a universal
+firewall for every VS Code extension or terminal. See
+[`secret-guard/`](secret-guard/) and the
+[`architecture decision`](docs/secret-guard/ARCHITECTURE.md).
+
 ```
  Agent ──MCP──▶  xSOM AI Guard  ──MCP──▶  downstream tool servers (mail, CRM, fs…)
                  policy → HITL → audit
@@ -36,6 +43,7 @@ call before you execute a tool), and the **LLM provider proxy** (point an SDK's
 | **Tool integrity** | MCP tool fingerprinting, drift/poison detection, quarantine at the proxy, operable approve / re-baseline. |
 | **Taint** | Indirect prompt-injection taint tracked across a session and enforced at the action boundary. |
 | **Egress DLP** | Outbound prompt scanning: block fixed-form secrets, flag structured PII — value never logged (kind + hash only). |
+| **Local Secret Guard V0** | Dependency-free TypeScript core, local CLI/hook bridge, VS Code `UserPromptSubmit` hook (Preview), `@secretguard` fallback, redaction + authoritative rescan. Explicitly scoped to protected paths. |
 | **AI observability** | Per-agent usage, cost and latency, OTLP `gen_ai` ingestion, cost-anomaly detection. |
 | **Tenancy** | Multi-tenant by Postgres RLS, self-serve signup, gateway tokens (hash-stored), client/project scoping. |
 
@@ -71,7 +79,9 @@ videos are explicitly illustrative.
 ## Prerequisites
 
 - **Python 3.12** and [uv](https://docs.astral.sh/uv/)
-- **Node 20+** (console)
+- **Node 22.13+** for the full quickstart and Secret Guard workspace (the
+  existing console alone remains compatible with Node 20+)
+- **VS Code 1.137+** to build or exercise the Secret Guard extension and Preview hook.
 - **PostgreSQL 16** server binaries — an *ephemeral* cluster is spun up for the
   hermetic RLS/HITL/audit tests and `make demo` (no live database required).
   On Debian/Ubuntu: `apt-get install -y postgresql-16`.
@@ -159,7 +169,7 @@ Console (`frontend/.env.local`): `NEXT_PUBLIC_SUPABASE_URL`,
 | `make install` | Install backend + console deps + Playwright browser. |
 | `make dev` | Run the control API (+ console); the gateway runs over stdio. |
 | `make test` | pytest + Playwright smoke. |
-| `make verify` | ruff + mypy + tests + security audit + sovereignty gate + coverage gate + eslint + tsc. |
+| `make verify` | Backend + console gates, then Secret Guard lint/types/unit coverage/hook contracts/extension-host/VSIX/latency/audit. |
 | `make sovereignty-gate` | `SM-15`: fails if any module on the decision path *can* reach the network (`AD-25`). |
 | `make demo` | End-to-end break-then-control demo. |
 | `make up` / `make down` | Bring the self-hosted compose stack up / down (the volume survives `down`). |
@@ -178,6 +188,7 @@ api/       hardened FastAPI control API (auth, authorize, policy, approvals, aud
            integrity, trust, DLP, LLM proxy, usage, signup)
 supabase/  SQL migrations (RLS, append-only audit) + the schema_migrations ledger
 frontend/  Next.js 14 console (onboarding, inspector, approvals, audit, admin)
+secret-guard/ local TypeScript core, CLI/hook bridge, VS Code extension, tests and benchmarks
 scripts/   audit_security, audit_sovereignty, gen_coverage, verify_chain, demo, seed_demo
 tests/     pytest suite (ephemeral Postgres harness) + Playwright e2e
 docs/      SPEC, BUILD_PLAN, SECURITY, DEPLOY, product/ (PRD, architecture, epics)
@@ -189,6 +200,8 @@ See [`docs/SECURITY.md`](docs/SECURITY.md) for the threat model and pentest
 checklist. Highlights: HITL enforced at the gateway (never by the prompt),
 fail-closed defaults, tenant isolation by Postgres RLS, append-only hash-chained
 audit, httpOnly auth cookies, no secrets in git (trufflehog in CI).
+Secret Guard's narrower local threat model and coverage limits live in
+[`docs/secret-guard/THREAT_MODEL.md`](docs/secret-guard/THREAT_MODEL.md).
 
 ## Status
 
@@ -196,4 +209,6 @@ MVP milestones **M0–M8** plus **M9–M12** (AI Act compliance plane, tool inte
 and RBAC, risk/trust-graduated escalation, taint) are complete, alongside egress
 DLP, AI observability and the LLM proxy. See `docs/BUILD_PLAN.md` for the MVP and
 `docs/product/` (PRD, `ARCHITECTURE-V2.md`, `EPICS.md`, `PLAN-REVIEW.md`) for what
-v2 adds next — starting with one-command deployment.
+v2 adds next — starting with one-command deployment. Secret Guard V0 is an
+independent, locally enforced add-on with its own phased plan in
+`docs/secret-guard/DEVELOPMENT_PLAN.md`.

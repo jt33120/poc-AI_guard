@@ -5,17 +5,23 @@ COMPOSE ?= docker compose
 # Mirrors the defaults in docker-compose.yml, for the URLs printed by `make up`.
 XSOM_API_PORT ?= 8000
 
-.PHONY: install frontend-install dev test verify demo lint fmt fmt-check typecheck audit \
-        coverage-gate coverage-map threat-rows marketing-facts replays demo-snapshot migrations-manifest sovereignty-gate verify-frontend test-frontend seed-demo clean up down down-hard logs ps cli backup restore overhead overhead-gate
+.PHONY: install frontend-install secret-guard-install dev test verify demo lint fmt fmt-check typecheck audit \
+        coverage-gate coverage-map threat-rows marketing-facts replays demo-snapshot migrations-manifest sovereignty-gate verify-frontend verify-secret-guard test-frontend seed-demo clean up down down-hard logs ps cli backup restore overhead overhead-gate
 
 install:           ## Install backend + frontend deps
 	$(UV) sync
 	@$(MAKE) frontend-install
+	@$(MAKE) secret-guard-install
 
 frontend-install:
 	@if [ -f frontend/package.json ]; then \
 		npm --prefix frontend install && \
 		npm --prefix frontend exec playwright install --with-deps chromium; \
+	fi
+
+secret-guard-install:
+	@if [ -f secret-guard/package-lock.json ]; then \
+		npm --prefix secret-guard ci; \
 	fi
 
 dev:               ## Run control API (+ frontend if scaffolded); gateway MCP runs over stdio
@@ -52,9 +58,9 @@ audit:             ## Static security audit (fails on CRITICAL)
 sovereignty-gate:  ## AD-25/SM-15: nothing on the decision path can reach the network
 	$(UV) run python scripts/audit_sovereignty.py
 
-# verify = ruff + mypy + tests + audit_security (+ eslint/tsc when frontend exists).
-# CLAUDE.md §8. Frontend checks are skipped cleanly until M7 scaffolds frontend/.
-verify: lint fmt-check typecheck test audit sovereignty-gate coverage-gate overhead-gate verify-frontend
+# verify = backend + frontend + Secret Guard quality and security gates.
+# CLAUDE.md §8. Install both Node workspaces first with `make install`.
+verify: lint fmt-check typecheck test audit sovereignty-gate coverage-gate overhead-gate verify-frontend verify-secret-guard
 	@echo ">> verify: OK"
 
 seed-demo:         ## Load the committed demonstration tenant (FR-182/183)
@@ -96,6 +102,15 @@ verify-frontend:
 		npm --prefix frontend run lint && npm --prefix frontend run typecheck; \
 	else \
 		echo ">> frontend not scaffolded yet (M7): eslint/tsc skipped"; \
+	fi
+
+verify-secret-guard:
+	@if [ -d secret-guard/node_modules ]; then \
+		echo ">> Secret Guard checks (lint + types + unit + hooks + VSIX + latency)"; \
+		npm --prefix secret-guard run verify; \
+	else \
+		echo ">> Secret Guard deps missing: run 'make install'"; \
+		exit 1; \
 	fi
 
 demo:              ## End-to-end break-then-control story

@@ -1,0 +1,108 @@
+{
+  "name": "xsom-secret-guard-vscode",
+  "displayName": "xSOM Secret Guard",
+  "version": "0.1.0",
+  "description": "Local-first scanning for @secretguard prompts and the VS Code Preview hook when active",
+  "publisher": "xsom",
+  "private": true,
+  "type": "module",
+  "license": "SEE LICENSE IN LICENSE.txt",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jt33120/poc-AI_guard.git",
+    "directory": "secret-guard/packages/vscode"
+  },
+  "engines": {
+    "vscode": "^1.137.0"
+  },
+  "preview": true,
+  "categories": [
+    "Linters",
+    "Other"
+  ],
+  "keywords": [
+    "security",
+    "secrets",
+    "copilot",
+    "ai",
+    "dlp"
+  ],
+  "main": "./dist/extension.cjs",
+  "activationEvents": [
+    "onStartupFinished",
+    "onChatParticipant:xsom.secretGuard",
+    "onCommand:secretGuard.scanSelection",
+    "onCommand:secretGuard.scanClipboard",
+    "onCommand:secretGuard.scanDocument",
+    "onCommand:secretGuard.enableHook",
+    "onCommand:secretGuard.disableHook",
+    "onCommand:secretGuard.copyRedacted"
+  ],
+  "contributes": {
+    "chatParticipants": [
+      {
+        "id": "xsom.secretGuard",
+        "name": "secretguard",
+        "fullName": "xSOM Secret Guard",
+        "description": "Scanne localement le prompt avant de l’envoyer au modèle sélectionné.",
+        "isSticky": true
+      }
+    ],
+    "commands": [
+      {
+        "command": "secretGuard.scanSelection",
+        "title": "Secret Guard: Scanner la sélection"
+      },
+      {
+        "command": "secretGuard.scanClipboard",
+        "title": "Secret Guard: Scanner le presse-papiers"
+      },
+      {
+        "command": "secretGuard.scanDocument",
+        "title": "Secret Guard: Scanner le document ouvert"
+      },
+      {
+        "command": "secretGuard.enableHook",
+        "title": "Secret Guard: Activer le hook natif (Preview)"
+      },
+      {
+        "command": "secretGuard.disableHook",
+        "title": "Secret Guard: Désactiver le hook natif"
+      },
+      {
+        "command": "secretGuard.copyRedacted",
+        "title": "Secret Guard: Copier la version expurgée"
+      }
+    ],
+    "configuration": {
+      "title": "xSOM Secret Guard",
+      "properties": {
+        "secretGuard.hook.warnMode": {
+          "type": "string",
+          "enum": [
+            "block",
+            "allow"
+          ],
+          "enumDescriptions": [
+            "Bloquer aussi les détections ambiguës jusqu’à expurgation.",
+            "Afficher un avertissement et laisser continuer les détections ambiguës."
+          ],
+          "default": "block",
+          "scope": "machine",
+          "description": "Comportement du hook natif pour un verdict WARN. Les verdicts BLOCK ne sont jamais contournables."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:extension": "node ../../scripts/run-vscode-tests.mjs",
+    "package": "vsce package --no-dependencies --out dist/xsom-secret-guard-vscode.vsix",
+    "vscode:prepublish": "npm run build"
+  },
+  "dependencies": {
+    "@xsom/secret-guard-cli": "0.1.0",
+    "@xsom/secret-guard-core": "0.1.0"
+  }
+}

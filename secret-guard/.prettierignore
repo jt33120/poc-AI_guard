@@ -1,0 +1,5 @@
+coverage/
+packages/*/dist/
+.vscode-test/
+*.vsix
+package-lock.json

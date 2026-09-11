@@ -1,0 +1,51 @@
+{
+  "name": "@xsom/secret-guard-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local-first secret protection for AI coding assistant prompts",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "clean": "node scripts/clean.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "typecheck": "npm run build --workspace @xsom/secret-guard-core && npm run typecheck --workspace @xsom/secret-guard-cli && npm run build --workspace @xsom/secret-guard-cli && npm run typecheck --workspace xsom-secret-guard-vscode",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "build": "npm run build --workspace @xsom/secret-guard-core && npm run build --workspace @xsom/secret-guard-cli && npm run build --workspace xsom-secret-guard-vscode",
+    "test:cli": "node scripts/test-cli.mjs",
+    "test:extension": "npm run test:extension --workspace xsom-secret-guard-vscode",
+    "test:package": "npm run package --workspace xsom-secret-guard-vscode && node scripts/inspect-vsix.mjs",
+    "evaluate": "node scripts/evaluate.mjs",
+    "evaluate:check": "node scripts/evaluate.mjs --check",
+    "fuzz:check": "node scripts/fuzz.mjs",
+    "dogfood:check": "node scripts/dogfood.mjs",
+    "benchmark": "node scripts/benchmark.mjs",
+    "benchmark:check": "node scripts/benchmark.mjs --check",
+    "audit": "npm audit --audit-level=high",
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test:coverage && npm run build && npm run test:cli && npm run test:extension && npm run test:package && npm run evaluate:check && npm run fuzz:check && npm run dogfood:check && npm run benchmark:check && npm run audit"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.2",
+    "@types/mocha": "^10.0.10",
+    "@types/vscode": "^1.137.0",
+    "@vitest/coverage-v8": "^5.0.0",
+    "@vscode/vsce": "^3.6.0",
+    "@vscode/test-electron": "^3.1.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.10.0",
+    "globals": "^17.12.0",
+    "mocha": "^12.0.0",
+    "prettier": "^3.9.6",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.70.0",
+    "vitest": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=22.13"
+  }
+}

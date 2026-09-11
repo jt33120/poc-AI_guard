@@ -16,7 +16,13 @@ Permettre à une entreprise de mettre un agent IA en production sans risque d'ac
 
 **MVP** : auth multi-tenant ; gateway MCP (proxy de N serveurs d'outils en aval) ; moteur de policy + classification d'action ; HITL (dry-run + approbation + timeout) ; audit immuable hash-chaîné + exports AI Act/RGPD ; LLM juge mince ; control API ; frontend (4 écrans) ; tests + CI.
 
-**Hors MVP (extensions)** : prompt injection, PII stripping, médiation RAG, fleet, souverain, anomaly ML.
+**Hors MVP gateway (extensions)** : prompt injection, PII stripping, médiation RAG, fleet, souverain, anomaly ML.
+
+**Add-on indépendant** : `secret-guard/` protège localement les prompts sur des
+chemins explicitement contrôlés (hooks compatibles, CLI, participant VS Code).
+Il ne change pas la garantie du gateway MCP et ne prétend pas intercepter toutes
+les webviews, pièces jointes, lectures de repository ou sorties d'outils. Son
+architecture et ses gates sont spécifiés dans `docs/secret-guard/`.
 
 ---
 
