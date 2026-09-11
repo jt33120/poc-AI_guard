@@ -1,0 +1,30 @@
+{
+  "name": "@xsom/secret-guard-cli",
+  "version": "0.1.0",
+  "description": "Local CLI and AI assistant hook bridge for Secret Guard",
+  "type": "module",
+  "bin": {
+    "secret-guard": "dist/index.js"
+  },
+  "exports": {
+    "./hook": {
+      "types": "./dist/hook.d.ts",
+      "default": "./dist/hook.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@xsom/secret-guard-core": "0.1.0"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "license": "UNLICENSED"
+}

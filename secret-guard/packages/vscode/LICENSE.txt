@@ -1,0 +1,5 @@
+Copyright (c) 2026 xSOM Consulting. All rights reserved.
+
+This software is proprietary and confidential. No permission is granted to
+copy, modify, distribute, sublicense, or publish it without prior written
+authorization from xSOM Consulting.

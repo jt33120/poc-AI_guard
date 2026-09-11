@@ -26,6 +26,9 @@ frontend/out/
 frontend/.turbo/
 frontend/test-results/
 frontend/playwright-report/
+secret-guard/coverage/
+secret-guard/.vscode-test/
+secret-guard/**/.vscode-test/
 *.tsbuildinfo
 
 # Vercel CLI local link state (deploy config lives in the Vercel project, not git)
