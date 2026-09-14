@@ -52,8 +52,8 @@ assistants that were already open.
 
 Two version floors apply, and the first one stops everything: the extension
 manifest declares `engines.vscode: ^1.136.0`, so VS Code refuses to install it
-below 1.136 and the other three hosts are not covered either, for lack of an
-install. The VS Code/Copilot hook itself needs 1.137 or newer.
+below 1.136 and the install fails, including for the other three hosts. The
+VS Code/Copilot hook itself needs 1.137 or newer.
 
 Releases are cut either by tagging (`git tag secret-guard-v0.2.0 && git push
 origin secret-guard-v0.2.0`) or by running the `Secret Guard release` workflow
