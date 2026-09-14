@@ -326,7 +326,7 @@ export const GUARD_COPY = {
     extLimitsTitle: "Ce que le cadenas ne dit pas",
     extLimits: [
       "Le cadenas de la barre d’état est un indicateur. Le verrou, lui, est le hook natif, dans le cycle d’envoi de l’assistant.",
-      "Le hook VS Code et Copilot demande VS Code 1.137 ou plus récent. Les trois autres assistants n’attendent pas cette version.",
+      "Deux planchers, et le premier arrête tout : l’extension refuse de s’installer sous VS Code 1.136, et le hook VS Code et Copilot demande 1.137. Sous 1.136, l’installation échoue, y compris pour les trois autres assistants.",
       "Un hook écrit dans vos réglages utilisateur reste retirable par l’utilisateur. Une application en entreprise passe par une configuration administrée.",
       "« Aucun secret détecté » ne veut pas dire « contenu sûr ».",
     ],
@@ -631,7 +631,7 @@ export const GUARD_COPY = {
     extLimitsTitle: "What the lock does not say",
     extLimits: [
       "The status bar lock is an indicator. The lock itself is the native hook, inside the assistant submit lifecycle.",
-      "The VS Code and Copilot hook requires VS Code 1.137 or newer. The other three assistants do not wait for that version.",
+      "Two floors, and the first one stops everything: the extension refuses to install below VS Code 1.136, and the VS Code and Copilot hook requires 1.137. Below 1.136 the install fails, including for the other three assistants.",
       "A hook written into your user settings stays removable by the user. Enterprise enforcement goes through managed configuration.",
       "“No secret detected” does not mean “safe content”.",
     ],
