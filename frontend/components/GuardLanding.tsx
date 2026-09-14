@@ -135,7 +135,6 @@ export function GuardLanding() {
       </header>
       <section className="guard-hero guard-wrap">
         <div className="guard-hero__copy">
-          <p className="guard-kicker">{copy.lab}</p>
           <h1>
             <span className="guard-product-name">xSOM AI Guard</span>
             {copy.title[0]}

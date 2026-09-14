@@ -31,11 +31,9 @@ export const EXTENSION_ON_MARKETPLACE: boolean = false;
 /** Concrete orientation copy; none of these illustrative paths claims live coverage. */
 export const GUARD_COPY = {
   fr: {
-    lab: "Le laboratoire IA de xSOM",
     poc: "Prototype en expérimentation",
-    title: ["L’IA avance.", "Gardez la main."],
-    intro:
-      "Des collaborateurs qui créent. Des développeurs qui automatisent. Des données dont vous choisissez le chemin.",
+    title: ["La solution cyber", "pour tous vos usages IA."],
+    intro: "Simple, efficace.",
     explore: "Voir les menaces",
     signin: "Accéder au POC",
     evidence: "Périmètre & preuves",
@@ -340,11 +338,9 @@ export const GUARD_COPY = {
     footer: "Un terrain d’expérimentation, pas une offre généralisée.",
   },
   en: {
-    lab: "The xSOM AI lab",
     poc: "Experimental prototype",
-    title: ["AI moves forward.", "Stay in control."],
-    intro:
-      "People creating. Developers automating. Data with a clearly defined path.",
+    title: ["The cybersecurity solution", "for every AI use case."],
+    intro: "Simple. Effective.",
     explore: "See the threats",
     signin: "Open the POC",
     evidence: "Scope & evidence",

@@ -250,8 +250,10 @@ test("un visiteur sans cookie reçoit le français, et le document le déclare",
   // lecteur d'écran lisait de l'anglais avec une voix française. Vérifier l'un sans
   // l'autre laisserait ce désaccord passer.
   await expect(page.locator("html")).toHaveAttribute("lang", "fr");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("L’IA avance.");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Gardez la main.");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("La solution cyber");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(
+    "pour tous vos usages IA.",
+  );
 
   // Le titre et la description existent, et sont français. Sans ce lot il n'y avait
   // ni l'un ni l'autre : une page cliente ne peut pas en exporter.
@@ -268,8 +270,8 @@ test("un visiteur sans cookie reçoit le français, et le document le déclare",
   // l'anglais. (Que la page soit devenue un composant serveur ne se lit pas ici mais
   // dans le poids du bundle : 2,56 ko de JS de page avant, 187 o après.)
   const html = (await reponse?.text()) ?? "";
-  expect(html).toContain("L’IA avance.");
-  expect(html).toContain("Gardez la main.");
+  expect(html).toContain("La solution cyber");
+  expect(html).toContain("pour tous vos usages IA.");
 });
 
 test("basculer en anglais tient au rechargement", async ({ page }) => {
@@ -279,15 +281,23 @@ test("basculer en anglais tient au rechargement", async ({ page }) => {
   // (« Empoisonnement », « Agents », « entraînons »). Le sélecteur était juste tant que
   // la page était courte, ce qui est la définition d'un sélecteur fragile.
   await page.getByRole("button", { name: "EN", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("AI moves forward.");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Stay in control.");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(
+    "The cybersecurity solution",
+  );
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(
+    "for every AI use case.",
+  );
 
   // Le rechargement est le point : la préférence tient dans un cookie que le serveur
   // relit, elle ne vit pas seulement dans l'état d'un composant.
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("AI moves forward.");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Stay in control.");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(
+    "The cybersecurity solution",
+  );
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(
+    "for every AI use case.",
+  );
   await expect(page).toHaveTitle(/An experimental AI governance POC/);
 });
 
