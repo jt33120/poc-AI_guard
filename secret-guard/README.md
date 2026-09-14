@@ -47,11 +47,13 @@ Run **Secret Guard: Activer la protection automatique** once, and restart the
 assistants that were already open. The VS Code/Copilot hook requires VS Code
 1.137 or newer; Claude Code, Codex and Windsurf do not.
 
-Releases are cut by tagging: `git tag secret-guard-v0.2.0 && git push origin
-secret-guard-v0.2.0`. The `secret-guard-release.yml` workflow replays
-`npm run verify`, checks that the tag matches the manifest version, attaches the
-VSIX to the release, and publishes to the Marketplace when a `VSCE_PAT` secret is
-configured.
+Releases are cut either by tagging (`git tag secret-guard-v0.2.0 && git push
+origin secret-guard-v0.2.0`) or by running the `Secret Guard release` workflow
+from the Actions tab with the manifest version as its input, which creates the
+tag itself. Either way `secret-guard-release.yml` replays `npm run verify`,
+refuses a version that does not match the manifest, attaches the VSIX to the
+release under a stable asset name, and publishes to the Marketplace when a
+`VSCE_PAT` secret is configured.
 
 ## Development
 
