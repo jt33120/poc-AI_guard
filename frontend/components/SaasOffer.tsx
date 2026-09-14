@@ -48,6 +48,7 @@ export function SaasOffer() {
             }
           >
             <Link href="/">{copy.saasBack}</Link>
+            <Link href="/extension">{copy.extNav}</Link>
             <Link href="/evidence">{copy.evidence}</Link>
             <LanguageToggle />
             <Link href="/login" className="guard-button guard-button--small">

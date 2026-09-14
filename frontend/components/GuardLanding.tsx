@@ -123,6 +123,7 @@ export function GuardLanding() {
           >
             <a href="#menaces-accueil">{copy.problemKicker}</a>
             <a href="#vous">{copy.whoKicker}</a>
+            <Link href="/extension">{copy.extNav}</Link>
             <Link href="/evidence">{copy.evidence}</Link>
             <LanguageToggle />
             <Link href="/login" className="guard-button guard-button--small">

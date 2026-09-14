@@ -32,6 +32,27 @@ native host hook is scanned before the assistant processes it. Clean prompts pas
 without interaction; WARN/BLOCK and scanner failures stop the prompt with exit
 code 2 and a non-sensitive reason.
 
+## Installation
+
+Download `xsom-secret-guard-vscode.vsix` from the `/extension` page of the
+console, or from the
+[latest GitHub release](https://github.com/jt33120/poc-AI_guard/releases/latest),
+then either drop the file onto the VS Code window or run:
+
+```bash
+code --install-extension xsom-secret-guard-vscode.vsix
+```
+
+Run **Secret Guard: Activer la protection automatique** once, and restart the
+assistants that were already open. The VS Code/Copilot hook requires VS Code
+1.137 or newer; Claude Code, Codex and Windsurf do not.
+
+Releases are cut by tagging: `git tag secret-guard-v0.2.0 && git push origin
+secret-guard-v0.2.0`. The `secret-guard-release.yml` workflow replays
+`npm run verify`, checks that the tag matches the manifest version, attaches the
+VSIX to the release, and publishes to the Marketplace when a `VSCE_PAT` secret is
+configured.
+
 ## Development
 
 ```bash

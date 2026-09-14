@@ -4,9 +4,13 @@
   "version": "0.2.0",
   "description": "Automatic local-first prompt protection for VS Code/Copilot, Claude Code, Codex and Windsurf",
   "publisher": "xsom",
-  "private": true,
   "type": "module",
   "license": "SEE LICENSE IN LICENSE.txt",
+  "icon": "icon.png",
+  "galleryBanner": {
+    "color": "#12253E",
+    "theme": "dark"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/jt33120/poc-AI_guard.git",
