@@ -139,10 +139,15 @@ test("the extension page hands over a file that installs, and names its limits",
   // Une installation, quatre assistants : c'est l'argument, il doit être vérifiable.
   await expect(page.locator(".guard-ext-hosts li")).toHaveCount(4);
 
-  // Les trois bornes. Celle de la version est la plus facile à taire, et c'est
-  // celle qui fait échouer une installation par ailleurs correcte.
+  // Les quatre bornes. Celle de la version est la plus facile à taire, et c'est
+  // celle qui fait échouer une installation par ailleurs correcte : le premier
+  // lecteur de la page s'est arrêté là, en 1.133, avec le bon fichier et la
+  // bonne commande. Les deux planchers sont donc tenus tous les deux, parce que
+  // ne nommer que 1.137 laissait croire qu'on installe quand même en 1.133 pour
+  // couvrir les trois autres assistants.
   const bornes = page.locator(".guard-ext-limits li");
   await expect(bornes).toHaveCount(4);
+  await expect(bornes.nth(1)).toContainText("1.136");
   await expect(bornes.nth(1)).toContainText("1.137");
   await expect(page.getByText("est un indicateur", { exact: false })).toBeVisible();
 

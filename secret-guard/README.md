@@ -48,8 +48,12 @@ Opening the `.vsix` in the editor does not install it: VS Code displays an
 archive, not an extension.
 
 Run **Secret Guard: Activer la protection automatique** once, and restart the
-assistants that were already open. The VS Code/Copilot hook requires VS Code
-1.137 or newer; Claude Code, Codex and Windsurf do not.
+assistants that were already open.
+
+Two version floors apply, and the first one stops everything: the extension
+manifest declares `engines.vscode: ^1.136.0`, so VS Code refuses to install it
+below 1.136 and the other three hosts are not covered either, for lack of an
+install. The VS Code/Copilot hook itself needs 1.137 or newer.
 
 Releases are cut either by tagging (`git tag secret-guard-v0.2.0 && git push
 origin secret-guard-v0.2.0`) or by running the `Secret Guard release` workflow
