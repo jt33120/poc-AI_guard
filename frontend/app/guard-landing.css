@@ -984,3 +984,61 @@ html[data-signal-motion="reduced"] .guard-landing * {
   animation: none !important;
   transition: none !important;
 }
+
+/* --- La page de téléchargement de l'extension ------------------------------- */
+
+/* Le bouton porte le canal qui marche ; le lien Place de marché, quand il existe,
+   se pose à côté sans lui disputer le regard. À 390 px la ligne se casse plutôt
+   que de comprimer la cible tactile. */
+.guard-ext-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4) var(--sp-6);
+}
+
+/* Trois gestes, pas quatre : la grille à quatre colonnes de `/saas` laisserait une
+   colonne vide. `auto-fit` la remplit avec ce qu'il y a. */
+.guard-landing .guard-ext-steps {
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+
+.guard-landing .guard-ext-hosts {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  margin-block: var(--sp-6) 0;
+}
+.guard-ext-hosts li {
+  padding: var(--sp-2) var(--sp-4);
+  border: var(--signal-border) solid var(--signal-line-strong);
+  border-radius: var(--r-md);
+  color: var(--signal-muted);
+  font-size: var(--fs-xs);
+}
+
+.guard-ext-limits__title {
+  margin-top: var(--sp-8);
+  font-size: var(--fs-body);
+  font-weight: 600;
+}
+.guard-landing .guard-ext-limits {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-3);
+  margin-block: var(--sp-4);
+  max-width: 70ch;
+}
+.guard-ext-limits li {
+  display: flex;
+  gap: var(--sp-3);
+  color: var(--signal-faint);
+  font-size: var(--fs-sm);
+  line-height: var(--signal-leading);
+}
+.guard-ext-limits li > span {
+  color: var(--signal-accent-text);
+}

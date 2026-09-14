@@ -116,6 +116,41 @@ test("the self-serve page says what the product does, and where that stops", asy
   await expect(page.getByRole("link", { name: /Créer un compte/ }).first()).toHaveAttribute("href", "/signup");
 });
 
+test("the extension page hands over a file that installs, and names its limits", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("navigation", { name: "Navigation principale" }).getByRole("link", { name: "Extension", exact: true }).click();
+  await expect(page).toHaveURL(/\/extension$/);
+
+  // Le bouton est le produit de cette page. Un lien relatif ou un chemin de
+  // release daté ne tiendrait pas d'une version à l'autre : le nom d'asset est
+  // fixe, et c'est ce qui rend `latest/download` utilisable comme lien permanent.
+  const telecharger = page.getByRole("link", { name: /Télécharger l’extension/ });
+  await expect(telecharger).toHaveAttribute(
+    "href",
+    "https://github.com/jt33120/poc-AI_guard/releases/latest/download/xsom-secret-guard-vscode.vsix",
+  );
+
+  // Trois gestes, et le deuxième dit comment on installe un VSIX. Sans lui, la
+  // page rendrait un fichier sans mode d'emploi.
+  const gestes = page.locator(".guard-start__steps li");
+  await expect(gestes).toHaveCount(3);
+  await expect(gestes.nth(1)).toContainText("VSIX");
+
+  // Une installation, quatre assistants : c'est l'argument, il doit être vérifiable.
+  await expect(page.locator(".guard-ext-hosts li")).toHaveCount(4);
+
+  // Les trois bornes. Celle de la version est la plus facile à taire, et c'est
+  // celle qui fait échouer une installation par ailleurs correcte.
+  const bornes = page.locator(".guard-ext-limits li");
+  await expect(bornes).toHaveCount(4);
+  await expect(bornes.nth(1)).toContainText("1.137");
+  await expect(page.getByText("est un indicateur", { exact: false })).toBeVisible();
+
+  // Tant que la fiche n'existe pas, la page ne propose pas de l'ouvrir.
+  await expect(page.getByRole("link", { name: /Installer depuis VS Code/ })).toHaveCount(0);
+  await expect(page.getByText("compte éditeur", { exact: false })).toBeVisible();
+});
+
 for (const width of [390, 768, 1440]) {
   test(`the landing stays contained in French and English at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
@@ -143,5 +178,8 @@ for (const width of [390, 768, 1440]) {
       const seconde = await etapes.nth(1).boundingBox();
       expect(seconde!.y).toBeGreaterThan(premiere!.y);
     }
+
+    await page.goto("/extension");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
 }

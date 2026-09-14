@@ -104,10 +104,18 @@ verify-frontend:
 		echo ">> frontend not scaffolded yet (M7): eslint/tsc skipped"; \
 	fi
 
+# `test:extension` lance un hote VS Code reel, qui exige un affichage. La CI
+# enveloppe deja cette commande dans `xvfb-run`; sans le meme geste ici, la cible
+# echouait sur toute machine sans ecran, et `make verify` ne pouvait pas etre vert
+# en local alors que la CI l'etait.
 verify-secret-guard:
 	@if [ -d secret-guard/node_modules ]; then \
 		echo ">> Secret Guard checks (lint + types + unit + hooks + VSIX + latency)"; \
-		npm --prefix secret-guard run verify; \
+		if [ -z "$$DISPLAY" ] && command -v xvfb-run >/dev/null 2>&1; then \
+			xvfb-run -a npm --prefix secret-guard run verify; \
+		else \
+			npm --prefix secret-guard run verify; \
+		fi; \
 	else \
 		echo ">> Secret Guard deps missing: run 'make install'"; \
 		exit 1; \

@@ -578,9 +578,22 @@ Code confirme cette distinction de plateforme dans [Agent Hooks](https://code.vi
 ### 9.4 Distribution
 
 L’extension est empaquetable avec vsce en VSIX et la CI inspecte son contenu.
-Elle n’est actuellement ni signée ni publiée. Marketplace et les autres canaux
-décrits dans [Publishing Extensions](https://code.visualstudio.com/api/working-with-extensions/publishing-extension)
-restent des options de distribution futures.
+
+Le workflow `secret-guard-release.yml` rejoue `npm run verify` sur l’étiquette,
+vérifie que l’étiquette et la version du manifeste coïncident, puis attache le
+VSIX à une release GitHub sous un nom d’asset stable. `/extension` publie ce lien
+permanent : c’est le canal d’installation qui fonctionne sans compte.
+
+La publication sur Marketplace, décrite dans [Publishing Extensions](https://code.visualstudio.com/api/working-with-extensions/publishing-extension),
+est câblée dans le même workflow mais conditionnée à la présence du secret
+`VSCE_PAT` : le dépôt ne porte pas de compte éditeur, et son absence n’échoue pas
+la release. Le manifeste est prêt pour ce canal (éditeur, icône, licence, et plus
+de marqueur `private`) et `scripts/inspect-vsix.mjs` tient ces quatre points dans
+le contrat de release. L’extension n’est pas signée.
+
+Tant que la fiche Marketplace n’existe pas, `EXTENSION_ON_MARKETPLACE` vaut
+`false` dans `frontend/components/guard-copy.ts` et la page ne montre pas un
+bouton menant à une fiche absente.
 
 Cette installation couvre les hooks utilisateur VS Code/Copilot, Claude Code,
 Codex et Windsurf. Une politique d’entreprise peut bloquer, remplacer ou forcer

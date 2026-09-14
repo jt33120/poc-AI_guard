@@ -18,6 +18,7 @@ const expectedFiles = [
   "extension/LICENSE.txt",
   "extension/dist/extension.cjs",
   "extension/dist/hook.cjs",
+  "extension/icon.png",
   "extension/package.json",
   "extension/readme.md",
 ].sort();
@@ -25,6 +26,7 @@ const localEquivalents = new Map([
   ["extension/LICENSE.txt", "packages/vscode/LICENSE.txt"],
   ["extension/dist/extension.cjs", "packages/vscode/dist/extension.cjs"],
   ["extension/dist/hook.cjs", "packages/vscode/dist/hook.cjs"],
+  ["extension/icon.png", "packages/vscode/icon.png"],
   ["extension/package.json", "packages/vscode/package.json"],
   ["extension/readme.md", "packages/vscode/README.md"],
 ]);
@@ -122,7 +124,10 @@ const packagedManifest = JSON.parse(
 if (
   packagedManifest.main !== "./dist/extension.cjs" ||
   packagedManifest.preview !== true ||
-  packagedManifest.license !== "SEE LICENSE IN LICENSE.txt"
+  packagedManifest.license !== "SEE LICENSE IN LICENSE.txt" ||
+  packagedManifest.icon !== "icon.png" ||
+  packagedManifest.publisher !== "xsom" ||
+  packagedManifest.private !== undefined
 ) {
   throw new Error("VSIX package manifest violates the release contract");
 }

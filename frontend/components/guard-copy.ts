@@ -9,6 +9,25 @@
 export const CONTACT_MAILTO =
   "mailto:julian.talou@xsom.fr?subject=xSOM%20AI%20Guard%20%3A%20cas%20d%E2%80%99usage";
 
+/**
+ * Le canal de distribution de l'extension, et l'état réel de sa publication.
+ *
+ * Le nom de l'asset est fixe d'une version à l'autre, ce qui rend `latest/download`
+ * permanent : la page n'a pas à connaître le numéro de version publié.
+ */
+export const EXTENSION_VSIX_URL =
+  "https://github.com/jt33120/poc-AI_guard/releases/latest/download/xsom-secret-guard-vscode.vsix";
+
+export const EXTENSION_MARKETPLACE_URL =
+  "https://marketplace.visualstudio.com/items?itemName=xsom.xsom-secret-guard-vscode";
+
+/**
+ * Vrai seulement une fois la fiche réellement en ligne. Le type est élargi à
+ * `boolean` pour que la bascule soit une valeur à changer, et non une réécriture des
+ * deux endroits où la page teste la constante.
+ */
+export const EXTENSION_ON_MARKETPLACE: boolean = false;
+
 /** Concrete orientation copy; none of these illustrative paths claims live coverage. */
 export const GUARD_COPY = {
   fr: {
@@ -270,6 +289,47 @@ export const GUARD_COPY = {
     saasBack: "Retour à l’accueil",
     saasNote:
       "Le périmètre dépend de ce que vous branchez : ce qui ne passe pas par nous n’est pas contrôlé.",
+    extNav: "Extension",
+    extKicker: "Poste de travail",
+    extTitle: "Le secret n’atteint pas le modèle.",
+    extIntro:
+      "Secret Guard lit le prompt sur votre machine, avant l’envoi. Un jeton, une clé privée, un mot de passe : la demande s’arrête là, et rien ne part.",
+    extInstallVsix: "Télécharger l’extension",
+    extInstallMarket: "Installer depuis VS Code",
+    extMarketSoon:
+      "La Place de marché VS Code demande un compte éditeur, que ce prototype n’a pas encore ouvert. Le fichier ci-dessus est donc le canal, et il s’installe en deux gestes.",
+    extStepsTitle: "Trois gestes",
+    extSteps: [
+      {
+        title: "Télécharger",
+        body: "Un fichier, attaché à la dernière version publiée. Aucun compte, aucun dépôt à cloner, aucune compilation.",
+      },
+      {
+        title: "Installer",
+        body: "Glissez le fichier dans la fenêtre de VS Code. Ou, dans le panneau Extensions, le menu à trois points, puis « Installer à partir d’un VSIX ».",
+      },
+      {
+        title: "Activer, une fois",
+        body: "Palette de commandes, puis « Secret Guard: Activer la protection automatique ». Redémarrez les assistants déjà ouverts.",
+      },
+    ],
+    extHostsTitle: "Une installation, quatre assistants",
+    extHostsBody:
+      "L’activation écrit un hook dans vos réglages utilisateur. Ce qui s’y trouvait est conservé, et la commande inverse le retire.",
+    extHosts: ["VS Code et Copilot", "Claude Code", "Codex", "Windsurf Cascade"],
+    extCheckTitle: "Vérifier que ça tient",
+    extCheckBody:
+      "Composez un faux jeton : les lettres « ghp_ » suivies de trente-six caractères alphanumériques quelconques. Collez-le dans la conversation de l’un des quatre assistants. L’envoi doit être refusé avant d’atteindre le modèle.",
+    extLocalTitle: "Rien ne sort pour décider",
+    extLocalBody:
+      "La détection est locale et déterministe. Aucun candidat n’est vérifié en ligne, aucune télémétrie n’est émise, et un résultat porte la règle et sa raison, jamais la valeur détectée.",
+    extLimitsTitle: "Ce que le cadenas ne dit pas",
+    extLimits: [
+      "Le cadenas de la barre d’état est un indicateur. Le verrou, lui, est le hook natif, dans le cycle d’envoi de l’assistant.",
+      "Le hook VS Code et Copilot demande VS Code 1.137 ou plus récent. Les trois autres assistants n’attendent pas cette version.",
+      "Un hook écrit dans vos réglages utilisateur reste retirable par l’utilisateur. Une application en entreprise passe par une configuration administrée.",
+      "« Aucun secret détecté » ne veut pas dire « contenu sûr ».",
+    ],
     limits: "Ce que le POC ne promet pas",
     limitsText:
       "Pas de protection automatique de tous les usages IA. Pas de certification de conformité. Le périmètre réel dépend du branchement, des règles et des fonctions éprouvées.",
@@ -534,6 +594,47 @@ export const GUARD_COPY = {
     saasBack: "Back to the home page",
     saasNote:
       "Scope depends on what you connect: anything that does not go through us is not governed.",
+    extNav: "Extension",
+    extKicker: "Your workstation",
+    extTitle: "The secret never reaches the model.",
+    extIntro:
+      "Secret Guard reads the prompt on your machine, before it is sent. A token, a private key, a password: the request stops there, and nothing leaves.",
+    extInstallVsix: "Download the extension",
+    extInstallMarket: "Install from VS Code",
+    extMarketSoon:
+      "The VS Code Marketplace requires a publisher account, which this prototype has not opened yet. The file above is the channel, and it installs in two steps.",
+    extStepsTitle: "Three steps",
+    extSteps: [
+      {
+        title: "Download",
+        body: "One file, attached to the latest published version. No account, no repository to clone, no build.",
+      },
+      {
+        title: "Install",
+        body: "Drop the file into the VS Code window. Or, in the Extensions panel, the three dot menu, then “Install from VSIX”.",
+      },
+      {
+        title: "Activate, once",
+        body: "Command palette, then “Secret Guard: Activer la protection automatique”. Restart assistants that were already open.",
+      },
+    ],
+    extHostsTitle: "One install, four assistants",
+    extHostsBody:
+      "Activation writes one hook into your user settings. What was already there is preserved, and the reverse command removes it.",
+    extHosts: ["VS Code and Copilot", "Claude Code", "Codex", "Windsurf Cascade"],
+    extCheckTitle: "Check that it holds",
+    extCheckBody:
+      "Compose a fake token: the letters “ghp_” followed by thirty six alphanumeric characters of your choice. Paste it into any of the four assistants. The send must be refused before it reaches the model.",
+    extLocalTitle: "Nothing leaves to decide",
+    extLocalBody:
+      "Detection is local and deterministic. No candidate is verified online, no telemetry is emitted, and a result carries the rule and its reason, never the detected value.",
+    extLimitsTitle: "What the lock does not say",
+    extLimits: [
+      "The status bar lock is an indicator. The lock itself is the native hook, inside the assistant submit lifecycle.",
+      "The VS Code and Copilot hook requires VS Code 1.137 or newer. The other three assistants do not wait for that version.",
+      "A hook written into your user settings stays removable by the user. Enterprise enforcement goes through managed configuration.",
+      "“No secret detected” does not mean “safe content”.",
+    ],
     limits: "What the POC does not promise",
     limitsText:
       "No automatic protection for every AI use. No compliance certification. Actual scope depends on integration, policies and proven functionality.",
