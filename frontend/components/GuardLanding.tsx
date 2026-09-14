@@ -1,178 +1,103 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import { Wordmark, XsomMark } from "@/components/brand";
 import { GUARD_COPY } from "@/components/guard-copy";
-import { MenacesLanding } from "@/components/MenacesLanding";
+import { GUARD_HOME_COPY, type GuardHomeCopy } from "@/components/guard-home-copy";
+import { GuardCampus } from "@/components/GuardCampus";
+import { GuardHeroVideo } from "@/components/GuardHeroVideo";
 import { Orientation } from "@/components/Orientation";
 import { SignalPreferences } from "@/design-system/react";
 import { LanguageToggle, useT } from "@/lib/i18n";
 
-type Scenario = "document" | "code" | "action";
-type Copy = (typeof GUARD_COPY)[keyof typeof GUARD_COPY];
-
-function Arrow({ vertical = false }: { vertical?: boolean }) {
+function Products({ copy }: { copy: GuardHomeCopy }) {
   return (
-    <span
-      className={`guard-arrow${vertical ? " guard-arrow--vertical" : ""}`}
-      aria-hidden="true"
-    >
-      <svg viewBox="0 0 80 24">
-        <path d="M2 12h72m-8-8 8 8-8 8" />
-      </svg>
-    </span>
-  );
-}
-
-/** Selections describe illustrative scenarios; they never execute an action. */
-function ControlScene({ copy }: { copy: Copy }) {
-  const [scenario, setScenario] = useState<Scenario>("action");
-  const selected = copy.scenarios[scenario];
-  return (
-    <div className="guard-scene" data-scenario={scenario}>
-      <div className="guard-scene__bar">
-        <span>{copy.demo}</span>
-        <span aria-hidden="true">01 — 03</span>
+    <section id="produits" className="guard-home-section guard-products guard-wrap" aria-labelledby="products-heading">
+      <div className="guard-home-heading">
+        <p className="guard-kicker">{copy.productsKicker}</p>
+        <h2 id="products-heading">{copy.productsTitle}</h2>
+        <p>{copy.productsIntro}</p>
       </div>
-      <div className="guard-examples" role="group" aria-label={copy.choose}>
-        {(["document", "code", "action"] as const).map((id) => (
-          <button
-            key={id}
-            type="button"
-            aria-pressed={id === scenario}
-            onClick={() => setScenario(id)}
-          >
-            {copy.examples[id]}
-          </button>
-        ))}
-      </div>
-      <div
-        className="guard-stage"
-        role="img"
-        aria-label={`${copy.scene} : ${selected.source} → ${copy.control} → ${selected.target}`}
-      >
-        {/* Generated infrastructure illustration, not a deployment screenshot. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          className="guard-stage__image"
-          src="/signal-media/infrastructure-hero.webp"
-          alt=""
-          width={1536}
-          height={1024}
-          fetchPriority="high"
-        />
-        <div className="guard-stage__node guard-stage__node--source">
-          <span className="guard-mini-label">{copy.input}</span>
-          <strong>{selected.source}</strong>
+      <article className="guard-product-feature">
+        <div className="guard-product-feature__copy">
+          <p className="guard-product-feature__tag"><span aria-hidden="true" />{copy.featured}</p>
+          <h3>{copy.extensionTitle}</h3>
+          <p className="guard-product-feature__lead">{copy.extensionIntro}</p>
+          <p>{copy.extensionBody}</p>
+          <ul>{copy.extensionFeatures.map((feature) => <li key={feature}>{feature}</li>)}</ul>
+          <Link href="/extension" className="guard-button">{copy.extensionAction}<span aria-hidden="true">↗</span></Link>
+          <p className="guard-product-feature__note">{copy.extensionNote}</p>
         </div>
-        <div
-          className="guard-stage__link guard-stage__link--left"
-          key={`${scenario}-left`}
-        >
-          <Arrow />
-        </div>
-        <div className="guard-core">
-          <div className="guard-core__label">
-            <strong>{copy.control}</strong>
-            <span>{copy.policy}</span>
+        <div className="guard-product-preview" aria-label={copy.preview}>
+          <div className="guard-product-preview__bar"><span aria-hidden="true">⌘</span><strong>AI Guard / VS Code</strong><span>{copy.preview}</span></div>
+          <div className="guard-product-preview__editor">
+            <div><span aria-hidden="true">01</span><p>{copy.previewPrompt}</p></div>
+            <div><span aria-hidden="true">02</span><code>API_KEY = <mark>{copy.previewValue}</mark></code></div>
+            <div><span aria-hidden="true">03</span><span className="guard-product-preview__cursor" aria-hidden="true" /></div>
           </div>
+          <div className="guard-product-preview__decision">
+            <span className="guard-product-preview__alert" aria-hidden="true">!</span>
+            <div><span>{copy.previewSecret}</span><strong>{copy.previewDecision}</strong><p>{copy.previewDetail}</p></div>
+          </div>
+          <p className="guard-product-preview__foot">{copy.previewLocal}</p>
         </div>
-        <div
-          className="guard-stage__link guard-stage__link--right"
-          key={`${scenario}-right`}
-        >
-          <Arrow />
-        </div>
-        <div className="guard-stage__node guard-stage__node--target">
-          <span className="guard-mini-label">{copy.output}</span>
-          <strong>{selected.target}</strong>
-        </div>
-      </div>
-      <div
-        className="guard-scene__result"
-        aria-live="polite"
-        aria-atomic="true"
-      >
-        <div>
-          <span className="guard-mini-label">{selected.request}</span>
-          <strong>{selected.rule}</strong>
-        </div>
-        <span className="guard-status">{selected.status}</span>
-        <p>{selected.note}</p>
-      </div>
-    </div>
+      </article>
+      <article className="guard-platform-product">
+        <div><p className="guard-kicker">{copy.platformTag}</p><h3>{copy.platformTitle}</h3><p>{copy.platformBody}</p></div>
+        <Link href="/saas" className="guard-link">{copy.platformAction}<span aria-hidden="true">↗</span></Link>
+      </article>
+      <aside className="guard-glossary-link">
+        <span className="guard-glossary-link__icon" aria-hidden="true">Aa</span>
+        <div><h3>{copy.glossaryTitle}</h3><p>{copy.glossaryBody}</p></div>
+        <Link href="/menaces">{copy.glossaryAction}<span aria-hidden="true">↗</span></Link>
+      </aside>
+    </section>
   );
 }
 
 export function GuardLanding() {
   const { lang } = useT();
   const copy = GUARD_COPY[lang];
+  const home = GUARD_HOME_COPY[lang];
   return (
-    <main className="guard-landing">
+    <main className="guard-landing guard-home">
       <header className="guard-header">
         <div className="guard-wrap guard-header__inner">
-          <Link href="/" className="brand">
-            <XsomMark />
-            <Wordmark />
-          </Link>
-          <nav
-            aria-label={
-              lang === "fr" ? "Navigation principale" : "Main navigation"
-            }
-          >
-            <a href="#menaces-accueil">{copy.problemKicker}</a>
-            <a href="#vous">{copy.whoKicker}</a>
-            <Link href="/extension">{copy.extNav}</Link>
-            <Link href="/evidence">{copy.evidence}</Link>
+          <Link href="/" className="brand"><XsomMark /><Wordmark /></Link>
+          <nav aria-label={lang === "fr" ? "Navigation principale" : "Main navigation"}>
+            <a href="#usages">{home.navUsages}</a>
+            <a href="#produits">{home.navProducts}</a>
+            <Link href="/menaces">{home.navGlossary}</Link>
+            <Link href="/extension" className="guard-home-nav-secondary">{copy.extNav}</Link>
             <LanguageToggle />
-            <Link href="/login" className="guard-button guard-button--small">
-              {copy.signin}
-              <span aria-hidden="true">↗</span>
-            </Link>
+            <Link href="/login" className="guard-button guard-button--small">{copy.signin}<span aria-hidden="true">↗</span></Link>
           </nav>
         </div>
       </header>
-      <section className="guard-hero guard-wrap">
-        <div className="guard-hero__copy">
-          <h1>
-            <span className="guard-product-name">xSOM AI Guard</span>
-            {copy.title[0]}
-            <br />
-            <span>{copy.title[1]}</span>
-          </h1>
-          <p className="guard-hero__intro">{copy.intro}</p>
-          <a href="#menaces-accueil" className="guard-button">
-            {copy.explore}
-            <span aria-hidden="true">↓</span>
-          </a>
-          <p className="guard-hero__note">
-            <span className="guard-poc-label">{copy.poc}</span>
-            {copy.heroNote}
-          </p>
+      <section className="guard-masthead" aria-labelledby="home-heading">
+        <GuardHeroVideo copy={home} />
+        <div className="guard-masthead__scrim" aria-hidden="true" />
+        <div className="guard-wrap guard-masthead__inner">
+          <div className="guard-masthead__copy">
+            <p className="guard-masthead__eyebrow"><span className="guard-french-mark" aria-hidden="true"><i /><i /><i /></span>{home.eyebrow}</p>
+            <h1 id="home-heading"><span className="guard-product-name">xSOM AI Guard</span>{home.title[0]}<br /><span>{home.title[1]}</span></h1>
+            <p className="guard-masthead__intro">{home.intro}</p>
+            <div className="guard-masthead__actions"><a href="#usages" className="guard-button">{home.explore}<span aria-hidden="true">↓</span></a><a href="#produits">{home.productsLink}<span aria-hidden="true">↗</span></a></div>
+            <p className="guard-masthead__note"><span />{copy.poc}</p>
+          </div>
+          <div className="guard-masthead__principles">{home.principles.map((principle, index) => <span key={principle}><small aria-hidden="true">0{index + 1}</small>{principle}</span>)}</div>
         </div>
-        <ControlScene copy={copy} />
       </section>
-      {/* La trame de la page, et c'est tout son objet : d'où vient le problème,
-          puis qui vous êtes, puis où cela vous mène. L'ancienne suite (usages,
-          principes, contact) posait trois fois la même question sans jamais aiguiller,
-          si bien qu'on lisait la page sans savoir ce qu'on était censé en faire. */}
-      <MenacesLanding copy={copy} />
+      <GuardCampus copy={home} />
+      <Products copy={home} />
       <Orientation copy={copy} />
       <footer className="guard-footer">
         <div className="guard-wrap">
-          <div className="brand">
-            <XsomMark />
-            <Wordmark />
-          </div>
+          <div className="brand"><XsomMark /><Wordmark /></div>
           <p>{copy.footer}</p>
-          <a href="https://www.xsom.fr" target="_blank" rel="noreferrer">
-            {copy.cabinet} ↗
-          </a>
-          <details>
-            <summary>{lang === "fr" ? "Affichage" : "Display"}</summary>
-            <SignalPreferences lang={lang} />
-          </details>
+          <Link href="/evidence">{copy.evidence}</Link>
+          <a href="https://www.xsom.fr" target="_blank" rel="noreferrer">{copy.cabinet} ↗</a>
+          <details><summary>{lang === "fr" ? "Affichage" : "Display"}</summary><SignalPreferences lang={lang} /></details>
         </div>
       </footer>
     </main>

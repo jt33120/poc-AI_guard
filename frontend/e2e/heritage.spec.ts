@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { GUARD_COPY } from "../components/guard-copy";
+import { GUARD_HOME_COPY } from "../components/guard-home-copy";
 
 function copyLeaves(value: unknown): string[] {
   if (typeof value === "string") return [value];
@@ -11,7 +12,7 @@ test("the entire nested orientation copy stays illustrative, without invented co
   const coverage = /menace|ligne|facette|couvert|couvre|matrice|bloqu|threat|row|facet|cover|block/i;
   const number = /\d+|\b(?:dix-sept|dix-huit|dix-neuf|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|quinze|seize|vingt|seventeen|eighteen|nineteen|two|three|four|five|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|twenty)\b/i;
   for (const language of ["fr", "en"] as const) {
-    const phrases = copyLeaves(GUARD_COPY[language]);
+    const phrases = copyLeaves([GUARD_COPY[language], GUARD_HOME_COPY[language]]);
     expect(phrases.length).toBeGreaterThan(50);
     for (const phrase of phrases) {
       expect(phrase.trim(), `${language}: an empty visible label`).not.toBe("");
@@ -25,7 +26,7 @@ test("the entire nested orientation copy stays illustrative, without invented co
   expect(number.test("Une liste de menaces")).toBe(false);
 });
 
-test("the landing answers three questions in order, without connecting a service", async ({ page }) => {
+test("the landing explains AI uses, introduces the extension and keeps both next steps", async ({ page }) => {
   let apiRequests = 0;
   await page.route("**/api/**", async (route) => {
     apiRequests += 1;
@@ -33,34 +34,26 @@ test("the landing answers three questions in order, without connecting a service
   });
   await page.goto("/");
 
-  // 1. L'accueil. La scène reste illustrative, et le dit.
+  // Le parcours présente les usages, puis les produits, puis les deux suites.
   await expect(page.getByText("Prototype en expérimentation", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("Scénario illustratif · aucune action réelle", { exact: true })).toBeVisible();
-  const examples = page.getByRole("group", { name: "Choisir un exemple", exact: true });
-  await examples.getByRole("button", { name: "Du code", exact: true }).click();
-  await expect(page.locator(".guard-scene")).toHaveAttribute("data-scenario", "code");
-  await expect(page.getByText("Connexion à configurer", { exact: true })).toBeVisible();
+  await expect(page.locator(".guard-masthead")).toBeVisible();
+  await expect(page.locator("#usages .guard-campus")).toBeVisible();
+  await expect(page.locator("#menaces-accueil")).toHaveCount(0);
+  expect(await page.locator(".guard-masthead, #usages, #produits, #vous").evaluateAll(
+    (sections) => sections.map((section) => section.classList.contains("guard-masthead") ? "masthead" : section.id),
+  )).toEqual(["masthead", "usages", "produits", "vous"]);
 
-  // 2. Le problème, groupé. Le défaut montre le haut du classement, pas le premier
-  // maillon : un lecteur qui ne clique jamais doit voir ce qui coûte le plus.
-  const groupes = page.getByRole("group", { name: "Choisir un maillon", exact: true });
-  await expect(groupes.getByRole("button", { name: /Les plus coûteuses/ })).toHaveAttribute("aria-pressed", "true");
-  const menaces = page.locator(".guard-threat");
-  await expect(menaces).toHaveCount(5);
-  await expect(menaces.first()).toContainText("Injection de prompts indirecte");
-  await expect(menaces.first().locator(".diag")).toHaveCount(1);
+  const navigation = page.getByRole("navigation", { name: "Navigation principale" });
+  await expect(navigation.getByRole("link", { name: "Nos usages", exact: true })).toHaveAttribute("href", "#usages");
+  await expect(navigation.getByRole("link", { name: "Nos produits", exact: true })).toHaveAttribute("href", "#produits");
+  await expect(navigation.getByRole("link", { name: "Glossaire", exact: true })).toHaveAttribute("href", "/menaces");
 
-  // Un maillon cliqué ne montre que ses menaces. C'est ce qui empêche la section de
-  // dérouler les vingt-trois d'affilée.
-  await groupes.getByRole("button", { name: /Le modèle/ }).click();
-  await expect(page.locator(".guard-threat").first()).not.toContainText("Injection de prompts indirecte");
-  await expect(page.locator(".guard-threat").count()).resolves.toBeLessThan(23);
+  const produits = page.locator("#produits");
+  await expect(produits.getByRole("heading", { name: "AI Guard pour VS Code", exact: true })).toBeVisible();
+  await expect(produits.getByRole("link").first()).toHaveAttribute("href", "/extension");
+  await expect(produits.locator('a[href="/saas"]')).toHaveCount(1);
 
-  // La section ne revendique rien : aucun identifiant de relevé, aucun mode publié.
-  await expect(page.locator("#menaces-accueil").getByText(/\bM-\d{2}\b/)).toHaveCount(0);
-
-  // 3. L'aiguillage. Deux chemins, deux destinations différentes.
-  const chemins = page.locator(".guard-path");
+  const chemins = page.locator("#vous .guard-path");
   await expect(chemins).toHaveCount(2);
   await expect(chemins.filter({ hasText: "Organisation" }).getByRole("link")).toHaveAttribute("href", /^mailto:/);
   await expect(chemins.filter({ hasText: "Développeur" }).getByRole("link")).toHaveAttribute("href", "/saas");
@@ -70,6 +63,76 @@ test("the landing answers three questions in order, without connecting a service
   await page.getByRole("link", { name: "Périmètre & preuves", exact: true }).first().click();
   await expect(page).toHaveURL(/\/evidence$/);
   await expect(page.locator("#menaces .paysage .menace")).toHaveCount(23);
+});
+
+test("the campus switches risks and universes with a keyboard, without service calls", async ({ page }) => {
+  let apiRequests = 0;
+  await page.route("**/api/**", async (route) => {
+    apiRequests += 1;
+    await route.fulfill({ status: 503, json: { detail: "Illustrative campus only" } });
+  });
+  await page.goto("/");
+  const usages = page.locator("#usages");
+  const toggle = usages.getByRole("switch", { name: "Afficher les risques", exact: true });
+  const universes = usages.getByRole("group", { name: "Choisir un univers IA", exact: true });
+  const detail = page.locator("#campus-detail");
+  const risks = usages.locator(".guard-campus__risk-label:visible");
+
+  await expect(toggle).toHaveAttribute("aria-checked", "false");
+  await expect(risks).toHaveCount(0);
+  await toggle.focus();
+  await page.keyboard.press("Space");
+  await expect(toggle).toHaveAttribute("aria-checked", "true");
+  await expect(risks).toHaveCount(3);
+
+  const contentByUniverse = new Set<string>();
+  for (const name of ["Développement", "Collaborateurs", "Modèles & données"]) {
+    const choice = universes.getByRole("button", { name, exact: true });
+    await choice.focus();
+    await page.keyboard.press("Enter");
+    await expect(choice).toHaveAttribute("aria-pressed", "true");
+    await expect(universes.locator('[aria-pressed="true"]')).toHaveCount(1);
+    await expect(detail).toContainText(name);
+    await expect(detail.locator(".guard-campus__risks li")).toHaveCount(3);
+    await expect(detail.getByText("Le rôle des contrôles", { exact: true })).toBeVisible();
+    await expect(detail.locator(".guard-campus__safeguards li")).toHaveCount(3);
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
+    contentByUniverse.add((await detail.innerText()).trim());
+  }
+  expect(contentByUniverse.size).toBe(3);
+
+  // Les repères posés sur le bâtiment pilotent la même sélection que la liste.
+  const pins = usages.locator(".guard-campus__annotations");
+  for (const name of ["Collaborateurs", "Modèles & données", "Développement"]) {
+    const pin = pins.getByRole("button", { name, exact: true });
+    await pin.click();
+    await expect(pin).toHaveAttribute("aria-pressed", "true");
+    await expect(pins.locator('[aria-pressed="true"]')).toHaveCount(1);
+    await expect(universes.getByRole("button", { name, exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(detail.getByRole("heading", { name, exact: true })).toBeVisible();
+  }
+
+  await toggle.focus();
+  await page.keyboard.press("Space");
+  await expect(toggle).toHaveAttribute("aria-checked", "false");
+  await expect(risks).toHaveCount(0);
+  expect(apiRequests).toBe(0);
+});
+
+test("the hero respects reduced motion without downloading its video", async ({ page }) => {
+  const videoRequests: string[] = [];
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  page.on("request", (request) => {
+    if (/ai-guard-hero-v2\.webm(?:\?|$)/.test(request.url())) videoRequests.push(request.url());
+  });
+  await page.goto("/");
+  const video = page.locator(".guard-masthead__video");
+  await expect(video).toBeVisible();
+  await expect(video).toHaveAttribute("poster", "/signal-media/ai-guard-hero-v2.png");
+  await expect(video).toHaveAttribute("preload", "none");
+  await expect.poll(() => video.evaluate((element) => (element as HTMLVideoElement).paused)).toBe(true);
+  await expect(video).not.toHaveAttribute("src", /\S/);
+  expect(videoRequests).toEqual([]);
 });
 
 test("the self-serve page says what the product does, and where that stops", async ({ page }) => {
@@ -160,13 +223,16 @@ for (const width of [390, 768, 1440]) {
   test(`the landing stays contained in French and English at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/");
-    await page.getByRole("group", { name: "Choisir un maillon", exact: true })
-      .getByRole("button", { name: /Ses actions/ })
+    await page.getByRole("group", { name: "Choisir un univers IA", exact: true })
+      .getByRole("button", { name: "Modèles & données", exact: true })
       .click();
-    await expect(page.locator(".guard-threat").first()).toBeVisible();
+    await page.getByRole("switch", { name: "Afficher les risques", exact: true }).click();
+    await expect(page.locator(".guard-campus__risk-label:visible")).toHaveCount(3);
+    await expect(page.locator("#campus-detail")).toContainText("Modèles & données");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.getByRole("button", { name: "EN", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Tell us about you.", exact: true })).toBeVisible();
+    await expect(page.locator("#campus-detail")).not.toContainText("Modèles & données");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 
     await page.goto("/saas");
