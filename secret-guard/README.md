@@ -37,11 +37,15 @@ code 2 and a non-sensitive reason.
 Download `xsom-secret-guard-vscode.vsix` from the `/extension` page of the
 console, or from the
 [latest GitHub release](https://github.com/jt33120/poc-AI_guard/releases/latest),
-then either drop the file onto the VS Code window or run:
+then install it with the command palette (**Extensions: Install from VSIX**) or
+from a shell:
 
 ```bash
 code --install-extension xsom-secret-guard-vscode.vsix
 ```
+
+Opening the `.vsix` in the editor does not install it: VS Code displays an
+archive, not an extension.
 
 Run **Secret Guard: Activer la protection automatique** once, and restart the
 assistants that were already open. The VS Code/Copilot hook requires VS Code

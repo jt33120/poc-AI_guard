@@ -306,7 +306,7 @@ export const GUARD_COPY = {
       },
       {
         title: "Installer",
-        body: "Glissez le fichier dans la fenêtre de VS Code. Ou, dans le panneau Extensions, le menu à trois points, puis « Installer à partir d’un VSIX ».",
+        body: "Palette de commandes, puis « Extensions : Installer à partir d’un VSIX », et désignez le fichier. Ouvrir le fichier ne l’installe pas : VS Code affiche une archive, pas une extension.",
       },
       {
         title: "Activer, une fois",
@@ -611,7 +611,7 @@ export const GUARD_COPY = {
       },
       {
         title: "Install",
-        body: "Drop the file into the VS Code window. Or, in the Extensions panel, the three dot menu, then “Install from VSIX”.",
+        body: "Command palette, then “Extensions: Install from VSIX”, and point it at the file. Opening the file does not install it: VS Code shows an archive, not an extension.",
       },
       {
         title: "Activate, once",
