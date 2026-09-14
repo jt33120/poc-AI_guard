@@ -579,10 +579,16 @@ Code confirme cette distinction de plateforme dans [Agent Hooks](https://code.vi
 
 L’extension est empaquetable avec vsce en VSIX et la CI inspecte son contenu.
 
-Le workflow `secret-guard-release.yml` rejoue `npm run verify` sur l’étiquette,
-vérifie que l’étiquette et la version du manifeste coïncident, puis attache le
-VSIX à une release GitHub sous un nom d’asset stable. `/extension` publie ce lien
-permanent : c’est le canal d’installation qui fonctionne sans compte.
+Le workflow `secret-guard-release.yml` rejoue `npm run verify`, refuse une
+version qui ne coïncide pas avec le manifeste, puis attache le VSIX à une release
+GitHub sous un nom d’asset stable. `/extension` publie ce lien permanent : c’est
+le canal d’installation qui fonctionne sans compte.
+
+Il se déclenche de deux façons : une étiquette `secret-guard-v*` poussée, ou un
+lancement manuel prenant la version en entrée, qui crée l’étiquette lui-même. Le
+second existe parce que le droit de pousser sur `refs/tags/*` n’est pas donné à
+tous les porteurs du dépôt, et qu’une release inatteignable laisse le bouton de
+`/extension` sur un 404.
 
 La publication sur Marketplace, décrite dans [Publishing Extensions](https://code.visualstudio.com/api/working-with-extensions/publishing-extension),
 est câblée dans le même workflow mais conditionnée à la présence du secret
