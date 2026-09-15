@@ -1,5 +1,5 @@
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import process from "node:process";
 
 import type { WarnMode } from "@xsom/secret-guard-cli/hook";
@@ -86,6 +86,31 @@ export function renderPowerShellCommand(
   hookPath: string,
   warnMode: WarnMode,
 ): string {
+  const commandLine = [
+    '"%XSOM_SECRET_GUARD_EXECUTABLE%"',
+    '"%XSOM_SECRET_GUARD_HOOK%"',
+    '"%XSOM_SECRET_GUARD_WARN_ARGUMENT%"',
+  ].join(" ");
+  return [
+    "$env:ELECTRON_RUN_AS_NODE='1'",
+    `$env:XSOM_SECRET_GUARD_MANAGED='${MANAGED_MARKER}'`,
+    `$env:XSOM_SECRET_GUARD_EXECUTABLE=${quotePowerShell(executable)}`,
+    `$env:XSOM_SECRET_GUARD_HOOK=${quotePowerShell(hookPath)}`,
+    `$env:XSOM_SECRET_GUARD_WARN_ARGUMENT=${quotePowerShell(`--warn=${warnMode}`)}`,
+    // Code.exe is a GUI-subsystem executable on Windows. PowerShell can run it
+    // but does not reliably populate $LASTEXITCODE, so Codex cannot observe the
+    // scanner's blocking exit code. cmd.exe is a console process and preserves
+    // both inherited stdin and the child exit status.
+    `& $env:ComSpec /d /v:off /s /c ${quotePowerShell(commandLine)}`,
+    "exit $LASTEXITCODE",
+  ].join("; ");
+}
+
+function renderLegacyPowerShellCommand(
+  executable: string,
+  hookPath: string,
+  warnMode: WarnMode,
+): string {
   return [
     "$env:ELECTRON_RUN_AS_NODE='1'",
     `$env:XSOM_SECRET_GUARD_MANAGED='${MANAGED_MARKER}'`,
@@ -100,6 +125,15 @@ export function renderWindowsCommand(
   warnMode: WarnMode,
 ): string {
   const script = renderPowerShellCommand(executable, hookPath, warnMode);
+  return `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "${script.replaceAll('"', '\\"')}"`;
+}
+
+function renderLegacyWindowsCommand(
+  executable: string,
+  hookPath: string,
+  warnMode: WarnMode,
+): string {
+  const script = renderLegacyPowerShellCommand(executable, hookPath, warnMode);
   return `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "${script.replaceAll('"', '\\"')}"`;
 }
 
@@ -133,7 +167,14 @@ function nestedEntry(
       host.id === "claude" && process.platform === "win32" ? windows : posix,
     timeout: HOST_HOOK_TIMEOUT_SECONDS,
   };
-  if (host.id === "codex") handler.commandWindows = windows;
+  // Codex already evaluates commandWindows in PowerShell. A nested -Command
+  // string expands $env and $LASTEXITCODE in the outer shell before execution.
+  if (host.id === "codex")
+    handler.commandWindows = renderPowerShellCommand(
+      executable,
+      hookPath,
+      warnMode,
+    );
   return { hooks: [handler] };
 }
 
@@ -192,8 +233,136 @@ function legacyManagedEntry(
   return null;
 }
 
+function legacyGuiExecutableEntry(
+  host: HostDefinition,
+  executable: string,
+  hookPath: string,
+  warnMode: WarnMode,
+): Record<string, unknown> {
+  const posix = renderPosixCommand(executable, hookPath, warnMode);
+  const powershell = renderLegacyPowerShellCommand(
+    executable,
+    hookPath,
+    warnMode,
+  );
+  if (host.format === "direct") {
+    return {
+      type: "command",
+      command: posix,
+      linux: posix,
+      osx: posix,
+      windows: renderLegacyWindowsCommand(executable, hookPath, warnMode),
+      timeout: HOST_HOOK_TIMEOUT_SECONDS,
+    };
+  }
+  if (host.format === "windsurf") {
+    return { command: posix, powershell };
+  }
+  const handler: Record<string, unknown> = {
+    type: "command",
+    command:
+      host.id === "claude" && process.platform === "win32"
+        ? renderLegacyWindowsCommand(executable, hookPath, warnMode)
+        : posix,
+    timeout: HOST_HOOK_TIMEOUT_SECONDS,
+  };
+  if (host.id === "codex") handler.commandWindows = powershell;
+  return { hooks: [handler] };
+}
+
+function legacyWindowsWrapperEntries(
+  host: HostDefinition,
+  hookPath: string,
+): readonly Record<string, unknown>[] {
+  if (host.id !== "claude" && host.id !== "codex") return [];
+  const home = dirname(dirname(host.configPath));
+  const runners = new Set([
+    join(dirname(hookPath), "run-hook.cmd"),
+    join(home, "AppData", "Local", "xsom-secret-guard", "run-hook.cmd"),
+  ]);
+  return [...runners].map((runner) => {
+    const command = `${runner.replaceAll("\\", "/")} ; exit $LASTEXITCODE`;
+    const handler: Record<string, unknown> = {
+      type: "command",
+      command,
+      timeout: HOST_HOOK_TIMEOUT_SECONDS,
+    };
+    if (host.id === "codex") handler.commandWindows = command;
+    return { hooks: [handler] };
+  });
+}
+
+function legacyStandaloneEntries(
+  host: HostDefinition,
+): readonly Record<string, unknown>[] {
+  if (host.id !== "codex" || process.platform !== "win32") return [];
+  const home = dirname(dirname(host.configPath));
+  const standaloneHook = join(
+    home,
+    "AppData",
+    "Local",
+    "xsom-secret-guard",
+    "hook.cjs",
+  );
+  const roots = [
+    process.env.ProgramFiles,
+    process.env.ProgramW6432,
+    process.env["ProgramFiles(x86)"],
+  ].filter((root): root is string => root !== undefined && root.length > 0);
+  const executables = new Set([
+    ...roots.map((root) => join(root, "nodejs", "node.exe")),
+    ...(process.env.LOCALAPPDATA
+      ? [join(process.env.LOCALAPPDATA, "Programs", "nodejs", "node.exe")]
+      : []),
+  ]);
+  return [...executables].flatMap((executable) =>
+    (["block", "allow"] as const).flatMap((warnMode) => [
+      managedEntry(host, executable, standaloneHook, warnMode),
+      legacyGuiExecutableEntry(host, executable, standaloneHook, warnMode),
+      {
+        hooks: [
+          {
+            type: "command",
+            command: renderPosixCommand(executable, standaloneHook, warnMode),
+            commandWindows: renderWindowsCommand(
+              executable,
+              standaloneHook,
+              warnMode,
+            ),
+            timeout: HOST_HOOK_TIMEOUT_SECONDS,
+          },
+        ],
+      },
+      {
+        hooks: [
+          {
+            type: "command",
+            command: renderPosixCommand(executable, standaloneHook, warnMode),
+            commandWindows: renderLegacyWindowsCommand(
+              executable,
+              standaloneHook,
+              warnMode,
+            ),
+            timeout: HOST_HOOK_TIMEOUT_SECONDS,
+          },
+        ],
+      },
+    ]),
+  );
+}
+
+function canonicalValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalValue);
+  if (typeof value !== "object" || value === null) return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => [key, canonicalValue(entry)]),
+  );
+}
+
 function canonical(value: unknown): string {
-  return JSON.stringify(value);
+  return JSON.stringify(canonicalValue(value));
 }
 
 function containsMarker(value: unknown): boolean {
@@ -247,9 +416,58 @@ function exactManagedEntry(
   return (["block", "allow"] as const).some((warnMode) => {
     const current = managedEntry(host, executable, hookPath, warnMode);
     const legacy = legacyManagedEntry(host, executable, hookPath, warnMode);
+    const legacyGuiExecutable = legacyGuiExecutableEntry(
+      host,
+      executable,
+      hookPath,
+      warnMode,
+    );
+    const wrappers = legacyWindowsWrapperEntries(host, hookPath);
+    const standalone = legacyStandaloneEntries(host);
+    const nestedPowerShell =
+      host.id === "codex"
+        ? {
+            hooks: [
+              {
+                type: "command",
+                command: renderPosixCommand(executable, hookPath, warnMode),
+                commandWindows: renderWindowsCommand(
+                  executable,
+                  hookPath,
+                  warnMode,
+                ),
+                timeout: HOST_HOOK_TIMEOUT_SECONDS,
+              },
+            ],
+          }
+        : null;
+    const legacyNestedPowerShell =
+      host.id === "codex"
+        ? {
+            hooks: [
+              {
+                type: "command",
+                command: renderPosixCommand(executable, hookPath, warnMode),
+                commandWindows: renderLegacyWindowsCommand(
+                  executable,
+                  hookPath,
+                  warnMode,
+                ),
+                timeout: HOST_HOOK_TIMEOUT_SECONDS,
+              },
+            ],
+          }
+        : null;
     return (
       canonical(value) === canonical(current) ||
-      (legacy !== null && canonical(value) === canonical(legacy))
+      (legacy !== null && canonical(value) === canonical(legacy)) ||
+      canonical(value) === canonical(legacyGuiExecutable) ||
+      (nestedPowerShell !== null &&
+        canonical(value) === canonical(nestedPowerShell)) ||
+      (legacyNestedPowerShell !== null &&
+        canonical(value) === canonical(legacyNestedPowerShell)) ||
+      wrappers.some((wrapper) => canonical(value) === canonical(wrapper)) ||
+      standalone.some((entry) => canonical(value) === canonical(entry))
     );
   });
 }
@@ -270,7 +488,11 @@ export function inspectHostConfig(
       exactManagedEntry(entry, host, executable, hookPath),
     );
     const marked = entries.filter(containsMarker);
-    if (exact.length === 1 && marked.length === 1) return "configured";
+    const foreignMarked = marked.some(
+      (entry) => !exactManagedEntry(entry, host, executable, hookPath),
+    );
+    if (foreignMarked) return "degraded";
+    if (exact.length === 1) return "configured";
     return marked.length === 0 ? "off" : "degraded";
   } catch {
     return "degraded";

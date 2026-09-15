@@ -978,7 +978,20 @@ function scanAssignmentPattern(
   while ((match = pattern.exec(view.text)) !== null) {
     const key = match[1] ?? "";
     const secretType = typeForSensitiveKey(key);
-    if (secretType === null) continue;
+    if (secretType === null) {
+      // ASSIGNMENT-style patterns consume both their leading boundary and any
+      // whitespace following the separator. Reconsider that trailing
+      // whitespace so a harmless label such as `configuration :` cannot hide
+      // a sensitive assignment that immediately follows it.
+      const trailingWhitespace = /\s+$/.exec(match[0])?.[0].length ?? 0;
+      if (trailingWhitespace > 0) {
+        pattern.lastIndex = Math.max(
+          (match.index ?? 0) + 1,
+          pattern.lastIndex - trailingWhitespace,
+        );
+      }
+      continue;
+    }
     const valueSyntaxOffset = pattern.lastIndex;
     const parsed = parseAssignmentValue(
       view.text,
@@ -1193,13 +1206,32 @@ function entropyExcluded(value: string): boolean {
   );
 }
 
+function isShellEnvironmentPath(
+  text: string,
+  start: number,
+  value: string,
+): boolean {
+  const prefix = text.slice(Math.max(0, start - 5), start);
+  const hasEnvironmentSigil =
+    text[start - 1] === "$" || prefix.toLowerCase() === "$env:";
+  return (
+    hasEnvironmentSigil &&
+    /^[A-Za-z_][A-Za-z0-9_]*\/[A-Za-z0-9._/-]+$/.test(value)
+  );
+}
+
 export function scanEntropy(view: MappedView): InternalFinding[] {
   const findings: InternalFinding[] = [];
   const pattern = clonePattern(ENTROPY_TOKEN);
   for (const match of view.text.matchAll(pattern)) {
     const value = match[0];
     const viewStart = match.index ?? 0;
-    if (entropyExcluded(value) || !hasStrongEntropy(value)) continue;
+    if (
+      entropyExcluded(value) ||
+      isShellEnvironmentPath(view.text, viewStart, value) ||
+      !hasStrongEntropy(value)
+    )
+      continue;
     const [start, end] = mapRange(view, viewStart, viewStart + value.length);
     findings.push({
       ruleId: "high_entropy",

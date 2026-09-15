@@ -42,8 +42,11 @@ async function notifySuccess() {
 }
 
 try {
+  const vscodeExecutablePath = process.env.XSOM_VSCODE_TEST_EXECUTABLE;
   const run = runTests({
-    version: "1.137.0",
+    ...(vscodeExecutablePath === undefined
+      ? { version: "1.137.0" }
+      : { vscodeExecutablePath }),
     extensionDevelopmentPath,
     extensionTestsPath,
     extensionTestsEnv: {

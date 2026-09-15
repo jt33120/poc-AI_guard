@@ -59,6 +59,34 @@ describe("false-positive controls", () => {
   });
 
   it.each([
+    '$ powershell -NoProfile -ExecutionPolicy Bypass -File "$USERPROFILE/Downloads/Install-VSCode-1.137.0.ps1"',
+    '$ powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE/Downloads/Install-VSCode-1.137.0.ps1"',
+  ])("does not warn on a shell environment rooted path: %s", (content) => {
+    expect(scan({ content }).decision).toBe("ALLOW");
+  });
+
+  it("does not broadly exempt a path-shaped entropy candidate", () => {
+    const result = scan({
+      content: "run USERPROFILE/Downloads/Install-VSCode-1.137.0.ps1",
+    });
+    expect(result.decision).toBe("WARN");
+    expect(result.findings[0]?.ruleId).toBe("high_entropy");
+  });
+
+  it.each([
+    'Analyse cette configuration de test : password="not-a-real-password-for-test"',
+    "configuration : PASSWORD=myrealpassword",
+    "configuration :\n  PASSWORD=myrealpassword",
+  ])(
+    "does not let a preceding non-sensitive label hide an assignment: %s",
+    (content) => {
+      const result = scan({ content });
+      expect(result.decision).toBe("BLOCK");
+      expect(result.findings[0]?.secretType).toBe("password");
+    },
+  );
+
+  it.each([
     "password: null",
     "password: false",
     "password: undefined",

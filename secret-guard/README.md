@@ -26,11 +26,11 @@ The delivered V0.2 uses the assistants' native pre-submit hooks:
   installation, a persistent lock status, `@secretguard` as a diagnostic owned
   flow, and explicit scan commands.
 
-Once **Secret Guard: Activer la protection automatique** has completed, typing
-`@secretguard` is not required. Every text prompt submitted through a configured
-native host hook is scanned before the assistant processes it. Clean prompts pass
-without interaction; WARN/BLOCK and scanner failures stop the prompt with exit
-code 2 and a non-sensitive reason.
+Once automatic onboarding has completed, typing `@secretguard` is not required.
+Every text prompt submitted through a configured native host hook is scanned
+before the assistant processes it. Clean prompts pass without interaction;
+WARN/BLOCK and scanner failures stop the prompt with exit code 2 and a
+non-sensitive reason.
 
 ## Installation
 
@@ -47,16 +47,33 @@ code --install-extension xsom-secret-guard-vscode.vsix
 Opening the `.vsix` in the editor does not install it: VS Code displays an
 archive, not an extension.
 
-Run **Secret Guard: Activer la protection automatique** once, and restart the
-assistants that were already open.
+Installing the extension configures and verifies the local hooks automatically
+by default. A first-run action opens Codex CLI so the user can review the xSOM
+`UserPromptSubmit` definition, trust its current hash, and then start a new
+Codex chat. This explicit trust step cannot be automated by a user extension
+because Codex runs trusted hooks outside its sandbox. Set
+`secretGuard.hook.autoEnable` to `false` when hook installation must remain
+manual.
 
-Two version floors apply, and the first one stops everything: the extension
-manifest declares `engines.vscode: ^1.136.0`, so VS Code refuses to install it
-below 1.136 and the install fails, including for the other three hosts. The
-VS Code/Copilot hook itself needs 1.137 or newer.
+On Windows, Codex runs `commandWindows` in PowerShell already. Secret Guard
+supplies the script directly: nesting a quoted `powershell -Command` expands
+variables too early and can turn a blocking verdict into a non-blocking error.
+The regression test runs the generated command through PowerShell with clean
+and synthetic password prompts.
 
-Releases are cut either by tagging (`git tag secret-guard-v0.2.0 && git push
-origin secret-guard-v0.2.0`) or by running the `Secret Guard release` workflow
+For the old standalone installation in `%LOCALAPPDATA%/xsom-secret-guard`, run
+`node --experimental-strip-types scripts/repair-codex-windows-hook.mjs` from this
+directory to check the repair, then add `--apply` to back up and update only the
+recognized Secret Guard entry. Review the changed definition in `/hooks` and
+start a new session; this script does not approve hooks on your behalf.
+
+Two version floors apply independently: the extension shell supports VS Code
+1.133 or newer, while the native VS Code/Copilot hook itself needs 1.137 or
+newer. On VS Code 1.133–1.136, the extension can still configure and protect
+Claude Code, Codex and Windsurf; it must not claim native Copilot coverage.
+
+Releases are cut either by tagging (`git tag secret-guard-v0.2.1 && git push
+origin secret-guard-v0.2.1`) or by running the `Secret Guard release` workflow
 from the Actions tab with the manifest version as its input, which creates the
 tag itself. Either way `secret-guard-release.yml` replays `npm run verify`,
 refuses a version that does not match the manifest, attaches the VSIX to the

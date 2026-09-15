@@ -25,6 +25,7 @@ function registerTests(mocha: Mocha): void {
         "secretGuard.scanClipboard",
         "secretGuard.scanDocument",
         "secretGuard.enableHook",
+        "secretGuard.finishCodexSetup",
         "secretGuard.disableHook",
         "secretGuard.copyRedacted",
       ]) {
@@ -40,15 +41,28 @@ function registerTests(mocha: Mocha): void {
       );
       assert.ok(extension);
       const manifest = extension.packageJSON as {
-        contributes?: { chatParticipants?: Array<{ id?: string }> };
+        contributes?: {
+          chatParticipants?: Array<{ id?: string }>;
+          configuration?: {
+            properties?: Record<string, { default?: unknown }>;
+          };
+        };
+        engines?: { vscode?: string };
         preview?: unknown;
         telemetry?: unknown;
       };
       assert.equal(manifest.telemetry, undefined);
       assert.equal(manifest.preview, true);
+      assert.equal(manifest.engines?.vscode, "^1.133.0");
       assert.equal(
         manifest.contributes?.chatParticipants?.[0]?.id,
         "xsom.secretGuard",
+      );
+      assert.equal(
+        manifest.contributes?.configuration?.properties?.[
+          "secretGuard.hook.autoEnable"
+        ]?.default,
+        true,
       );
     }),
   );

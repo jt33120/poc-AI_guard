@@ -1,7 +1,7 @@
 {
   "name": "xsom-secret-guard-vscode",
   "displayName": "xSOM Secret Guard",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Automatic local-first prompt protection for VS Code/Copilot, Claude Code, Codex and Windsurf",
   "publisher": "xsom",
   "type": "module",
@@ -17,7 +17,7 @@
     "directory": "secret-guard/packages/vscode"
   },
   "engines": {
-    "vscode": "^1.136.0"
+    "vscode": "^1.133.0"
   },
   "preview": true,
   "categories": [
@@ -39,6 +39,7 @@
     "onCommand:secretGuard.scanClipboard",
     "onCommand:secretGuard.scanDocument",
     "onCommand:secretGuard.enableHook",
+    "onCommand:secretGuard.finishCodexSetup",
     "onCommand:secretGuard.disableHook",
     "onCommand:secretGuard.copyRedacted"
   ],
@@ -70,6 +71,10 @@
         "title": "Secret Guard: Activer la protection automatique"
       },
       {
+        "command": "secretGuard.finishCodexSetup",
+        "title": "Secret Guard: Finaliser l’approbation Codex"
+      },
+      {
         "command": "secretGuard.disableHook",
         "title": "Secret Guard: Désactiver la protection automatique"
       },
@@ -81,6 +86,12 @@
     "configuration": {
       "title": "xSOM Secret Guard",
       "properties": {
+        "secretGuard.hook.autoEnable": {
+          "type": "boolean",
+          "default": true,
+          "scope": "machine",
+          "description": "Configure et vérifie automatiquement les hooks locaux au premier démarrage de l’extension. Codex conserve son approbation explicite obligatoire."
+        },
         "secretGuard.hook.warnMode": {
           "type": "string",
           "enum": [

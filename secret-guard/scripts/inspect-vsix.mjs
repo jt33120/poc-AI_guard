@@ -60,8 +60,17 @@ function archivePattern(path) {
     .replaceAll("*", "[*]");
 }
 
-function unzip(arguments_) {
-  const result = spawnSync("unzip", arguments_, {
+function tarArchivePattern(path) {
+  return path
+    .replaceAll("\\", "\\\\")
+    .replaceAll("[", "\\[")
+    .replaceAll("]", "\\]")
+    .replaceAll("?", "\\?")
+    .replaceAll("*", "\\*");
+}
+
+function runArchiveTool(executable, arguments_) {
+  const result = spawnSync(executable, arguments_, {
     encoding: null,
     maxBuffer: 4_000_000,
     timeout: 5_000,
@@ -69,9 +78,38 @@ function unzip(arguments_) {
   if (result.error !== undefined) throw result.error;
   if (result.status !== 0) {
     const diagnostic = result.stderr?.toString("utf8").trim() ?? "";
-    throw new Error(`cannot inspect VSIX: ${diagnostic}`);
+    throw new Error(
+      `cannot inspect VSIX with ${executable}: ${diagnostic || `exit ${String(result.status)}`}`,
+    );
   }
   return result.stdout;
+}
+
+function unzip(arguments_) {
+  const unzipArguments =
+    arguments_[0] === "-p" && arguments_[2] !== undefined
+      ? [arguments_[0], arguments_[1], archivePattern(arguments_[2])]
+      : arguments_;
+  const result = spawnSync("unzip", unzipArguments, {
+    encoding: null,
+    maxBuffer: 4_000_000,
+    timeout: 5_000,
+  });
+  if (result.error?.code !== "ENOENT") {
+    if (result.error !== undefined) throw result.error;
+    if (result.status !== 0) {
+      const diagnostic = result.stderr?.toString("utf8").trim() ?? "";
+      throw new Error(`cannot inspect VSIX with unzip: ${diagnostic}`);
+    }
+    return result.stdout;
+  }
+  if (process.platform !== "win32") throw result.error;
+
+  const tarArguments =
+    arguments_[0] === "-Z1"
+      ? ["-tf", arguments_[1]]
+      : ["-xOf", arguments_[1], tarArchivePattern(arguments_[2])];
+  return runArchiveTool("tar.exe", tarArguments);
 }
 
 const archive = await stat(vsix);
@@ -79,7 +117,10 @@ if (archive.size <= 0 || archive.size > 2_000_000) {
   throw new Error(`VSIX has an invalid size: ${archive.size} bytes`);
 }
 
-const files = unzip(["-Z1", vsix]).toString("utf8").split("\n").filter(Boolean);
+const files = unzip(["-Z1", vsix])
+  .toString("utf8")
+  .split(/\r?\n/u)
+  .filter(Boolean);
 if (new Set(files).size !== files.length) {
   throw new Error("VSIX contains duplicate archive entries");
 }
@@ -93,10 +134,7 @@ if (missing.length > 0 || unexpected.length > 0) {
 }
 
 const archivedContents = new Map(
-  expectedFiles.map((path) => [
-    path,
-    unzip(["-p", vsix, archivePattern(path)]),
-  ]),
+  expectedFiles.map((path) => [path, unzip(["-p", vsix, path])]),
 );
 for (const [archivePath, relativeLocalPath] of localEquivalents) {
   const archived = archivedContents.get(archivePath);

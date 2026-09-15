@@ -8,12 +8,47 @@ import {
   type WarnChoice,
 } from "./dispatch.js";
 import { HookManager, type HookHealth } from "./hook-manager.js";
+import {
+  activationStrategy,
+  CODEX_ONBOARDING_REVISION,
+  shouldOfferCodexFinalization,
+  supportsVsCodePromptHooks,
+} from "./onboarding.js";
+import { defaultHostDefinitions } from "./host-config.js";
 import { markdownReport, modalReport } from "./presentation.js";
+
+const FINISH_CODEX_SETUP = "Finaliser Codex";
 
 function configuredWarnMode(): "allow" | "block" {
   return vscode.workspace
     .getConfiguration("secretGuard")
     .get<"allow" | "block">("hook.warnMode", "block");
+}
+
+function configuredAutoEnable(): boolean {
+  return vscode.workspace
+    .getConfiguration("secretGuard")
+    .get<boolean>("hook.autoEnable", true);
+}
+
+async function openCodexHookReview(): Promise<void> {
+  const terminal = vscode.window.createTerminal({
+    name: "Secret Guard — approbation Codex",
+  });
+  terminal.show();
+  terminal.sendText("codex", true);
+  await vscode.window.showInformationMessage(
+    "Dans le terminal Codex, choisissez Review hooks, ouvrez UserPromptSubmit et approuvez uniquement le hook xSOM. Créez ensuite un nouveau chat Codex.",
+  );
+}
+
+async function offerCodexFinalization(modal: boolean): Promise<void> {
+  const selected = await vscode.window.showWarningMessage(
+    "Secret Guard est configuré et ses canaris locaux sont validés. Codex exige encore une approbation explicite avant d’exécuter ce hook utilisateur hors sandbox.",
+    { modal },
+    FINISH_CODEX_SETUP,
+  );
+  if (selected === FINISH_CODEX_SETUP) await openCodexHookReview();
 }
 
 async function copyRedacted(content?: unknown): Promise<void> {
@@ -156,9 +191,9 @@ async function updateStatus(
     .filter((host) => host.configured)
     .map((host) => host.label);
   if (health.state === "active") {
-    item.text = "$(lock) Secret Guard: actif";
-    item.tooltip = `Hooks bloquants configurés et canaris locaux validés : ${configured.join(", ")}. Redémarrez les assistants après une première activation.`;
-    item.command = "secretGuard.disableHook";
+    item.text = "$(lock) Secret Guard: prêt";
+    item.tooltip = `Hooks configurés et canaris locaux validés : ${configured.join(", ")}. Codex peut encore demander d’approuver la définition xSOM. Cliquez pour finaliser Codex.`;
+    item.command = "secretGuard.finishCodexSetup";
   } else if (health.state === "partial") {
     item.text = "$(lock) Secret Guard: partiel";
     item.tooltip = `Protection automatique active pour ${configured.join(", ")}. Cliquez pour compléter l’installation.`;
@@ -180,15 +215,30 @@ async function updateStatus(
 export async function activate(
   context: vscode.ExtensionContext,
 ): Promise<void> {
-  const manager = new HookManager(context);
+  const hosts = defaultHostDefinitions().filter(
+    (host) => host.id !== "vscode" || supportsVsCodePromptHooks(vscode.version),
+  );
+  const manager = new HookManager(context, { hosts });
   const status = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Right,
     100,
   );
   context.subscriptions.push(status);
 
+  let activationHealth: HookHealth | undefined;
   try {
-    await manager.refreshIfConfigured(configuredWarnMode());
+    const initial = await manager.getHealth();
+    const strategy = activationStrategy(
+      initial.state,
+      configuredAutoEnable(),
+      context.extensionMode === vscode.ExtensionMode.Test,
+    );
+    if (strategy === "enable") {
+      activationHealth = await manager.enable(configuredWarnMode());
+    } else {
+      activationHealth =
+        await manager.refreshIfConfigured(configuredWarnMode());
+    }
   } catch {
     // Activation must preserve manual scanning even if the optional hook fails.
   }
@@ -225,13 +275,15 @@ export async function activate(
       });
     }),
     vscode.commands.registerCommand("secretGuard.copyRedacted", copyRedacted),
+    vscode.commands.registerCommand(
+      "secretGuard.finishCodexSetup",
+      openCodexHookReview,
+    ),
     vscode.commands.registerCommand("secretGuard.enableHook", async () => {
       try {
         await manager.enable(configuredWarnMode());
         await updateStatus(status, manager);
-        await vscode.window.showInformationMessage(
-          "Hooks automatiques configurés : VS Code/Copilot, Claude Code, Codex et Windsurf scanneront le champ texte de chaque prompt sans @secretguard. Redémarrez les assistants déjà ouverts.",
-        );
+        await offerCodexFinalization(false);
       } catch {
         await updateStatus(status, manager);
         await vscode.window.showErrorMessage(
@@ -269,6 +321,21 @@ export async function activate(
     handleChat,
   );
   context.subscriptions.push(participant);
+
+  if (
+    activationHealth !== undefined &&
+    shouldOfferCodexFinalization(
+      activationHealth.state,
+      context.globalState.get<number>("codexOnboardingRevision"),
+      context.extensionMode === vscode.ExtensionMode.Test,
+    )
+  ) {
+    await offerCodexFinalization(true);
+    await context.globalState.update(
+      "codexOnboardingRevision",
+      CODEX_ONBOARDING_REVISION,
+    );
+  }
 }
 
 export function deactivate(): void {
