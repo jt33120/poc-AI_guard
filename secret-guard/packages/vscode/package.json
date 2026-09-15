@@ -1,7 +1,7 @@
 {
   "name": "xsom-secret-guard-vscode",
   "displayName": "xSOM Secret Guard",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Automatic local-first prompt protection for VS Code/Copilot, Claude Code, Codex and Windsurf",
   "publisher": "xsom",
   "type": "module",

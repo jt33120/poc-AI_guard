@@ -72,8 +72,8 @@ Two version floors apply independently: the extension shell supports VS Code
 newer. On VS Code 1.133–1.136, the extension can still configure and protect
 Claude Code, Codex and Windsurf; it must not claim native Copilot coverage.
 
-Releases are cut either by tagging (`git tag secret-guard-v0.2.1 && git push
-origin secret-guard-v0.2.1`) or by running the `Secret Guard release` workflow
+Releases are cut either by tagging (`git tag secret-guard-v0.2.2 && git push
+origin secret-guard-v0.2.2`) or by running the `Secret Guard release` workflow
 from the Actions tab with the manifest version as its input, which creates the
 tag itself. Either way `secret-guard-release.yml` replays `npm run verify`,
 refuses a version that does not match the manifest, attaches the VSIX to the

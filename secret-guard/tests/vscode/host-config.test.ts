@@ -228,7 +228,11 @@ describe("multi-host hook configuration", () => {
       );
       expect(upgraded).not.toContain("run-hook.cmd");
       expect(upgraded).toContain(MANAGED_MARKER);
-      expect(upgraded).toContain("exit $LASTEXITCODE");
+      if (hostId === "codex" || process.platform === "win32") {
+        expect(upgraded).toContain("exit $LASTEXITCODE");
+      } else {
+        expect(upgraded).toContain("/usr/bin/env");
+      }
       expect(
         inspectHostConfig(upgraded, host, windowsExecutable, windowsHook),
       ).toBe("configured");
