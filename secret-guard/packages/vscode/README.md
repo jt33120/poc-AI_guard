@@ -68,7 +68,7 @@ jointes ne sont pas prises en charge dans `@secretguard`.
    qu’un message ordinaire passe normalement.
 
 ```text
-Analyse cette configuration : PASSWORD=definitely-not-a-real-secret-123
+Analyse cette configuration : PASSWORD=XXX
 ```
 
 Le centre de protection n’affiche ni prompts ni valeurs détectées. Il ne charge

@@ -21,7 +21,7 @@ interface EnvEntry {
   name: string;
   value: string;
 }
-const SECRET = "xsom.gateway.connection";
+const CONNECTION_STORAGE_KEY = "xsom.gateway.connection";
 const CONNECTION_ERRORS: Record<string, string> = {
   claude_extension_missing:
     "Installez d’abord l’extension officielle Claude Code dans cette fenêtre VS Code.",
@@ -50,7 +50,7 @@ export class GatewayIntegration implements vscode.Disposable {
   }
   public async restore(): Promise<void> {
     if (vscode.env.remoteName) return;
-    const stored = await this.context.secrets.get(SECRET);
+    const stored = await this.context.secrets.get(CONNECTION_STORAGE_KEY);
     if (!stored) return;
     try {
       await this.start(JSON.parse(stored) as Connection);
@@ -97,7 +97,7 @@ export class GatewayIntegration implements vscode.Disposable {
     try {
       await this.start({ endpoint: gatewayUrl(endpoint), token, installation });
       await this.context.secrets.store(
-        SECRET,
+        CONNECTION_STORAGE_KEY,
         JSON.stringify({ endpoint: gatewayUrl(endpoint), token, installation }),
       );
       await vscode.workspace
@@ -256,7 +256,7 @@ export class GatewayIntegration implements vscode.Disposable {
     }
     await this.stopBridge();
     this.queue = undefined;
-    await this.context.secrets.delete(SECRET);
+    await this.context.secrets.delete(CONNECTION_STORAGE_KEY);
     await this.context.globalState.update("xsom.claudeBase", undefined);
     this.status = "Déconnecté";
   }
