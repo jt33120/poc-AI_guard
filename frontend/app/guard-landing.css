@@ -1012,11 +1012,20 @@ html[data-signal-motion="reduced"] .guard-landing * {
   margin-block: var(--sp-6) 0;
 }
 .guard-ext-hosts li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-4);
   border: var(--signal-border) solid var(--signal-line-strong);
   border-radius: var(--r-md);
   color: var(--signal-muted);
   font-size: var(--fs-xs);
+}
+.guard-ext-hosts__logo {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.45rem;
+  object-fit: cover;
 }
 
 .guard-ext-limits__title {

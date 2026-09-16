@@ -1,8 +1,8 @@
 {
   "name": "xsom-secret-guard-vscode",
   "displayName": "xSOM Secret Guard",
-  "version": "0.2.2",
-  "description": "Automatic local-first prompt protection for VS Code/Copilot, Claude Code, Codex and Windsurf",
+  "version": "0.3.0",
+  "description": "Vos idées à l’IA, vos secrets à l’abri. Détection locale et protection des prompts pour Claude Code, Codex, Copilot et Windsurf.",
   "publisher": "xsom",
   "type": "module",
   "license": "SEE LICENSE IN LICENSE.txt",
@@ -35,6 +35,8 @@
   "activationEvents": [
     "onStartupFinished",
     "onChatParticipant:xsom.secretGuard",
+    "onCommand:secretGuard.showDashboard",
+    "onCommand:secretGuard.chooseMode",
     "onCommand:secretGuard.scanSelection",
     "onCommand:secretGuard.scanClipboard",
     "onCommand:secretGuard.scanDocument",
@@ -55,20 +57,43 @@
     ],
     "commands": [
       {
+        "command": "secretGuard.connectGateway",
+        "title": "Secret Guard: Raccorder ce poste à xSOM",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "secretGuard.disconnectGateway",
+        "title": "Secret Guard: Déconnecter la passerelle xSOM"
+      },
+      {
+        "command": "secretGuard.chooseMode",
+        "title": "Secret Guard: Choisir le mode de protection",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "secretGuard.showDashboard",
+        "title": "Secret Guard: Ouvrir le centre de protection",
+        "icon": "$(shield)"
+      },
+      {
         "command": "secretGuard.scanSelection",
-        "title": "Secret Guard: Scanner la sélection"
+        "title": "Secret Guard: Scanner la sélection",
+        "icon": "$(search)"
       },
       {
         "command": "secretGuard.scanClipboard",
-        "title": "Secret Guard: Scanner le presse-papiers"
+        "title": "Secret Guard: Scanner le presse-papiers",
+        "icon": "$(clippy)"
       },
       {
         "command": "secretGuard.scanDocument",
-        "title": "Secret Guard: Scanner le document ouvert"
+        "title": "Secret Guard: Scanner le document ouvert",
+        "icon": "$(file-text)"
       },
       {
         "command": "secretGuard.enableHook",
-        "title": "Secret Guard: Activer la protection automatique"
+        "title": "Secret Guard: Activer la protection automatique",
+        "icon": "$(shield)"
       },
       {
         "command": "secretGuard.finishCodexSetup",
@@ -83,9 +108,44 @@
         "title": "Secret Guard: Copier la version expurgée"
       }
     ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "secretGuard.scanSelection",
+          "when": "editorHasSelection",
+          "group": "secretGuard@1"
+        },
+        {
+          "command": "secretGuard.scanDocument",
+          "when": "editorTextFocus",
+          "group": "secretGuard@2"
+        }
+      ]
+    },
     "configuration": {
       "title": "xSOM Secret Guard",
       "properties": {
+        "secretGuard.mode": {
+          "type": "string",
+          "enum": [
+            "block",
+            "redact",
+            "observe"
+          ],
+          "enumItemLabels": [
+            "🔒 Bloquer",
+            "🧹 Expurger",
+            "👁️ Avertir et laisser passer"
+          ],
+          "enumDescriptions": [
+            "Bloque les messages avec des secrets détectés, les détections ambiguës et les analyses incomplètes.",
+            "Nettoie automatiquement dans @secretguard et les sessions Claude raccordées à la passerelle xSOM. Sans passerelle, bloque puis propose un nettoyage via le presse-papiers.",
+            "Avertit et laisse passer le texte original, même avec des secrets. Aucun nettoyage."
+          ],
+          "default": "block",
+          "scope": "application",
+          "description": "Mode de protection commun aux assistants locaux. Après un changement, ouvrez une nouvelle session de votre assistant."
+        },
         "secretGuard.hook.autoEnable": {
           "type": "boolean",
           "default": true,
@@ -93,6 +153,7 @@
           "description": "Configure et vérifie automatiquement les hooks locaux au premier démarrage de l’extension. Codex conserve son approbation explicite obligatoire."
         },
         "secretGuard.hook.warnMode": {
+          "deprecationMessage": "Utilisez Secret Guard: Mode. Cet ancien réglage reste utilisé tant qu’aucun mode n’est explicitement choisi.",
           "type": "string",
           "enum": [
             "block",

@@ -32,6 +32,8 @@ from api.credentials import router as credentials_router
 from api.dlp import router as dlp_router
 from api.entitlement_guard import requires
 from api.errors import register_exception_handlers
+from api.extension_devices import router as extension_devices_router
+from api.extension_ingest import router as extension_ingest_router
 from api.gateway_tokens import router as gateway_tokens_router
 from api.health import router as health_router
 from api.integrity import router as integrity_router
@@ -111,12 +113,13 @@ _SOCLE: tuple[APIRouter, ...] = (health_router, ops_router)
 #: un module d'`api/` expose un `router` absent d'ici.
 _PLANS: dict[Plane, tuple[APIRouter, ...]] = {
     Plane.DECISION: (authorize_router,),
-    Plane.LLM: (llm_proxy_router,),
+    Plane.LLM: (llm_proxy_router, extension_ingest_router),
     Plane.CONSOLE: (
         servers_router,
         policy_router,
         approvals_router,
         audit_router,
+        extension_devices_router,
         gateway_tokens_router,
         agents_router,
         usage_router,
@@ -161,6 +164,8 @@ _CAPACITE_PAR_ROUTEUR: tuple[tuple[APIRouter, Capability | None], ...] = (
     (authorize_router, None),  # §4.1 — le verdict est la garantie, il ne se facture pas
     (approvals_router, None),  # §4.1 — tenir un humain dans la boucle non plus
     (audit_router, None),  # §4.2 — le journal prouve ; le facturer serait vendre le risque
+    (extension_devices_router, None),  # device evidence uses the same tenant boundary
+    (extension_ingest_router, None),  # gateway-token authentication on ingestion
     (policy_router, None),  # sans policy éditable, le produit ne fait rien
     (trust_router, None),  # lecture du capital de confiance, adossée à l'audit
     # --- Ceux qui n'authentifient PAS par JWT, et que ce garde ne peut pas tenir ----
@@ -211,7 +216,10 @@ _CAPACITE_PAR_ROUTEUR: tuple[tuple[APIRouter, Capability | None], ...] = (
 #: dans le plan `décision` sans qu'aucun des onze contrôles ne bronche.
 _PREFIXES_CHAUDS: dict[Plane, tuple[str, ...]] = {
     Plane.DECISION: ("/v1/authorize",),
-    Plane.LLM: ("/proxy/",),
+    # The extension ingress is deliberately colocated with the LLM proxy: it
+    # authenticates with the same per-workstation gateway token and must remain
+    # available even when the human-facing console plane is unavailable.
+    Plane.LLM: ("/proxy/", "/v1/extension/"),
 }
 
 #: Servi par tous les plans : les deux sondes, le relevé opérationnel, et le principal

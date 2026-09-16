@@ -10,7 +10,7 @@ import {
   scan,
 } from "@xsom/secret-guard-core";
 
-import { runHook, type WarnMode } from "./hook.js";
+import { parseHookMode, runHook, type WarnMode } from "./hook.js";
 import { humanReport } from "./report.js";
 
 const MAX_STDIN_BYTES = 1_200_000;
@@ -127,6 +127,12 @@ async function scanCommand(args: readonly string[]): Promise<number> {
 }
 
 function warnMode(args: readonly string[]): WarnMode {
+  const mode = args.find((arg) => arg.startsWith("--mode="));
+  if (mode !== undefined) {
+    if (!["--mode=block", "--mode=redact", "--mode=observe"].includes(mode))
+      throw new UsageError("--mode must be block, redact or observe");
+    return parseHookMode(args);
+  }
   const option = args.find((arg) => arg.startsWith("--warn="));
   if (option === undefined || option === "--warn=block") return "block";
   if (option === "--warn=allow") return "allow";
@@ -156,7 +162,7 @@ function usage(): string {
   return [
     "Usage:",
     "  secret-guard scan [--json|--redact] [file|-]",
-    "  secret-guard hook [--warn=block|allow]",
+    "  secret-guard hook [--mode=block|redact|observe] [--warn=block|allow (legacy)]",
     "",
     "Exit codes: scan uses 0 allow, 1 warn, 2 block; hook uses 0 allow or 2 block.",
   ].join("\n");

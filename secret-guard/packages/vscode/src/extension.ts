@@ -1,4 +1,6 @@
+import { randomBytes } from "node:crypto";
 import * as vscode from "vscode";
+import type { ProtectionMode, WarnMode } from "@xsom/secret-guard-cli/hook";
 
 import { redactAndRescan, scan, type ScanInput } from "@xsom/secret-guard-core";
 
@@ -8,21 +10,36 @@ import {
   type WarnChoice,
 } from "./dispatch.js";
 import { HookManager, type HookHealth } from "./hook-manager.js";
-import {
-  activationStrategy,
-  CODEX_ONBOARDING_REVISION,
-  shouldOfferCodexFinalization,
-  supportsVsCodePromptHooks,
-} from "./onboarding.js";
+import { GatewayIntegration } from "./gateway-integration.js";
+import { activationStrategy, supportsVsCodePromptHooks } from "./onboarding.js";
 import { defaultHostDefinitions } from "./host-config.js";
 import { markdownReport, modalReport } from "./presentation.js";
+import {
+  dashboardHtml,
+  DASHBOARD_COMMANDS,
+  HEALTH_LABELS,
+} from "./dashboard.js";
+import {
+  modeLabel,
+  protectionMode,
+  PROTECTION_MODES,
+} from "./protection-mode.js";
 
 const FINISH_CODEX_SETUP = "Finaliser Codex";
+let gateway: GatewayIntegration | undefined;
 
-function configuredWarnMode(): "allow" | "block" {
-  return vscode.workspace
-    .getConfiguration("secretGuard")
-    .get<"allow" | "block">("hook.warnMode", "block");
+function configuredMode(): ProtectionMode {
+  return protectionMode(
+    vscode.workspace.getConfiguration("secretGuard").inspect<unknown>("mode")
+      ?.globalValue,
+  );
+}
+
+function configuredWarnMode(): WarnMode {
+  const config = vscode.workspace.getConfiguration("secretGuard");
+  if (config.inspect<unknown>("mode")?.globalValue !== undefined)
+    return configuredMode();
+  return config.get<"allow" | "block">("hook.warnMode", "block");
 }
 
 function configuredAutoEnable(): boolean {
@@ -42,10 +59,9 @@ async function openCodexHookReview(): Promise<void> {
   );
 }
 
-async function offerCodexFinalization(modal: boolean): Promise<void> {
+async function offerCodexFinalization(): Promise<void> {
   const selected = await vscode.window.showWarningMessage(
     "Secret Guard est configuré et ses canaris locaux sont validés. Codex exige encore une approbation explicite avant d’exécuter ce hook utilisateur hors sandbox.",
-    { modal },
     FINISH_CODEX_SETUP,
   );
   if (selected === FINISH_CODEX_SETUP) await openCodexHookReview();
@@ -66,6 +82,13 @@ async function copyRedacted(content?: unknown): Promise<void> {
 
 async function presentScan(input: ScanInput): Promise<void> {
   const result = scan(input);
+  gateway?.record({
+    kind: "scan",
+    assistant: "manual",
+    mode: configuredMode(),
+    outcome: result.decision === "ALLOW" ? "clean" : "warned",
+    findings: result.findings.length,
+  });
   if (result.decision === "ALLOW") {
     await vscode.window.showInformationMessage(modalReport(result));
     return;
@@ -119,32 +142,19 @@ async function handleChat(
     return;
   }
 
-  const result = scan({ content: request.prompt, sourceKind: "prompt" });
-  if (result.decision === "BLOCK" || !result.complete) {
-    const sanitized = result.complete
-      ? redactAndRescan({ content: request.prompt, sourceKind: "prompt" })
-      : undefined;
-    const redactedContent =
-      sanitized?.final.complete === true &&
-      sanitized.final.decision === "ALLOW" &&
-      sanitized.final.findings.length === 0
-        ? sanitized.content
-        : undefined;
-    stream.markdown(markdownReport(result));
-    if (redactedContent !== undefined) {
-      stream.button({
-        command: "secretGuard.copyRedacted",
-        title: "Copier la version expurgée",
-        arguments: [redactedContent],
-      });
-    }
-    return;
-  }
+  const mode = configuredMode();
 
   let response: vscode.LanguageModelChatResponse | undefined;
   let outcome: DispatchOutcome;
   try {
     outcome = await dispatchGuarded(request.prompt, {
+      mode,
+      notifyWarning: () => {
+        stream.markdown(
+          "👁️ **Mode Avertir** · Le texte original est transmis sans nettoyage malgré une détection ou une analyse incomplète.\n\n",
+        );
+        return Promise.resolve();
+      },
       chooseForWarning: () => warningChoice(),
       transport: async (content) => {
         response = await request.model.sendRequest(
@@ -161,8 +171,33 @@ async function handleChat(
     return;
   }
 
+  gateway?.record({
+    kind: "scan",
+    assistant: "secretguard",
+    mode,
+    outcome: !outcome.sent
+      ? "blocked"
+      : outcome.redacted
+        ? "redacted"
+        : "passed",
+    findings: outcome.initial.findings.length,
+  });
   if (!outcome.sent || response === undefined) {
     stream.markdown(markdownReport(outcome.final));
+    const sanitized = outcome.initial.complete
+      ? redactAndRescan({ content: request.prompt, sourceKind: "prompt" })
+      : undefined;
+    if (
+      sanitized?.final.complete &&
+      sanitized.final.decision === "ALLOW" &&
+      sanitized.final.findings.length === 0
+    ) {
+      stream.button({
+        command: "secretGuard.copyRedacted",
+        title: "Copier la version expurgée",
+        arguments: [sanitized.content],
+      });
+    }
     return;
   }
   if (outcome.redacted) {
@@ -180,36 +215,51 @@ async function handleChat(
 async function updateStatus(
   item: vscode.StatusBarItem,
   manager: HookManager,
-): Promise<void> {
+): Promise<HookHealth> {
   let health: HookHealth;
   try {
     health = await manager.getHealth();
   } catch {
     health = { state: "degraded", reason: "canary_failed", hosts: [] };
   }
-  const configured = health.hosts
-    .filter((host) => host.configured)
-    .map((host) => host.label);
+  item.name = "Secret Guard · Protection des prompts";
+  item.command = "secretGuard.showDashboard";
+  item.backgroundColor = undefined;
   if (health.state === "active") {
-    item.text = "$(lock) Secret Guard: prêt";
-    item.tooltip = `Hooks configurés et canaris locaux validés : ${configured.join(", ")}. Codex peut encore demander d’approuver la définition xSOM. Cliquez pour finaliser Codex.`;
-    item.command = "secretGuard.finishCodexSetup";
+    item.text = `$(shield) Secret Guard · ${configuredWarnMode() === "allow" ? "Avertir (ambiguïtés)" : modeLabel(configuredMode())}`;
+    if (configuredMode() === "observe")
+      item.backgroundColor = new vscode.ThemeColor(
+        "statusBarItem.warningBackground",
+      );
   } else if (health.state === "partial") {
-    item.text = "$(lock) Secret Guard: partiel";
-    item.tooltip = `Protection automatique active pour ${configured.join(", ")}. Cliquez pour compléter l’installation.`;
-    item.command = "secretGuard.enableHook";
+    item.text = "$(shield) Secret Guard · À compléter";
   } else if (health.state === "degraded") {
-    item.text = "$(unlock) Secret Guard: dégradé";
-    item.tooltip =
-      "La configuration, l’intégrité ou un canari local est invalide. La protection automatique ne doit pas être considérée active.";
-    item.command = "secretGuard.enableHook";
+    item.text = "$(warning) Secret Guard · À vérifier";
+    item.backgroundColor = new vscode.ThemeColor(
+      "statusBarItem.warningBackground",
+    );
   } else {
-    item.text = "$(unlock) Secret Guard: désactivé";
-    item.tooltip =
-      "Aucun hook automatique n’est configuré. Cliquez pour protéger VS Code/Copilot, Claude Code, Codex et Windsurf.";
-    item.command = "secretGuard.enableHook";
+    item.text = "$(shield) Secret Guard · Désactivé";
   }
+  const tooltip = new vscode.MarkdownString(undefined, true);
+  tooltip.appendMarkdown(
+    `### $(shield) Secret Guard\n\n**${HEALTH_LABELS[health.state]}**\n\n`,
+  );
+  for (const host of health.hosts) {
+    tooltip.appendText(
+      `${host.configured ? "✓" : "○"} ${host.label} — ${host.configured ? "configuré" : "non configuré"}\n`,
+    );
+    tooltip.appendMarkdown("\n");
+  }
+  tooltip.appendMarkdown(
+    "---\n\nAnalyse locale · Sans télémétrie\n\nCliquez pour ouvrir le centre de protection. Les tests locaux ne remplacent pas la validation dans chaque assistant.",
+  );
+  item.tooltip = tooltip;
+  item.accessibilityInformation = {
+    label: `Secret Guard : ${HEALTH_LABELS[health.state]}. Ouvrir le centre de protection.`,
+  };
   item.show();
+  return health;
 }
 
 export async function activate(
@@ -219,13 +269,99 @@ export async function activate(
     (host) => host.id !== "vscode" || supportsVsCodePromptHooks(vscode.version),
   );
   const manager = new HookManager(context, { hosts });
+  gateway = new GatewayIntegration(context);
+  context.subscriptions.push(gateway);
   const status = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Right,
     100,
   );
   context.subscriptions.push(status);
 
-  let activationHealth: HookHealth | undefined;
+  let panel: vscode.WebviewPanel | undefined;
+  let modeApplicationFailed = false;
+  let modeUpdate = Promise.resolve();
+  let lastEditor = vscode.window.activeTextEditor;
+  const refreshUi = async (): Promise<void> => {
+    const health = await updateStatus(status, manager);
+    if (modeApplicationFailed) {
+      status.text = "$(warning) Secret Guard · Mode à appliquer";
+      status.backgroundColor = new vscode.ThemeColor(
+        "statusBarItem.warningBackground",
+      );
+    }
+    if (panel !== undefined) {
+      panel.webview.html = dashboardHtml(
+        health,
+        configuredWarnMode(),
+        randomBytes(16).toString("hex"),
+        modeApplicationFailed,
+        gateway?.summary,
+      );
+    }
+  };
+  context.subscriptions.push(
+    vscode.commands.registerCommand("secretGuard.connectGateway", async () => {
+      await gateway?.connect();
+      await refreshUi();
+    }),
+    vscode.commands.registerCommand(
+      "secretGuard.disconnectGateway",
+      async () => {
+        const answer = await vscode.window.showWarningMessage(
+          "Déconnecter xSOM retire le nettoyage transparent de Claude dans les nouvelles sessions. Les hooks locaux restent actifs.",
+          { modal: true },
+          "Déconnecter",
+        );
+        if (answer === "Déconnecter") {
+          await gateway?.disconnect();
+          await refreshUi();
+        }
+      },
+    ),
+    vscode.commands.registerCommand("secretGuard.chooseMode", async () => {
+      const selected = await vscode.window.showQuickPick(
+        PROTECTION_MODES.map((entry) => ({
+          ...entry,
+          picked: entry.mode === configuredMode(),
+        })),
+        {
+          title: "Secret Guard · Mode de protection",
+          placeHolder: "Comment traiter vos prochains messages ?",
+          matchOnDescription: true,
+        },
+      );
+      if (selected !== undefined) {
+        await vscode.workspace
+          .getConfiguration("secretGuard")
+          .update("mode", selected.mode, vscode.ConfigurationTarget.Global);
+      }
+    }),
+    vscode.window.onDidChangeActiveTextEditor((editor) => {
+      if (editor !== undefined) lastEditor = editor;
+    }),
+    vscode.commands.registerCommand("secretGuard.showDashboard", async () => {
+      if (panel === undefined) {
+        panel = vscode.window.createWebviewPanel(
+          "secretGuard.dashboard",
+          "Secret Guard",
+          vscode.ViewColumn.Beside,
+          {
+            enableScripts: false,
+            enableForms: false,
+            localResourceRoots: [],
+            enableCommandUris: [...DASHBOARD_COMMANDS],
+          },
+        );
+        panel.iconPath = new vscode.ThemeIcon("shield");
+        panel.onDidDispose(() => {
+          panel = undefined;
+        });
+        context.subscriptions.push(panel);
+      } else panel.reveal();
+      await refreshUi();
+    }),
+  );
+
   try {
     const initial = await manager.getHealth();
     const strategy = activationStrategy(
@@ -234,15 +370,32 @@ export async function activate(
       context.extensionMode === vscode.ExtensionMode.Test,
     );
     if (strategy === "enable") {
-      activationHealth = await manager.enable(configuredWarnMode());
+      await manager.enable(configuredWarnMode());
     } else {
-      activationHealth =
-        await manager.refreshIfConfigured(configuredWarnMode());
+      await manager.refreshIfConfigured(configuredWarnMode());
     }
   } catch {
     // Activation must preserve manual scanning even if the optional hook fails.
   }
-  await updateStatus(status, manager);
+  await refreshUi();
+
+  if (context.extensionMode !== vscode.ExtensionMode.Test) {
+    void gateway
+      .restore()
+      .then(async () => {
+        const health = await manager.getHealth();
+        gateway?.record({
+          kind: "local_test",
+          assistant: "manual",
+          mode: configuredMode(),
+          outcome:
+            health.reason === "local_canaries_verified" ? "passed" : "failed",
+          findings: 0,
+        });
+        await refreshUi();
+      })
+      .catch(() => undefined);
+  }
 
   context.subscriptions.push(
     vscode.commands.registerCommand("secretGuard.scanSelection", async () => {
@@ -263,8 +416,8 @@ export async function activate(
       });
     }),
     vscode.commands.registerCommand("secretGuard.scanDocument", async () => {
-      const editor = vscode.window.activeTextEditor;
-      if (editor === undefined) {
+      const editor = vscode.window.activeTextEditor ?? lastEditor;
+      if (editor === undefined || editor.document.isClosed) {
         await vscode.window.showInformationMessage("Aucun document ouvert.");
         return;
       }
@@ -282,10 +435,11 @@ export async function activate(
     vscode.commands.registerCommand("secretGuard.enableHook", async () => {
       try {
         await manager.enable(configuredWarnMode());
-        await updateStatus(status, manager);
-        await offerCodexFinalization(false);
+        modeApplicationFailed = false;
+        await refreshUi();
+        await offerCodexFinalization();
       } catch {
-        await updateStatus(status, manager);
+        await refreshUi();
         await vscode.window.showErrorMessage(
           "Activation refusée : configuration non gérée, droits insuffisants ou canari local en échec.",
         );
@@ -294,25 +448,48 @@ export async function activate(
     vscode.commands.registerCommand("secretGuard.disableHook", async () => {
       try {
         await manager.disable();
-        await updateStatus(status, manager);
+        await refreshUi();
         await vscode.window.showInformationMessage(
           "Hooks automatiques Secret Guard retirés sans modifier les autres hooks.",
         );
       } catch {
-        await updateStatus(status, manager);
+        await refreshUi();
         await vscode.window.showErrorMessage(
           "Suppression refusée : le fichier de hook n’est pas géré par Secret Guard.",
         );
       }
     }),
     vscode.workspace.onDidChangeConfiguration(async (event) => {
-      if (!event.affectsConfiguration("secretGuard.hook.warnMode")) return;
-      try {
-        await manager.refreshIfConfigured(configuredWarnMode());
-      } catch {
-        // Status below exposes the degraded state without disabling manual mode.
-      }
-      await updateStatus(status, manager);
+      if (
+        !event.affectsConfiguration("secretGuard.hook.warnMode") &&
+        !event.affectsConfiguration("secretGuard.mode")
+      )
+        return;
+      modeUpdate = modeUpdate.then(async () => {
+        gateway?.record({
+          kind: "mode_changed",
+          assistant: "manual",
+          mode: configuredMode(),
+          outcome: "configured",
+          findings: 0,
+        });
+        try {
+          const health =
+            await manager.refreshIfConfigured(configuredWarnMode());
+          if (health.state === "degraded") throw new Error("mode_not_applied");
+          modeApplicationFailed = false;
+          void vscode.window.showInformationMessage(
+            `${modeLabel(configuredMode())} · Réglage enregistré. Ouvrez une nouvelle session de votre assistant pour utiliser les hooks actualisés.`,
+          );
+        } catch {
+          modeApplicationFailed = true;
+          void vscode.window.showErrorMessage(
+            "Le mode est enregistré, mais son application aux assistants a échoué. Ouvrez Secret Guard puis Configurer la protection pour réessayer.",
+          );
+        }
+        await refreshUi();
+      });
+      await modeUpdate;
     }),
   );
 
@@ -320,22 +497,8 @@ export async function activate(
     "xsom.secretGuard",
     handleChat,
   );
+  participant.iconPath = new vscode.ThemeIcon("shield");
   context.subscriptions.push(participant);
-
-  if (
-    activationHealth !== undefined &&
-    shouldOfferCodexFinalization(
-      activationHealth.state,
-      context.globalState.get<number>("codexOnboardingRevision"),
-      context.extensionMode === vscode.ExtensionMode.Test,
-    )
-  ) {
-    await offerCodexFinalization(true);
-    await context.globalState.update(
-      "codexOnboardingRevision",
-      CODEX_ONBOARDING_REVISION,
-    );
-  }
 }
 
 export function deactivate(): void {

@@ -2,8 +2,6 @@ import type { HookHealthState } from "./hook-manager.js";
 
 export type ActivationStrategy = "enable" | "refresh";
 
-export const CODEX_ONBOARDING_REVISION = 1;
-
 export function supportsVsCodePromptHooks(version: string): boolean {
   const match = /^(\d+)\.(\d+)/u.exec(version);
   if (match === null) return false;
@@ -19,16 +17,4 @@ export function activationStrategy(
 ): ActivationStrategy {
   if (state === "off" && autoEnable && !extensionTest) return "enable";
   return "refresh";
-}
-
-export function shouldOfferCodexFinalization(
-  state: HookHealthState,
-  completedRevision: number | undefined,
-  extensionTest: boolean,
-): boolean {
-  return (
-    !extensionTest &&
-    (state === "active" || state === "partial") &&
-    completedRevision !== CODEX_ONBOARDING_REVISION
-  );
 }

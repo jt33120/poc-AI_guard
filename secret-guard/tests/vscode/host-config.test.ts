@@ -10,6 +10,7 @@ import {
   defaultHostDefinitions,
   inspectHostConfig,
   MANAGED_MARKER,
+  renderClaudeWindowsCommand,
   renderPosixCommand,
   renderPowerShellCommand,
   renderWindowsCommand,
@@ -62,9 +63,39 @@ describe("multi-host hook configuration", () => {
     expect(renderWindowsCommand("C:\\guard.exe", hookPath, "block")).toMatch(
       /^powershell -NoProfile -NonInteractive /,
     );
+    const claudeWindows = renderClaudeWindowsCommand(
+      "C:\\guard.exe",
+      hookPath,
+      "block",
+    );
+    expect(claudeWindows).toContain("-EncodedCommand");
+    expect(claudeWindows).toContain("exit $LASTEXITCODE");
+    expect(claudeWindows).toContain(MANAGED_MARKER);
+    expect(claudeWindows).not.toContain("C:\\guard.exe");
   });
 
   for (const host of defaultHostDefinitions("/tmp/home")) {
+    it(`switches modes reversibly for ${host.id} without duplicating hooks`, () => {
+      let content: string | null = null;
+      for (const mode of [
+        "block",
+        "observe",
+        "redact",
+        "allow",
+        "block",
+      ] as const) {
+        content = configureHost(content, host, executable, hookPath, mode);
+        expect(inspectHostConfig(content, host, executable, hookPath)).toBe(
+          "configured",
+        );
+        const parsed = JSON.parse(content) as {
+          hooks: Record<string, unknown[]>;
+        };
+        expect(parsed.hooks[host.eventName]).toHaveLength(1);
+      }
+      expect(unconfigureHost(content, host, executable, hookPath)).toBeNull();
+    });
+
     it(`adds, refreshes, and removes only the ${host.id} entry`, () => {
       const foreign = {
         otherSetting: true,
@@ -96,8 +127,17 @@ describe("multi-host hook configuration", () => {
       expect(inspectHostConfig(refreshed, host, executable, hookPath)).toBe(
         "configured",
       );
-      expect(refreshed).toContain("--warn=allow");
-      expect(refreshed).not.toContain("--warn=block");
+      if (host.id === "claude" && process.platform === "win32") {
+        expect(refreshed).toContain(
+          renderClaudeWindowsCommand(executable, hookPath, "allow"),
+        );
+        expect(refreshed).not.toContain(
+          renderClaudeWindowsCommand(executable, hookPath, "block"),
+        );
+      } else {
+        expect(refreshed).toContain("--warn=allow");
+        expect(refreshed).not.toContain("--warn=block");
+      }
 
       const removed = unconfigureHost(refreshed, host, executable, hookPath);
       expect(removed).not.toBeNull();
@@ -239,6 +279,38 @@ describe("multi-host hook configuration", () => {
     },
   );
 
+  it.skipIf(process.platform !== "win32")(
+    "recognizes and upgrades Claude's double-expanded v0.2.2 command",
+    () => {
+      const host = defaultHostDefinitions()[1]!;
+      const oldCommand = renderWindowsCommand(executable, hookPath, "block");
+      const oldConfig = JSON.stringify({
+        hooks: {
+          UserPromptSubmit: [
+            {
+              hooks: [{ type: "command", command: oldCommand, timeout: 30 }],
+            },
+          ],
+        },
+      });
+
+      expect(inspectHostConfig(oldConfig, host, executable, hookPath)).toBe(
+        "configured",
+      );
+      const upgraded = configureHost(
+        oldConfig,
+        host,
+        executable,
+        hookPath,
+        "block",
+      );
+      expect(upgraded).not.toContain(oldCommand);
+      expect(upgraded).toContain(
+        renderClaudeWindowsCommand(executable, hookPath, "block"),
+      );
+    },
+  );
+
   it("migrates the nested PowerShell Codex command while preserving other hooks", () => {
     const host = defaultHostDefinitions()[2]!;
     const old = JSON.stringify({
@@ -333,6 +405,64 @@ describe("multi-host hook configuration", () => {
       expect(
         inspectHostConfig(upgraded, host, extensionExecutable, extensionHook),
       ).toBe("configured");
+    },
+  );
+
+  it.skipIf(process.platform !== "win32")(
+    "preserves the scanner verdict through Claude's outer PowerShell",
+    () => {
+      const host = defaultHostDefinitions()[1]!;
+      const directory = mkdtempSync(join(tmpdir(), "secret-guard-claude-"));
+      const bundle = join(directory, "hook ' $guard.cjs");
+      try {
+        const built = buildSync({
+          entryPoints: [resolve("packages/vscode/src/hook-entry.ts")],
+          bundle: true,
+          platform: "node",
+          format: "cjs",
+          write: false,
+          alias: {
+            "@xsom/secret-guard-cli/hook": resolve("packages/cli/src/hook.ts"),
+            "@xsom/secret-guard-core": resolve("packages/core/src/index.ts"),
+          },
+        });
+        writeFileSync(bundle, built.outputFiles[0]!.contents);
+        const config = JSON.parse(
+          configureHost(null, host, process.execPath, bundle, "block"),
+        );
+        const command = config.hooks.UserPromptSubmit[0].hooks[0].command;
+        for (const [prompt, expected] of [
+          ["Bonjour", 0],
+          [
+            "Analyse cette configuration : PASSWORD=definitely-not-a-real-secret-123",
+            2,
+          ],
+        ] as const) {
+          const result = spawnSync(
+            "powershell.exe",
+            ["-NoProfile", "-NonInteractive", "-Command", command],
+            {
+              input: JSON.stringify({
+                hook_event_name: "UserPromptSubmit",
+                prompt,
+              }),
+              encoding: "utf8",
+              timeout: 10_000,
+              windowsHide: true,
+            },
+          );
+          expect(result.error).toBeUndefined();
+          expect(result.status, result.stderr).toBe(expected);
+          if (expected === 2) {
+            expect(result.stderr).toContain("Secret Guard detected password");
+            expect(result.stderr).not.toContain(
+              "definitely-not-a-real-secret-123",
+            );
+          } else expect(JSON.parse(result.stdout)).toEqual({ continue: true });
+        }
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
     },
   );
 

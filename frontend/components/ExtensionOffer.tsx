@@ -22,9 +22,11 @@
  */
 
 import Link from "next/link";
+import Image from "next/image";
 
 import { Wordmark, XsomMark } from "@/components/brand";
 import {
+  CONTACT_MAILTO,
   EXTENSION_MARKETPLACE_URL,
   EXTENSION_ON_MARKETPLACE,
   EXTENSION_VSIX_URL,
@@ -81,6 +83,29 @@ export function ExtensionOffer() {
         )}
       </section>
 
+      <section className="guard-who guard-wrap" aria-labelledby="ext-plans">
+        <div className="guard-section-heading">
+          <h2 id="ext-plans">{copy.extPlansTitle}</h2>
+        </div>
+        <div className="guard-paths">
+          <article className="guard-path" id="individual">
+            <p className="guard-path__tag">{copy.extFreeLabel}</p>
+            <h3>{copy.extFreeTitle}</h3>
+            <p>{copy.extFreeBody}</p>
+            <a className="guard-link" href="#ext-steps">{copy.extStepsTitle} ↓</a>
+            <p className="guard-path__note">{copy.extFreeNote}</p>
+          </article>
+          <article className="guard-path" id="enterprise">
+            <p className="guard-path__tag">{copy.extEnterpriseLabel}</p>
+            <h3>{copy.extEnterpriseTitle}</h3>
+            <p>{copy.extEnterpriseBody}</p>
+            <a className="guard-button" href={CONTACT_MAILTO}>{copy.extEnterpriseAction} ↗</a>
+            <p className="guard-path__note">{copy.extEnterpriseNote}</p>
+            <a className="guard-link" href="https://learn.chatgpt.com/fr-FR/docs/hooks#hooks-gérés-définis-dans-requirementstoml" target="_blank" rel="noreferrer">{copy.extEnterpriseDocs} ↗</a>
+          </article>
+        </div>
+      </section>
+
       <section className="guard-start guard-wrap" aria-labelledby="ext-steps">
         <div className="guard-section-heading">
           <h2 id="ext-steps">{copy.extStepsTitle}</h2>
@@ -103,7 +128,19 @@ export function ExtensionOffer() {
         <p>{copy.extHostsBody}</p>
         <ul className="guard-ext-hosts">
           {copy.extHosts.map((hote) => (
-            <li key={hote}>{hote}</li>
+            <li key={hote}>
+              {hote === "Claude Code" ? (
+                <Image
+                  className="guard-ext-hosts__logo"
+                  src="/claude-ai-icon.webp"
+                  width={28}
+                  height={28}
+                  alt=""
+                  aria-hidden="true"
+                />
+              ) : null}
+              {hote}
+            </li>
           ))}
         </ul>
       </section>

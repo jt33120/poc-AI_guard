@@ -2,8 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   activationStrategy,
-  CODEX_ONBOARDING_REVISION,
-  shouldOfferCodexFinalization,
   supportsVsCodePromptHooks,
 } from "../../packages/vscode/src/onboarding.js";
 
@@ -26,24 +24,6 @@ describe("extension onboarding", () => {
       );
     },
   );
-
-  it("offers Codex finalization once for a ready first install", () => {
-    expect(shouldOfferCodexFinalization("active", undefined, false)).toBe(true);
-    expect(
-      shouldOfferCodexFinalization("active", CODEX_ONBOARDING_REVISION, false),
-    ).toBe(false);
-  });
-
-  it.each(["off", "degraded"] as const)(
-    "does not offer finalization while hook health is %s",
-    (state) => {
-      expect(shouldOfferCodexFinalization(state, undefined, false)).toBe(false);
-    },
-  );
-
-  it("does not open onboarding UI in extension-host tests", () => {
-    expect(shouldOfferCodexFinalization("active", undefined, true)).toBe(false);
-  });
 
   it.each([
     ["1.132.9", false],

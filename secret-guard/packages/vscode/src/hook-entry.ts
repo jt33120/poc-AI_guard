@@ -1,6 +1,8 @@
 import process from "node:process";
+import { dirname } from "node:path";
+import { canDelegate } from "./gateway-delegation.js";
 
-import { runHook, type WarnMode } from "@xsom/secret-guard-cli/hook";
+import { parseHookMode, runHook } from "@xsom/secret-guard-cli/hook";
 
 const MAX_HOOK_INPUT_BYTES = 1_200_000;
 
@@ -16,11 +18,6 @@ async function readBoundedStdin(): Promise<string> {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-function configuredWarnMode(): WarnMode {
-  const argument = process.argv.find((value) => value.startsWith("--warn="));
-  return argument === "--warn=allow" ? "allow" : "block";
-}
-
 async function main(): Promise<void> {
   let rawInput = "";
   try {
@@ -28,7 +25,30 @@ async function main(): Promise<void> {
   } catch {
     // Empty input produces the protocol's fail-closed response.
   }
-  const response = runHook(rawInput, configuredWarnMode());
+  const mode = parseHookMode(process.argv.slice(2));
+  const response = runHook(rawInput, mode);
+  let promptEvent = false;
+  try {
+    const input = JSON.parse(rawInput) as Record<string, unknown>;
+    promptEvent =
+      input.hook_event_name === "UserPromptSubmit" &&
+      typeof input.prompt === "string";
+  } catch {
+    /* Invalid envelopes must remain blocked. */
+  }
+  if (
+    !response.continue &&
+    promptEvent &&
+    mode === "redact" &&
+    (await canDelegate(
+      dirname(process.argv[1] ?? ""),
+      process.env.ANTHROPIC_BASE_URL,
+    ))
+  ) {
+    // The original travels only to the registered, mandatory-redaction route.
+    process.stdout.write(`${JSON.stringify({ continue: true })}\n`);
+    return;
+  }
   if (!response.continue) {
     process.stderr.write(
       `${response.stopReason ?? "Secret Guard blocked this prompt."}\n`,

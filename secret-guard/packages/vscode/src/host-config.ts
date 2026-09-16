@@ -2,7 +2,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import process from "node:process";
 
-import type { WarnMode } from "@xsom/secret-guard-cli/hook";
+import { hookModeArgument, type WarnMode } from "@xsom/secret-guard-cli/hook";
 
 export const MANAGED_MARKER = "xsom-secret-guard-v1";
 export const HOST_HOOK_TIMEOUT_SECONDS = 30;
@@ -77,7 +77,7 @@ export function renderPosixCommand(
     quotePosix(`XSOM_SECRET_GUARD_MANAGED=${MANAGED_MARKER}`),
     quotePosix(executable),
     quotePosix(hookPath),
-    quotePosix(`--warn=${warnMode}`),
+    quotePosix(hookModeArgument(warnMode)),
   ].join(" ");
 }
 
@@ -96,7 +96,7 @@ export function renderPowerShellCommand(
     `$env:XSOM_SECRET_GUARD_MANAGED='${MANAGED_MARKER}'`,
     `$env:XSOM_SECRET_GUARD_EXECUTABLE=${quotePowerShell(executable)}`,
     `$env:XSOM_SECRET_GUARD_HOOK=${quotePowerShell(hookPath)}`,
-    `$env:XSOM_SECRET_GUARD_WARN_ARGUMENT=${quotePowerShell(`--warn=${warnMode}`)}`,
+    `$env:XSOM_SECRET_GUARD_WARN_ARGUMENT=${quotePowerShell(hookModeArgument(warnMode))}`,
     // Code.exe is a GUI-subsystem executable on Windows. PowerShell can run it
     // but does not reliably populate $LASTEXITCODE, so Codex cannot observe the
     // scanner's blocking exit code. cmd.exe is a console process and preserves
@@ -126,6 +126,20 @@ export function renderWindowsCommand(
 ): string {
   const script = renderPowerShellCommand(executable, hookPath, warnMode);
   return `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "${script.replaceAll('"', '\\"')}"`;
+}
+
+export function renderClaudeWindowsCommand(
+  executable: string,
+  hookPath: string,
+  warnMode: WarnMode,
+): string {
+  const script = renderPowerShellCommand(executable, hookPath, warnMode);
+  const encoded = Buffer.from(script, "utf16le").toString("base64");
+  // Claude Code runs Windows hooks through PowerShell. Passing another
+  // double-quoted -Command makes the outer shell expand $env:* and
+  // $LASTEXITCODE before the scanner starts. -EncodedCommand avoids that
+  // expansion; the final exit propagates the scanner's blocking code 2.
+  return `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ${encoded}; exit $LASTEXITCODE # ${MANAGED_MARKER}`;
 }
 
 function renderLegacyWindowsCommand(
@@ -160,11 +174,12 @@ function nestedEntry(
   warnMode: WarnMode,
 ): Record<string, unknown> {
   const posix = renderPosixCommand(executable, hookPath, warnMode);
-  const windows = renderWindowsCommand(executable, hookPath, warnMode);
   const handler: Record<string, unknown> = {
     type: "command",
     command:
-      host.id === "claude" && process.platform === "win32" ? windows : posix,
+      host.id === "claude" && process.platform === "win32"
+        ? renderClaudeWindowsCommand(executable, hookPath, warnMode)
+        : posix,
     timeout: HOST_HOOK_TIMEOUT_SECONDS,
   };
   // Codex already evaluates commandWindows in PowerShell. A nested -Command
@@ -413,7 +428,7 @@ function exactManagedEntry(
   executable: string,
   hookPath: string,
 ): boolean {
-  return (["block", "allow"] as const).some((warnMode) => {
+  return (["block", "allow", "redact", "observe"] as const).some((warnMode) => {
     const current = managedEntry(host, executable, hookPath, warnMode);
     const legacy = legacyManagedEntry(host, executable, hookPath, warnMode);
     const legacyGuiExecutable = legacyGuiExecutableEntry(
@@ -458,6 +473,18 @@ function exactManagedEntry(
             ],
           }
         : null;
+    const legacyClaudeNestedPowerShell =
+      host.id === "claude" && process.platform === "win32"
+        ? {
+            hooks: [
+              {
+                type: "command",
+                command: renderWindowsCommand(executable, hookPath, warnMode),
+                timeout: HOST_HOOK_TIMEOUT_SECONDS,
+              },
+            ],
+          }
+        : null;
     return (
       canonical(value) === canonical(current) ||
       (legacy !== null && canonical(value) === canonical(legacy)) ||
@@ -466,6 +493,8 @@ function exactManagedEntry(
         canonical(value) === canonical(nestedPowerShell)) ||
       (legacyNestedPowerShell !== null &&
         canonical(value) === canonical(legacyNestedPowerShell)) ||
+      (legacyClaudeNestedPowerShell !== null &&
+        canonical(value) === canonical(legacyClaudeNestedPowerShell)) ||
       wrappers.some((wrapper) => canonical(value) === canonical(wrapper)) ||
       standalone.some((entry) => canonical(value) === canonical(entry))
     );

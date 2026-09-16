@@ -29,8 +29,12 @@ The delivered V0.2 uses the assistants' native pre-submit hooks:
 Once automatic onboarding has completed, typing `@secretguard` is not required.
 Every text prompt submitted through a configured native host hook is scanned
 before the assistant processes it. Clean prompts pass without interaction;
-WARN/BLOCK and scanner failures stop the prompt with exit code 2 and a
-non-sensitive reason.
+In the default Block mode, WARN/BLOCK and scanner failures stop the prompt with
+exit code 2 and a non-sensitive reason. Choose **Secret Guard → Changer de mode**
+or `secretGuard.mode` for Block, Redact, or Observe. Redact automatically cleans
+the owned `@secretguard` flow; native hooks block and guide to clipboard cleanup
+because they cannot replace the original prompt. Observe warns and permits the
+original text, including secrets. Invalid hook envelopes remain refused.
 
 ## Installation
 
@@ -48,7 +52,7 @@ Opening the `.vsix` in the editor does not install it: VS Code displays an
 archive, not an extension.
 
 Installing the extension configures and verifies the local hooks automatically
-by default. A first-run action opens Codex CLI so the user can review the xSOM
+by default. The dashboard's Finaliser Codex action opens Codex CLI so the user can review the xSOM
 `UserPromptSubmit` definition, trust its current hash, and then start a new
 Codex chat. This explicit trust step cannot be automated by a user extension
 because Codex runs trusted hooks outside its sandbox. Set
@@ -72,8 +76,8 @@ Two version floors apply independently: the extension shell supports VS Code
 newer. On VS Code 1.133–1.136, the extension can still configure and protect
 Claude Code, Codex and Windsurf; it must not claim native Copilot coverage.
 
-Releases are cut either by tagging (`git tag secret-guard-v0.2.2 && git push
-origin secret-guard-v0.2.2`) or by running the `Secret Guard release` workflow
+Releases are cut either by tagging (`git tag secret-guard-v0.2.4 && git push
+origin secret-guard-v0.2.4`) or by running the `Secret Guard release` workflow
 from the Actions tab with the manifest version as its input, which creates the
 tag itself. Either way `secret-guard-release.yml` replays `npm run verify`,
 refuses a version that does not match the manifest, attaches the VSIX to the

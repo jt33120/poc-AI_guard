@@ -56,6 +56,8 @@ from core import (
     dlp,
     dlp_config,
     entitlements,
+    extension_devices,
+    extension_redaction,
     monitor,
     policy_store,
     pricing,
@@ -630,7 +632,14 @@ def _debiter_un_appel(url: str, tenant_id: str) -> tuple[Entitlement, Meter]:
         return entitlements.AUCUNE, Meter.unknown
 
 
-async def _forward(request: Request, principal: GatewayPrincipal, provider: str) -> Response:
+async def _forward(
+    request: Request,
+    principal: GatewayPrincipal,
+    provider: str,
+    *,
+    extension: bool = False,
+    count_tokens: bool = False,
+) -> Response:
     # Le chronomètre de la garde, premier segment. Il court jusqu'à l'envoi chez le
     # fournisseur, s'arrête pendant l'aller-retour, et repart dans `_inspect` : sur
     # cette porte le verdict se rend en deux temps, de part et d'autre du modèle.
@@ -660,6 +669,55 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
         )
 
     body = await request.body()
+    device_id: str | None = None
+    cleaned: extension_redaction.Cleaned | None = None
+    request_id = str(uuid4())
+
+    async def record_extension(outcome: str) -> None:
+        if device_id is None:
+            return
+        registered_id = device_id
+        payload = {
+            "kind": "gateway_request",
+            "request_id": request_id,
+            "assistant": "claude",
+            "mode": "redact",
+            "outcome": outcome,
+            "findings": cleaned.count if cleaned else 0,
+            "rules": list(cleaned.kinds) if cleaned else [],
+            "analysis_complete": cleaned is not None,
+            "endpoint": "count_tokens" if count_tokens else "messages",
+        }
+
+        def write() -> None:
+            with db.connection(url) as conn, conn.transaction():
+                extension_devices.record(
+                    conn, principal.tenant_id, registered_id, str(uuid4()), "gateway", payload
+                )
+
+        await run_in_threadpool(write)
+
+    if extension:
+        if not droit.allows(Capability.dlp):
+            raise HTTPException(402, "Extension redaction requires DLP capability")
+
+        def registered_device() -> str:
+            with db.connection(url) as conn:
+                return extension_devices.device_for(conn, principal.tenant_id, principal.token_id)
+
+        try:
+            device_id = await run_in_threadpool(registered_device)
+            cleaned = await run_in_threadpool(extension_redaction.clean, body)
+        except LookupError:
+            raise HTTPException(409, "Register this workstation first") from None
+        except ValueError:
+            await record_extension("blocked")
+            raise HTTPException(
+                422, "Prompt cannot be completely cleaned; no request forwarded"
+            ) from None
+        body = cleaned.body
+
+    await record_extension("redacted" if cleaned and cleaned.count else "clean")
 
     # Egress data-loss guard: scan the outbound prompt for secrets/PII BEFORE it
     # leaves for the provider. Blocks fixed-form secrets, flags/redacts PII per the
@@ -717,12 +775,15 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
             "Content-Type": "application/json",
         }
     else:
-        upstream = base + "/v1/messages"
+        upstream = base + ("/v1/messages/count_tokens" if count_tokens else "/v1/messages")
         fwd_headers = {
-            "x-api-key": request.headers.get("x-api-key", ""),
             "anthropic-version": request.headers.get("anthropic-version", "2023-06-01"),
             "Content-Type": "application/json",
         }
+        # Preserve assistant-owned API/OAuth authentication and advertised capabilities.
+        for header in ("x-api-key", "authorization", "anthropic-beta"):
+            if header in request.headers:
+                fwd_headers[header] = request.headers[header]
 
     try:
         streaming = bool(json.loads(body or b"{}").get("stream"))
@@ -756,6 +817,15 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
         )
         upstream_req = client.build_request("POST", upstream, content=body, headers=fwd_headers)
         upstream_resp = await client.send(upstream_req, stream=True)
+        try:
+            await record_extension(
+                "upstream_accepted"
+                if 200 <= upstream_resp.status_code < 300
+                else "upstream_rejected"
+            )
+        except Exception:
+            await upstream_resp.aclose()
+            raise
         return StreamingResponse(
             upstream_resp.aiter_raw(),
             status_code=upstream_resp.status_code,
@@ -765,6 +835,15 @@ async def _forward(request: Request, principal: GatewayPrincipal, provider: str)
 
     started = time.monotonic()
     upstream_resp = await client.post(upstream, content=body, headers=fwd_headers)
+    await record_extension(
+        "upstream_accepted" if 200 <= upstream_resp.status_code < 300 else "upstream_rejected"
+    )
+    if count_tokens:
+        return Response(
+            content=upstream_resp.content,
+            status_code=upstream_resp.status_code,
+            media_type="application/json",
+        )
     latency_ms = (time.monotonic() - started) * 1000
     if upstream_resp.status_code == 200:
         try:
@@ -856,6 +935,24 @@ async def anthropic_messages(
     request: Request, principal: GatewayPrincipal = Depends(get_gateway_principal)
 ) -> Response:
     return await _forward(request, principal, "anthropic")
+
+
+@router.post("/extension/anthropic/v1/messages")
+@limiter.shared_limit(proxy_rpm_limit, scope="proxy_rpm")
+async def extension_messages(
+    request: Request,
+    principal: GatewayPrincipal = Depends(get_gateway_principal),
+) -> Response:
+    return await _forward(request, principal, "anthropic", extension=True)
+
+
+@router.post("/extension/anthropic/v1/messages/count_tokens")
+@limiter.shared_limit(proxy_rpm_limit, scope="proxy_rpm")
+async def extension_count_tokens(
+    request: Request,
+    principal: GatewayPrincipal = Depends(get_gateway_principal),
+) -> Response:
+    return await _forward(request, principal, "anthropic", extension=True, count_tokens=True)
 
 
 # --- Token-in-URL variants -----------------------------------------------------

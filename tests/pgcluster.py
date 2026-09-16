@@ -8,12 +8,14 @@ trust auth. On a non-root CI runner everything runs as the current user.
 from __future__ import annotations
 
 import os
-import pwd
 import shutil
 import socket
 import subprocess
 import tempfile
 from pathlib import Path
+
+if os.name != "nt":
+    import pwd
 
 _PG_VERSIONS = ("16", "17", "15", "14")
 _REQUIRED = ("initdb", "pg_ctl", "postgres", "psql")
@@ -43,7 +45,7 @@ def _free_port() -> int:
 
 
 def _postgres_user() -> pwd.struct_passwd | None:
-    if os.geteuid() != 0:
+    if os.name == "nt" or os.geteuid() != 0:
         return None
     try:
         return pwd.getpwnam("postgres")
@@ -72,6 +74,10 @@ class EphemeralPostgres:
             "LC_ALL": "C",
             "PGUSER": "postgres",
         }
+        if os.name == "nt":
+            for key in ("SYSTEMROOT", "SystemRoot", "COMSPEC", "TEMP", "TMP"):
+                if key in os.environ:
+                    env[key] = os.environ[key]
         kwargs: dict[str, object] = {
             "capture_output": True,
             "text": True,
@@ -81,7 +87,20 @@ class EphemeralPostgres:
         if self._pw is not None:
             kwargs["user"] = self._pw.pw_uid
             kwargs["group"] = self._pw.pw_gid
-        result = subprocess.run(cmd, **kwargs)  # type: ignore[call-overload]
+        if os.name == "nt":
+            # A detached postgres child can inherit pg_ctl's pipe handles on
+            # Windows: communicate() then waits for the server's entire lifetime.
+            # A file captures diagnostics without waiting for pipe EOF.
+            kwargs.pop("capture_output")
+            with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as output:
+                result = subprocess.run(  # type: ignore[call-overload]
+                    cmd, stdout=output, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, **kwargs
+                )
+                output.seek(0)
+                result.stdout = output.read()
+                result.stderr = ""
+        else:
+            result = subprocess.run(cmd, **kwargs)  # type: ignore[call-overload]
         if check and result.returncode != 0:
             raise RuntimeError(f"command failed: {cmd[0]}\n{result.stdout}\n{result.stderr}")
         return result
@@ -111,9 +130,11 @@ class EphemeralPostgres:
             ]
         )
         options = (
-            f"-p {self.port} -k {self.sockdir} -c listen_addresses=127.0.0.1 "
+            f"-p {self.port} -c listen_addresses=127.0.0.1 "
             "-c fsync=off -c synchronous_commit=off -c full_page_writes=off"
         )
+        if os.name != "nt":
+            options += f" -k {self.sockdir}"
         self._run(
             [
                 str(_bin("pg_ctl")),
@@ -147,4 +168,7 @@ class EphemeralPostgres:
         return self.url_for("postgres")
 
     def psql_apply(self, url: str, sql_file: Path) -> None:
-        self._run([str(_bin("psql")), url, "-v", "ON_ERROR_STOP=1", "-q", "-f", str(sql_file)])
+        # Windows getopt does not permute switches after positional arguments.
+        self._run(
+            [str(_bin("psql")), "-v", "ON_ERROR_STOP=1", "-q", "-f", str(sql_file), "-d", url]
+        )

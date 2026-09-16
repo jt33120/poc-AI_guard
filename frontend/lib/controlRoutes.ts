@@ -32,6 +32,9 @@ interface Route {
 const SEG = "[A-Za-z0-9_-]{1,64}";
 
 export const CONTROL_ROUTES: readonly Route[] = [
+  { pattern: new RegExp("^v1/extensions/devices$"), methods: ["GET"] },
+  { pattern: new RegExp("^v1/extensions/events$"), methods: ["GET"] },
+  { pattern: new RegExp("^v1/extensions/verify$"), methods: ["GET"] },
   { pattern: new RegExp("^v1/agents$"), methods: ["GET"] },
   { pattern: new RegExp("^v1/approvals$"), methods: ["GET"] },
   { pattern: new RegExp(`^v1/approvals/${SEG}/decision$`), methods: ["POST"] },

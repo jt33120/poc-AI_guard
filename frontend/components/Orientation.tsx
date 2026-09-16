@@ -56,7 +56,7 @@ export function Orientation({ copy }: { copy: Copy }) {
                   <span aria-hidden="true">↗</span>
                 </a>
               ) : (
-                <Link className="guard-button" href="/saas">
+                <Link className="guard-button" href="/extension">
                   {path.action}
                   <span aria-hidden="true">↗</span>
                 </Link>

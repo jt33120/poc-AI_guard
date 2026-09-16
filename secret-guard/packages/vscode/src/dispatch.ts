@@ -5,6 +5,7 @@ import {
   type ScanInput,
   type ScanResult,
 } from "@xsom/secret-guard-core";
+import type { ProtectionMode } from "@xsom/secret-guard-cli/hook";
 
 export type WarnChoice = "send" | "redact" | "cancel";
 
@@ -16,6 +17,8 @@ export interface DispatchOutcome {
 }
 
 export interface DispatchDependencies {
+  readonly mode?: ProtectionMode;
+  readonly notifyWarning?: (result: ScanResult) => Promise<void>;
   readonly chooseForWarning: (result: ScanResult) => Promise<WarnChoice>;
   readonly transport: (content: string) => Promise<void>;
   readonly scanner?: (input: ScanInput) => ScanResult;
@@ -56,7 +59,18 @@ export async function dispatchGuarded(
     initial = scannerFailure(content);
   }
 
-  if (!initial.complete || initial.decision === "BLOCK") {
+  if (dependencies.mode === "observe") {
+    if (!initial.complete || initial.decision !== "ALLOW") {
+      await dependencies.notifyWarning?.(initial);
+    }
+    await dependencies.transport(content);
+    return { initial, final: initial, sent: true, redacted: false };
+  }
+
+  if (
+    !initial.complete ||
+    (initial.decision === "BLOCK" && dependencies.mode !== "redact")
+  ) {
     return { initial, final: initial, sent: false, redacted: false };
   }
 
@@ -65,7 +79,12 @@ export async function dispatchGuarded(
     return { initial, final: initial, sent: true, redacted: false };
   }
 
-  const choice = await dependencies.chooseForWarning(initial);
+  const choice =
+    dependencies.mode === "redact"
+      ? "redact"
+      : dependencies.mode === "block"
+        ? "cancel"
+        : await dependencies.chooseForWarning(initial);
   if (choice === "cancel") {
     return { initial, final: initial, sent: false, redacted: false };
   }
@@ -81,7 +100,11 @@ export async function dispatchGuarded(
   } catch {
     final = scannerFailure(sanitized);
   }
-  if (!final.complete || final.decision !== "ALLOW") {
+  if (
+    !final.complete ||
+    final.decision !== "ALLOW" ||
+    final.findings.length > 0
+  ) {
     return { initial, final, sent: false, redacted: true };
   }
   await dependencies.transport(sanitized);

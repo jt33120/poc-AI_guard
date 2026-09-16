@@ -32,6 +32,7 @@ const ADMIN_LINKS = [
     code: "09",
   },
   { href: "/admin", fr: "Administration", en: "Administration", code: "10" },
+  { href: "/extensions", fr: "Extension VS Code", en: "VS Code extension", code: "11" },
 ];
 
 export function AppShell({

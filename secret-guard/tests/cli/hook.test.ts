@@ -1,10 +1,48 @@
 import { describe, expect, it } from "vitest";
 
-import { responseForResult, runHook } from "../../packages/cli/src/hook.js";
+import {
+  parseHookMode,
+  responseForResult,
+  runHook,
+} from "../../packages/cli/src/hook.js";
 
 const fakeToken = `ghp_${"aB3d".repeat(9)}`;
 
 describe("hook bridge", () => {
+  it("observes strong findings without disclosing the value in its report", () => {
+    const response = runHook(
+      JSON.stringify({ prompt: `PASSWORD=${fakeToken}` }),
+      "observe",
+    );
+    expect(response.continue).toBe(true);
+    expect(response.systemMessage).toContain("sans modification");
+    expect(JSON.stringify(response)).not.toContain(fakeToken);
+  });
+
+  it("blocks in redact mode when the host cannot replace the original", () => {
+    const response = runHook(
+      JSON.stringify({ prompt: `PASSWORD=${fakeToken}` }),
+      "redact",
+    );
+    expect(response.continue).toBe(false);
+    expect(response.stopReason).toContain("ne permet pas");
+    expect(response.stopReason).toContain("presse-papiers");
+    expect(JSON.stringify(response)).not.toContain(fakeToken);
+  });
+
+  it("preserves the legacy allow mode's strong-secret block", () => {
+    expect(
+      runHook(JSON.stringify({ prompt: fakeToken }), "allow").continue,
+    ).toBe(false);
+  });
+
+  it("parses modes without treating an invalid value as permissive", () => {
+    expect(parseHookMode(["--mode=observe"])).toBe("observe");
+    expect(parseHookMode(["--mode=redact"])).toBe("redact");
+    expect(parseHookMode(["--warn=allow"])).toBe("allow");
+    expect(parseHookMode(["--mode=typo", "--warn=allow"])).toBe("block");
+  });
+
   it("allows a clean prompt without echoing it", () => {
     const raw = JSON.stringify({
       hook_event_name: "UserPromptSubmit",

@@ -31,10 +31,10 @@ export function hookMessage(result: ScanResult): string {
   if (first === undefined) {
     return result.complete
       ? "Secret Guard could not establish a safe verdict."
-      : "Secret Guard blocked because the input could not be scanned completely.";
+      : "Secret Guard n’a pas pu analyser le texte en entier.";
   }
   const { line, column } = first.span.start;
   const extra =
     result.findings.length > 1 ? ` and ${result.findings.length - 1} more` : "";
-  return `Secret Guard detected ${first.secretType} at line ${line}, column ${column}${extra}. The detected value is not included in this hook result; host interception is not attested.`;
+  return `🛡️ Secret Guard · Contenu à vérifier\n\nSecret Guard detected ${first.secretType} at line ${line}, column ${column}${extra}.\n\nPour nettoyer le texte : copiez votre message, cliquez sur Secret Guard dans la barre de VS Code, puis sur « Vérifier le presse-papiers ». Si une version nettoyée est disponible, choisissez « Copier la version expurgée », puis collez-la dans votre chat.\nLes valeurs détectées ne sont pas affichées dans ce rapport.`;
 }

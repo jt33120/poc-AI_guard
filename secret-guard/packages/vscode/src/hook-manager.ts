@@ -13,7 +13,7 @@ import process from "node:process";
 
 import type * as vscode from "vscode";
 
-import type { WarnMode } from "@xsom/secret-guard-cli/hook";
+import { hookModeArgument, type WarnMode } from "@xsom/secret-guard-cli/hook";
 
 import {
   configureHost,
@@ -148,9 +148,10 @@ function executeHook(
   hookPath: string,
   prompt: string,
   protocol: HookProtocol,
+  mode: WarnMode,
 ): Promise<HookExecution> {
   return new Promise((resolve) => {
-    const child = spawn(executable, [hookPath, "--warn=block"], {
+    const child = spawn(executable, [hookPath, hookModeArgument(mode)], {
       env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
@@ -199,6 +200,7 @@ export async function verifyHookCanary(
   executable: string,
   hookPath: string,
   protocol: HookProtocol = "user-prompt-submit",
+  mode: WarnMode = "block",
 ): Promise<boolean> {
   const syntheticCanary = `ghp_${"Sg7".repeat(12)}`;
   const clean = await executeHook(
@@ -206,12 +208,14 @@ export async function verifyHookCanary(
     hookPath,
     "Explain this local function.",
     protocol,
+    mode,
   );
   const blocked = await executeHook(
     executable,
     hookPath,
     `Review candidate ${syntheticCanary}`,
     protocol,
+    mode,
   );
 
   let cleanResponse: unknown;
@@ -227,15 +231,33 @@ export async function verifyHookCanary(
     cleanResponse.continue === true &&
     Object.keys(cleanResponse).length === 1;
   const output = `${clean.stdout}${clean.stderr}${blocked.stdout}${blocked.stderr}`;
+  let findingHandled =
+    blocked.exitCode === 2 &&
+    blocked.stdout === "" &&
+    blocked.stderr.length > 0;
+  if (mode === "observe") {
+    try {
+      const response = JSON.parse(blocked.stdout) as {
+        continue?: unknown;
+        systemMessage?: unknown;
+      };
+      findingHandled =
+        blocked.exitCode === 0 &&
+        blocked.stderr === "" &&
+        response.continue === true &&
+        typeof response.systemMessage === "string" &&
+        response.systemMessage.length > 0;
+    } catch {
+      return false;
+    }
+  }
   return (
     clean.exitCode === 0 &&
     !clean.timedOut &&
     clean.stderr === "" &&
     cleanAllowed &&
-    blocked.exitCode === 2 &&
+    findingHandled &&
     !blocked.timedOut &&
-    blocked.stdout === "" &&
-    blocked.stderr.length > 0 &&
     !output.includes(syntheticCanary)
   );
 }
@@ -343,7 +365,7 @@ export class HookManager {
     const protocols = new Set(this.hosts.map((host) => host.protocol));
     const canaries = await Promise.all(
       [...protocols].map((protocol) =>
-        verifyHookCanary(this.executable, candidate, protocol),
+        verifyHookCanary(this.executable, candidate, protocol, warnMode),
       ),
     );
     if (canaries.some((healthy) => !healthy)) {

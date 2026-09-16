@@ -15,6 +15,7 @@ const PROTECTED = [
   "/policy",
   "/risk",
   "/settings",
+  "/extensions",
 ];
 
 export async function middleware(request: NextRequest) {

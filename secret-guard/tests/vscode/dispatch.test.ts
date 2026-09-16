@@ -31,6 +31,84 @@ function warningResult(content: string): ScanResult {
 }
 
 describe("authoritative dispatch gate", () => {
+  it("redacts strong findings before sending in automatic redact mode", async () => {
+    const transport = vi
+      .fn<(content: string) => Promise<void>>()
+      .mockResolvedValue();
+    const outcome = await dispatchGuarded(
+      `Analyse cette configuration : PASSWORD=${fakeToken}`,
+      {
+        mode: "redact",
+        transport,
+        chooseForWarning: () => Promise.resolve("cancel"),
+      },
+    );
+    expect(outcome.sent).toBe(true);
+    expect(outcome.redacted).toBe(true);
+    expect(outcome.final.decision).toBe("ALLOW");
+    expect(transport).toHaveBeenCalledOnce();
+    expect(transport.mock.calls[0]?.[0]).not.toContain(fakeToken);
+  });
+
+  it("warns before sending the exact original secret in observe mode", async () => {
+    const order: string[] = [];
+    const content = `PASSWORD=${fakeToken}`;
+    const outcome = await dispatchGuarded(content, {
+      mode: "observe",
+      chooseForWarning: () => Promise.resolve("cancel"),
+      notifyWarning: () => {
+        order.push("warn");
+        return Promise.resolve();
+      },
+      transport: (sent) => {
+        expect(sent).toBe(content);
+        order.push("send");
+        return Promise.resolve();
+      },
+    });
+    expect(outcome.sent).toBe(true);
+    expect(outcome.redacted).toBe(false);
+    expect(order).toEqual(["warn", "send"]);
+  });
+
+  it.each(["block", "redact", "observe"] as const)(
+    "handles scanner failure according to %s mode",
+    async (mode) => {
+      const transport = vi
+        .fn<(content: string) => Promise<void>>()
+        .mockResolvedValue();
+      const notifyWarning = vi
+        .fn<(result: ScanResult) => Promise<void>>()
+        .mockResolvedValue();
+      const outcome = await dispatchGuarded("original", {
+        mode,
+        transport,
+        notifyWarning,
+        chooseForWarning: () => Promise.resolve("send"),
+        scanner: () => {
+          throw new Error("scanner unavailable");
+        },
+      });
+      expect(outcome.sent).toBe(mode === "observe");
+      expect(transport).toHaveBeenCalledTimes(mode === "observe" ? 1 : 0);
+      expect(notifyWarning).toHaveBeenCalledTimes(mode === "observe" ? 1 : 0);
+    },
+  );
+
+  it("blocks ambiguous content without a send override in block mode", async () => {
+    const transport = vi
+      .fn<(content: string) => Promise<void>>()
+      .mockResolvedValue();
+    const outcome = await dispatchGuarded("ambiguous", {
+      mode: "block",
+      transport,
+      scanner: () => warningResult("ambiguous"),
+      chooseForWarning: () => Promise.resolve("send"),
+    });
+    expect(outcome.sent).toBe(false);
+    expect(transport).not.toHaveBeenCalled();
+  });
+
   it("calls the transport exactly once for clean content", async () => {
     const transport = vi
       .fn<(content: string) => Promise<void>>()

@@ -55,8 +55,8 @@ test("the landing explains AI uses, introduces the extension and keeps both next
 
   const chemins = page.locator("#vous .guard-path");
   await expect(chemins).toHaveCount(2);
-  await expect(chemins.filter({ hasText: "Organisation" }).getByRole("link")).toHaveAttribute("href", /^mailto:/);
-  await expect(chemins.filter({ hasText: "Développeur" }).getByRole("link")).toHaveAttribute("href", "/saas");
+  await expect(chemins.filter({ hasText: "Entreprise" }).getByRole("link")).toHaveAttribute("href", /^mailto:/);
+  await expect(chemins.filter({ hasText: "Individuelle / POC" }).getByRole("link")).toHaveAttribute("href", "/extension");
 
   expect(apiRequests).toBe(0);
 
@@ -137,7 +137,7 @@ test("the hero respects reduced motion without downloading its video", async ({ 
 
 test("the self-serve page says what the product does, and where that stops", async ({ page }) => {
   await page.goto("/");
-  await page.locator(".guard-path").filter({ hasText: "Développeur" }).getByRole("link").click();
+  await page.locator('#produits a[href="/saas"]').click();
   await expect(page).toHaveURL(/\/saas$/);
 
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Encadrez vos agents");
@@ -198,9 +198,17 @@ test("the extension page hands over a file that installs, and names its limits",
   const gestes = page.locator(".guard-start__steps li");
   await expect(gestes).toHaveCount(3);
   await expect(gestes.nth(1)).toContainText("VSIX");
+  await expect(gestes.nth(2)).toContainText("/hooks");
+  await expect(page.locator("#individual")).toContainText("Gratuit");
+  await expect(page.locator("#enterprise")).toContainText("MDM");
+  await expect(page.locator("#enterprise")).toContainText("requirements.toml");
+  await expect(page.locator("#enterprise")).toContainText("Codex ne distribue pas les scripts");
+  await expect(page.locator("#enterprise a.guard-button")).toHaveAttribute("href", /^mailto:/);
 
   // Une installation, quatre assistants : c'est l'argument, il doit être vérifiable.
   await expect(page.locator(".guard-ext-hosts li")).toHaveCount(4);
+  const claude = page.locator(".guard-ext-hosts li", { hasText: "Claude Code" });
+  await expect(claude.locator('img[src*="claude-ai-icon"]')).toBeVisible();
 
   // Les quatre bornes. Celle de la version est la plus facile à taire, et c'est
   // celle qui fait échouer une installation par ailleurs correcte : le premier

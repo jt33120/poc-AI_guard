@@ -21,6 +21,10 @@ function registerTests(mocha: Mocha): void {
 
       const commands = new Set(await vscode.commands.getCommands(true));
       for (const command of [
+        "secretGuard.showDashboard",
+        "secretGuard.chooseMode",
+        "secretGuard.connectGateway",
+        "secretGuard.disconnectGateway",
         "secretGuard.scanSelection",
         "secretGuard.scanClipboard",
         "secretGuard.scanDocument",
@@ -35,36 +39,39 @@ function registerTests(mocha: Mocha): void {
   );
 
   extensionSuite.addTest(
-    new Mocha.Test("declares an honest, telemetry-free manifest", () => {
-      const extension = vscode.extensions.getExtension(
-        "xsom.xsom-secret-guard-vscode",
-      );
-      assert.ok(extension);
-      const manifest = extension.packageJSON as {
-        contributes?: {
-          chatParticipants?: Array<{ id?: string }>;
-          configuration?: {
-            properties?: Record<string, { default?: unknown }>;
+    new Mocha.Test(
+      "declares a preview manifest without default telemetry",
+      () => {
+        const extension = vscode.extensions.getExtension(
+          "xsom.xsom-secret-guard-vscode",
+        );
+        assert.ok(extension);
+        const manifest = extension.packageJSON as {
+          contributes?: {
+            chatParticipants?: Array<{ id?: string }>;
+            configuration?: {
+              properties?: Record<string, { default?: unknown }>;
+            };
           };
+          engines?: { vscode?: string };
+          preview?: unknown;
+          telemetry?: unknown;
         };
-        engines?: { vscode?: string };
-        preview?: unknown;
-        telemetry?: unknown;
-      };
-      assert.equal(manifest.telemetry, undefined);
-      assert.equal(manifest.preview, true);
-      assert.equal(manifest.engines?.vscode, "^1.133.0");
-      assert.equal(
-        manifest.contributes?.chatParticipants?.[0]?.id,
-        "xsom.secretGuard",
-      );
-      assert.equal(
-        manifest.contributes?.configuration?.properties?.[
-          "secretGuard.hook.autoEnable"
-        ]?.default,
-        true,
-      );
-    }),
+        assert.equal(manifest.telemetry, undefined);
+        assert.equal(manifest.preview, true);
+        assert.equal(manifest.engines?.vscode, "^1.133.0");
+        assert.equal(
+          manifest.contributes?.chatParticipants?.[0]?.id,
+          "xsom.secretGuard",
+        );
+        assert.equal(
+          manifest.contributes?.configuration?.properties?.[
+            "secretGuard.hook.autoEnable"
+          ]?.default,
+          true,
+        );
+      },
+    ),
   );
 }
 
