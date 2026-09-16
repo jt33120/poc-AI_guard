@@ -1,9 +1,8 @@
 /* Homepage only. Shared xSOM tokens and console remain separate. */
 .guard-home { --home-ink: #0c1c33; --home-ice: #9dccff; --home-risk: #f9b8a5; --home-muted: #b4c8df; }
-.guard-home .guard-header nav > a:first-child { display: inline-flex; }
 .guard-home-section { padding-block: clamp(3.5rem, 7vw, 6.5rem) 0; scroll-margin-top: 2rem; }
 .guard-home-heading { max-width: 780px; margin-bottom: 2.5rem; }
-.guard-home-heading h2 { margin-top: .75rem; font-size: clamp(1.8rem, 3vw, 2.8rem); line-height: 1.2; font-weight: 600; }
+.guard-home-heading :is(h1, h2) { margin-top: .75rem; font-size: clamp(1.8rem, 3vw, 2.8rem); line-height: 1.2; font-weight: 600; }
 .guard-home-heading > p:last-child { margin-top: 1rem; max-width: 65ch; font-size: 1.15rem; color: var(--signal-muted); }
 .guard-masthead { position: relative; isolation: isolate; overflow: hidden; background: var(--home-ink); color: #f5f9ff; }
 .guard-masthead__video, .guard-masthead__scrim { position: absolute; width: 100%; height: 100%; inset: 0; z-index: -2; object-fit: cover; }
@@ -91,7 +90,7 @@
 .guard-product-feature { display: grid; grid-template-columns: 1.05fr 1fr; gap: 3rem; padding: clamp(1.5rem, 3.5vw, 3rem); align-items: center; border: 1px solid var(--signal-line); border-radius: 1.25rem; background: var(--signal-surface); }
 .guard-product-feature__tag { display: flex; gap: .5rem; align-items: center; font-size: .8rem; color: var(--signal-accent-text); }
 .guard-product-feature__tag > span { width: 6px; height: 6px; border-radius: 50%; background: var(--signal-accent-text); }
-.guard-product-feature h3 { margin-top: 1.2rem; font-size: clamp(1.5rem, 2.5vw, 2.3rem); font-weight: 600; line-height: 1.2; }
+.guard-product-feature :is(h2, h3) { margin-top: 1.2rem; font-size: clamp(1.5rem, 2.5vw, 2.3rem); font-weight: 600; line-height: 1.2; }
 .guard-product-feature__lead { font-size: 1.2rem; color: var(--signal-text); margin-top: .6rem !important; }
 .guard-product-feature__copy > p:not([class]) { color: var(--signal-muted); margin-top: 1rem; }
 .guard-home .guard-product-feature__copy > ul { display: flex; flex-wrap: wrap; list-style: none; gap: .5rem 1rem; padding: 0; margin-top: 1.2rem; font-size: .8rem; color: var(--signal-accent-text); }
@@ -115,10 +114,10 @@
 .guard-product-preview__decision strong { display: block; font-size: 1rem; margin-top: .25rem; }
 .guard-product-preview__decision p { margin-top: .25rem; font-size: .8rem; color: #c6d7ec; }
 .guard-product-preview__foot { padding: 1rem; font-size: .65rem; color: #b4c8df; }
-.guard-platform-product { display: flex; align-items: center; justify-content: space-between; gap: 2rem; padding: 2rem; border: 1px solid var(--signal-line); border-radius: 1rem; margin-top: 1rem; }
-.guard-platform-product h3 { font-size: 1.3rem; font-weight: 600; margin-top: .5rem; }
-.guard-platform-product div > p:last-child { color: var(--signal-muted); max-width: 75ch; margin-top: .7rem; }
-.guard-platform-product .guard-link { flex-shrink: 0; }
+.guard-products-page { padding-bottom: clamp(3.5rem, 7vw, 6.5rem); }
+.guard-product-feature + .guard-product-feature { margin-top: 2rem; }
+.guard-product-feature__hosts { margin-top: .8rem; color: var(--signal-muted); font-size: .85rem; }
+.guard-product-feature__price { display: block; color: var(--signal-accent-text); }
 .guard-glossary-link { display: flex; align-items: center; gap: 1.5rem; margin-top: 3rem; padding-block: 1.5rem; border-top: 1px solid var(--signal-line); border-bottom: 1px solid var(--signal-line); }
 .guard-glossary-link__icon { flex-shrink: 0; font: 500 1.75rem var(--font-display), sans-serif; color: var(--signal-accent-text); width: 50px; }
 .guard-glossary-link h3 { font-size: 1.1rem; font-weight: 600; }
@@ -127,9 +126,8 @@
 .guard-home .guard-who { padding-top: 5rem; padding-bottom: 5rem; }
 @media (max-width: 1100px) {
   .guard-home .guard-header nav { gap: 1rem; }
-  .guard-home .guard-home-nav-secondary { display: none !important; }
   .guard-campus__universes > button { padding-inline: 1rem; gap: .65rem; }
-  .guard-campus__footnote, .guard-platform-product, .guard-glossary-link { flex-wrap: wrap; }
+  .guard-campus__footnote, .guard-glossary-link { flex-wrap: wrap; }
   .guard-glossary-link a { margin-left: 0; }
   .guard-product-feature { gap: 2rem; }
 }
@@ -213,7 +211,6 @@
   .guard-product-preview__decision { margin-inline: .7rem; padding: .8rem; }
   .guard-product-preview__alert { flex-shrink: 0; }
   .guard-product-preview__decision strong { font-size: .9rem; }
-  .guard-platform-product { padding: 1.3rem; gap: 1rem; }
   .guard-glossary-link { gap: 1rem; margin-top: 2rem; }
   .guard-glossary-link__icon { width: 35px; font-size: 1.4rem; }
   .guard-glossary-link a { padding-left: 0; font-size: .85rem; }

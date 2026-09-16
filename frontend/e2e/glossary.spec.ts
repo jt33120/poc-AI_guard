@@ -8,7 +8,7 @@ test("the glossary combines local search and use filters, resets both and transl
   });
   await page.goto("/");
   await page.getByRole("navigation", { name: "Navigation principale" })
-    .getByRole("link", { name: "Glossaire", exact: true }).click();
+    .getByRole("link", { name: "Les menaces cyber IA", exact: true }).click();
   await expect(page).toHaveURL(/\/menaces$/);
   await expect(page.getByRole("heading", { name: "Glossaire des menaces IA", exact: true })).toBeVisible();
 

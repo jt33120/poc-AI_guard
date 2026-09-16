@@ -41,17 +41,20 @@ test("the landing explains AI uses, introduces the extension and keeps both next
   await expect(page.locator("#menaces-accueil")).toHaveCount(0);
   expect(await page.locator(".guard-masthead, #usages, #produits, #vous").evaluateAll(
     (sections) => sections.map((section) => section.classList.contains("guard-masthead") ? "masthead" : section.id),
-  )).toEqual(["masthead", "usages", "produits", "vous"]);
+  )).toEqual(["masthead", "usages", "vous"]);
 
+  // Le menu tient en deux entrées, et chacune mène à une page. Les ancres d'accueil
+  // qu'il portait ne voulaient rien dire ailleurs que sur l'accueil : un visiteur
+  // arrivé par `/menaces` se faisait renvoyer ici pour un simple défilement.
   const navigation = page.getByRole("navigation", { name: "Navigation principale" });
-  await expect(navigation.getByRole("link", { name: "Nos usages", exact: true })).toHaveAttribute("href", "#usages");
-  await expect(navigation.getByRole("link", { name: "Nos produits", exact: true })).toHaveAttribute("href", "#produits");
-  await expect(navigation.getByRole("link", { name: "Glossaire", exact: true })).toHaveAttribute("href", "/menaces");
+  await expect(navigation.getByRole("link")).toHaveCount(3);
+  await expect(navigation.getByRole("link", { name: "Nos produits", exact: true })).toHaveAttribute("href", "/produits");
+  await expect(navigation.getByRole("link", { name: "Les menaces cyber IA", exact: true })).toHaveAttribute("href", "/menaces");
+  await expect(navigation.getByRole("link", { name: /Se connecter/ })).toHaveAttribute("href", "/login");
 
-  const produits = page.locator("#produits");
-  await expect(produits.getByRole("heading", { name: "AI Guard pour VS Code", exact: true })).toBeVisible();
-  await expect(produits.getByRole("link").first()).toHaveAttribute("href", "/extension");
-  await expect(produits.locator('a[href="/saas"]')).toHaveCount(1);
+  // Le masthead mène aux produits sans passer par le menu : c'est la sortie que lit
+  // un visiteur qui ne remonte pas.
+  await expect(page.locator(".guard-masthead__actions").getByRole("link").nth(1)).toHaveAttribute("href", "/produits");
 
   const chemins = page.locator("#vous .guard-path");
   await expect(chemins).toHaveCount(2);
@@ -63,6 +66,39 @@ test("the landing explains AI uses, introduces the extension and keeps both next
   await page.getByRole("link", { name: "Périmètre & preuves", exact: true }).first().click();
   await expect(page).toHaveURL(/\/evidence$/);
   await expect(page.locator("#menaces .paysage .menace")).toHaveCount(23);
+});
+
+test("the products page gives both products the same billing, and the menu points at it", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("navigation", { name: "Navigation principale" })
+    .getByRole("link", { name: "Nos produits", exact: true }).click();
+  await expect(page).toHaveURL(/\/produits$/);
+
+  // Deux produits, deux blocs de même forme. La plateforme tenait en une ligne posée
+  // sous l'extension, sur une section d'accueil : un seul bloc rendu ici la ferait
+  // revenir au rang de note de bas de page sans que rien ne le signale.
+  const produits = page.locator(".guard-product-feature");
+  await expect(produits).toHaveCount(2);
+  await expect(produits.nth(0).getByRole("heading", { name: "Secret Guard", exact: true })).toBeVisible();
+  await expect(produits.nth(0).getByRole("link")).toHaveAttribute("href", "/extension");
+  await expect(produits.nth(1).getByRole("heading", { name: "AI Guard, la plateforme", exact: true })).toBeVisible();
+  await expect(produits.nth(1).getByRole("link")).toHaveAttribute("href", "/saas");
+  await expect(page.locator(".guard-glossary-link a")).toHaveAttribute("href", "/menaces");
+
+  // Le titre de la page est un `h1` : sans lui, la page des produits n'aurait pas de
+  // tête et la hiérarchie repartirait à `h2`.
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Deux produits");
+});
+
+test("every public header carries the same two entries and the same account door", async ({ page }) => {
+  for (const chemin of ["/", "/produits", "/saas", "/extension", "/menaces"]) {
+    await page.goto(chemin);
+    const navigation = page.getByRole("navigation", { name: "Navigation principale" });
+    await expect(navigation.getByRole("link", { name: "Nos produits", exact: true })).toHaveAttribute("href", "/produits");
+    await expect(navigation.getByRole("link", { name: "Les menaces cyber IA", exact: true })).toHaveAttribute("href", "/menaces");
+    await expect(navigation.getByRole("link", { name: /Se connecter/ })).toHaveAttribute("href", "/login");
+    await expect(navigation.getByRole("link")).toHaveCount(3);
+  }
 });
 
 test("the campus switches risks and universes with a keyboard, without service calls", async ({ page }) => {
@@ -136,8 +172,8 @@ test("the hero respects reduced motion without downloading its video", async ({ 
 });
 
 test("the self-serve page says what the product does, and where that stops", async ({ page }) => {
-  await page.goto("/");
-  await page.locator('#produits a[href="/saas"]').click();
+  await page.goto("/produits");
+  await page.locator('a[href="/saas"]').click();
   await expect(page).toHaveURL(/\/saas$/);
 
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Encadrez vos agents");
@@ -175,13 +211,16 @@ test("the self-serve page says what the product does, and where that stops", asy
   await expect(page.getByText("n’est pas contrôlé", { exact: false })).toBeVisible();
 
   // La sortie mène à la création de compte, pas à un formulaire de contact : c'est
-  // toute la différence entre ce chemin et celui du conseil.
-  await expect(page.getByRole("link", { name: /Créer un compte/ }).first()).toHaveAttribute("href", "/signup");
+  // toute la différence entre ce chemin et celui du conseil. Le sélecteur exclut
+  // l'en-tête, dont la porte du compte porte les mêmes mots pour une autre page.
+  await expect(
+    page.locator(".guard-saas-hero").getByRole("link", { name: "Créer un compte", exact: true }),
+  ).toHaveAttribute("href", "/signup");
 });
 
 test("the extension page hands over a file that installs, and names its limits", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("navigation", { name: "Navigation principale" }).getByRole("link", { name: "Extension", exact: true }).click();
+  await page.goto("/produits");
+  await page.locator('a[href="/extension"]').click();
   await expect(page).toHaveURL(/\/extension$/);
 
   // Le bouton est le produit de cette page. Un lien relatif ou un chemin de
@@ -260,5 +299,16 @@ for (const width of [390, 768, 1440]) {
 
     await page.goto("/extension");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+
+    await page.goto("/produits");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    if (width === 390) {
+      // Deux produits empilés, pas deux colonnes serrées : le contrôle de
+      // débordement ci-dessus laisse passer une grille qui tient à deux mots par
+      // ligne, et c'est exactement ce qu'on ne veut pas ici.
+      const premier = await page.locator(".guard-product-feature").nth(0).boundingBox();
+      const second = await page.locator(".guard-product-feature").nth(1).boundingBox();
+      expect(second!.y).toBeGreaterThan(premier!.y);
+    }
   });
 }

@@ -32,8 +32,9 @@ import {
   EXTENSION_VSIX_URL,
   GUARD_COPY,
 } from "@/components/guard-copy";
+import { GuardNav } from "@/components/GuardNav";
 import { SignalPreferences } from "@/design-system/react";
-import { LanguageToggle, useT } from "@/lib/i18n";
+import { useT } from "@/lib/i18n";
 
 export function ExtensionOffer() {
   const { lang } = useT();
@@ -46,19 +47,7 @@ export function ExtensionOffer() {
             <XsomMark />
             <Wordmark />
           </Link>
-          <nav
-            aria-label={
-              lang === "fr" ? "Navigation principale" : "Main navigation"
-            }
-          >
-            <Link href="/">{copy.saasBack}</Link>
-            <Link href="/saas">{copy.saasKicker}</Link>
-            <LanguageToggle />
-            <Link href="/login" className="guard-button guard-button--small">
-              {copy.signin}
-              <span aria-hidden="true">↗</span>
-            </Link>
-          </nav>
+          <GuardNav />
         </div>
       </header>
 

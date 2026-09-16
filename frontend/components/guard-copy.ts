@@ -35,7 +35,7 @@ export const GUARD_COPY = {
     title: ["La solution cyber", "pour tous vos usages IA."],
     intro: "Simple, efficace.",
     explore: "Voir les menaces",
-    signin: "Accéder au POC",
+    signin: "Se connecter / Créer un compte",
     evidence: "Périmètre & preuves",
     heroNote:
       "AI Guard est un POC du cabinet xSOM, ESN spécialisée en cybersécurité.",
@@ -285,10 +285,8 @@ export const GUARD_COPY = {
       },
     ],
     saasCta: "Créer un compte",
-    saasBack: "Retour à l’accueil",
     saasNote:
       "Le périmètre dépend de ce que vous branchez : ce qui ne passe pas par nous n’est pas contrôlé.",
-    extNav: "Extension",
     extKicker: "Secret Guard · Individuelle / POC gratuit",
     extTitle: "Repérez les secrets avant l’envoi.",
     extIntro:
@@ -359,7 +357,7 @@ export const GUARD_COPY = {
     title: ["The cybersecurity solution", "for every AI use case."],
     intro: "Simple. Effective.",
     explore: "See the threats",
-    signin: "Open the POC",
+    signin: "Sign in / Create account",
     evidence: "Scope & evidence",
     heroNote:
       "AI Guard is a POC by xSOM, an IT services firm specialising in cybersecurity.",
@@ -604,10 +602,8 @@ export const GUARD_COPY = {
       },
     ],
     saasCta: "Create an account",
-    saasBack: "Back to the home page",
     saasNote:
       "Scope depends on what you connect: anything that does not go through us is not governed.",
-    extNav: "Extension",
     extKicker: "Secret Guard · Free individual / POC",
     extTitle: "Detect secrets before sending.",
     extIntro:
