@@ -11,6 +11,7 @@
  * marqueur, une seule condition, écrite à un seul endroit.
  */
 
+import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 
 /** Le balayage déborde de 30 % de part et d'autre : la lumière entre dans le titre
@@ -79,6 +80,12 @@ function watchTitleSheen(): () => void {
 }
 
 export function Motion(): null {
+  // Le relevé des cibles est fait une fois par page. Sans cette dépendance, il
+  // n'était fait qu'une fois par chargement : le layout racine reste monté d'une
+  // page à l'autre, donc une page atteinte par un lien interne gardait ses
+  // `.reveal` à `opacity: 0` sans que rien ne vienne jamais les révéler.
+  const chemin = usePathname();
+
   useEffect(() => {
     // Posé par le script d'amorce, et seulement hors `prefers-reduced-motion`.
     if (document.documentElement.dataset.motion !== "on") return;
@@ -95,7 +102,7 @@ export function Motion(): null {
       stopReveal();
       stopSheen();
     };
-  }, []);
+  }, [chemin]);
 
   return null;
 }
