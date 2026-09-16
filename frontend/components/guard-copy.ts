@@ -22,6 +22,23 @@ export const EXTENSION_MARKETPLACE_URL =
   "https://marketplace.visualstudio.com/items?itemName=xsom.xsom-secret-guard-vscode";
 
 /**
+ * Les deux bannières vidéo, et l'état réel de leur média.
+ *
+ * `GuardHeroVideo` ne demande son fichier qu'au moment de le jouer, mais l'affiche
+ * du poster, elle, part au chargement : une paire annoncée sans fichier laisserait
+ * un 404 dans le journal du navigateur et un rectangle vide à l'écran. Tant que la
+ * bannière de `/extension` n'a pas son média, la constante vaut `null` et la page
+ * rend son fond uni. Le jour où le fichier arrive, c'est elle qui bascule.
+ */
+export const HOME_HERO_MEDIA = {
+  webm: "/signal-media/ai-guard-hero-v2.webm",
+  poster: "/signal-media/ai-guard-hero-v2.png",
+};
+
+export const EXTENSION_HERO_MEDIA: { webm: string; poster: string } | null =
+  null;
+
+/**
  * Vrai seulement une fois la fiche réellement en ligne. Le type est élargi à
  * `boolean` pour que la bascule soit une valeur à changer, et non une réécriture des
  * deux endroits où la page teste la constante.

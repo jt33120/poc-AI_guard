@@ -19,7 +19,10 @@
 .guard-masthead .guard-product-name { color: #b4c8df; font-size: 1.05rem; letter-spacing: .02em; margin-bottom: 1rem; }
 .guard-masthead__intro { margin-top: 1.6rem !important; max-width: 49ch; font-size: 1.2rem; color: #c6d7ec; line-height: 1.65; }
 .guard-masthead__actions { display: flex; align-items: center; gap: 1.75rem; margin-top: 2rem; flex-wrap: wrap; }
-.guard-masthead__actions > a:last-child { display: inline-flex; align-items: center; gap: 1.5rem; color: #f5f9ff; min-height: 44px; font-size: .95rem; }
+/* Le lien secondaire, et lui seul : la règle visait le dernier enfant, si bien
+   qu'une bannière à un seul bouton peignait son texte en blanc sur le bleu clair
+   du bouton, illisible. */
+.guard-masthead__actions > a:not(.guard-button) { display: inline-flex; align-items: center; gap: 1.5rem; color: #f5f9ff; min-height: 44px; font-size: .95rem; }
 .guard-masthead .guard-button { background: #dbeaff; border-color: #dbeaff; color: #123459; }
 .guard-masthead__note { display: flex; align-items: center; gap: .6rem; margin-top: 1.75rem !important; font-size: .8rem; color: var(--home-muted); }
 .guard-masthead__note > span { width: 6px; height: 6px; background: #91b3da; border-radius: 50%; }
@@ -97,23 +100,11 @@
 .guard-product-feature__copy > ul li::before { content: "↗"; margin-right: .35rem; }
 .guard-product-feature .guard-button { margin-top: 1.5rem; }
 .guard-product-feature__note { margin-top: 1rem !important; color: var(--signal-muted); font-size: .78rem; max-width: 55ch; }
-.guard-product-preview { min-width: 0; border: 1px solid #415b79; border-radius: .75rem; background: #0c1c33; color: #e8f1ff; box-shadow: 0 15px 35px #0c1c3320; transform: rotate(-1deg); }
-.guard-product-preview__bar { display: flex; align-items: center; gap: .75rem; padding: 1rem; border-bottom: 1px solid #ffffff20; }
-.guard-product-preview__bar strong { font-size: .8rem; font-weight: 500; }
-.guard-product-preview__bar > span:first-child { color: #9dccff; }
-.guard-product-preview__bar > span:last-child { margin-left: auto; color: #b4c8df; font-size: .65rem; }
-.guard-product-preview__editor { padding: 1.5rem 1rem; font-size: .83rem; }
-.guard-product-preview__editor > div { display: flex; align-items: baseline; gap: 1rem; min-height: 2rem; }
-.guard-product-preview__editor > div > span:first-child { color: #8ba6c8; font: .65rem var(--font-mono), monospace; }
-.guard-product-preview__editor code { font-size: .75rem; overflow-wrap: anywhere; }
-.guard-product-preview__editor mark { color: #ffd0bd; background: #b55f3333; padding: .2rem; border-bottom: 1px dashed #eaa488; }
-.guard-product-preview__cursor { display: inline-block; height: 14px; width: 6px; background: #91bbea; align-self: center; }
-.guard-product-preview__decision { display: flex; gap: .8rem; padding: 1rem; margin: 0 1rem; background: #29364a; border: 1px solid #778699; border-radius: .5rem; }
-.guard-product-preview__alert { display: grid; place-items: center; width: 24px; height: 24px; color: #ffccac; border: 1px solid #ca9879; border-radius: 50%; }
-.guard-product-preview__decision div > span { display: block; color: #ffccac; font-size: .75rem; }
-.guard-product-preview__decision strong { display: block; font-size: 1rem; margin-top: .25rem; }
-.guard-product-preview__decision p { margin-top: .25rem; font-size: .8rem; color: #c6d7ec; }
-.guard-product-preview__foot { padding: 1rem; font-size: .65rem; color: #b4c8df; }
+.guard-ext-market { margin-top: 2rem; }
+.guard-product-shot { min-width: 0; margin: 0; }
+.guard-product-shot > img { display: block; width: 100%; height: auto; border: 1px solid #415b79; border-radius: .75rem; background: #0c1c33; box-shadow: 0 15px 35px #0c1c3320; transform: rotate(-1deg); }
+.guard-product-shot figcaption { margin-top: 1rem; font-size: .78rem; color: var(--signal-muted); text-align: center; }
+.guard-product-feature__learn { display: inline-flex; align-items: center; gap: 1rem; margin-top: 1rem; min-height: var(--signal-touch); }
 .guard-products-page { padding-bottom: clamp(3.5rem, 7vw, 6.5rem); }
 .guard-product-feature + .guard-product-feature { margin-top: 2rem; }
 .guard-product-feature__hosts { margin-top: .8rem; color: var(--signal-muted); font-size: .85rem; }
@@ -148,7 +139,7 @@
   .guard-campus__universes small { font-size: .7rem; }
   .guard-campus__select-arrow { display: none; }
   .guard-product-feature { grid-template-columns: 1fr; }
-  .guard-product-preview { transform: none; }
+  .guard-product-shot > img { transform: none; }
   .guard-glossary-link > div { flex: 1; }
   .guard-glossary-link a { width: 100%; padding-left: calc(50px + 1.5rem); }
 }
@@ -203,14 +194,6 @@
   .guard-campus__examples li { font-size: .72rem; }
   .guard-campus__footnote { padding-inline: 1.3rem; }
   .guard-product-feature { padding: 1.3rem; }
-  .guard-product-preview__bar { flex-wrap: wrap; gap: .35rem .6rem; padding: .8rem; }
-  .guard-product-preview__bar > span:last-child { width: 100%; margin-left: 0; }
-  .guard-product-preview__editor { padding: 1.2rem .8rem; }
-  .guard-product-preview__editor > div { gap: .6rem; }
-  .guard-product-preview__editor code { font-size: .65rem; }
-  .guard-product-preview__decision { margin-inline: .7rem; padding: .8rem; }
-  .guard-product-preview__alert { flex-shrink: 0; }
-  .guard-product-preview__decision strong { font-size: .9rem; }
   .guard-glossary-link { gap: 1rem; margin-top: 2rem; }
   .guard-glossary-link__icon { width: 35px; font-size: 1.4rem; }
   .guard-glossary-link a { padding-left: 0; font-size: .85rem; }
