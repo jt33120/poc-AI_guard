@@ -15,6 +15,7 @@
  * produit est écrite sous son bouton plutôt qu'en bas de page.
  */
 
+import Image from "next/image";
 import Link from "next/link";
 
 import { Wordmark, XsomMark } from "@/components/brand";
@@ -27,11 +28,17 @@ import { GuardNav } from "@/components/GuardNav";
 import { SignalPreferences } from "@/design-system/react";
 import { useT } from "@/lib/i18n";
 
+// Les dimensions naturelles des deux captures. `next/image` les exige pour
+// réserver la place avant le chargement ; une valeur fausse ferait sauter la mise
+// en page à l'arrivée de l'image.
+const PANNEAU = { width: 958, height: 1110 };
+const CONSOLE = { width: 2880, height: 2600 };
+
 /** Le poste de travail : ce qui part du clavier, avant d'atteindre le modèle. */
 function SecretGuard({ copy }: { copy: GuardHomeCopy }) {
   return (
     <article className="guard-product-feature">
-      <div className="guard-product-feature__copy">
+      <div className="guard-product-feature__copy reveal" data-delay="1">
         <p className="guard-product-feature__tag">
           <span aria-hidden="true" />
           {copy.extensionTag}
@@ -54,43 +61,16 @@ function SecretGuard({ copy }: { copy: GuardHomeCopy }) {
           {copy.extensionNote}
         </p>
       </div>
-      <div className="guard-product-preview" aria-label={copy.preview}>
-        <div className="guard-product-preview__bar">
-          <span aria-hidden="true">⌘</span>
-          <strong>AI Guard / VS Code</strong>
-          <span>{copy.preview}</span>
-        </div>
-        <div className="guard-product-preview__editor">
-          <div>
-            <span aria-hidden="true">01</span>
-            <p>{copy.previewPrompt}</p>
-          </div>
-          <div>
-            <span aria-hidden="true">02</span>
-            <code>
-              API_KEY = <mark>{copy.previewValue}</mark>
-            </code>
-          </div>
-          <div>
-            <span aria-hidden="true">03</span>
-            <span
-              className="guard-product-preview__cursor"
-              aria-hidden="true"
-            />
-          </div>
-        </div>
-        <div className="guard-product-preview__decision">
-          <span className="guard-product-preview__alert" aria-hidden="true">
-            !
-          </span>
-          <div>
-            <span>{copy.previewSecret}</span>
-            <strong>{copy.previewDecision}</strong>
-            <p>{copy.previewDetail}</p>
-          </div>
-        </div>
-        <p className="guard-product-preview__foot">{copy.previewLocal}</p>
-      </div>
+      <figure className="guard-product-shot reveal" data-delay="2">
+        <Image
+          src="/signal-media/secret-guard-panneau.png"
+          alt={copy.extensionShotAlt}
+          width={PANNEAU.width}
+          height={PANNEAU.height}
+          sizes="(max-width: 800px) 100vw, 46vw"
+        />
+        <figcaption>{copy.extensionShotCaption}</figcaption>
+      </figure>
     </article>
   );
 }
@@ -99,7 +79,7 @@ function SecretGuard({ copy }: { copy: GuardHomeCopy }) {
 function Platform({ copy }: { copy: GuardHomeCopy }) {
   return (
     <article className="guard-product-feature">
-      <div className="guard-product-feature__copy">
+      <div className="guard-product-feature__copy reveal" data-delay="1">
         <p className="guard-product-feature__tag">
           <span aria-hidden="true" />
           {copy.platformTag}
@@ -112,47 +92,26 @@ function Platform({ copy }: { copy: GuardHomeCopy }) {
             <li key={feature}>{feature}</li>
           ))}
         </ul>
-        <Link href="/saas" className="guard-button">
+        <Link href="/signup" className="guard-button">
           {copy.platformAction}
+          <span aria-hidden="true">↗</span>
+        </Link>
+        <Link href="/saas" className="guard-link guard-product-feature__learn">
+          {copy.platformLearn}
           <span aria-hidden="true">↗</span>
         </Link>
         <p className="guard-product-feature__note">{copy.platformNote}</p>
       </div>
-      <div className="guard-product-preview" aria-label={copy.preview}>
-        <div className="guard-product-preview__bar">
-          <span aria-hidden="true">⌘</span>
-          <strong>{copy.consolePreview}</strong>
-          <span>{copy.preview}</span>
-        </div>
-        <div className="guard-product-preview__editor">
-          <div>
-            <span aria-hidden="true">01</span>
-            <p>{copy.consoleRequest}</p>
-          </div>
-          <div>
-            <span aria-hidden="true">02</span>
-            <code>{copy.consoleRule}</code>
-          </div>
-          <div>
-            <span aria-hidden="true">03</span>
-            <span
-              className="guard-product-preview__cursor"
-              aria-hidden="true"
-            />
-          </div>
-        </div>
-        <div className="guard-product-preview__decision">
-          <span className="guard-product-preview__alert" aria-hidden="true">
-            !
-          </span>
-          <div>
-            <span>{copy.consoleSignal}</span>
-            <strong>{copy.consoleDecision}</strong>
-            <p>{copy.consoleDetail}</p>
-          </div>
-        </div>
-        <p className="guard-product-preview__foot">{copy.consoleFoot}</p>
-      </div>
+      <figure className="guard-product-shot reveal" data-delay="2">
+        <Image
+          src="/signal-media/ai-guard-console.png"
+          alt={copy.platformShotAlt}
+          width={CONSOLE.width}
+          height={CONSOLE.height}
+          sizes="(max-width: 800px) 100vw, 46vw"
+        />
+        <figcaption>{copy.platformShotCaption}</figcaption>
+      </figure>
     </article>
   );
 }
@@ -177,14 +136,14 @@ export function ProductsOffer() {
         className="guard-home-section guard-products guard-products-page guard-wrap"
         aria-labelledby="products-heading"
       >
-        <div className="guard-home-heading">
+        <div className="guard-home-heading reveal">
           <p className="guard-kicker">{home.productsKicker}</p>
           <h1 id="products-heading">{home.productsTitle}</h1>
           <p>{home.productsIntro}</p>
         </div>
         <SecretGuard copy={home} />
         <Platform copy={home} />
-        <aside className="guard-glossary-link">
+        <aside className="guard-glossary-link reveal">
           <span className="guard-glossary-link__icon" aria-hidden="true">
             Aa
           </span>

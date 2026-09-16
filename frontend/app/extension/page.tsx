@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { ExtensionOffer } from "@/components/ExtensionOffer";
 import "../guard-landing.css";
+import "../guard-home.css";
 
 export const metadata: Metadata = {
   title: "Secret Guard, l’extension | xSOM AI Guard",

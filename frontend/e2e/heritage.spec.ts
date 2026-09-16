@@ -82,8 +82,22 @@ test("the products page gives both products the same billing, and the menu point
   await expect(produits.nth(0).getByRole("heading", { name: "Secret Guard", exact: true })).toBeVisible();
   await expect(produits.nth(0).getByRole("link")).toHaveAttribute("href", "/extension");
   await expect(produits.nth(1).getByRole("heading", { name: "AI Guard, la plateforme", exact: true })).toBeVisible();
-  await expect(produits.nth(1).getByRole("link")).toHaveAttribute("href", "/saas");
+  // La sortie de la plateforme est la porte du compte, pas la page qui la décrit :
+  // celle-ci reste accessible en second, sans être la première chose qu'on clique.
+  await expect(produits.nth(1).getByRole("link", { name: /inscrire/ })).toHaveAttribute("href", "/signup");
+  await expect(produits.nth(1).locator('a[href="/saas"]')).toHaveCount(1);
   await expect(page.locator(".guard-glossary-link a")).toHaveAttribute("href", "/menaces");
+
+  // Les deux captures sont de vraies images, et elles se décodent : un chemin mort
+  // laisserait une figure vide que `toBeVisible` accepterait sans broncher.
+  const captures = page.locator(".guard-product-shot img");
+  await expect(captures).toHaveCount(2);
+  await expect.poll(() =>
+    captures.evaluateAll((images) => images.every((image) => (image as HTMLImageElement).naturalWidth > 0)),
+  ).toBe(true);
+  for (const capture of await captures.all()) {
+    expect((await capture.getAttribute("alt"))?.length ?? 0).toBeGreaterThan(20);
+  }
 
   // Le titre de la page est un `h1` : sans lui, la page des produits n'aurait pas de
   // tête et la hiérarchie repartirait à `h2`.
@@ -99,6 +113,46 @@ test("every public header carries the same two entries and the same account door
     await expect(navigation.getByRole("link", { name: /Se connecter/ })).toHaveAttribute("href", "/login");
     await expect(navigation.getByRole("link")).toHaveCount(3);
   }
+});
+
+test("reducing motion reveals the content instead of hiding it for good", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/produits");
+
+  // L'effet existe bien : sans `is-visible`, la cible est masquée.
+  const masquee = await page.evaluate(() => {
+    const cible = document.querySelector(".guard-glossary-link") as HTMLElement;
+    cible.classList.remove("is-visible");
+    document.documentElement.dataset.motion = "on";
+    return getComputedStyle(cible).opacity;
+  });
+  expect(masquee).toBe("0");
+
+  // Et le réglage « Réduire les animations » écrit `off`, pas l'absence de marqueur.
+  // Un sélecteur de présence gardait alors l'opacité à zéro sur un contenu que plus
+  // rien n'allait révéler : un clic effaçait la page, durablement.
+  const reduite = await page.evaluate(() => {
+    const cible = document.querySelector(".guard-glossary-link") as HTMLElement;
+    cible.classList.remove("is-visible");
+    document.documentElement.dataset.motion = "off";
+    return getComputedStyle(cible).opacity;
+  });
+  expect(reduite).toBe("1");
+});
+
+test("a page reached by an internal link still reveals what it hides", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/");
+  await page.getByRole("navigation", { name: "Navigation principale" })
+    .getByRole("link", { name: "Nos produits", exact: true }).click();
+  await expect(page).toHaveURL(/\/produits$/);
+
+  // Le layout racine reste monté d'une page à l'autre : sans relevé des cibles à
+  // chaque navigation, cette page gardait ses révélations à zéro pour toujours.
+  await expect.poll(
+    () => page.locator(".guard-home-heading").evaluate((n) => getComputedStyle(n).opacity),
+    { timeout: 5_000 },
+  ).toBe("1");
 });
 
 test("the campus switches risks and universes with a keyboard, without service calls", async ({ page }) => {

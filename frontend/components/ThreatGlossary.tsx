@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { Wordmark, XsomMark } from "@/components/brand";
+import { Diagramme, DiagrammeDefs } from "@/components/Diagramme";
 import { GuardNav } from "@/components/GuardNav";
 import { SignalPreferences } from "@/design-system/react";
+import { figureDeFiche } from "@/lib/glossary-figures";
 import { useT } from "@/lib/i18n";
 import {
   GLOSSARY_COPY,
@@ -54,7 +56,7 @@ export function ThreatGlossary() {
       </header>
 
       <main>
-        <section className="guard-wrap guard-glossary__hero" aria-labelledby="glossary-heading">
+        <section className="guard-wrap guard-glossary__hero reveal" aria-labelledby="glossary-heading">
           <Link href="/" className="guard-glossary__back"><span aria-hidden="true">←</span> {copy.home}</Link>
           <p className="guard-kicker">{copy.kicker}</p>
           <h1 id="glossary-heading">{copy.title}</h1>
@@ -62,7 +64,8 @@ export function ThreatGlossary() {
         </section>
 
         <section id="definitions" className="guard-wrap guard-glossary__content" aria-labelledby="glossary-heading" tabIndex={-1}>
-          <div className="guard-glossary__toolbar">
+          <DiagrammeDefs />
+          <div className="guard-glossary__toolbar reveal" data-delay="1">
             <div className="guard-glossary__search">
               <label htmlFor="threat-search">{copy.search}</label>
               <div>
@@ -97,6 +100,7 @@ export function ThreatGlossary() {
               <ul className="guard-glossary__grid">
                 {entries.map((entry) => {
                   const definition = entry.copy[lang];
+                  const figure = figureDeFiche(entry.id);
                   return (
                     <li key={entry.id}>
                       <article id={entry.id} className="guard-glossary__card" aria-labelledby={`${entry.id}-title`}>
@@ -105,6 +109,11 @@ export function ThreatGlossary() {
                         </div>
                         <h2 id={`${entry.id}-title`}>{definition.title}</h2>
                         <p className="guard-glossary__definition">{definition.definition}</p>
+                        {figure && (
+                          <div className="guard-glossary__figure">
+                            <Diagramme corps={figure} ouvert />
+                          </div>
+                        )}
                         <div className="guard-glossary__example">
                           <h3>{copy.example}</h3>
                           <p>{definition.example}</p>

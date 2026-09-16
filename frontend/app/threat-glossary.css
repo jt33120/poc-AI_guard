@@ -164,6 +164,25 @@
   color: var(--signal-muted);
   margin-top: var(--sp-3) !important;
 }
+/* La figure explique le mécanisme que la définition vient de nommer, avant que
+   l'exemple ne le raconte. Elle est centrée parce qu'une carte de glossaire est
+   plus large que le dessin, et que collé à gauche il se lit comme une vignette.
+
+   Les quatre jetons sont obligatoires : `.diag` les fait par défaut pointer sur la
+   palette de `globals.css`, dont `--paper`, un blanc que le système de design ne
+   rebride pas. Sans ce bloc, les stations sortiraient blanches sur une carte
+   sombre. */
+.guard-glossary__figure {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--sp-5);
+}
+.guard-glossary__card .diag {
+  --diag-line: var(--signal-faint);
+  --diag-text: var(--signal-muted);
+  --diag-hot: var(--signal-accent-text);
+  --diag-face: var(--signal-surface);
+}
 .guard-glossary__example {
   margin-block: var(--sp-5);
   padding: var(--sp-4);

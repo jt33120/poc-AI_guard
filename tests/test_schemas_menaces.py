@@ -1,11 +1,17 @@
 """Les diagrammes de menace sont tenus par une grammaire, pas par une consigne.
 
-Vingt-trois figures SVG, écrites une par une, rendues **en ligne** dans la page pour
-qu'elles lisent les jetons CSS et basculent avec la bande. Inline veut dire que leur
-balisage entre dans le document tel quel : ce fichier est la raison pour laquelle on
-peut se le permettre.
+Des figures SVG écrites une par une, rendues **en ligne** dans la page pour qu'elles
+lisent les jetons CSS et basculent avec la bande. Inline veut dire que leur balisage
+entre dans le document tel quel : ce fichier est la raison pour laquelle on peut se le
+permettre.
 
-Ce qu'il empêche, dans l'ordre de ce que ça coûte :
+Elles vivent dans **deux fichiers**, parce qu'elles n'ont pas le même index : celles de
+`lib/schemas.ts` répondent à un rang du classement, celles de `lib/glossary-schemas.ts`
+à une fiche du glossaire qu'aucun rang ne dessinait. Deux index, une seule grammaire —
+ce qui suit s'applique donc aux deux jeux, et un jeu qui inventerait son vocabulaire
+casserait le système aussi sûrement qu'une figure isolée.
+
+Ce que ce fichier empêche, dans l'ordre de ce que ça coûte :
 
 1. **Une couleur écrite en dur.** C'est le défaut qui ne se voit pas : la figure est
    parfaite sur la bande où on l'a dessinée, et devient invisible sur l'autre. Aucun
@@ -20,21 +26,26 @@ Ce qu'il empêche, dans l'ordre de ce que ça coûte :
    `dangerouslySetInnerHTML` sans garde est une promesse qu'on tient de mémoire.
 
 La grammaire est petite exprès. Six classes, une liste d'éléments, un cadre fixe :
-c'est ce qui fait que vingt-trois figures dessinées séparément forment un système.
-Un garde qui autoriserait « tout SVG valide » laisserait passer vingt-trois styles.
+c'est ce qui fait que des figures dessinées séparément forment un système. Un garde qui
+autoriserait « tout SVG valide » laisserait passer autant de styles que de figures.
 """
 
 from __future__ import annotations
 
 import re
 import xml.etree.ElementTree as ET
+from collections.abc import Callable
 from itertools import pairwise
 from pathlib import Path
+
+import pytest
 
 _RACINE = Path(__file__).resolve().parent.parent
 _FRONT = _RACINE / "frontend"
 _SCHEMAS = _FRONT / "lib" / "schemas.ts"
+_SCHEMAS_GLOSSAIRE = _FRONT / "lib" / "glossary-schemas.ts"
 _MENACES = _FRONT / "lib" / "menaces.ts"
+_FICHES = _FRONT / "lib" / "threat-glossary.ts"
 _CSS = _FRONT / "app" / "globals.css"
 
 #: Le cadre. Une marge de 4 est laissée au trait : un contour de 1.4 centré sur le
@@ -43,7 +54,7 @@ _LARGEUR, _HAUTEUR = 200.0, 112.0
 _MARGE = 4.0
 
 #: Tout le vocabulaire. Ajouter un élément ici est une décision de conception, pas un
-#: détail : c'est ce qui garde les vingt-trois figures dans la même langue.
+#: détail : c'est ce qui garde toutes les figures dans la même langue.
 _ELEMENTS = frozenset(
     {"g", "rect", "circle", "line", "path", "polygon", "polyline", "text", "title"}
 )
@@ -74,10 +85,41 @@ def _corps() -> dict[int, str]:
     return trouve
 
 
+def _corps_glossaire() -> dict[str, str]:
+    """Identifiant de fiche vers corps SVG, lus depuis `lib/glossary-schemas.ts`."""
+    texte = _SCHEMAS_GLOSSAIRE.read_text(encoding="utf-8")
+    return {
+        m.group(1): m.group(2)
+        for m in re.finditer(r'^\s{2}"([\w-]+)":\s*`([^`]*)`', texte, flags=re.MULTILINE)
+    }
+
+
 def _rangs_attendus() -> set[int]:
     """Les rangs déclarés dans `MENACES` : la liste que les figures doivent couvrir."""
     texte = _MENACES.read_text(encoding="utf-8")
     return {int(r) for r in re.findall(r"\{\s*rang:\s*(\d+),", texte)}
+
+
+def _ids_de_fiches() -> set[str]:
+    """Les identifiants déclarés dans `THREAT_GLOSSARY` : les fiches qui existent."""
+    texte = _FICHES.read_text(encoding="utf-8")
+    return set(re.findall(r'^\s+id: "([\w-]+)",', texte, flags=re.MULTILINE))
+
+
+def _figures_menaces() -> dict[str, str]:
+    """Le jeu du classement, ses rangs ramenés à des clés de texte comme l'autre jeu."""
+    return {str(rang): corps for rang, corps in _corps().items()}
+
+
+#: Les deux jeux de figures, sous le nom de leur fichier. Chaque contrôle de grammaire
+#: ci-dessous porte sur les deux : c'est ce qui fait que les figures du glossaire ne
+#: dérivent pas de celles du classement, alors qu'elles se relisent séparément.
+_JEUX: tuple[tuple[str, Callable[[], dict[str, str]]], ...] = (
+    ("schemas.ts", _figures_menaces),
+    ("glossary-schemas.ts", _corps_glossaire),
+)
+
+_SUR_CHAQUE_JEU = pytest.mark.parametrize(("jeu", "lire"), _JEUX, ids=[nom for nom, _ in _JEUX])
 
 
 def _arbre(corps: str) -> ET.Element:
@@ -199,18 +241,36 @@ def test_no_diagram_is_left_without_a_threat() -> None:
     assert not orphelins, f"figures sans menace correspondante : {orphelins}"
 
 
-def test_every_diagram_is_well_formed() -> None:
+def test_every_glossary_diagram_answers_a_real_entry() -> None:
+    """Une figure du glossaire indexée sur rien ne s'affiche nulle part, et personne ne le voit.
+
+    C'est le pendant du contrôle ci-dessus, pour l'autre index : ici la clé n'est pas un
+    rang mais un `id` de `THREAT_GLOSSARY`. Une faute de frappe dans l'identifiant rend la
+    figure muette sans rien casser — la fiche s'affiche simplement sans schéma.
+    """
+    inconnus = sorted(set(_corps_glossaire()) - _ids_de_fiches())
+    assert not inconnus, (
+        f"figures indexées sur une fiche qui n'existe pas : {inconnus}\n"
+        "  fix : la clé doit être un `id` de `frontend/lib/threat-glossary.ts`."
+    )
+
+
+@_SUR_CHAQUE_JEU
+def test_every_diagram_is_well_formed(jeu: str, lire: Callable[[], dict[str, str]]) -> None:
     """Un corps mal formé casse le rendu de la page entière, pas seulement le sien."""
     casses = []
-    for rang, corps in sorted(_corps().items()):
+    for cle, corps in lire().items():
         try:
             _arbre(corps)
         except ET.ParseError as erreur:
-            casses.append(f"{rang} : {erreur}")
-    assert not casses, "XML mal formé :\n  " + "\n  ".join(casses)
+            casses.append(f"{cle} : {erreur}")
+    assert not casses, f"XML mal formé dans {jeu} :\n  " + "\n  ".join(casses)
 
 
-def test_no_diagram_writes_a_colour_of_its_own() -> None:
+@_SUR_CHAQUE_JEU
+def test_no_diagram_writes_a_colour_of_its_own(
+    jeu: str, lire: Callable[[], dict[str, str]]
+) -> None:
     """Le défaut invisible : parfait sur une bande, effacé sur l'autre.
 
     Une figure qui écrit sa couleur ne suit pas `.section--light`. Elle reste juste
@@ -218,42 +278,46 @@ def test_no_diagram_writes_a_colour_of_its_own() -> None:
     change. C'est exactement le défaut que `--copper-sheen` a produit dans le relevé.
     """
     fautes = []
-    for rang, corps in sorted(_corps().items()):
+    for cle, corps in lire().items():
         for motif, quoi in (
             (_COULEUR, "attribut de couleur"),
             (_VALEUR_COULEUR, "valeur de couleur"),
         ):
             for trouve in motif.findall(corps):
-                fautes.append(f"{rang} : {quoi} « {trouve} »")
+                fautes.append(f"{cle} : {quoi} « {trouve} »")
     assert not fautes, (
-        "une figure écrit sa propre couleur :\n  " + "\n  ".join(fautes) + "\n\n"
+        f"une figure de {jeu} écrit sa propre couleur :\n  " + "\n  ".join(fautes) + "\n\n"
         "  fix : la couleur vient des classes (n, n--hot, f, a, x, d, t, t--hot), "
         "elles seules lisent les jetons et basculent avec la bande."
     )
 
 
-def test_only_the_declared_vocabulary_is_used() -> None:
+@_SUR_CHAQUE_JEU
+def test_only_the_declared_vocabulary_is_used(jeu: str, lire: Callable[[], dict[str, str]]) -> None:
     """Six classes et une liste d'éléments : c'est ce qui fait un système."""
     fautes = []
-    for rang, corps in sorted(_corps().items()):
+    for cle, corps in lire().items():
         for e in _arbre(corps).iter():
             if e.tag == "svg":
                 continue
             if e.tag not in _ELEMENTS:
-                fautes.append(f"{rang} : élément <{e.tag}> hors vocabulaire")
+                fautes.append(f"{cle} : élément <{e.tag}> hors vocabulaire")
             inconnues = set((e.get("class") or "").split()) - _CLASSES
             if inconnues:
-                fautes.append(f"{rang} : classe(s) {sorted(inconnues)} hors vocabulaire")
+                fautes.append(f"{cle} : classe(s) {sorted(inconnues)} hors vocabulaire")
             marqueur = e.get("marker-end")
             if marqueur and marqueur not in _MARQUEURS:
-                fautes.append(f"{rang} : marker-end « {marqueur} » inconnu")
-    assert not fautes, "vocabulaire :\n  " + "\n  ".join(fautes)
+                fautes.append(f"{cle} : marker-end « {marqueur} » inconnu")
+    assert not fautes, f"vocabulaire dans {jeu} :\n  " + "\n  ".join(fautes)
 
 
-def test_nothing_animates_or_executes_on_its_own() -> None:
+@_SUR_CHAQUE_JEU
+def test_nothing_animates_or_executes_on_its_own(
+    jeu: str, lire: Callable[[], dict[str, str]]
+) -> None:
     """`<animate>` contourne `prefers-reduced-motion`, `<script>` contourne tout le reste."""
     fautes = []
-    for rang, corps in sorted(_corps().items()):
+    for cle, corps in lire().items():
         for interdit in (
             "<script",
             "<animate",
@@ -264,126 +328,152 @@ def test_nothing_animates_or_executes_on_its_own() -> None:
             "http",
         ):
             if interdit in corps:
-                fautes.append(f"{rang} : « {interdit} » interdit")
+                fautes.append(f"{cle} : « {interdit} » interdit")
         combien = corps.count("a-move")
         if combien > 1:
-            fautes.append(f"{rang} : {combien} éléments animés, un seul est permis")
+            fautes.append(f"{cle} : {combien} éléments animés, un seul est permis")
     assert not fautes, (
-        "balisage interdit :\n  " + "\n  ".join(fautes) + "\n\n"
+        f"balisage interdit dans {jeu} :\n  " + "\n  ".join(fautes) + "\n\n"
         "  Le mouvement est porté par la feuille de style, qui l'arrête sous "
         "`prefers-reduced-motion` ; un `<animate>` y échapperait."
     )
 
 
-def test_every_diagram_carries_its_accessible_name() -> None:
+@_SUR_CHAQUE_JEU
+def test_every_diagram_carries_its_accessible_name(
+    jeu: str, lire: Callable[[], dict[str, str]]
+) -> None:
     """Une figure rendue en `role=img` sans nom est annoncée comme un blanc."""
     fautes = []
-    for rang, corps in sorted(_corps().items()):
+    for cle, corps in lire().items():
         racine = _arbre(corps)
         titres = racine.findall("title")
         if len(titres) != 1:
-            fautes.append(f"{rang} : {len(titres)} <title>, il en faut exactement un")
+            fautes.append(f"{cle} : {len(titres)} <title>, il en faut exactement un")
             continue
         if next(iter(racine)).tag != "title":
-            fautes.append(f"{rang} : le <title> n'est pas en première position")
+            fautes.append(f"{cle} : le <title> n'est pas en première position")
         texte = (titres[0].text or "").strip()
         if not texte:
-            fautes.append(f"{rang} : <title> vide")
+            fautes.append(f"{cle} : <title> vide")
         elif len(texte) > 90:
-            fautes.append(f"{rang} : <title> de {len(texte)} caractères, 90 au plus")
-    assert not fautes, "nom accessible :\n  " + "\n  ".join(fautes)
+            fautes.append(f"{cle} : <title> de {len(texte)} caractères, 90 au plus")
+    assert not fautes, f"nom accessible dans {jeu} :\n  " + "\n  ".join(fautes)
 
 
-def test_labels_stay_short_and_french() -> None:
+@_SUR_CHAQUE_JEU
+def test_labels_stay_short_and_french(jeu: str, lire: Callable[[], dict[str, str]]) -> None:
     """Six étiquettes courtes. Au-delà, la figure se lit comme un paragraphe."""
     fautes = []
-    for rang, corps in sorted(_corps().items()):
+    for cle, corps in lire().items():
         textes = list(_arbre(corps).iter("text"))
         if len(textes) > 6:
-            fautes.append(f"{rang} : {len(textes)} étiquettes, six au plus")
+            fautes.append(f"{cle} : {len(textes)} étiquettes, six au plus")
         for t in textes:
             contenu = (t.text or "").strip()
             if len(contenu) > 16:
                 fautes.append(
-                    f"{rang} : « {contenu} » fait {len(contenu)} caractères, seize au plus"
+                    f"{cle} : « {contenu} » fait {len(contenu)} caractères, seize au plus"
                 )
             if "—" in contenu:
-                fautes.append(f"{rang} : tiret cadratin dans « {contenu} »")
-    assert not fautes, "étiquettes :\n  " + "\n  ".join(fautes)
+                fautes.append(f"{cle} : tiret cadratin dans « {contenu} »")
+    assert not fautes, f"étiquettes dans {jeu} :\n  " + "\n  ".join(fautes)
 
 
-def test_nothing_falls_outside_the_frame() -> None:
+@_SUR_CHAQUE_JEU
+def test_nothing_falls_outside_the_frame(jeu: str, lire: Callable[[], dict[str, str]]) -> None:
     """Un `viewBox` met à l'échelle, il ne rogne pas : ce qui déborde écrase le reste."""
     fautes = []
-    for rang, corps in sorted(_corps().items()):
+    for cle, corps in lire().items():
         for balise, x0, y0, x1, y1 in _boites(_arbre(corps)):
             if x0 < -0.01 or y0 < -0.01 or x1 > _LARGEUR + 0.01 or y1 > _HAUTEUR + 0.01:
                 fautes.append(
-                    f"{rang} : <{balise}> occupe x {x0:.0f}..{x1:.0f}, y {y0:.0f}..{y1:.0f} "
+                    f"{cle} : <{balise}> occupe x {x0:.0f}..{x1:.0f}, y {y0:.0f}..{y1:.0f} "
                     f"hors du cadre {_LARGEUR:.0f}x{_HAUTEUR:.0f}"
                 )
-    assert not fautes, "géométrie hors cadre :\n  " + "\n  ".join(fautes)
+    assert not fautes, f"géométrie hors cadre dans {jeu} :\n  " + "\n  ".join(fautes)
 
 
-def test_no_two_labels_collide() -> None:
+@_SUR_CHAQUE_JEU
+def test_no_two_labels_collide(jeu: str, lire: Callable[[], dict[str, str]]) -> None:
     """Deux étiquettes superposées sont illisibles, et invisibles à la relecture du code."""
     fautes = []
-    for rang, corps in sorted(_corps().items()):
+    for cle, corps in lire().items():
         boites = [(t.text or "", _boite_texte(t)) for t in _arbre(corps).iter("text")]
         for i, (ta, ba) in enumerate(boites):
             for tb, bb in boites[i + 1 :]:
                 if _chevauchent(ba, bb):
-                    fautes.append(f"{rang} : « {ta} » et « {tb} » se chevauchent")
+                    fautes.append(f"{cle} : « {ta} » et « {tb} » se chevauchent")
     assert not fautes, (
-        "étiquettes superposées :\n  " + "\n  ".join(fautes) + "\n\n"
+        f"étiquettes superposées dans {jeu} :\n  " + "\n  ".join(fautes) + "\n\n"
         "  Largeur approchée : 4.9 px par caractère à 8 px de corps."
     )
 
 
-def test_stations_are_big_enough_to_hold_their_label() -> None:
+@_SUR_CHAQUE_JEU
+def test_stations_are_big_enough_to_hold_their_label(
+    jeu: str, lire: Callable[[], dict[str, str]]
+) -> None:
     """Une boîte plus étroite que son étiquette la laisse dépasser des deux côtés."""
     fautes = []
-    for rang, corps in sorted(_corps().items()):
-        racine = _arbre(corps)
-        for e in racine.iter("rect"):
+    for cle, corps in lire().items():
+        for e in _arbre(corps).iter("rect"):
             if "n" not in (e.get("class") or "").split():
                 continue
             largeur, hauteur = float(e.get("width", 0)), float(e.get("height", 0))
             if largeur < 34 or hauteur < 20:
-                fautes.append(f"{rang} : station de {largeur:.0f}x{hauteur:.0f}, 34x20 au minimum")
-    assert not fautes, "stations trop petites :\n  " + "\n  ".join(fautes)
+                fautes.append(f"{cle} : station de {largeur:.0f}x{hauteur:.0f}, 34x20 au minimum")
+    assert not fautes, f"stations trop petites dans {jeu} :\n  " + "\n  ".join(fautes)
 
 
-def test_the_stylesheet_defines_every_class_the_diagrams_use() -> None:
+@_SUR_CHAQUE_JEU
+def test_the_stylesheet_defines_every_class_the_diagrams_use(
+    jeu: str, lire: Callable[[], dict[str, str]]
+) -> None:
     """Une classe employée mais non stylée dessine du noir par défaut, sur toutes les bandes."""
     css = _CSS.read_text(encoding="utf-8")
     employees = set()
-    for corps in _corps().values():
+    for corps in lire().values():
         for e in _arbre(corps).iter():
             employees.update((e.get("class") or "").split())
     manquantes = sorted(c for c in employees if f".{c}" not in css)
     assert not manquantes, (
-        f"classes employées par les figures mais absentes de `globals.css` : {manquantes}"
+        f"classes employées par les figures de {jeu} mais absentes de `globals.css` : {manquantes}"
     )
 
 
-def test_the_guard_reads_diagrams_that_are_really_there() -> None:
+#: Combien de figures chaque jeu doit au moins rendre à sa lecture.
+_MINIMUM = {"schemas.ts": 16, "glossary-schemas.ts": 1}
+
+
+@_SUR_CHAQUE_JEU
+def test_the_guard_reads_diagrams_that_are_really_there(
+    jeu: str, lire: Callable[[], dict[str, str]]
+) -> None:
     """Contrôle de non-vacuité : un garde qui ne lit rien passe toujours.
 
-    Toutes les vérifications ci-dessus bouclent sur `_corps()`. Si la regex qui lit
-    `schemas.ts` cesse de correspondre, elles rendent zéro faute sur zéro figure et le
-    fichier entier devient décoratif. C'est le mode de panne le plus probable ici.
+    Toutes les vérifications ci-dessus bouclent sur ce que la regex a su lire. Si elle
+    cesse de correspondre — une accolade déplacée, un fichier renommé — elles rendent
+    zéro faute sur zéro figure et le fichier entier devient décoratif. C'est le mode de
+    panne le plus probable ici, et il vaut pour les deux jeux.
     """
-    corps = _corps()
-    assert len(corps) >= 16, f"seulement {len(corps)} figures lues, la regex a-t-elle cassé ?"
-    assert all(len(c) > 80 for c in corps.values()), "au moins une figure est quasi vide"
-    total = sum(len(list(_arbre(c).iter("text"))) for c in corps.values())
-    assert total >= len(corps), "les figures ne portent presque aucune étiquette"
+    figures = lire()
+    attendu = _MINIMUM[jeu]
+    assert len(figures) >= attendu, (
+        f"seulement {len(figures)} figures lues dans {jeu}, la regex a-t-elle cassé ?"
+    )
+    assert all(len(c) > 80 for c in figures.values()), f"au moins une figure de {jeu} est vide"
+    total = sum(len(list(_arbre(c).iter("text"))) for c in figures.values())
+    assert total >= len(figures), f"les figures de {jeu} ne portent presque aucune étiquette"
 
 
-#: Le seul rang qui a le droit à une diagonale : le croisement y est le sujet, deux
-#: entrées presque identiques donnant deux verdicts opposés.
-_DIAGONALES_PERMISES = frozenset({23})
+#: Les seules clés qui ont droit à une diagonale, jeu par jeu. Au rang 23 le croisement
+#: est le sujet : deux entrées presque identiques donnant deux verdicts opposés. Aucune
+#: fiche du glossaire n'a ce sujet, d'où le jeu vide.
+_DIAGONALES_PERMISES: dict[str, frozenset[str]] = {
+    "schemas.ts": frozenset({"23"}),
+    "glossary-schemas.ts": frozenset(),
+}
 
 #: La hauteur unique des stations. La critique du jeu complet a montré que 22 et 24
 #: cohabitaient : les lignes de base du texte s'en trouvaient décalées d'un pixel d'une
@@ -416,7 +506,8 @@ def _segments(el: ET.Element) -> list[tuple[str, float, float, float, float]]:
     return out
 
 
-def test_no_two_stations_overlap() -> None:
+@_SUR_CHAQUE_JEU
+def test_no_two_stations_overlap(jeu: str, lire: Callable[[], dict[str, str]]) -> None:
     """Deux boîtes superposées se lisent comme un bug, pas comme une intention.
 
     Trouvé par la critique du jeu et non par ce fichier : au rang 7, `Humain` occupait
@@ -424,7 +515,7 @@ def test_no_two_stations_overlap() -> None:
     étiquettes, pas les stations. Il les vérifie maintenant.
     """
     fautes = []
-    for rang, corps in sorted(_corps().items()):
+    for cle, corps in lire().items():
         boites = [
             (
                 float(e.get("x", 0)),
@@ -439,69 +530,77 @@ def test_no_two_stations_overlap() -> None:
             for b in boites[i + 1 :]:
                 if _chevauchent(a, b):
                     fautes.append(
-                        f"{rang} : deux stations se chevauchent, "
+                        f"{cle} : deux stations se chevauchent, "
                         f"x {a[0]:.0f}..{a[2]:.0f} et x {b[0]:.0f}..{b[2]:.0f}"
                     )
-    assert not fautes, "stations superposées :\n  " + "\n  ".join(fautes)
+    assert not fautes, f"stations superposées dans {jeu} :\n  " + "\n  ".join(fautes)
 
 
-def test_stations_share_one_height() -> None:
+@_SUR_CHAQUE_JEU
+def test_stations_share_one_height(jeu: str, lire: Callable[[], dict[str, str]]) -> None:
     """Une hauteur unique, sinon la colonne vibre d'une vignette à l'autre."""
     fautes = []
-    for rang, corps in sorted(_corps().items()):
+    for cle, corps in lire().items():
         for e in _arbre(corps).iter("rect"):
             if "n" not in (e.get("class") or "").split():
                 continue
             h = float(e.get("height", 0))
             if abs(h - _HAUTEUR_STATION) > 0.01:
                 fautes.append(
-                    f"{rang} : station de hauteur {h:.0f}, {_HAUTEUR_STATION:.0f} attendue"
+                    f"{cle} : station de hauteur {h:.0f}, {_HAUTEUR_STATION:.0f} attendue"
                 )
     assert not fautes, (
-        "hauteurs de station dépareillées :\n  " + "\n  ".join(fautes) + "\n\n"
+        f"hauteurs de station dépareillées dans {jeu} :\n  " + "\n  ".join(fautes) + "\n\n"
         "  Une exception voulue se dessine avec une AUTRE marque, pas avec une station étirée."
     )
 
 
-def test_the_block_bar_is_a_short_perpendicular_stroke() -> None:
+@_SUR_CHAQUE_JEU
+def test_the_block_bar_is_a_short_perpendicular_stroke(
+    jeu: str, lire: Callable[[], dict[str, str]]
+) -> None:
     """`x` a un seul dialecte : une barre courte en travers du flux qu'elle coupe.
 
     Le jeu en avait deux — la barre courte, et une longue diagonale barrant une boîte
     entière. Deux sens sous une même classe, donc aucune des deux ne s'apprend.
     """
     fautes = []
-    for rang, corps in sorted(_corps().items()):
+    for cle, corps in lire().items():
         for cls, x1, y1, x2, y2 in _segments(_arbre(corps)):
             if "x" not in cls.split():
                 continue
             longueur = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
             if longueur > 22:
-                fautes.append(f"{rang} : barre de blocage de {longueur:.0f}, 22 au plus")
+                fautes.append(f"{cle} : barre de blocage de {longueur:.0f}, 22 au plus")
             if abs(x1 - x2) > 0.5 and abs(y1 - y2) > 0.5:
-                fautes.append(f"{rang} : barre de blocage en diagonale")
-    assert not fautes, "barres de blocage :\n  " + "\n  ".join(fautes)
+                fautes.append(f"{cle} : barre de blocage en diagonale")
+    assert not fautes, f"barres de blocage dans {jeu} :\n  " + "\n  ".join(fautes)
 
 
-def test_lines_run_along_the_grid() -> None:
+@_SUR_CHAQUE_JEU
+def test_lines_run_along_the_grid(jeu: str, lire: Callable[[], dict[str, str]]) -> None:
     """Une diagonale attire l'oeil : elle doit vouloir dire quelque chose.
 
-    Tous les flux sont orthogonaux, sauf le seul rang dont le sujet EST le croisement.
+    Tous les flux sont orthogonaux, sauf la seule figure dont le sujet EST le croisement.
     Sans cette règle, chaque figure invente son angle et le jeu perd sa grille.
     """
+    permises = _DIAGONALES_PERMISES[jeu]
     fautes = []
-    for rang, corps in sorted(_corps().items()):
-        if rang in _DIAGONALES_PERMISES:
+    for cle, corps in lire().items():
+        if cle in permises:
             continue
         for cls, x1, y1, x2, y2 in _segments(_arbre(corps)):
             if not ({"f", "a"} & set(cls.split())):
                 continue
             if abs(x1 - x2) > 0.5 and abs(y1 - y2) > 0.5:
                 fautes.append(
-                    f"{rang} : segment « {cls} » en diagonale, "
+                    f"{cle} : segment « {cls} » en diagonale, "
                     f"({x1:.0f},{y1:.0f}) vers ({x2:.0f},{y2:.0f})"
                 )
     assert not fautes, (
-        "diagonales hors du rang qui les justifie :\n  " + "\n  ".join(fautes) + "\n\n"
+        f"diagonales hors de la figure qui les justifie, dans {jeu} :\n  "
+        + "\n  ".join(fautes)
+        + "\n\n"
         "  fix : un tracé orthogonal (montée, traverse, descente) dit la même chose "
         "et garde la grille du jeu."
     )

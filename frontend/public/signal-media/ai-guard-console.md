@@ -1,0 +1,10 @@
+# AI Guard — console de supervision
+
+- Capture d'écran réelle de la console xSOM AI Guard, page `/inspector`, réalisée le 16 septembre 2026 ; aucun montage, aucune retouche, aucun élément redessiné.
+- Les données affichées sont des données de démonstration injectées pour la capture : le registre d'outils et le journal d'audit ont été simulés par interception réseau (`page.route`) dans un test Playwright temporaire, supprimé après usage. Aucune donnée client réelle n'y figure.
+- Innocuité du jeu de données : noms d'outils génériques (`files.read`, `crm.delete_contact`, `billing.refund`, `db.drop_table`…), aucun nom de personne, aucune adresse, aucun jeton, aucun secret ; les valeurs `args_hash` et `request_id` sont des chaînes inventées.
+- L'écran montre, dans un seul cadre : le registre des neuf outils avec leur verdict de policy, la règle effective de `billing.refund` — validation humaine requise — rendue par le diagramme d'autorisation Agent → Guard → HITL → Outil, et le récit de l'appel `#4821` en quatre étapes (intention, règle, verdict, trace), avec empreinte des arguments, plan d'entrée, mode d'exécution et signal DLP.
+- Le diagramme d'autorisation est en mode service : la capture ne porte aucun filigrane de démonstration ni mention « données illustratives ».
+- Génération locale : build Next.js de production servi sur `127.0.0.1:3100`, Chromium piloté par Playwright, fenêtre 1 440 × 1 300 pixels, facteur d'échelle 2, animations réduites, thème clair, interface en français.
+- `ai-guard-console.png` : 2 880 × 2 600 pixels, 224 406 octets, palette adaptative de 256 couleurs sans tramage (équivalent pngquant) ; aucune autre transformation que cette réduction de palette.
+- Vérification : le peuplement de l'écran est contrôlé par assertions avant la capture — neuf outils au registre, outil sélectionné au verdict `human_in_the_loop`, panneau de règle visible, bande de récit à quatre étapes, et absence des chaînes « données illustratives », « illustrative data » et « Démonstration · ».

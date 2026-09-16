@@ -23,6 +23,17 @@ test("the glossary combines local search and use filters, resets both and transl
   }
   await expect(cards.getByText(/\bM-\d{2}\b/)).toHaveCount(0);
 
+  // Chaque fiche explique son mécanisme par une figure, et chaque figure porte son
+  // nom accessible. Les marqueurs de flèche sont posés UNE fois pour le document :
+  // un jeu par fiche produirait huit `id` identiques et un rendu qui dépend de
+  // l'ordre de lecture.
+  await expect(page.locator(".guard-glossary__card .diag")).toHaveCount(8);
+  await expect(page.locator("marker#fx")).toHaveCount(1);
+  await expect(page.locator("marker#ax")).toHaveCount(1);
+  for (const card of await cards.all()) {
+    await expect(card.locator(".diag > title")).toHaveCount(1);
+  }
+
   // La recherche ignore accents et casse, et les mots portent sur une même fiche.
   await search.fill("CODE GENERE");
   await expect(cards).toHaveCount(1);

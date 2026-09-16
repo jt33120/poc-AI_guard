@@ -27,11 +27,14 @@ import Image from "next/image";
 import { Wordmark, XsomMark } from "@/components/brand";
 import {
   CONTACT_MAILTO,
+  EXTENSION_HERO_MEDIA,
   EXTENSION_MARKETPLACE_URL,
   EXTENSION_ON_MARKETPLACE,
   EXTENSION_VSIX_URL,
   GUARD_COPY,
 } from "@/components/guard-copy";
+import { GUARD_HOME_COPY } from "@/components/guard-home-copy";
+import { GuardHeroVideo } from "@/components/GuardHeroVideo";
 import { GuardNav } from "@/components/GuardNav";
 import { SignalPreferences } from "@/design-system/react";
 import { useT } from "@/lib/i18n";
@@ -39,8 +42,9 @@ import { useT } from "@/lib/i18n";
 export function ExtensionOffer() {
   const { lang } = useT();
   const copy = GUARD_COPY[lang];
+  const home = GUARD_HOME_COPY[lang];
   return (
-    <main className="guard-landing">
+    <main className="guard-landing guard-home">
       <header className="guard-header">
         <div className="guard-wrap guard-header__inner">
           <Link href="/" className="brand">
@@ -51,40 +55,62 @@ export function ExtensionOffer() {
         </div>
       </header>
 
-      <section className="guard-saas-hero guard-wrap">
-        <p className="guard-kicker">{copy.extKicker}</p>
-        <h1>{copy.extTitle}</h1>
-        <p className="guard-hero__intro">{copy.extIntro}</p>
-        <div className="guard-ext-actions">
-          <a className="guard-button" href={EXTENSION_VSIX_URL} download>
-            {copy.extInstallVsix}
-            <span aria-hidden="true">↓</span>
-          </a>
-          {EXTENSION_ON_MARKETPLACE ? (
-            <a className="guard-link" href={EXTENSION_MARKETPLACE_URL}>
-              {copy.extInstallMarket}
-              <span aria-hidden="true">↗</span>
-            </a>
-          ) : null}
-        </div>
-        {EXTENSION_ON_MARKETPLACE ? null : (
-          <p className="guard-saas-open">{copy.extMarketSoon}</p>
+      <section className="guard-masthead" aria-labelledby="ext-heading">
+        {EXTENSION_HERO_MEDIA && (
+          <GuardHeroVideo copy={home} media={EXTENSION_HERO_MEDIA} />
         )}
+        <div className="guard-masthead__scrim" aria-hidden="true" />
+        <div className="guard-wrap guard-masthead__inner">
+          <div className="guard-masthead__copy">
+            <p className="guard-masthead__eyebrow">
+              <span className="guard-french-mark" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+              </span>
+              {copy.extKicker}
+            </p>
+            <h1 id="ext-heading">{copy.extTitle}</h1>
+            <p className="guard-masthead__intro">{copy.extIntro}</p>
+            <div className="guard-masthead__actions guard-ext-actions reveal" data-delay="1">
+              <a className="guard-button" href={EXTENSION_VSIX_URL} download>
+                {copy.extInstallVsix}
+                <span aria-hidden="true">↓</span>
+              </a>
+              {EXTENSION_ON_MARKETPLACE ? (
+                <a href={EXTENSION_MARKETPLACE_URL}>
+                  {copy.extInstallMarket}
+                  <span aria-hidden="true">↗</span>
+                </a>
+              ) : null}
+            </div>
+            <p className="guard-masthead__note reveal" data-delay="2">
+              <span />
+              {copy.poc}
+            </p>
+          </div>
+        </div>
       </section>
+
+      {EXTENSION_ON_MARKETPLACE ? null : (
+        <div className="guard-wrap guard-ext-market">
+          <p className="guard-saas-open">{copy.extMarketSoon}</p>
+        </div>
+      )}
 
       <section className="guard-who guard-wrap" aria-labelledby="ext-plans">
         <div className="guard-section-heading">
           <h2 id="ext-plans">{copy.extPlansTitle}</h2>
         </div>
         <div className="guard-paths">
-          <article className="guard-path" id="individual">
+          <article className="guard-path reveal" data-delay="1" id="individual">
             <p className="guard-path__tag">{copy.extFreeLabel}</p>
             <h3>{copy.extFreeTitle}</h3>
             <p>{copy.extFreeBody}</p>
             <a className="guard-link" href="#ext-steps">{copy.extStepsTitle} ↓</a>
             <p className="guard-path__note">{copy.extFreeNote}</p>
           </article>
-          <article className="guard-path" id="enterprise">
+          <article className="guard-path reveal" data-delay="2" id="enterprise">
             <p className="guard-path__tag">{copy.extEnterpriseLabel}</p>
             <h3>{copy.extEnterpriseTitle}</h3>
             <p>{copy.extEnterpriseBody}</p>
@@ -101,7 +127,7 @@ export function ExtensionOffer() {
         </div>
         <ol className="guard-start__steps guard-ext-steps">
           {copy.extSteps.map((etape, index) => (
-            <li key={etape.title}>
+            <li key={etape.title} className="reveal" data-delay={String(index + 1)}>
               <span className="guard-step-number">0{index + 1}</span>
               <div>
                 <h3>{etape.title}</h3>
@@ -116,8 +142,8 @@ export function ExtensionOffer() {
         <h2 id="ext-hosts">{copy.extHostsTitle}</h2>
         <p>{copy.extHostsBody}</p>
         <ul className="guard-ext-hosts">
-          {copy.extHosts.map((hote) => (
-            <li key={hote}>
+          {copy.extHosts.map((hote, index) => (
+            <li key={hote} className="reveal" data-delay={String(index + 1)}>
               {hote === "Claude Code" ? (
                 <Image
                   className="guard-ext-hosts__logo"
@@ -144,8 +170,8 @@ export function ExtensionOffer() {
         <p>{copy.extLocalBody}</p>
         <h3 className="guard-ext-limits__title">{copy.extLimitsTitle}</h3>
         <ul className="guard-ext-limits">
-          {copy.extLimits.map((borne) => (
-            <li key={borne}>
+          {copy.extLimits.map((borne, index) => (
+            <li key={borne} className="reveal" data-delay={String(index + 1)}>
               <span aria-hidden="true">↗</span>
               {borne}
             </li>
