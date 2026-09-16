@@ -20,13 +20,21 @@ import {
   HEALTH_LABELS,
 } from "./dashboard.js";
 import {
+  isProtectionMode,
   modeLabel,
   protectionMode,
   PROTECTION_MODES,
 } from "./protection-mode.js";
+import {
+  statusTooltipMarkdown,
+  STATUS_TOOLTIP_COMMANDS,
+  type LastScan,
+} from "./status-tooltip.js";
 
 const FINISH_CODEX_SETUP = "Finaliser Codex";
 let gateway: GatewayIntegration | undefined;
+// Metadata only: the scanned content and detected values are never retained.
+let lastScan: LastScan | undefined;
 
 function configuredMode(): ProtectionMode {
   return protectionMode(
@@ -80,8 +88,22 @@ async function copyRedacted(content?: unknown): Promise<void> {
   );
 }
 
-async function presentScan(input: ScanInput): Promise<void> {
+async function presentScan(
+  input: ScanInput & { sourceKind: LastScan["source"] },
+  onScanned: () => Promise<void>,
+): Promise<void> {
   const result = scan(input);
+  lastScan = {
+    source: input.sourceKind,
+    decision: result.decision,
+    findings: result.findings.length,
+    complete: result.complete,
+    time: new Date().toLocaleTimeString("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+  };
+  await onScanned();
   gateway?.record({
     kind: "scan",
     assistant: "manual",
@@ -212,9 +234,16 @@ async function handleChat(
   }
 }
 
+async function saveMode(mode: ProtectionMode): Promise<void> {
+  await vscode.workspace
+    .getConfiguration("secretGuard")
+    .update("mode", mode, vscode.ConfigurationTarget.Global);
+}
+
 async function updateStatus(
   item: vscode.StatusBarItem,
   manager: HookManager,
+  modeApplicationFailed: boolean,
 ): Promise<HookHealth> {
   let health: HookHealth;
   try {
@@ -241,19 +270,32 @@ async function updateStatus(
   } else {
     item.text = "$(shield) Secret Guard · Désactivé";
   }
-  const tooltip = new vscode.MarkdownString(undefined, true);
-  tooltip.appendMarkdown(
-    `### $(shield) Secret Guard\n\n**${HEALTH_LABELS[health.state]}**\n\n`,
-  );
-  for (const host of health.hosts) {
-    tooltip.appendText(
-      `${host.configured ? "✓" : "○"} ${host.label} — ${host.configured ? "configuré" : "non configuré"}\n`,
+  if (modeApplicationFailed) {
+    item.text = "$(warning) Secret Guard · Mode à appliquer";
+    item.backgroundColor = new vscode.ThemeColor(
+      "statusBarItem.warningBackground",
     );
-    tooltip.appendMarkdown("\n");
   }
-  tooltip.appendMarkdown(
-    "---\n\nAnalyse locale · Sans télémétrie\n\nCliquez pour ouvrir le centre de protection. Les tests locaux ne remplacent pas la validation dans chaque assistant.",
+  const tooltip = new vscode.MarkdownString(
+    statusTooltipMarkdown({
+      health,
+      warnMode: configuredWarnMode(),
+      modeApplicationFailed,
+      ...(gateway === undefined
+        ? {}
+        : {
+            gateway: {
+              state: gateway.state,
+              status: gateway.status,
+              ...(gateway.audit === undefined ? {} : { audit: gateway.audit }),
+            },
+          }),
+      ...(lastScan === undefined ? {} : { lastScan }),
+    }),
+    true,
   );
+  tooltip.supportHtml = true;
+  tooltip.isTrusted = { enabledCommands: STATUS_TOOLTIP_COMMANDS };
   item.tooltip = tooltip;
   item.accessibilityInformation = {
     label: `Secret Guard : ${HEALTH_LABELS[health.state]}. Ouvrir le centre de protection.`,
@@ -282,13 +324,7 @@ export async function activate(
   let modeUpdate = Promise.resolve();
   let lastEditor = vscode.window.activeTextEditor;
   const refreshUi = async (): Promise<void> => {
-    const health = await updateStatus(status, manager);
-    if (modeApplicationFailed) {
-      status.text = "$(warning) Secret Guard · Mode à appliquer";
-      status.backgroundColor = new vscode.ThemeColor(
-        "statusBarItem.warningBackground",
-      );
-    }
+    const health = await updateStatus(status, manager, modeApplicationFailed);
     if (panel !== undefined) {
       panel.webview.html = dashboardHtml(
         health,
@@ -330,12 +366,14 @@ export async function activate(
           matchOnDescription: true,
         },
       );
-      if (selected !== undefined) {
-        await vscode.workspace
-          .getConfiguration("secretGuard")
-          .update("mode", selected.mode, vscode.ConfigurationTarget.Global);
-      }
+      if (selected !== undefined) await saveMode(selected.mode);
     }),
+    vscode.commands.registerCommand(
+      "secretGuard.setMode",
+      async (mode?: unknown) => {
+        if (isProtectionMode(mode)) await saveMode(mode);
+      },
+    ),
     vscode.window.onDidChangeActiveTextEditor((editor) => {
       if (editor !== undefined) lastEditor = editor;
     }),
@@ -401,19 +439,25 @@ export async function activate(
     vscode.commands.registerCommand("secretGuard.scanSelection", async () => {
       const editor = vscode.window.activeTextEditor;
       const content = editor?.document.getText(editor.selection) ?? "";
-      await presentScan({
-        content,
-        sourceKind: "selection",
-        ...(editor === undefined
-          ? {}
-          : { languageId: editor.document.languageId }),
-      });
+      await presentScan(
+        {
+          content,
+          sourceKind: "selection",
+          ...(editor === undefined
+            ? {}
+            : { languageId: editor.document.languageId }),
+        },
+        refreshUi,
+      );
     }),
     vscode.commands.registerCommand("secretGuard.scanClipboard", async () => {
-      await presentScan({
-        content: await vscode.env.clipboard.readText(),
-        sourceKind: "clipboard",
-      });
+      await presentScan(
+        {
+          content: await vscode.env.clipboard.readText(),
+          sourceKind: "clipboard",
+        },
+        refreshUi,
+      );
     }),
     vscode.commands.registerCommand("secretGuard.scanDocument", async () => {
       const editor = vscode.window.activeTextEditor ?? lastEditor;
@@ -421,11 +465,14 @@ export async function activate(
         await vscode.window.showInformationMessage("Aucun document ouvert.");
         return;
       }
-      await presentScan({
-        content: editor.document.getText(),
-        sourceKind: "document",
-        languageId: editor.document.languageId,
-      });
+      await presentScan(
+        {
+          content: editor.document.getText(),
+          sourceKind: "document",
+          languageId: editor.document.languageId,
+        },
+        refreshUi,
+      );
     }),
     vscode.commands.registerCommand("secretGuard.copyRedacted", copyRedacted),
     vscode.commands.registerCommand(

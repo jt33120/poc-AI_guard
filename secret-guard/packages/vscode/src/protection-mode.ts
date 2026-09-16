@@ -29,8 +29,12 @@ export const PROTECTION_MODES: ReadonlyArray<{
   },
 ];
 
+export function isProtectionMode(value: unknown): value is ProtectionMode {
+  return value === "block" || value === "redact" || value === "observe";
+}
+
 export function protectionMode(value: unknown): ProtectionMode {
-  return value === "redact" || value === "observe" ? value : "block";
+  return isProtectionMode(value) ? value : "block";
 }
 
 export function modeLabel(mode: ProtectionMode): string {

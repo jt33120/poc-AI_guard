@@ -40,6 +40,30 @@ function registerTests(mocha: Mocha): void {
 
   extensionSuite.addTest(
     new Mocha.Test(
+      "switches mode from the status bar and ignores invalid modes",
+      async () => {
+        const config = (): vscode.WorkspaceConfiguration =>
+          vscode.workspace.getConfiguration("secretGuard");
+        await config().update(
+          "mode",
+          undefined,
+          vscode.ConfigurationTarget.Global,
+        );
+        await vscode.commands.executeCommand("secretGuard.setMode", "typo");
+        assert.equal(config().inspect("mode")?.globalValue, undefined);
+        await vscode.commands.executeCommand("secretGuard.setMode", "observe");
+        assert.equal(config().inspect("mode")?.globalValue, "observe");
+        await config().update(
+          "mode",
+          undefined,
+          vscode.ConfigurationTarget.Global,
+        );
+      },
+    ),
+  );
+
+  extensionSuite.addTest(
+    new Mocha.Test(
       "declares a preview manifest without default telemetry",
       () => {
         const extension = vscode.extensions.getExtension(

@@ -39,8 +39,13 @@ observation de la passerelle. Pièces jointes non inspectables : refus sans repl
 
 ### Choisir le comportement
 
-Cliquez sur **Secret Guard → Changer de mode**, ou ouvrez les paramètres
-**Secret Guard: Mode**. Le choix est commun aux assistants de cette installation.
+Survolez **Secret Guard** dans la barre d’état : le panneau de contrôle permet de
+changer de niveau (1 Avertir, 2 Expurger, 3 Bloquer) sans ouvrir de page. Il
+affiche aussi l’état de chaque assistant, les vérifications du presse-papiers et
+du document, le dernier résultat (métadonnées seulement, jamais la valeur) et la
+passerelle xSOM. Vous pouvez également cliquer sur **Secret Guard → Changer de
+mode**, ou ouvrir les paramètres **Secret Guard: Mode**. Le choix est commun aux
+assistants de cette installation.
 
 | Mode                         | Comportement                                                                                                                                 |
 | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
