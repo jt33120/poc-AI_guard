@@ -35,8 +35,10 @@ export const HOME_HERO_MEDIA = {
   poster: "/signal-media/ai-guard-hero-v2.png",
 };
 
-export const EXTENSION_HERO_MEDIA: { webm: string; poster: string } | null =
-  null;
+export const EXTENSION_HERO_MEDIA: { webm: string; poster: string } | null = {
+  webm: "/signal-media/ai-guard-extension-v1.webm",
+  poster: "/signal-media/ai-guard-extension-v1.png",
+};
 
 /**
  * Vrai seulement une fois la fiche réellement en ligne. Le type est élargi à
