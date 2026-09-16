@@ -72,6 +72,12 @@
 .guard-header nav > a:hover {
   color: var(--signal-accent-text);
 }
+/* Le menu partagé n'a que deux entrées, et aucune n'est redondante avec la marque.
+   La règle qui masque le premier lien sous 1100 px date du temps où il disait
+   « Retour à l'accueil » ; appliquée ici, elle supprimerait la moitié du menu. */
+.guard-header nav > a.guard-nav__link:first-child {
+  display: inline-flex;
+}
 .guard-header .brand__product {
   font-family: var(--font-body), sans-serif;
 }
@@ -825,6 +831,7 @@
     width: 100%;
     justify-content: space-between;
     gap: var(--sp-2);
+    flex-wrap: wrap;
   }
   .guard-header nav > a:first-child {
     display: none;

@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { Wordmark, XsomMark } from "@/components/brand";
+import { GuardNav } from "@/components/GuardNav";
 import { SignalPreferences } from "@/design-system/react";
-import { LanguageToggle, useT } from "@/lib/i18n";
+import { useT } from "@/lib/i18n";
 import {
   GLOSSARY_COPY,
   GLOSSARY_USES,
@@ -48,14 +49,7 @@ export function ThreatGlossary() {
             <XsomMark />
             <Wordmark />
           </Link>
-          <nav aria-label={copy.mainNav}>
-            <Link href="/#usages">{copy.usesNav}</Link>
-            <Link href="/#produits">{copy.productsNav}</Link>
-            <LanguageToggle />
-            <Link href="/saas" className="guard-button guard-button--small">
-              {copy.selfService}<span aria-hidden="true">↗</span>
-            </Link>
-          </nav>
+          <GuardNav />
         </div>
       </header>
 
@@ -142,7 +136,7 @@ export function ThreatGlossary() {
               <h2 id="glossary-next-heading">{copy.nextTitle}</h2>
               <p>{copy.nextText}</p>
             </div>
-            <Link href="/#produits" className="guard-button">{copy.nextLink}<span aria-hidden="true">↗</span></Link>
+            <Link href="/produits" className="guard-button">{copy.nextLink}<span aria-hidden="true">↗</span></Link>
           </aside>
         </section>
       </main>

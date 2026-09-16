@@ -28,8 +28,9 @@ import Link from "next/link";
 
 import { Wordmark, XsomMark } from "@/components/brand";
 import { CONTACT_MAILTO, GUARD_COPY } from "@/components/guard-copy";
+import { GuardNav } from "@/components/GuardNav";
 import { SignalPreferences } from "@/design-system/react";
-import { LanguageToggle, useT } from "@/lib/i18n";
+import { useT } from "@/lib/i18n";
 
 export function SaasOffer() {
   const { lang } = useT();
@@ -42,20 +43,7 @@ export function SaasOffer() {
             <XsomMark />
             <Wordmark />
           </Link>
-          <nav
-            aria-label={
-              lang === "fr" ? "Navigation principale" : "Main navigation"
-            }
-          >
-            <Link href="/">{copy.saasBack}</Link>
-            <Link href="/extension">{copy.extNav}</Link>
-            <Link href="/evidence">{copy.evidence}</Link>
-            <LanguageToggle />
-            <Link href="/login" className="guard-button guard-button--small">
-              {copy.signin}
-              <span aria-hidden="true">↗</span>
-            </Link>
-          </nav>
+          <GuardNav />
         </div>
       </header>
 
