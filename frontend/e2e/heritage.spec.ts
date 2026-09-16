@@ -286,6 +286,12 @@ test("the extension page hands over a file that installs, and names its limits",
     "https://github.com/jt33120/poc-AI_guard/releases/latest/download/xsom-secret-guard-vscode.vsix",
   );
 
+  // La bannière porte son média. L'affiche part au chargement : un chemin mort
+  // laisserait un rectangle vide derrière le titre, sans rien casser d'autre.
+  const fond = page.locator(".guard-masthead__video");
+  await expect(fond).toHaveAttribute("poster", "/signal-media/ai-guard-extension-v1.png");
+  await expect(fond).toHaveAttribute("preload", "none");
+
   // Trois gestes, et le deuxième dit comment on installe un VSIX. Sans lui, la
   // page rendrait un fichier sans mode d'emploi.
   const gestes = page.locator(".guard-start__steps li");
