@@ -50,6 +50,7 @@ from api.gateway_auth import (
 from api.ratelimit import limiter, proxy_rpm_limit
 from core import (
     approvals,
+    attachments,
     audit,
     billing,
     db,
@@ -668,9 +669,20 @@ async def _forward(
             detail="'llm_proxy' is not included in your plan",
         )
 
-    body = await request.body()
+    if extension:
+        chunks: list[bytes] = []
+        size = 0
+        async for chunk in request.stream():
+            size += len(chunk)
+            if size > attachments.MAX_REQUEST_BYTES:
+                raise HTTPException(413, "Attachment request too large; no request forwarded")
+            chunks.append(chunk)
+        body = b"".join(chunks)
+    else:
+        body = await request.body()
     device_id: str | None = None
     cleaned: extension_redaction.Cleaned | None = None
+    attachment_error: str | None = None
     request_id = str(uuid4())
 
     async def record_extension(outcome: str) -> None:
@@ -686,6 +698,10 @@ async def _forward(
             "findings": cleaned.count if cleaned else 0,
             "rules": list(cleaned.kinds) if cleaned else [],
             "analysis_complete": cleaned is not None,
+            "attachments": cleaned.attachments if cleaned else 0,
+            "attachment_formats": list(cleaned.attachment_formats) if cleaned else [],
+            "attachment_delivery": "text_only" if cleaned and cleaned.attachments else "none",
+            "attachment_error": attachment_error,
             "endpoint": "count_tokens" if count_tokens else "messages",
         }
 
@@ -710,6 +726,12 @@ async def _forward(
             cleaned = await run_in_threadpool(extension_redaction.clean, body)
         except LookupError:
             raise HTTPException(409, "Register this workstation first") from None
+        except attachments.AttachmentError as exc:
+            attachment_error = str(exc)
+            await record_extension("blocked")
+            raise HTTPException(
+                422, {"code": str(exc), "message": "Attachment not inspected; no request forwarded"}
+            ) from None
         except ValueError:
             await record_extension("blocked")
             raise HTTPException(

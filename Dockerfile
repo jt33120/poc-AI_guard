@@ -14,6 +14,10 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
+# Offline OCR's OpenCV/ONNX wheels need these shared libraries on slim Linux.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1 libglib2.0-0 libgomp1 && apt-get clean
+
 # Dependency layer — cached until pyproject.toml / uv.lock change.
 # `[tool.uv] package = false` => uv installs only the locked dependencies.
 COPY pyproject.toml uv.lock ./

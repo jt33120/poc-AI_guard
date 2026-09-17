@@ -6,7 +6,7 @@ import json
 import re
 from dataclasses import dataclass
 
-from core import dlp
+from core import attachments, dlp
 
 MAX_BYTES = 1_048_576
 _KEY = (
@@ -26,10 +26,12 @@ class Cleaned:
     body: bytes
     count: int
     kinds: tuple[str, ...]
+    attachments: int = 0
+    attachment_formats: tuple[str, ...] = ()
 
 
 def clean(body: bytes) -> Cleaned:
-    if len(body) > MAX_BYTES:
+    if len(body) > attachments.MAX_REQUEST_BYTES:
         raise ValueError("request_too_large")
     try:
         data = json.loads(body.decode("utf-8"))
@@ -39,6 +41,8 @@ def clean(body: bytes) -> Cleaned:
         raise ValueError("messages_required")
     count = 0
     kinds: set[str] = set()
+    reader = attachments.AttachmentReader()
+    text_bytes = 0
 
     def spans(text: str) -> list[tuple[int, int, str]]:
         found = []
@@ -67,10 +71,13 @@ def clean(body: bytes) -> Cleaned:
         return merged
 
     def visit(value: object, depth: int = 0) -> object:
-        nonlocal count
+        nonlocal count, text_bytes
         if depth > 40:
             raise ValueError("request_too_deep")
         if isinstance(value, str):
+            text_bytes += len(value.encode("utf-8"))
+            if text_bytes > MAX_BYTES:
+                raise ValueError("request_too_large")
             parts: list[str] = []
             cursor = 0
             for start, end, kind in spans(value):
@@ -89,7 +96,22 @@ def clean(body: bytes) -> Cleaned:
             return [visit(item, depth + 1) for item in value]
         if isinstance(value, dict):
             block_type = value.get("type")
-            if block_type in ("image", "document", "redacted_thinking"):
+            if block_type in ("image", "document"):
+                extracted = reader.read(value)
+                # Preserve useful textual metadata but never the raw source,
+                # citations, embedded resources or binary payload. The model sees
+                # only what we can inspect and clean, not an unredacted original.
+                metadata = []
+                for field in ("title", "context"):
+                    item = value.get(field)
+                    if item is not None:
+                        if not isinstance(item, str):
+                            raise attachments.AttachmentError("attachment_invalid_metadata")
+                        metadata.append(item)
+                text = "[Attachment: text rendition; original omitted]\n"
+                text += "\n".join([*metadata, extracted])
+                return {"type": "text", "text": visit(text, depth + 1)}
+            if block_type == "redacted_thinking":
                 raise ValueError("attachments_not_supported")
             if block_type == "thinking":
                 if not isinstance(value.get("thinking"), str) or spans(value["thinking"]):
@@ -120,4 +142,9 @@ def clean(body: bytes) -> Cleaned:
     for field in ("messages", "system", "tools"):
         if field in data:
             data[field] = visit(data[field])
-    return Cleaned(json.dumps(data, ensure_ascii=False).encode(), count, tuple(sorted(kinds)))
+    cleaned = json.dumps(data, ensure_ascii=False).encode()
+    if len(cleaned) > MAX_BYTES:
+        raise ValueError("request_too_large")
+    return Cleaned(
+        cleaned, count, tuple(sorted(kinds)), reader.count, tuple(sorted(reader.formats))
+    )
