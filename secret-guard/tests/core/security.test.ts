@@ -74,7 +74,7 @@ describe("false-positive controls", () => {
   });
 
   it.each([
-    'Analyse cette configuration de test : password="not-a-real-password-for-test"',
+    'Analyse cette configuration de test : password="not-a-real-pw-4-tst"',
     "configuration : PASSWORD=myrealpassword",
     "configuration :\n  PASSWORD=myrealpassword",
   ])(

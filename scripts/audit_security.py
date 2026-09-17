@@ -56,7 +56,7 @@ class Finding:
 
 
 def _rel(path: Path) -> str:
-    return str(path.relative_to(REPO))
+    return path.relative_to(REPO).as_posix()
 
 
 def _iter_files() -> list[Path]:
