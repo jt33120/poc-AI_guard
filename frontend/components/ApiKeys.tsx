@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { CopyButton } from "@/components/ConsoleUI";
 import { apiDelete, apiGet, apiSend } from "@/lib/client";
 import { useT } from "@/lib/i18n";
 
@@ -92,9 +93,12 @@ export function ApiKeys() {
           <p className="text-sm font-medium text-brand-bright">
             {t("keys.created", { name: created.name })}
           </p>
-          <code className="mt-2 block break-all rounded-lg bg-navy-mid/70 px-3 py-2 font-mono text-xs text-white">
-            {created.token}
-          </code>
+          <div className="mt-2 flex items-center gap-2">
+            <code className="flex-1 break-all rounded-lg bg-navy-mid/70 px-3 py-2 font-mono text-xs text-white">
+              {created.token}
+            </code>
+            <CopyButton text={created.token} label={t("common.copy")} />
+          </div>
         </div>
       ) : null}
 

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import { useClientScope } from "@/components/ClientScope";
 import { ProviderIcon } from "@/components/ProviderIcon";
-import { ConsoleHeader } from "@/components/ConsoleUI";
+import { ConsoleHeader, CopyButton } from "@/components/ConsoleUI";
 import { AuthorizationFlow, SignalVideo } from "@/design-system/react";
 import { apiSend, apiSendVoid } from "@/lib/client";
 import { type StrKey, useT } from "@/lib/i18n";
@@ -93,24 +93,6 @@ defaults:
     external_send: ${c.external_send}
     irreversible: ${c.irreversible}
 `;
-}
-
-function CopyButton({ text, label }: { text: string; label: string }) {
-  const { t } = useT();
-  const [done, setDone] = useState(false);
-  return (
-    <button
-      type="button"
-      className="btn btn-ghost px-3 py-1 text-xs"
-      onClick={() => {
-        void navigator.clipboard?.writeText(text);
-        setDone(true);
-        setTimeout(() => setDone(false), 1500);
-      }}
-    >
-      {done ? t("onb.copied") : label}
-    </button>
-  );
 }
 
 export default function OnboardingPage() {
@@ -483,7 +465,7 @@ export default function OnboardingPage() {
           <div className="card p-5">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold">{t("onb.key.title")}</h3>
-              <CopyButton text={apiKey} label={t("onb.copy")} />
+              <CopyButton text={apiKey} label={t("common.copy")} />
             </div>
             <code className="mt-2 block break-all rounded-lg bg-navy-mid/70 px-3 py-2 font-mono text-xs text-brand-bright">
               {apiKey}
@@ -497,7 +479,7 @@ export default function OnboardingPage() {
                 <h3 className="text-sm font-semibold">{t("onb.url.title")}</h3>
                 <CopyButton
                   text={proxyBase(stack, apiKey, apiBase) ?? ""}
-                  label={t("onb.copy")}
+                  label={t("common.copy")}
                 />
               </div>
               <p className="muted mt-1 text-xs">{t("onb.url.note")}</p>
@@ -515,7 +497,7 @@ export default function OnboardingPage() {
                 </h3>
                 <CopyButton
                   text={integrationPrompt(stack, apiKey, apiBase) ?? ""}
-                  label={t("onb.copy")}
+                  label={t("common.copy")}
                 />
               </div>
               <p className="muted mt-1 text-xs">{t("onb.prompt.note")}</p>
@@ -532,7 +514,7 @@ export default function OnboardingPage() {
               </h3>
               <CopyButton
                 text={snippet(stack, apiKey, apiBase)}
-                label={t("onb.copy")}
+                label={t("common.copy")}
               />
             </div>
             <p className="muted mt-1 text-xs">

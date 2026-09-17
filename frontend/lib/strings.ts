@@ -33,6 +33,8 @@ export const STR = {
   },
 
   "common.loading": { en: "Loading…", fr: "Chargement…" },
+  "common.copy": { en: "Copy", fr: "Copier" },
+  "common.copied": { en: "Copied", fr: "Copié" },
   "common.waking": {
     en: "Waking the secure backend: the first load after a quiet period can take up to a minute.",
     fr: "Réveil du serveur sécurisé : le premier chargement après une période d'inactivité peut prendre jusqu'à une minute.",
@@ -968,8 +970,6 @@ export const STR = {
     en: "Zero-code monitoring: just change the base_url. xSOM sees and audits every tool-call the model makes (your provider key is forwarded, never stored).",
     fr: "Monitoring zéro-code : changez seulement le base_url. xSOM voit et audite chaque tool-call du modèle (votre clé provider est transmise, jamais stockée).",
   },
-  "onb.copy": { en: "Copy", fr: "Copier" },
-  "onb.copied": { en: "Copied", fr: "Copié" },
   "onb.done.t": { en: "Key created. Complete the integration.", fr: "Clé créée. Intégration à terminer." },
   "onb.done.d": {
     en: "Configure your agent with the snippet below. Make a test call, then check its first recorded event in the audit trail.",
