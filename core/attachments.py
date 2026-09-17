@@ -28,6 +28,7 @@ if sys.platform == "win32":
 else:
     _NO_WINDOW = 0
 
+
 class AttachmentError(ValueError):
     """Content-free, machine-readable refusal reason."""
 
