@@ -259,6 +259,13 @@ def _process(
                         continue
                 kept.append(block)
             data["content"] = kept
+            # A reply announcing a tool call it no longer carries cannot be read by
+            # the client: end the turn and say why, as the OpenAI branch does.
+            if data.get("stop_reason") == "tool_use" and not any(
+                (block or {}).get("type") == "tool_use" for block in kept
+            ):
+                kept.append({"type": "text", "text": _BLOCKED_NOTE})
+                data["stop_reason"] = "end_turn"
     return audited
 
 
@@ -837,6 +844,10 @@ async def _forward(
             observing=observing,
             decision_ms=cout_amont,
         )
+        # The relayed stream carries no Content-Encoding, so it must reach the client
+        # decoded: ask for none, and decode anyway if the provider compresses regardless.
+        # Raw gzip bytes gave Claude Code a stream without a single readable event.
+        fwd_headers["Accept-Encoding"] = "identity"
         upstream_req = client.build_request("POST", upstream, content=body, headers=fwd_headers)
         upstream_resp = await client.send(upstream_req, stream=True)
         try:
@@ -849,7 +860,7 @@ async def _forward(
             await upstream_resp.aclose()
             raise
         return StreamingResponse(
-            upstream_resp.aiter_raw(),
+            upstream_resp.aiter_bytes(),
             status_code=upstream_resp.status_code,
             media_type=upstream_resp.headers.get("content-type", "text/event-stream"),
             background=BackgroundTask(upstream_resp.aclose),
@@ -867,7 +878,10 @@ async def _forward(
             media_type="application/json",
         )
     latency_ms = (time.monotonic() - started) * 1000
-    if upstream_resp.status_code == 200:
+    # The Secret Guard relay cleans what leaves; it does not rule on the assistant's
+    # own tools (docs/secret-guard/GATEWAY_AUDIT.md). Its streams were never inspected,
+    # and applying the action policy only on the non-streaming fallback broke sessions.
+    if upstream_resp.status_code == 200 and not extension:
         try:
             data = upstream_resp.json()
         except ValueError:

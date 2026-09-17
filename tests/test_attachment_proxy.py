@@ -3,10 +3,12 @@
 PostgreSQL/RLS qualification remains in test_extension_devices.py.
 """
 
+import gzip
 import json
 from contextlib import nullcontext
 from types import SimpleNamespace
 
+import httpx
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -107,3 +109,63 @@ def test_streamed_upload_stops_at_envelope_limit(relay, monkeypatch) -> None:
     assert response.status_code == 413
     assert provider.captured == {}
 
+
+SSE = b'event: message_start\ndata: {"type":"message_start"}\n\n'
+
+
+def test_a_compressed_stream_reaches_the_assistant_readable(relay, monkeypatch) -> None:
+    """Relayer les octets bruts d'un flux gzip, sans son Content-Encoding, livrait un
+    flux illisible : Claude Code n'y trouvait aucun événement et basculait en
+    non-streaming à chaque requête."""
+    client, _, _ = relay
+    asked: dict[str, str | None] = {}
+
+    def provider(request: httpx.Request) -> httpx.Response:
+        asked["accept-encoding"] = request.headers.get("accept-encoding")
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream", "content-encoding": "gzip"},
+            stream=httpx.ByteStream(gzip.compress(SSE)),
+        )
+
+    monkeypatch.setattr(
+        llm_proxy, "_http", lambda: httpx.AsyncClient(transport=httpx.MockTransport(provider))
+    )
+    monkeypatch.setattr(llm_proxy, "_audit_streamed", lambda *args, **kwargs: None)
+    response = client.post(
+        "/proxy/extension/anthropic/v1/messages",
+        json={
+            "model": "claude-test",
+            "stream": True,
+            "messages": [{"role": "user", "content": "ok"}],
+        },
+    )
+    assert response.status_code == 200
+    assert response.content == SSE
+    assert asked["accept-encoding"] == "identity"
+
+
+def test_the_extension_relay_cleans_but_never_rewrites_tool_calls(relay, monkeypatch) -> None:
+    """Le relais Secret Guard nettoie (GATEWAY_AUDIT.md) ; la policy d'actions d'AI Guard
+    n'a pas à retirer les outils de l'assistant. Elle ne s'appliquait qu'au repli
+    non-streaming, et ce repli cassait la session."""
+    client, provider, _ = relay
+    reply = {
+        "id": "msg_synthetic",
+        "type": "message",
+        "role": "assistant",
+        "stop_reason": "tool_use",
+        "content": [
+            {"type": "tool_use", "id": "toolu_1", "name": "Read", "input": {"file_path": "a"}}
+        ],
+    }
+    provider._resp = _FakeResp(reply)
+    inspected: list[object] = []
+    monkeypatch.setattr(llm_proxy, "_inspect", lambda *args: inspected.append(args))
+    response = client.post(
+        "/proxy/extension/anthropic/v1/messages",
+        json={"model": "claude-test", "messages": [{"role": "user", "content": "lis a"}]},
+    )
+    assert response.status_code == 200
+    assert response.json() == reply
+    assert inspected == []

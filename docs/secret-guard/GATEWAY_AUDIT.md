@@ -21,7 +21,9 @@ réseau sur les commandes locales. La modification du champ de saisie est diffé
   configurée en HTTPS (HTTP uniquement pour une passerelle de développement locale).
 - Le chemin extension de la passerelle nettoie systématiquement secrets et valeurs
   ambiguës en XXX, puis rescane. Entrée invalide/incomplète : refus sans relais.
-  La politique DLP du tenant peut imposer un refus supplémentaire.
+  La politique DLP du tenant peut imposer un refus supplémentaire. Ce chemin ne rend
+  aucun verdict sur les outils de l'assistant : les appels d'outils de la réponse sont
+  relayés tels quels, en streaming comme en repli non-streaming.
 - Les hooks continuent de protéger les sessions non raccordées. Un hook ne délègue
   au relais que si son environnement désigne exactement le relais local géré vivant.
 - Les événements client sont des observations déclarées. Les événements passerelle

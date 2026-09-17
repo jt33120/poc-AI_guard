@@ -223,6 +223,46 @@ def test_extract_tool_use_anthropic() -> None:
     ]
 
 
+def test_a_refused_anthropic_tool_call_still_leaves_a_valid_reply(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Retirer le seul `tool_use` sans toucher `stop_reason` rendait une réponse que
+    le client ne sait pas lire : il attend un appel d'outil qui n'est plus là. Claude
+    Code réessayait, puis abandonnait sur « tool call could not be parsed »."""
+    monkeypatch.setattr(llm_proxy, "_verdict", lambda *args: ("irreversible", "deny"))
+    data: dict[str, Any] = {
+        "stop_reason": "tool_use",
+        "content": [
+            {"type": "thinking", "thinking": "", "signature": "synthetic"},
+            {"type": "tool_use", "id": "toolu_1", "name": "crm.delete_contact", "input": {}},
+        ],
+    }
+    audited = llm_proxy._process("anthropic", data, None, False, None)  # type: ignore[arg-type]
+    assert [block["type"] for block in data["content"]] == ["thinking", "text"]
+    assert data["content"][-1]["text"] == llm_proxy._BLOCKED_NOTE
+    assert data["stop_reason"] == "end_turn"
+    assert [row[2] for row in audited] == ["deny"]
+
+
+def test_a_partly_refused_anthropic_reply_keeps_its_remaining_tool_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        llm_proxy,
+        "_verdict",
+        lambda policy, name, args, judge: (
+            ("irreversible", "deny") if name == "crm.delete_contact" else ("read", "allow")
+        ),
+    )
+    data = json.loads(json.dumps(ANTHROPIC_BODY))
+    data["stop_reason"] = "tool_use"
+    llm_proxy._process("anthropic", data, None, False, None)  # type: ignore[arg-type]
+    assert [block.get("name") for block in data["content"] if block["type"] == "tool_use"] == [
+        "crm.get_contact"
+    ]
+    assert data["stop_reason"] == "tool_use"
+
+
 def test_anthropic_proxy_forwards_and_audits(
     db: DBHandle,
     test_verifier: TokenVerifier,
