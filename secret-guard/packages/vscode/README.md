@@ -22,10 +22,16 @@ Aucun prompt, secret ni empreinte de secret dans ces événements. Consultation 
 la console xSOM → **Extension VS Code**. L’audit de l’extension ne remplace pas une
 observation de la passerelle. Pièces jointes non inspectables : refus sans repli.
 
+Le backend du relais prend désormais en charge Markdown, PNG statiques (OCR) et
+PDF texte/scannés. Seul le texte extrait puis nettoyé est transmis au fournisseur :
+pas le fichier original ni son rendu visuel. L'extraction se fait sur le backend
+xSOM, pas nécessairement sur ce poste. Cette capacité nécessite son redéploiement
+et ne couvre pas les pièces des conversations natives Codex/Copilot.
+
 ## Un poste de travail plus serein
 
-- 🛡️ **Centre de protection** : cliquez sur Secret Guard dans la barre d’état
-  pour retrouver vos assistants, leur configuration et vos actions rapides.
+- 🛡️ **Contrôles rapides** : cliquez sur Secret Guard dans la barre d’état,
+  puis sur **Ouvrir** pour afficher le centre de protection.
 - 🔎 **Vérification à la demande** : scannez une sélection, le document ouvert
   ou le presse-papiers. Retrouvez aussi les scans dans le clic droit de l’éditeur.
 - 📋 **Copie expurgée** : lorsqu’elle est disponible, récupérez une version dont
@@ -39,13 +45,14 @@ observation de la passerelle. Pièces jointes non inspectables : refus sans repl
 
 ### Choisir le comportement
 
-Survolez **Secret Guard** dans la barre d’état : le panneau de contrôle permet de
-changer de niveau (1 Avertir, 2 Expurger, 3 Bloquer) sans ouvrir de page. Il
-affiche aussi l’état de chaque assistant, les vérifications du presse-papiers et
-du document, le dernier résultat (métadonnées seulement, jamais la valeur) et la
-passerelle xSOM. Vous pouvez également cliquer sur **Secret Guard → Changer de
-mode**, ou ouvrir les paramètres **Secret Guard: Mode**. Le choix est commun aux
-assistants de cette installation.
+Cliquez sur **Secret Guard** dans la barre d’état : le panneau de contrôle permet
+de changer de niveau (1 Avertir, 2 Expurger, 3 Bloquer), de vérifier le
+presse-papiers ou le document, de voir le dernier résultat (métadonnées
+seulement, jamais la valeur) et de raccorder la passerelle xSOM. Le bouton
+**Ouvrir**, en haut à droite, affiche la page complète de configuration. Vous
+pouvez également lancer **Secret Guard → Changer de mode**, ou ouvrir les
+paramètres **Secret Guard: Mode**. Le choix est commun aux assistants de cette
+installation.
 
 | Mode                         | Comportement                                                                                                                                 |
 | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -83,8 +90,7 @@ aucune ressource distante et n’exécute aucun JavaScript dans sa vue.
 
 Local-first prompt secret detection. The primary surface is automatic:
 
-- native pre-submit hook installers for VS Code/Copilot, Claude Code, Codex, and
-  Windsurf Cascade;
+- native pre-submit hook installers for GitHub Copilot, Claude Code, and Codex;
 - the `@secretguard` chat participant, which owns and scans its request before using the selected model;
 - explicit scan commands for the current selection, document, or clipboard.
 
@@ -96,9 +102,9 @@ metadata-only audit and the gateway relay described above. Development requires
 Node.js 22.13 or newer.
 
 On first startup, the extension automatically verifies the copied runner with
-clean and blocking canaries for both supported envelopes, then merges one owned
+clean and blocking canaries, then merges one owned
 hook into the supported native host configurations. Existing settings and hooks
-are preserved. VS Code 1.133–1.136 can protect Claude Code, Codex and Windsurf;
+are preserved. VS Code 1.133–1.136 can protect Claude Code and Codex;
 native VS Code/Copilot prompt hooks are added only on VS Code 1.137 or newer.
 The dashboard's Finaliser Codex action opens Codex CLI to review and trust only the xSOM hook, then
 the user starts a new Codex chat. Codex deliberately requires this one explicit

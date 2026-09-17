@@ -4,7 +4,10 @@ import { join, resolve } from "node:path";
 import process from "node:process";
 import { build } from "esbuild";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { verifyHookCanary } from "../../packages/vscode/src/hook-manager.js";
+import {
+  verifyFileReadCanary,
+  verifyHookCanary,
+} from "../../packages/vscode/src/hook-manager.js";
 import { protectionMode } from "../../packages/vscode/src/protection-mode.js";
 
 let fixtureDirectory: string;
@@ -26,16 +29,22 @@ afterAll(async () => {
 });
 
 describe("protection modes in the actual hook process", () => {
-  for (const protocol of ["user-prompt-submit", "windsurf"] as const) {
-    it.each(["block", "redact", "observe", "allow"] as const)(
-      `${protocol}: clean and sensitive canaries follow %s`,
-      async (mode) => {
-        await expect(
-          verifyHookCanary(process.execPath, hookPath, protocol, mode),
-        ).resolves.toBe(true);
-      },
-    );
-  }
+  it.each(["block", "redact", "observe", "allow"] as const)(
+    `user-prompt-submit: clean and sensitive canaries follow %s`,
+    async (mode) => {
+      await expect(
+        verifyHookCanary(process.execPath, hookPath, mode),
+      ).resolves.toBe(true);
+    },
+  );
+  it.each(["block", "redact", "observe", "allow"] as const)(
+    `pre-tool-use Read: clean and sensitive files follow %s`,
+    async (mode) => {
+      await expect(
+        verifyFileReadCanary(process.execPath, hookPath, mode),
+      ).resolves.toBe(true);
+    },
+  );
   it("defaults absent and invalid settings to block", () => {
     expect(protectionMode(undefined)).toBe("block");
     expect(protectionMode("typo")).toBe("block");

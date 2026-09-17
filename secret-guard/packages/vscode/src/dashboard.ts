@@ -62,7 +62,7 @@ export function dashboardHtml(
         host.id === "codex"
           ? "Approbation du hook requise dans Codex."
           : "Blocage à confirmer dans votre session.";
-      return `<article class="host"><div class="host-top"><span class="host-icon" aria-hidden="true">${host.id === "claude" ? "✳" : host.id === "codex" ? "⌘" : host.id === "windsurf" ? "≈" : "◇"}</span><span class="badge ${healthy ? "ready" : "attention"}">${label}</span></div><h3>${escapeHtml(host.label)}</h3><p>${detail}</p>${host.id === "codex" && host.configured ? '<a href="command:secretGuard.finishCodexSetup">Finaliser Codex <span aria-hidden="true">↗</span></a>' : ""}</article>`;
+      return `<article class="host"><div class="host-top"><span class="host-icon" aria-hidden="true">${host.id === "claude" ? "✳" : host.id === "codex" ? "⌘" : "◇"}</span><span class="badge ${healthy ? "ready" : "attention"}">${label}</span></div><h3>${escapeHtml(host.label)}</h3><p>${detail}</p>${host.id === "codex" && host.configured ? '<a href="command:secretGuard.finishCodexSetup">Finaliser Codex <span aria-hidden="true">↗</span></a>' : ""}</article>`;
     })
     .join("");
   return `<!DOCTYPE html>

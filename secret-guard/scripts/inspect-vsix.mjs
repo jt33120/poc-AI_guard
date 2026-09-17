@@ -19,6 +19,7 @@ const expectedFiles = [
   "extension/dist/extension.cjs",
   "extension/dist/hook.cjs",
   "extension/icon.png",
+  "extension/media/xsom-icons.ttf",
   "extension/package.json",
   "extension/readme.md",
 ].sort();
@@ -27,6 +28,7 @@ const localEquivalents = new Map([
   ["extension/dist/extension.cjs", "packages/vscode/dist/extension.cjs"],
   ["extension/dist/hook.cjs", "packages/vscode/dist/hook.cjs"],
   ["extension/icon.png", "packages/vscode/icon.png"],
+  ["extension/media/xsom-icons.ttf", "packages/vscode/media/xsom-icons.ttf"],
   ["extension/package.json", "packages/vscode/package.json"],
   ["extension/readme.md", "packages/vscode/README.md"],
 ]);

@@ -37,6 +37,16 @@ export function protectionMode(value: unknown): ProtectionMode {
   return isProtectionMode(value) ? value : "block";
 }
 
+const SHORT_LABELS: Record<ProtectionMode, string> = {
+  observe: "Avertir",
+  redact: "Expurger",
+  block: "Bloquer",
+};
+
+export function modeShortLabel(mode: ProtectionMode): string {
+  return SHORT_LABELS[mode];
+}
+
 export function modeLabel(mode: ProtectionMode): string {
   return (
     PROTECTION_MODES.find((entry) => entry.mode === mode)?.label ?? "🔒 Bloquer"

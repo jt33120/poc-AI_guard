@@ -2,13 +2,27 @@ import { randomBytes } from "node:crypto";
 import * as vscode from "vscode";
 import type { ProtectionMode, WarnMode } from "@xsom/secret-guard-cli/hook";
 
-import { redactAndRescan, scan, type ScanInput } from "@xsom/secret-guard-core";
+import {
+  decodeScannableText,
+  redactAndRescan,
+  scan,
+  MAX_INPUT_BYTES,
+  type ScanInput,
+} from "@xsom/secret-guard-core";
+
+import {
+  composePrompt,
+  unreadableReferencesMessage,
+  type ReferenceText,
+  type ResolvedReference,
+} from "./chat-references.js";
 
 import {
   dispatchGuarded,
   type DispatchOutcome,
   type WarnChoice,
 } from "./dispatch.js";
+import { ActivityMonitor } from "./hook-activity.js";
 import { HookManager, type HookHealth } from "./hook-manager.js";
 import { GatewayIntegration } from "./gateway-integration.js";
 import { activationStrategy, supportsVsCodePromptHooks } from "./onboarding.js";
@@ -22,12 +36,15 @@ import {
 import {
   isProtectionMode,
   modeLabel,
+  modeShortLabel,
   protectionMode,
   PROTECTION_MODES,
 } from "./protection-mode.js";
 import {
+  STATUS_BAR_CLICK_COMMAND,
   statusTooltipMarkdown,
   STATUS_TOOLTIP_COMMANDS,
+  type Appearance,
   type LastScan,
 } from "./status-tooltip.js";
 
@@ -151,25 +168,99 @@ async function warningChoice(): Promise<WarnChoice> {
   return choice === "Envoyer quand même" ? "send" : "cancel";
 }
 
+function textReference(label: string, content: string): ResolvedReference {
+  return decodeScannableText(new TextEncoder().encode(content)) === undefined
+    ? { status: "unreadable", label }
+    : { status: "text", label, content };
+}
+
+// An open editor wins over the disk so unsaved edits are what gets checked.
+async function readUriReference(uri: vscode.Uri): Promise<ResolvedReference> {
+  const label = vscode.workspace.asRelativePath(uri);
+  const open = vscode.workspace.textDocuments.find(
+    (document) => document.uri.toString() === uri.toString(),
+  );
+  if (open !== undefined) return textReference(label, open.getText());
+  try {
+    const metadata = await vscode.workspace.fs.stat(uri);
+    if (
+      (metadata.type & vscode.FileType.File) === 0 ||
+      metadata.size > MAX_INPUT_BYTES
+    )
+      return { status: "unreadable", label };
+    const content = decodeScannableText(
+      await vscode.workspace.fs.readFile(uri),
+    );
+    return content === undefined
+      ? { status: "unreadable", label }
+      : { status: "text", label, content };
+  } catch {
+    return { status: "unreadable", label };
+  }
+}
+
+async function readLocationReference(
+  location: vscode.Location,
+): Promise<ResolvedReference> {
+  const { start, end } = location.range;
+  const label = `${vscode.workspace.asRelativePath(location.uri)}:${String(start.line + 1)}-${String(end.line + 1)}`;
+  try {
+    const document = await vscode.workspace.openTextDocument(location.uri);
+    return textReference(label, document.getText(location.range));
+  } catch {
+    return { status: "unreadable", label };
+  }
+}
+
+function resolveReference(
+  reference: vscode.ChatPromptReference,
+): Promise<ResolvedReference> {
+  const { value } = reference;
+  const label = reference.modelDescription ?? reference.id;
+  if (typeof value === "string")
+    return Promise.resolve(textReference(label, value));
+  if (value instanceof vscode.Uri) return readUriReference(value);
+  if (value instanceof vscode.Location) return readLocationReference(value);
+  return Promise.resolve({ status: "unreadable", label });
+}
+
 async function handleChat(
   request: vscode.ChatRequest,
   _context: vscode.ChatContext,
   stream: vscode.ChatResponseStream,
   token: vscode.CancellationToken,
 ): Promise<void> {
-  if (request.references.length > 0) {
+  const mode = configuredMode();
+  const references = await Promise.all(
+    request.references.map(resolveReference),
+  );
+  const unreadable = references.filter(
+    (reference) => reference.status === "unreadable",
+  );
+  if (unreadable.length > 0) {
+    gateway?.record({
+      kind: "scan",
+      assistant: "secretguard",
+      mode,
+      outcome: "blocked",
+      findings: 0,
+    });
     stream.markdown(
-      "$(lock) **Envoi bloqué.** La V0 ne scanne pas encore le contenu résolu des pièces jointes ou références.",
+      unreadableReferencesMessage(unreadable.map(({ label }) => label)),
     );
     return;
   }
-
-  const mode = configuredMode();
+  const content = composePrompt(
+    request.prompt,
+    references.filter(
+      (reference): reference is ReferenceText => reference.status === "text",
+    ),
+  );
 
   let response: vscode.LanguageModelChatResponse | undefined;
   let outcome: DispatchOutcome;
   try {
-    outcome = await dispatchGuarded(request.prompt, {
+    outcome = await dispatchGuarded(content, {
       mode,
       notifyWarning: () => {
         stream.markdown(
@@ -178,9 +269,9 @@ async function handleChat(
         return Promise.resolve();
       },
       chooseForWarning: () => warningChoice(),
-      transport: async (content) => {
+      transport: async (guarded) => {
         response = await request.model.sendRequest(
-          [vscode.LanguageModelChatMessage.User(content)],
+          [vscode.LanguageModelChatMessage.User(guarded)],
           {},
           token,
         );
@@ -207,7 +298,7 @@ async function handleChat(
   if (!outcome.sent || response === undefined) {
     stream.markdown(markdownReport(outcome.final));
     const sanitized = outcome.initial.complete
-      ? redactAndRescan({ content: request.prompt, sourceKind: "prompt" })
+      ? redactAndRescan({ content, sourceKind: "prompt" })
       : undefined;
     if (
       sanitized?.final.complete &&
@@ -240,6 +331,28 @@ async function saveMode(mode: ProtectionMode): Promise<void> {
     .update("mode", mode, vscode.ConfigurationTarget.Global);
 }
 
+function tooltipAppearance(kind: vscode.ColorThemeKind): Appearance {
+  return kind === vscode.ColorThemeKind.Light ||
+    kind === vscode.ColorThemeKind.HighContrastLight
+    ? "light"
+    : "dark";
+}
+
+// The status text outside checks, and whether a hook is checking right now.
+let idleStatusText = "$(shield) Secret Guard";
+let checkRunning = false;
+// VS Code spins only a few built-in codicons, so the xSOM mark turns through
+// pre-rotated glyphs of media/xsom-icons.ttf (a third of a turn per cycle).
+const SPINNER_FRAMES = 6;
+const SPINNER_FRAME_MS = 90;
+let spinnerFrame = 0;
+
+function showStatusText(item: vscode.StatusBarItem): void {
+  item.text = checkRunning
+    ? `$(xsom-mark-${String(spinnerFrame)}) Secret Guard : vérification…`
+    : idleStatusText;
+}
+
 async function updateStatus(
   item: vscode.StatusBarItem,
   manager: HookManager,
@@ -252,32 +365,34 @@ async function updateStatus(
     health = { state: "degraded", reason: "canary_failed", hosts: [] };
   }
   item.name = "Secret Guard · Protection des prompts";
-  item.command = "secretGuard.showDashboard";
+  item.command = STATUS_BAR_CLICK_COMMAND;
   item.backgroundColor = undefined;
   if (health.state === "active") {
-    item.text = `$(shield) Secret Guard · ${configuredWarnMode() === "allow" ? "Avertir (ambiguïtés)" : modeLabel(configuredMode())}`;
+    idleStatusText = `$(shield) Secret Guard : ${configuredWarnMode() === "allow" ? "réglage permissif" : modeShortLabel(configuredMode())}`;
     if (configuredMode() === "observe")
       item.backgroundColor = new vscode.ThemeColor(
         "statusBarItem.warningBackground",
       );
   } else if (health.state === "partial") {
-    item.text = "$(shield) Secret Guard · À compléter";
+    idleStatusText = "$(shield) Secret Guard : à compléter";
   } else if (health.state === "degraded") {
-    item.text = "$(warning) Secret Guard · À vérifier";
+    idleStatusText = "$(warning) Secret Guard : à vérifier";
     item.backgroundColor = new vscode.ThemeColor(
       "statusBarItem.warningBackground",
     );
   } else {
-    item.text = "$(shield) Secret Guard · Désactivé";
+    idleStatusText = "$(shield) Secret Guard : désactivé";
   }
   if (modeApplicationFailed) {
-    item.text = "$(warning) Secret Guard · Mode à appliquer";
+    idleStatusText = "$(warning) Secret Guard : niveau non appliqué";
     item.backgroundColor = new vscode.ThemeColor(
       "statusBarItem.warningBackground",
     );
   }
+  showStatusText(item);
   const tooltip = new vscode.MarkdownString(
     statusTooltipMarkdown({
+      appearance: tooltipAppearance(vscode.window.activeColorTheme.kind),
       health,
       warnMode: configuredWarnMode(),
       modeApplicationFailed,
@@ -298,7 +413,7 @@ async function updateStatus(
   tooltip.isTrusted = { enabledCommands: STATUS_TOOLTIP_COMMANDS };
   item.tooltip = tooltip;
   item.accessibilityInformation = {
-    label: `Secret Guard : ${HEALTH_LABELS[health.state]}. Ouvrir le centre de protection.`,
+    label: `Secret Guard : ${HEALTH_LABELS[health.state]}. Ouvrir les contrôles.`,
   };
   item.show();
   return health;
@@ -317,7 +432,36 @@ export async function activate(
     vscode.StatusBarAlignment.Right,
     100,
   );
-  context.subscriptions.push(status);
+  let spinner: ReturnType<typeof setInterval> | undefined;
+  const stopSpinner = (): void => {
+    if (spinner !== undefined) clearInterval(spinner);
+    spinner = undefined;
+  };
+  context.subscriptions.push(
+    status,
+    new ActivityMonitor(context.globalStorageUri.fsPath, (running) => {
+      checkRunning = running;
+      stopSpinner();
+      const reduceMotion =
+        vscode.workspace
+          .getConfiguration("workbench")
+          .get<string>("reduceMotion") === "on";
+      if (running && !reduceMotion)
+        spinner = setInterval(() => {
+          spinnerFrame = (spinnerFrame + 1) % SPINNER_FRAMES;
+          showStatusText(status);
+        }, SPINNER_FRAME_MS);
+      showStatusText(status);
+    }),
+    { dispose: stopSpinner },
+  );
+  // An open status bar hover is a snapshot VS Code never refreshes. Re-adding
+  // the item detaches the hover's target, which closes it, so acting from the
+  // controls never leaves stale state on screen.
+  const closeStatusControls = (): void => {
+    status.hide();
+    status.show();
+  };
 
   let panel: vscode.WebviewPanel | undefined;
   let modeApplicationFailed = false;
@@ -337,12 +481,14 @@ export async function activate(
   };
   context.subscriptions.push(
     vscode.commands.registerCommand("secretGuard.connectGateway", async () => {
+      closeStatusControls();
       await gateway?.connect();
       await refreshUi();
     }),
     vscode.commands.registerCommand(
       "secretGuard.disconnectGateway",
       async () => {
+        closeStatusControls();
         const answer = await vscode.window.showWarningMessage(
           "Déconnecter xSOM retire le nettoyage transparent de Claude dans les nouvelles sessions. Les hooks locaux restent actifs.",
           { modal: true },
@@ -371,13 +517,18 @@ export async function activate(
     vscode.commands.registerCommand(
       "secretGuard.setMode",
       async (mode?: unknown) => {
+        closeStatusControls();
         if (isProtectionMode(mode)) await saveMode(mode);
       },
     ),
+    vscode.window.onDidChangeActiveColorTheme(async () => {
+      await refreshUi();
+    }),
     vscode.window.onDidChangeActiveTextEditor((editor) => {
       if (editor !== undefined) lastEditor = editor;
     }),
     vscode.commands.registerCommand("secretGuard.showDashboard", async () => {
+      closeStatusControls();
       if (panel === undefined) {
         panel = vscode.window.createWebviewPanel(
           "secretGuard.dashboard",
@@ -451,6 +602,7 @@ export async function activate(
       );
     }),
     vscode.commands.registerCommand("secretGuard.scanClipboard", async () => {
+      closeStatusControls();
       await presentScan(
         {
           content: await vscode.env.clipboard.readText(),
@@ -480,6 +632,7 @@ export async function activate(
       openCodexHookReview,
     ),
     vscode.commands.registerCommand("secretGuard.enableHook", async () => {
+      closeStatusControls();
       try {
         await manager.enable(configuredWarnMode());
         modeApplicationFailed = false;

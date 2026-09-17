@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 export function routeFile(storage: string, base: string): string {
@@ -37,4 +37,30 @@ export async function canDelegate(
   } catch {
     return false;
   }
+}
+
+/** Whether a live relay is connected on this machine, whichever process uses it. */
+export async function relayConnected(storage: string): Promise<boolean> {
+  let names: string[];
+  try {
+    names = await readdir(storage);
+  } catch {
+    return false;
+  }
+  for (const name of names) {
+    if (!/^gateway-[a-f0-9]{64}\.json$/u.test(name)) continue;
+    try {
+      const descriptor = JSON.parse(
+        await readFile(join(storage, name), "utf8"),
+      ) as { baseUrl?: unknown };
+      if (
+        typeof descriptor.baseUrl === "string" &&
+        (await canDelegate(storage, descriptor.baseUrl))
+      )
+        return true;
+    } catch {
+      // An unreadable descriptor is not a live relay.
+    }
+  }
+  return false;
 }

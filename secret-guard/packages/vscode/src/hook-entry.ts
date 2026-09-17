@@ -1,10 +1,13 @@
 import process from "node:process";
 import { dirname } from "node:path";
-import { canDelegate } from "./gateway-delegation.js";
+import { canDelegate, relayConnected } from "./gateway-delegation.js";
+import { beginActivity } from "./hook-activity.js";
 
 import { parseHookMode, runHook } from "@xsom/secret-guard-cli/hook";
 
 const MAX_HOOK_INPUT_BYTES = 1_200_000;
+const STALE_SESSION_MESSAGE =
+  "🔌 Secret Guard · Session non raccordée\nLe relais xSOM nettoie automatiquement, mais cette session Claude a été ouverte avant le raccordement. Ouvrez une nouvelle session, puis renvoyez votre message.";
 
 async function readBoundedStdin(): Promise<string> {
   const chunks: Buffer[] = [];
@@ -18,7 +21,7 @@ async function readBoundedStdin(): Promise<string> {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-async function main(): Promise<void> {
+async function check(storage: string): Promise<void> {
   let rawInput = "";
   try {
     rawInput = await readBoundedStdin();
@@ -27,36 +30,54 @@ async function main(): Promise<void> {
   }
   const mode = parseHookMode(process.argv.slice(2));
   const response = runHook(rawInput, mode);
-  let promptEvent = false;
+  // Prompts, their @-mentioned files and Read tool results all reach the
+  // provider inside the request the relay cleans; nothing else is delegated.
+  let relayedEvent = false;
   try {
     const input = JSON.parse(rawInput) as Record<string, unknown>;
-    promptEvent =
-      input.hook_event_name === "UserPromptSubmit" &&
-      typeof input.prompt === "string";
+    relayedEvent =
+      (input.hook_event_name === "UserPromptSubmit" &&
+        typeof input.prompt === "string") ||
+      (input.hook_event_name === "PreToolUse" && input.tool_name === "Read");
   } catch {
     /* Invalid envelopes must remain blocked. */
   }
   if (
     !response.continue &&
-    promptEvent &&
+    relayedEvent &&
     mode === "redact" &&
-    (await canDelegate(
-      dirname(process.argv[1] ?? ""),
-      process.env.ANTHROPIC_BASE_URL,
-    ))
+    (await canDelegate(storage, process.env.ANTHROPIC_BASE_URL))
   ) {
     // The original travels only to the registered, mandatory-redaction route.
     process.stdout.write(`${JSON.stringify({ continue: true })}\n`);
     return;
   }
   if (!response.continue) {
+    // Claude reads ANTHROPIC_BASE_URL once, when the session starts: a session
+    // opened before the relay was connected can never delegate to it.
+    const staleClaudeSession =
+      relayedEvent &&
+      mode === "redact" &&
+      process.env.CLAUDE_PROJECT_DIR !== undefined &&
+      (await relayConnected(storage));
     process.stderr.write(
-      `${response.stopReason ?? "Secret Guard blocked this prompt."}\n`,
+      `${staleClaudeSession ? STALE_SESSION_MESSAGE : (response.stopReason ?? "Secret Guard blocked this prompt.")}\n`,
     );
     process.exitCode = 2;
     return;
   }
   process.stdout.write(`${JSON.stringify(response)}\n`);
+}
+
+async function main(): Promise<void> {
+  // The installed hook lives in the extension's storage folder.
+  const storage = dirname(process.argv[1] ?? "");
+  const done = beginActivity(storage);
+  try {
+    await check(storage);
+  } finally {
+    done();
+  }
 }
 
 void main();

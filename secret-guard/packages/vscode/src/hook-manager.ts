@@ -2,12 +2,14 @@ import { spawn } from "node:child_process";
 import {
   copyFile,
   mkdir,
+  mkdtemp,
   readFile,
   rename,
   rm,
   stat,
   writeFile,
 } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import process from "node:process";
 
@@ -15,12 +17,12 @@ import type * as vscode from "vscode";
 
 import { hookModeArgument, type WarnMode } from "@xsom/secret-guard-cli/hook";
 
+import { QUIET_ACTIVITY_ENV } from "./hook-activity.js";
 import {
   configureHost,
   defaultHostDefinitions,
   inspectHostConfig,
   type HookHost,
-  type HookProtocol,
   type HostDefinition,
   unconfigureHost,
 } from "./host-config.js";
@@ -134,25 +136,32 @@ async function restoreOptional(
   else await writeAtomically(path, content);
 }
 
-function inputForProtocol(protocol: HookProtocol, prompt: string): string {
-  return protocol === "windsurf"
-    ? JSON.stringify({
-        agent_action_name: "pre_user_prompt",
-        tool_info: { user_prompt: prompt },
-      })
-    : JSON.stringify({ hook_event_name: "UserPromptSubmit", prompt });
+function promptInput(prompt: string): string {
+  return JSON.stringify({ hook_event_name: "UserPromptSubmit", prompt });
+}
+
+function fileReadInput(filePath: string): string {
+  return JSON.stringify({
+    hook_event_name: "PreToolUse",
+    tool_name: "Read",
+    tool_input: { file_path: filePath },
+  });
 }
 
 function executeHook(
   executable: string,
   hookPath: string,
-  prompt: string,
-  protocol: HookProtocol,
+  input: string,
   mode: WarnMode,
 ): Promise<HookExecution> {
   return new Promise((resolve) => {
     const child = spawn(executable, [hookPath, hookModeArgument(mode)], {
-      env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+      // Health checks must not show up as a user-facing check in progress.
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: "1",
+        [QUIET_ACTIVITY_ENV]: "1",
+      },
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
     });
@@ -192,31 +201,25 @@ function executeHook(
     child.stdin.once("error", () => {
       // A rejected hook can close stdin before the canary has been written.
     });
-    child.stdin.end(inputForProtocol(protocol, prompt));
+    child.stdin.end(input);
   });
 }
 
-export async function verifyHookCanary(
+const SYNTHETIC_CANARY = `ghp_${"Sg7".repeat(12)}`;
+const CLEAN_CANARY_TEXT = "Explain this local function.";
+const SECRET_CANARY_TEXT = `Review candidate ${SYNTHETIC_CANARY}`;
+
+// The hook must let the clean input through untouched and stop (or, in
+// observe mode, flag) the synthetic secret without echoing it.
+async function verifyContract(
   executable: string,
   hookPath: string,
-  protocol: HookProtocol = "user-prompt-submit",
-  mode: WarnMode = "block",
+  mode: WarnMode,
+  cleanInput: string,
+  secretInput: string,
 ): Promise<boolean> {
-  const syntheticCanary = `ghp_${"Sg7".repeat(12)}`;
-  const clean = await executeHook(
-    executable,
-    hookPath,
-    "Explain this local function.",
-    protocol,
-    mode,
-  );
-  const blocked = await executeHook(
-    executable,
-    hookPath,
-    `Review candidate ${syntheticCanary}`,
-    protocol,
-    mode,
-  );
+  const clean = await executeHook(executable, hookPath, cleanInput, mode);
+  const blocked = await executeHook(executable, hookPath, secretInput, mode);
 
   let cleanResponse: unknown;
   try {
@@ -258,8 +261,57 @@ export async function verifyHookCanary(
     cleanAllowed &&
     findingHandled &&
     !blocked.timedOut &&
-    !output.includes(syntheticCanary)
+    !output.includes(SYNTHETIC_CANARY)
   );
+}
+
+export function verifyHookCanary(
+  executable: string,
+  hookPath: string,
+  mode: WarnMode = "block",
+): Promise<boolean> {
+  return verifyContract(
+    executable,
+    hookPath,
+    mode,
+    promptInput(CLEAN_CANARY_TEXT),
+    promptInput(SECRET_CANARY_TEXT),
+  );
+}
+
+export async function verifyFileReadCanary(
+  executable: string,
+  hookPath: string,
+  mode: WarnMode = "block",
+): Promise<boolean> {
+  const directory = await mkdtemp(join(tmpdir(), "secret-guard-canary-"));
+  try {
+    const cleanFile = join(directory, "clean.md");
+    const flaggedFile = join(directory, "flagged.md");
+    await writeFile(cleanFile, CLEAN_CANARY_TEXT, { mode: 0o600 });
+    await writeFile(flaggedFile, SECRET_CANARY_TEXT, { mode: 0o600 });
+    return await verifyContract(
+      executable,
+      hookPath,
+      mode,
+      fileReadInput(cleanFile),
+      fileReadInput(flaggedFile),
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+}
+
+async function verifyCanaries(
+  executable: string,
+  hookPath: string,
+  hosts: readonly HostDefinition[],
+  mode: WarnMode,
+): Promise<boolean> {
+  const checks = [verifyHookCanary(executable, hookPath, mode)];
+  if (hosts.some((host) => host.guardsFileReads === true))
+    checks.push(verifyFileReadCanary(executable, hookPath, mode));
+  return (await Promise.all(checks)).every(Boolean);
 }
 
 export class HookManager {
@@ -321,14 +373,13 @@ export class HookManager {
     ) {
       return { state: "degraded", reason: "hook_modified", hosts };
     }
-    const protocols = new Set(configured.map(({ host }) => host.protocol));
-    const canaries = await Promise.all(
-      [...protocols].map((protocol) =>
-        verifyHookCanary(this.executable, this.installedHook, protocol),
-      ),
+    const healthy = await verifyCanaries(
+      this.executable,
+      this.installedHook,
+      configured.map(({ host }) => host),
+      "block",
     );
-    if (canaries.some((healthy) => !healthy))
-      return { state: "degraded", reason: "canary_failed", hosts };
+    if (!healthy) return { state: "degraded", reason: "canary_failed", hosts };
     return {
       state: configured.length === this.hosts.length ? "active" : "partial",
       reason: "local_canaries_verified",
@@ -362,13 +413,9 @@ export class HookManager {
     await mkdir(dirname(this.installedHook), { recursive: true });
     await rm(candidate, { force: true });
     await copyFile(this.bundledHook, candidate);
-    const protocols = new Set(this.hosts.map((host) => host.protocol));
-    const canaries = await Promise.all(
-      [...protocols].map((protocol) =>
-        verifyHookCanary(this.executable, candidate, protocol, warnMode),
-      ),
-    );
-    if (canaries.some((healthy) => !healthy)) {
+    if (
+      !(await verifyCanaries(this.executable, candidate, this.hosts, warnMode))
+    ) {
       await rm(candidate, { force: true });
       throw new Error("hook_canary_failed");
     }

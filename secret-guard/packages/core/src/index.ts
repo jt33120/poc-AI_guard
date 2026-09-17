@@ -6,6 +6,7 @@ export {
   isPlaceholder,
 } from "./rules.js";
 export { MAX_INPUT_BYTES, RULESET_VERSION } from "./types.js";
+export { decodeScannableText } from "./text.js";
 export type {
   Decision,
   Finding,

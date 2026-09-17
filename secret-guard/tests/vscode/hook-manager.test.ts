@@ -23,8 +23,9 @@ const HEALTHY_HOOK = [
   "process.stdin.on('data', chunk => { input += chunk; });",
   "process.stdin.on('end', () => {",
   "  const parsed = JSON.parse(input);",
-  "  const prompt = parsed.prompt ?? parsed.tool_info?.user_prompt;",
-  "  if (prompt.includes('ghp_')) {",
+  "  const file = parsed.tool_input?.file_path;",
+  "  const text = file === undefined ? parsed.prompt : require('node:fs').readFileSync(file, 'utf8');",
+  "  if (text.includes('ghp_')) {",
   "    process.stderr.write('Secret Guard blocked this prompt.\\n');",
   "    process.exitCode = 2;",
   "  } else {",
@@ -177,7 +178,7 @@ describe("transactional hook lifecycle", () => {
 
     const health = await manager.enable("block");
     expect(health.state).toBe("active");
-    expect(health.hosts).toHaveLength(4);
+    expect(health.hosts).toHaveLength(3);
     expect(health.hosts.every((host) => host.configured)).toBe(true);
     for (const host of hosts) {
       expect(await readFile(host.configPath, "utf8")).toContain(

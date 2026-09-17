@@ -4,7 +4,8 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { gatewayUrl } from "./gateway-client.js";
 
-const MAX_BYTES = 1_048_576;
+// Match the backend's bounded binary envelope; cleaned text remains capped at 1 MiB.
+const MAX_BYTES = 16 * 1_048_576;
 const ROUTES = new Set(["/v1/messages", "/v1/messages/count_tokens"]);
 
 export interface GatewayBridge {

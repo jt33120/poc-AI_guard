@@ -1,5 +1,15 @@
+import { basename, resolve } from "node:path";
+import process from "node:process";
+
 import { scan, type ScanResult } from "@xsom/secret-guard-core";
 
+import {
+  MAX_MENTIONED_FILES,
+  mentionedPaths,
+  readLocalFile,
+  type FileReader,
+  type FileText,
+} from "./file-guard.js";
 import { hookMessage } from "./report.js";
 
 export type ProtectionMode = "block" | "redact" | "observe";
@@ -28,17 +38,19 @@ export interface HookResponse {
 }
 
 interface HookInput {
-  readonly agent_action_name?: unknown;
   readonly hook_event_name?: unknown;
   readonly hookEventName?: unknown;
   readonly prompt?: unknown;
-  readonly tool_info?: unknown;
+  readonly tool_name?: unknown;
+  readonly tool_input?: unknown;
+  readonly cwd?: unknown;
 }
 
-interface ExtractedPrompt {
-  readonly host: "windsurf" | "user-prompt-submit";
-  readonly prompt: string;
-}
+// A prompt, with the files it @-mentions, or a file the assistant is about to
+// read with its Read tool (Claude Code PreToolUse).
+type HookSubject =
+  | { readonly kind: "prompt"; readonly prompt: string; readonly cwd: string }
+  | { readonly kind: "read"; readonly path: string };
 
 function block(reason: string): HookResponse {
   return {
@@ -47,25 +59,116 @@ function block(reason: string): HookResponse {
   };
 }
 
-function extractPrompt(input: HookInput): ExtractedPrompt | null {
-  if (input.agent_action_name !== undefined) {
-    if (input.agent_action_name !== "pre_user_prompt") return null;
-    if (
-      typeof input.tool_info !== "object" ||
-      input.tool_info === null ||
-      !("user_prompt" in input.tool_info) ||
-      typeof input.tool_info.user_prompt !== "string"
-    ) {
-      return null;
-    }
-    return { host: "windsurf", prompt: input.tool_info.user_prompt };
-  }
-
+function hookSubject(input: HookInput): HookSubject | null {
   const eventName = input.hook_event_name ?? input.hookEventName;
+  const cwd = typeof input.cwd === "string" ? input.cwd : process.cwd();
+  if (eventName === "PreToolUse") {
+    if (input.tool_name !== "Read") return null;
+    const toolInput = input.tool_input;
+    if (typeof toolInput !== "object" || toolInput === null) return null;
+    const path = (toolInput as { readonly file_path?: unknown }).file_path;
+    return typeof path === "string" && path !== ""
+      ? { kind: "read", path: resolve(cwd, path) }
+      : null;
+  }
   if (eventName !== undefined && eventName !== "UserPromptSubmit") return null;
   return typeof input.prompt === "string"
-    ? { host: "user-prompt-submit", prompt: input.prompt }
+    ? { kind: "prompt", prompt: input.prompt, cwd }
     : null;
+}
+
+function readSafely(readFile: FileReader, path: string): FileText {
+  try {
+    return readFile(path);
+  } catch {
+    return { status: "unreadable" };
+  }
+}
+
+function fileVerdict(file: FileText): ScanResult | undefined {
+  if (file.status !== "text") return undefined;
+  try {
+    return scan({ content: file.content, sourceKind: "document" });
+  } catch {
+    return undefined;
+  }
+}
+
+function fileDetail(name: string, result: ScanResult | undefined): string {
+  const first = result?.findings[0];
+  if (result === undefined || !result.complete || first === undefined)
+    return `Secret Guard n’a pas pu analyser « ${name} » en entier : fichier binaire, de plus de 1 Mio ou inaccessible.`;
+  const extra =
+    result.findings.length > 1
+      ? ` et ${String(result.findings.length - 1)} autre(s) détection(s)`
+      : "";
+  return `« ${name} » contient ${first.secretType} ligne ${String(first.span.start.line)}${extra}. La valeur n’est pas affichée.`;
+}
+
+/**
+ * The verdict for one file whose content would reach the model. Hosts cannot
+ * rewrite a file as they read it, so redact mode blocks like block mode unless
+ * the xSOM relay takes over (see the VS Code hook entry).
+ */
+export function fileResponse(
+  path: string,
+  warnMode: WarnMode,
+  readFile: FileReader = readLocalFile,
+): HookResponse {
+  const file = readSafely(readFile, path);
+  if (file.status === "absent") return { continue: true };
+  const result = fileVerdict(file);
+  if (result?.decision === "ALLOW" && result.complete)
+    return { continue: true };
+  const detail = fileDetail(basename(path), result);
+  if (warnMode === "observe")
+    return {
+      continue: true,
+      systemMessage: `👁️ Secret Guard · Avertir et laisser passer\n${detail}\nLe fichier est transmis sans modification.`,
+    };
+  if (
+    result?.complete === true &&
+    result.decision === "WARN" &&
+    warnMode === "allow"
+  )
+    return { continue: true, systemMessage: detail };
+  const advice =
+    warnMode === "redact"
+      ? "Cet assistant ne permet pas à Secret Guard de nettoyer un fichier : retirez la valeur, ou raccordez le relais xSOM pour un nettoyage automatique."
+      : "Retirez la valeur du fichier avant de le partager.";
+  return block(
+    `🔒 Secret Guard · Fichier bloqué\n${detail}\n${advice}\nAssistant : ne lisez pas ce fichier par un autre moyen (shell, recherche) ; signalez le blocage à l’utilisateur.`,
+  );
+}
+
+function combine(responses: readonly HookResponse[]): HookResponse {
+  const blocked = responses.find((response) => !response.continue);
+  if (blocked !== undefined) return blocked;
+  const messages = responses.flatMap((response) =>
+    response.systemMessage === undefined ? [] : [response.systemMessage],
+  );
+  return messages.length === 0
+    ? { continue: true }
+    : { continue: true, systemMessage: messages.join("\n\n") };
+}
+
+function mentionedFilesResponse(
+  prompt: string,
+  cwd: string,
+  warnMode: WarnMode,
+  readFile: FileReader,
+): HookResponse {
+  const paths = mentionedPaths(prompt, cwd);
+  const checked = paths
+    .slice(0, MAX_MENTIONED_FILES)
+    .map((path) => fileResponse(path, warnMode, readFile));
+  if (paths.length > MAX_MENTIONED_FILES && warnMode !== "observe")
+    checked.push(
+      block(
+        `🔒 Secret Guard · Trop de fichiers mentionnés\nAu-delà de ${String(MAX_MENTIONED_FILES)} mentions @, les fichiers ne sont pas tous vérifiés.`,
+      ),
+    );
+  return combine(checked);
 }
 
 export function responseForResult(
@@ -95,6 +198,7 @@ export function responseForResult(
 export function runHook(
   rawInput: string,
   warnMode: WarnMode = "block",
+  readFile: FileReader = readLocalFile,
 ): HookResponse {
   let input: HookInput;
   try {
@@ -109,13 +213,18 @@ export function runHook(
     );
   }
 
-  const extracted = extractPrompt(input);
-  if (extracted === null)
+  const subject = hookSubject(input);
+  if (subject === null)
     return block("Secret Guard blocked an unexpected or invalid hook event.");
+  if (subject.kind === "read")
+    return fileResponse(subject.path, warnMode, readFile);
 
   try {
-    const result = scan({ content: extracted.prompt, sourceKind: "prompt" });
-    return responseForResult(result, warnMode);
+    const result = scan({ content: subject.prompt, sourceKind: "prompt" });
+    return combine([
+      responseForResult(result, warnMode),
+      mentionedFilesResponse(subject.prompt, subject.cwd, warnMode, readFile),
+    ]);
   } catch {
     if (warnMode === "observe") {
       return {

@@ -7,17 +7,22 @@ import { hookModeArgument, type WarnMode } from "@xsom/secret-guard-cli/hook";
 export const MANAGED_MARKER = "xsom-secret-guard-v1";
 export const HOST_HOOK_TIMEOUT_SECONDS = 30;
 
-export type HookHost = "vscode" | "claude" | "codex" | "windsurf";
-export type HookProtocol = "user-prompt-submit" | "windsurf";
+export type HookHost = "vscode" | "claude" | "codex";
+export type HookProtocol = "user-prompt-submit";
 
 export interface HostDefinition {
   readonly id: HookHost;
   readonly label: string;
   readonly configPath: string;
-  readonly eventName: "UserPromptSubmit" | "pre_user_prompt";
-  readonly format: "direct" | "nested" | "windsurf";
+  readonly eventName: "UserPromptSubmit";
+  readonly format: "direct" | "nested";
   readonly protocol: HookProtocol;
+  // Also runs the hook before the host's Read tool hands a file to the model.
+  readonly guardsFileReads?: true;
 }
+
+export const FILE_READ_EVENT = "PreToolUse";
+export const FILE_READ_MATCHER = "Read";
 
 export function defaultHostDefinitions(
   home = homedir(),
@@ -25,7 +30,7 @@ export function defaultHostDefinitions(
   return [
     {
       id: "vscode",
-      label: "VS Code / Copilot",
+      label: "GitHub Copilot",
       configPath: join(home, ".copilot", "hooks", "xsom-secret-guard.json"),
       eventName: "UserPromptSubmit",
       format: "direct",
@@ -38,6 +43,7 @@ export function defaultHostDefinitions(
       eventName: "UserPromptSubmit",
       format: "nested",
       protocol: "user-prompt-submit",
+      guardsFileReads: true,
     },
     {
       id: "codex",
@@ -46,14 +52,6 @@ export function defaultHostDefinitions(
       eventName: "UserPromptSubmit",
       format: "nested",
       protocol: "user-prompt-submit",
-    },
-    {
-      id: "windsurf",
-      label: "Windsurf Cascade",
-      configPath: join(home, ".codeium", "windsurf", "hooks.json"),
-      eventName: "pre_user_prompt",
-      format: "windsurf",
-      protocol: "windsurf",
     },
   ];
 }
@@ -167,11 +165,19 @@ function directEntry(
   };
 }
 
+// Claude Code shows this text with its spinner while the hook runs, so a
+// check of about a second does not look like a frozen assistant.
+export const CLAUDE_STATUS_MESSAGES = {
+  prompt: "Secret Guard · vérification du message…",
+  fileRead: "Secret Guard · vérification du fichier…",
+} as const;
+
 function nestedEntry(
   host: HostDefinition,
   executable: string,
   hookPath: string,
   warnMode: WarnMode,
+  statusMessage?: string,
 ): Record<string, unknown> {
   const posix = renderPosixCommand(executable, hookPath, warnMode);
   const handler: Record<string, unknown> = {
@@ -182,6 +188,8 @@ function nestedEntry(
         : posix,
     timeout: HOST_HOOK_TIMEOUT_SECONDS,
   };
+  if (host.id === "claude" && statusMessage !== undefined)
+    handler.statusMessage = statusMessage;
   // Codex already evaluates commandWindows in PowerShell. A nested -Command
   // string expands $env and $LASTEXITCODE in the outer shell before execution.
   if (host.id === "codex")
@@ -193,17 +201,6 @@ function nestedEntry(
   return { hooks: [handler] };
 }
 
-function windsurfEntry(
-  executable: string,
-  hookPath: string,
-  warnMode: WarnMode,
-): Record<string, unknown> {
-  return {
-    command: renderPosixCommand(executable, hookPath, warnMode),
-    powershell: renderPowerShellCommand(executable, hookPath, warnMode),
-  };
-}
-
 function managedEntry(
   host: HostDefinition,
   executable: string,
@@ -212,9 +209,13 @@ function managedEntry(
 ): Record<string, unknown> {
   if (host.format === "direct")
     return directEntry(executable, hookPath, warnMode);
-  if (host.format === "windsurf")
-    return windsurfEntry(executable, hookPath, warnMode);
-  return nestedEntry(host, executable, hookPath, warnMode);
+  return nestedEntry(
+    host,
+    executable,
+    hookPath,
+    warnMode,
+    CLAUDE_STATUS_MESSAGES.prompt,
+  );
 }
 
 function legacyManagedEntry(
@@ -269,9 +270,6 @@ function legacyGuiExecutableEntry(
       windows: renderLegacyWindowsCommand(executable, hookPath, warnMode),
       timeout: HOST_HOOK_TIMEOUT_SECONDS,
     };
-  }
-  if (host.format === "windsurf") {
-    return { command: posix, powershell };
   }
   const handler: Record<string, unknown> = {
     type: "command",
@@ -397,7 +395,7 @@ function parseRoot(content: string | null): Record<string, unknown> {
 
 function eventEntries(
   root: Record<string, unknown>,
-  host: HostDefinition,
+  eventName: string,
   create: boolean,
 ): unknown[] | null {
   let hooks = root.hooks;
@@ -410,10 +408,10 @@ function eventEntries(
     throw new Error("invalid_host_hooks_config");
   }
   const hookMap = hooks as Record<string, unknown>;
-  let entries = hookMap[host.eventName];
+  let entries = hookMap[eventName];
   if (entries === undefined && create) {
     entries = [];
-    hookMap[host.eventName] = entries;
+    hookMap[eventName] = entries;
   }
   if (!Array.isArray(entries)) {
     if (entries === undefined) return null;
@@ -485,8 +483,15 @@ function exactManagedEntry(
             ],
           }
         : null;
+    // 0.4.3 installed the current Claude command without a status message.
+    const claudeWithoutStatus =
+      host.id === "claude"
+        ? nestedEntry(host, executable, hookPath, warnMode)
+        : null;
     return (
       canonical(value) === canonical(current) ||
+      (claudeWithoutStatus !== null &&
+        canonical(value) === canonical(claudeWithoutStatus)) ||
       (legacy !== null && canonical(value) === canonical(legacy)) ||
       canonical(value) === canonical(legacyGuiExecutable) ||
       (nestedPowerShell !== null &&
@@ -501,7 +506,87 @@ function exactManagedEntry(
   });
 }
 
-export type HostConfigState = "off" | "configured" | "degraded";
+function readGuardEntry(
+  host: HostDefinition,
+  executable: string,
+  hookPath: string,
+  warnMode: WarnMode,
+  statusMessage: string | null = CLAUDE_STATUS_MESSAGES.fileRead,
+): Record<string, unknown> {
+  return {
+    matcher: FILE_READ_MATCHER,
+    ...nestedEntry(
+      host,
+      executable,
+      hookPath,
+      warnMode,
+      statusMessage ?? undefined,
+    ),
+  };
+}
+
+function exactReadGuardEntry(
+  value: unknown,
+  host: HostDefinition,
+  executable: string,
+  hookPath: string,
+): boolean {
+  return (["block", "allow", "redact", "observe"] as const).some(
+    (warnMode) =>
+      canonical(value) ===
+        canonical(readGuardEntry(host, executable, hookPath, warnMode)) ||
+      canonical(value) ===
+        canonical(readGuardEntry(host, executable, hookPath, warnMode, null)),
+  );
+}
+
+type EntryMatcher = (entry: unknown) => boolean;
+
+interface ManagedEvent {
+  readonly eventName: string;
+  readonly isManaged: EntryMatcher;
+  readonly entry: (warnMode: WarnMode) => Record<string, unknown>;
+}
+
+function managedEvents(
+  host: HostDefinition,
+  executable: string,
+  hookPath: string,
+): readonly ManagedEvent[] {
+  const prompt: ManagedEvent = {
+    eventName: host.eventName,
+    isManaged: (entry) => exactManagedEntry(entry, host, executable, hookPath),
+    entry: (warnMode) => managedEntry(host, executable, hookPath, warnMode),
+  };
+  if (host.guardsFileReads !== true) return [prompt];
+  return [
+    prompt,
+    {
+      eventName: FILE_READ_EVENT,
+      isManaged: (entry) =>
+        exactReadGuardEntry(entry, host, executable, hookPath),
+      entry: (warnMode) => readGuardEntry(host, executable, hookPath, warnMode),
+    },
+  ];
+}
+
+// "outdated": the prompt guard is installed but a newer guard (file reads) is
+// not yet; refreshing the configuration completes it.
+export type HostConfigState = "off" | "configured" | "outdated" | "degraded";
+
+type EventState = "off" | "configured" | "degraded";
+
+function inspectEvent(
+  root: Record<string, unknown>,
+  event: ManagedEvent,
+): EventState {
+  const entries = eventEntries(root, event.eventName, false);
+  if (entries === null) return "off";
+  const marked = entries.filter(containsMarker);
+  if (marked.some((entry) => !event.isManaged(entry))) return "degraded";
+  if (entries.filter(event.isManaged).length === 1) return "configured";
+  return marked.length === 0 ? "off" : "degraded";
+}
 
 export function inspectHostConfig(
   content: string | null,
@@ -511,21 +596,27 @@ export function inspectHostConfig(
 ): HostConfigState {
   if (content === null) return "off";
   try {
-    const entries = eventEntries(parseRoot(content), host, false);
-    if (entries === null) return "off";
-    const exact = entries.filter((entry) =>
-      exactManagedEntry(entry, host, executable, hookPath),
+    const root = parseRoot(content);
+    const [prompt, ...others] = managedEvents(host, executable, hookPath).map(
+      (event) => inspectEvent(root, event),
     );
-    const marked = entries.filter(containsMarker);
-    const foreignMarked = marked.some(
-      (entry) => !exactManagedEntry(entry, host, executable, hookPath),
-    );
-    if (foreignMarked) return "degraded";
-    if (exact.length === 1) return "configured";
-    return marked.length === 0 ? "off" : "degraded";
+    const states = [prompt, ...others];
+    if (states.includes("degraded")) return "degraded";
+    if (states.every((state) => state === "configured")) return "configured";
+    if (prompt === "configured") return "outdated";
+    return states.every((state) => state === "off") ? "off" : "degraded";
   } catch {
     return "degraded";
   }
+}
+
+function foreignMarked(
+  entries: readonly unknown[],
+  event: ManagedEvent,
+): boolean {
+  return entries.some(
+    (entry) => containsMarker(entry) && !event.isManaged(entry),
+  );
 }
 
 export function configureHost(
@@ -536,19 +627,19 @@ export function configureHost(
   warnMode: WarnMode,
 ): string {
   const root = parseRoot(content);
-  const entries = eventEntries(root, host, true);
-  if (entries === null) throw new Error("invalid_host_event_config");
-  const foreignMarked = entries.some(
-    (entry) =>
-      containsMarker(entry) &&
-      !exactManagedEntry(entry, host, executable, hookPath),
-  );
-  if (foreignMarked) throw new Error("refusing_to_replace_unrecognized_guard");
-  const retained = entries.filter(
-    (entry) => !exactManagedEntry(entry, host, executable, hookPath),
-  );
-  retained.push(managedEntry(host, executable, hookPath, warnMode));
-  (root.hooks as Record<string, unknown>)[host.eventName] = retained;
+  const events = managedEvents(host, executable, hookPath);
+  const updates = events.map((event) => {
+    const entries = eventEntries(root, event.eventName, true);
+    if (entries === null) throw new Error("invalid_host_event_config");
+    if (foreignMarked(entries, event))
+      throw new Error("refusing_to_replace_unrecognized_guard");
+    return { event, entries };
+  });
+  for (const { event, entries } of updates) {
+    const retained = entries.filter((entry) => !event.isManaged(entry));
+    retained.push(event.entry(warnMode));
+    (root.hooks as Record<string, unknown>)[event.eventName] = retained;
+  }
   return `${JSON.stringify(root, null, 2)}\n`;
 }
 
@@ -569,20 +660,20 @@ export function unconfigureHost(
 ): string | null {
   if (content === null) return null;
   const root = parseRoot(content);
-  const entries = eventEntries(root, host, false);
-  if (entries === null) return content;
-  const foreignMarked = entries.some(
-    (entry) =>
-      containsMarker(entry) &&
-      !exactManagedEntry(entry, host, executable, hookPath),
-  );
-  if (foreignMarked) throw new Error("refusing_to_remove_unrecognized_guard");
-  const retained = entries.filter(
-    (entry) => !exactManagedEntry(entry, host, executable, hookPath),
-  );
+  const updates = managedEvents(host, executable, hookPath).flatMap((event) => {
+    const entries = eventEntries(root, event.eventName, false);
+    if (entries === null) return [];
+    if (foreignMarked(entries, event))
+      throw new Error("refusing_to_remove_unrecognized_guard");
+    return [{ event, entries }];
+  });
+  if (updates.length === 0) return content;
   const hooks = root.hooks as Record<string, unknown>;
-  if (retained.length === 0) Reflect.deleteProperty(hooks, host.eventName);
-  else hooks[host.eventName] = retained;
+  for (const { event, entries } of updates) {
+    const retained = entries.filter((entry) => !event.isManaged(entry));
+    if (retained.length === 0) Reflect.deleteProperty(hooks, event.eventName);
+    else hooks[event.eventName] = retained;
+  }
   if (isEmptyObject(hooks)) delete root.hooks;
   return isEmptyObject(root) ? null : `${JSON.stringify(root, null, 2)}\n`;
 }

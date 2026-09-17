@@ -1,8 +1,8 @@
 {
   "name": "xsom-secret-guard-vscode",
   "displayName": "xSOM Secret Guard",
-  "version": "0.4.0",
-  "description": "Vos idées à l’IA, vos secrets à l’abri. Détection locale et protection des prompts pour Claude Code, Codex, Copilot et Windsurf.",
+  "version": "0.4.3",
+  "description": "Vos idées à l’IA, vos secrets à l’abri. Détection locale et protection des prompts pour Claude Code, Codex et GitHub Copilot.",
   "publisher": "xsom",
   "type": "module",
   "license": "SEE LICENSE IN LICENSE.txt",
@@ -46,6 +46,50 @@
     "onCommand:secretGuard.copyRedacted"
   ],
   "contributes": {
+    "icons": {
+      "xsom-mark-0": {
+        "description": "Marque xSOM, étape 1/6 de l’animation de vérification Secret Guard",
+        "default": {
+          "fontPath": "media/xsom-icons.ttf",
+          "fontCharacter": "\\E000"
+        }
+      },
+      "xsom-mark-1": {
+        "description": "Marque xSOM, étape 2/6 de l’animation de vérification Secret Guard",
+        "default": {
+          "fontPath": "media/xsom-icons.ttf",
+          "fontCharacter": "\\E001"
+        }
+      },
+      "xsom-mark-2": {
+        "description": "Marque xSOM, étape 3/6 de l’animation de vérification Secret Guard",
+        "default": {
+          "fontPath": "media/xsom-icons.ttf",
+          "fontCharacter": "\\E002"
+        }
+      },
+      "xsom-mark-3": {
+        "description": "Marque xSOM, étape 4/6 de l’animation de vérification Secret Guard",
+        "default": {
+          "fontPath": "media/xsom-icons.ttf",
+          "fontCharacter": "\\E003"
+        }
+      },
+      "xsom-mark-4": {
+        "description": "Marque xSOM, étape 5/6 de l’animation de vérification Secret Guard",
+        "default": {
+          "fontPath": "media/xsom-icons.ttf",
+          "fontCharacter": "\\E004"
+        }
+      },
+      "xsom-mark-5": {
+        "description": "Marque xSOM, étape 6/6 de l’animation de vérification Secret Guard",
+        "default": {
+          "fontPath": "media/xsom-icons.ttf",
+          "fontCharacter": "\\E005"
+        }
+      }
+    },
     "chatParticipants": [
       {
         "id": "xsom.secretGuard",

@@ -6,6 +6,7 @@ import { join, resolve } from "node:path";
 import { buildSync } from "esbuild";
 
 import {
+  CLAUDE_STATUS_MESSAGES,
   configureHost,
   defaultHostDefinitions,
   inspectHostConfig,
@@ -41,6 +42,19 @@ function legacyNestedPowerShellCommand(
 }
 
 describe("multi-host hook configuration", () => {
+  it("targets only GitHub Copilot, Claude Code and Codex", () => {
+    expect(
+      defaultHostDefinitions("/tmp/home").map(({ id, label }) => ({
+        id,
+        label,
+      })),
+    ).toEqual([
+      { id: "vscode", label: "GitHub Copilot" },
+      { id: "claude", label: "Claude Code" },
+      { id: "codex", label: "Codex" },
+    ]);
+  });
+
   it("renders injection-safe commands with an ownership marker", () => {
     const posix = renderPosixCommand(
       "/tmp/a'b$(touch /tmp/pwn)",
@@ -255,9 +269,11 @@ describe("multi-host hook configuration", () => {
         hooks: { UserPromptSubmit: [{ hooks: [handler] }] },
       });
 
+      // Claude also guards file reads now: an old prompt-only entry is kept
+      // recognizable but reported for refresh.
       expect(
         inspectHostConfig(oldConfig, host, windowsExecutable, windowsHook),
-      ).toBe("configured");
+      ).toBe(hostId === "claude" ? "outdated" : "configured");
 
       const upgraded = configureHost(
         oldConfig,
@@ -295,7 +311,7 @@ describe("multi-host hook configuration", () => {
       });
 
       expect(inspectHostConfig(oldConfig, host, executable, hookPath)).toBe(
-        "configured",
+        "outdated",
       );
       const upgraded = configureHost(
         oldConfig,
@@ -527,4 +543,109 @@ describe("multi-host hook configuration", () => {
     },
     25_000,
   );
+  it("guards Claude file reads with a Read matcher next to the prompt hook", () => {
+    const host = defaultHostDefinitions().find(
+      (candidate) => candidate.id === "claude",
+    )!;
+    const foreign = {
+      matcher: "Bash",
+      hooks: [{ type: "command", command: "lint" }],
+    };
+    const configured = configureHost(
+      JSON.stringify({ hooks: { PreToolUse: [foreign] } }),
+      host,
+      executable,
+      hookPath,
+      "redact",
+    );
+    const parsed = JSON.parse(configured) as {
+      hooks: Record<string, Array<{ matcher?: string }>>;
+    };
+    expect(parsed.hooks.UserPromptSubmit).toHaveLength(1);
+    expect(parsed.hooks.PreToolUse).toHaveLength(2);
+    expect(parsed.hooks.PreToolUse?.[0]).toEqual(foreign);
+    expect(parsed.hooks.PreToolUse?.[1]?.matcher).toBe("Read");
+    expect(inspectHostConfig(configured, host, executable, hookPath)).toBe(
+      "configured",
+    );
+
+    const promptOnly = JSON.parse(configured) as {
+      hooks: Record<string, unknown[]>;
+    };
+    promptOnly.hooks.PreToolUse = [foreign];
+    expect(
+      inspectHostConfig(JSON.stringify(promptOnly), host, executable, hookPath),
+    ).toBe("outdated");
+
+    const removed = unconfigureHost(configured, host, executable, hookPath);
+    expect(JSON.parse(removed!)).toEqual({ hooks: { PreToolUse: [foreign] } });
+  });
+
+  it("keeps file-read guards away from hosts without a Read tool contract", () => {
+    for (const host of defaultHostDefinitions().filter(
+      (candidate) => candidate.id !== "claude",
+    )) {
+      const configured = configureHost(
+        null,
+        host,
+        executable,
+        hookPath,
+        "block",
+      );
+      expect(configured).not.toContain("PreToolUse");
+    }
+  });
+
+  it("refuses to replace a forged file-read guard", () => {
+    const host = defaultHostDefinitions().find(
+      (candidate) => candidate.id === "claude",
+    )!;
+    const forged = JSON.stringify({
+      hooks: {
+        PreToolUse: [
+          {
+            matcher: "Read",
+            hooks: [{ type: "command", command: `evil ${MANAGED_MARKER}` }],
+          },
+        ],
+      },
+    });
+    expect(inspectHostConfig(forged, host, executable, hookPath)).toBe(
+      "degraded",
+    );
+    expect(() =>
+      configureHost(forged, host, executable, hookPath, "block"),
+    ).toThrow("refusing_to_replace_unrecognized_guard");
+  });
+  it("gives Claude hooks a status message and upgrades 0.4.3 entries without one", () => {
+    const hosts = defaultHostDefinitions();
+    const claude = hosts.find((candidate) => candidate.id === "claude")!;
+    const configured = JSON.parse(
+      configureHost(null, claude, executable, hookPath, "block"),
+    ) as {
+      hooks: Record<string, Array<{ hooks: Array<Record<string, unknown>> }>>;
+    };
+    expect(
+      configured.hooks.UserPromptSubmit?.[0]?.hooks[0]?.statusMessage,
+    ).toBe(CLAUDE_STATUS_MESSAGES.prompt);
+    expect(configured.hooks.PreToolUse?.[0]?.hooks[0]?.statusMessage).toBe(
+      CLAUDE_STATUS_MESSAGES.fileRead,
+    );
+
+    const withoutStatus = structuredClone(configured);
+    for (const entries of Object.values(withoutStatus.hooks))
+      for (const entry of entries) delete entry.hooks[0]!.statusMessage;
+    const old = JSON.stringify(withoutStatus);
+    expect(inspectHostConfig(old, claude, executable, hookPath)).toBe(
+      "configured",
+    );
+    expect(configureHost(old, claude, executable, hookPath, "block")).toContain(
+      CLAUDE_STATUS_MESSAGES.fileRead,
+    );
+
+    const codex = hosts.find((candidate) => candidate.id === "codex")!;
+    expect(
+      configureHost(null, codex, executable, hookPath, "block"),
+    ).not.toContain("statusMessage");
+  });
 });

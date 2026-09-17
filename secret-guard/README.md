@@ -19,9 +19,8 @@ The delivered V0.2 uses the assistants' native pre-submit hooks:
   with no runtime dependency, network access, filesystem access, telemetry, or
   logging;
 - `@xsom/secret-guard-cli`: file/stdin scanner and one fail-closed hook process
-  compatible with VS Code/Copilot `UserPromptSubmit`, Claude Code
-  `UserPromptSubmit`, Codex `UserPromptSubmit`, and Windsurf Cascade
-  `pre_user_prompt`;
+  compatible with the `UserPromptSubmit` hooks of GitHub Copilot, Claude Code,
+  and Codex;
 - `xsom-secret-guard-vscode`: VS Code extension with automatic multi-host hook
   installation, a persistent lock status, `@secretguard` as a diagnostic owned
   flow, and explicit scan commands.
@@ -74,7 +73,7 @@ start a new session; this script does not approve hooks on your behalf.
 Two version floors apply independently: the extension shell supports VS Code
 1.133 or newer, while the native VS Code/Copilot hook itself needs 1.137 or
 newer. On VS Code 1.133–1.136, the extension can still configure and protect
-Claude Code, Codex and Windsurf; it must not claim native Copilot coverage.
+Claude Code and Codex; it must not claim native Copilot coverage.
 
 Releases are cut either by tagging (`git tag secret-guard-v0.2.4 && git push
 origin secret-guard-v0.2.4`) or by running the `Secret Guard release` workflow
@@ -128,16 +127,39 @@ preserved; disable removes only the exact Secret Guard entries. The lock is red
 or open when configuration, bytes, or canaries no longer match.
 
 VS Code agent hooks remain Preview. User-level hooks can be removed by the user
-and are not an enterprise tamper boundary. Windsurf documents system-level or
-cloud-distributed hooks for mandatory fleet enforcement; Codex and Claude Code
-also support managed policy layers. A local administrator can always remove a
-user-level install.
+and are not an enterprise tamper boundary. Codex and Claude Code also support
+managed policy layers. A local administrator can always remove a user-level
+install.
 
-The protection covers the documented text prompt field only. It does not scan
-attachments, automatically-added context, files read later by the agent, tool
-output, terminal input, a ChatGPT browser tab, or any client without a compatible
-native hook. A visual overlay on another extension's Send button would not add a
-security boundary and is intentionally not used.
+Native-hook protection covers the documented text prompt field, plus the local
+text files it can reach:
+
+- files `@`-mentioned in a prompt (`@path`, `@"path with spaces"`, `@path#L1-9`),
+  resolved from the hook's working directory, for every configured host;
+- in Claude Code only, every file the `Read` tool is about to hand to the model
+  (`PreToolUse` hook with a `Read` matcher, installed next to the prompt hook).
+
+Files are checked locally with the same detector. A binary file, a file over
+1 MiB or an inaccessible file is an incomplete scan: blocked in block/redact
+modes, flagged in observe mode. A missing file passes, since the host's own read
+fails without disclosing anything. Each check starts a hook process (about one
+second through Claude Code's PowerShell runner on Windows).
+
+`@secretguard` now reads its `#file`, selection and range references as UTF-8
+text, sends them in the same message as the prompt and scans or redacts that
+whole message; any other reference (image, folder, tool) blocks the request.
+
+Native hooks still do not scan pasted or dragged images, context the host adds
+without a `Read` call, `Grep`/`Bash` output, edit snippets, terminal input, a
+ChatGPT browser tab, native Copilot or Codex attachments, or any client without
+a compatible hook. A visual overlay on another extension's Send button would not
+add a security boundary and is intentionally not used.
+
+The separately connected Claude relay now has a backend attachment reader for
+Markdown, static PNG screenshots (offline OCR), and PDFs (text plus page OCR).
+It sends only extracted, secret-cleaned text to the provider, never the original
+binary. It does not add native Codex/Copilot attachment coverage. See the
+[attachment contract, limits and activation steps](../docs/secret-guard/attachments.md).
 
 ## Implemented verification budgets
 

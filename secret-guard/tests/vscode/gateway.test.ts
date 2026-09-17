@@ -20,6 +20,7 @@ import {
 } from "../../packages/vscode/src/gateway-bridge.js";
 import {
   canDelegate,
+  relayConnected,
   routeFile,
 } from "../../packages/vscode/src/gateway-delegation.js";
 
@@ -132,6 +133,34 @@ describe("metadata-only asynchronous audit", () => {
 });
 
 describe("bounded subscription-compatible Claude relay", () => {
+  it("accepts attachment envelopes above the former text-only limit", async () => {
+    const target = await remote();
+    const relay = await bridge(target.base);
+    const body = JSON.stringify({
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "document",
+              source: {
+                type: "base64",
+                media_type: "application/pdf",
+                data: Buffer.alloc(1024 * 1024, 65).toString("base64"),
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const response = await fetch(`${relay.baseUrl}/v1/messages/count_tokens`, {
+      method: "POST",
+      body,
+    });
+    expect(response.status).toBe(200);
+    await response.text();
+    expect(target.captured[0]?.body).toBe(body);
+  });
   it("the actual hook delegates redact only, and never malformed envelopes", async () => {
     const target = await remote();
     const relay = await bridge(target.base);
@@ -218,7 +247,7 @@ describe("bounded subscription-compatible Claude relay", () => {
       (
         await fetch(`${relay.baseUrl}/v1/messages`, {
           method: "POST",
-          body: "x".repeat(1048577),
+          body: "x".repeat(16 * 1048576 + 1),
         })
       ).status,
     ).toBe(413);
@@ -236,5 +265,72 @@ describe("bounded subscription-compatible Claude relay", () => {
     );
     expect(await canDelegate(directory, relay.baseUrl)).toBe(true);
     expect(await canDelegate(directory, "https://example.invalid")).toBe(false);
+  });
+  it("sees a live relay whichever process uses it", async () => {
+    const target = await remote();
+    const relay = await bridge(target.base);
+    const directory = await mkdtemp(join(tmpdir(), "xsom-relay-connected-"));
+    resources.push(() => rm(directory, { recursive: true, force: true }));
+    expect(await relayConnected(directory)).toBe(false);
+    const gone = `http://127.0.0.1:1/${"0".repeat(64)}`;
+    await writeFile(
+      routeFile(directory, gone),
+      JSON.stringify({ baseUrl: gone }),
+    );
+    expect(await relayConnected(directory)).toBe(false);
+    await writeFile(
+      routeFile(directory, relay.baseUrl),
+      JSON.stringify({ baseUrl: relay.baseUrl }),
+    );
+    expect(await relayConnected(directory)).toBe(true);
+  });
+  it("tells a Claude session opened before the relay to start a new one", async () => {
+    const target = await remote();
+    const relay = await bridge(target.base);
+    const directory = await mkdtemp(join(tmpdir(), "xsom-stale-session-"));
+    resources.push(() => rm(directory, { recursive: true, force: true }));
+    const runner = join(directory, "hook.cjs");
+    await build({
+      entryPoints: ["packages/vscode/src/hook-entry.ts"],
+      outfile: runner,
+      bundle: true,
+      platform: "node",
+      format: "cjs",
+    });
+    const env = { ...process.env, CLAUDE_PROJECT_DIR: directory };
+    Reflect.deleteProperty(env, "ANTHROPIC_BASE_URL");
+    const run = (): Promise<{ code: number | null; stderr: string }> =>
+      new Promise((resolve, reject) => {
+        const child = spawn(process.execPath, [runner, "--mode=redact"], {
+          env,
+          windowsHide: true,
+          timeout: 5000,
+          stdio: ["pipe", "ignore", "pipe"],
+        });
+        let stderr = "";
+        child.stderr.on(
+          "data",
+          (chunk: Buffer) => (stderr += chunk.toString()),
+        );
+        child.on("error", reject);
+        child.on("close", (code) => { resolve({ code, stderr }); });
+        child.stdin.end(
+          JSON.stringify({
+            hook_event_name: "UserPromptSubmit",
+            prompt: "PASSWORD=definitely-not-a-real-secret-123",
+          }),
+        );
+      });
+    const unconnected = await run();
+    expect(unconnected.code).toBe(2);
+    expect(unconnected.stderr).not.toContain("nouvelle session");
+    await writeFile(
+      routeFile(directory, relay.baseUrl),
+      JSON.stringify({ baseUrl: relay.baseUrl }),
+    );
+    const stale = await run();
+    expect(stale.code).toBe(2);
+    expect(stale.stderr).toContain("ouverte avant le raccordement");
+    expect(stale.stderr).toContain("nouvelle session");
   });
 });

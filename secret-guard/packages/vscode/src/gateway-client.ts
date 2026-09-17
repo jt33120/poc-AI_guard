@@ -5,8 +5,7 @@ export type AuditEvent = {
   at: string;
   kind:
     "scan" | "mode_changed" | "local_test" | "gateway_configured" | "heartbeat";
-  assistant:
-    "manual" | "secretguard" | "claude" | "codex" | "copilot" | "windsurf";
+  assistant: "manual" | "secretguard" | "claude" | "codex" | "copilot";
   mode: "block" | "redact" | "observe";
   outcome:
     | "clean"

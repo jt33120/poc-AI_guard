@@ -1,22 +1,41 @@
 import type { ProtectionMode, WarnMode } from "@xsom/secret-guard-cli/hook";
 import type { Decision } from "@xsom/secret-guard-core";
-import type { HookHealth, HostHealth } from "./hook-manager.js";
+import type { HookHealth } from "./hook-manager.js";
 import { HEALTH_LABELS, HEALTH_REASONS } from "./dashboard.js";
+import { modeShortLabel } from "./protection-mode.js";
+import {
+  alertCard,
+  banner,
+  footer,
+  levelTile,
+  scopeTile,
+  sectionHeader,
+  stateCard,
+  wideButton,
+  type Appearance,
+  type Art,
+  type Icon,
+  type LevelState,
+  type Tone,
+} from "./tooltip-art.js";
 
-// VS Code hovers keep only a sanitized HTML subset: tables, a few inline tags and
-// <span style> restricted to color, background-color and border-radius, each
-// written exactly as `property:value;`. Every style below follows that grammar.
+export type { Appearance } from "./tooltip-art.js";
+
+export const STATUS_BAR_CLICK_COMMAND = "workbench.action.showHover";
+
+// VS Code hovers keep only a sanitized HTML subset: tables, a few inline tags,
+// <img> with data: sources and <span style> restricted to color,
+// background-color and border-radius, each written exactly as `property:value;`.
+// Every click target is one image from tooltip-art; HTML carries only the
+// dynamic lines. Image rows and 19px text lines stack with no other spacing.
 
 export const STATUS_TOOLTIP_COMMANDS = [
   "secretGuard.setMode",
   "secretGuard.enableHook",
-  "secretGuard.finishCodexSetup",
   "secretGuard.scanClipboard",
-  "secretGuard.scanDocument",
   "secretGuard.connectGateway",
   "secretGuard.disconnectGateway",
   "secretGuard.showDashboard",
-  "workbench.action.openSettings",
 ] as const;
 
 type TooltipCommand = (typeof STATUS_TOOLTIP_COMMANDS)[number];
@@ -32,6 +51,7 @@ export interface LastScan {
 }
 
 export interface StatusTooltipInput {
+  readonly appearance: Appearance;
   readonly health: HookHealth;
   readonly warnMode: WarnMode;
   readonly modeApplicationFailed?: boolean;
@@ -43,86 +63,69 @@ export interface StatusTooltipInput {
   readonly lastScan?: LastScan;
 }
 
+type Gateway = NonNullable<StatusTooltipInput["gateway"]>;
+
 const COLOR = {
-  muted: "var(--vscode-descriptionForeground)",
-  faint: "var(--vscode-disabledForeground)",
-  surface: "var(--vscode-textCodeBlock-background)",
-  green: "var(--vscode-charts-green)",
-  yellow: "var(--vscode-charts-yellow)",
-  red: "var(--vscode-charts-red)",
-  blue: "var(--vscode-charts-blue)",
-  purple: "var(--vscode-charts-purple)",
-  onAccent: "var(--vscode-editor-background)",
-  primary: "var(--vscode-button-background)",
-  onPrimary: "var(--vscode-button-foreground)",
-  secondary: "var(--vscode-button-secondaryBackground)",
-  onSecondary: "var(--vscode-button-secondaryForeground)",
+  body: "var(--vscode-editorHoverWidget-foreground)",
+  dim: "var(--vscode-descriptionForeground)",
 } as const;
 
-interface ModeTier {
+const TONE_COLORS: Record<Tone, string> = {
+  ok: "var(--vscode-charts-green)",
+  info: "var(--vscode-charts-blue)",
+  warn: "var(--vscode-charts-yellow)",
+  danger: "var(--vscode-charts-red)",
+};
+
+interface ModeTier extends LevelState {
   readonly mode: ProtectionMode;
-  readonly level: number;
-  readonly short: string;
   readonly title: string;
-  readonly color: string;
-  readonly exposure: string;
-  readonly meter: number;
-  readonly description: string;
-  readonly effects: ReadonlyArray<readonly [string, string]>;
 }
 
-// Ordered from least to most protective, as the selector reads left to right.
+// Ordered from least to most protective, as the tiles read left to right.
+// Card strings are sized for one SVG line each (description ≤ 48 characters,
+// effects ≤ 44).
 const TIERS: readonly ModeTier[] = [
   {
     mode: "observe",
-    level: 1,
-    short: "Avertir",
+    label: modeShortLabel("observe"),
     title: "Avertir et laisser passer",
-    color: COLOR.red,
+    tone: "warn",
     exposure: "Élevée",
-    meter: 4,
-    description: "Transmettre le texte original, même avec des secrets.",
+    exposed: 3,
+    description: "Transmet le texte original après avertissement.",
     effects: [
-      ["Envoi", "Le message part tel quel, secrets compris"],
+      ["Envoi", "Tel quel, secrets compris"],
       ["Signal", "Avertissement affiché, aucun nettoyage"],
     ],
   },
   {
     mode: "redact",
-    level: 2,
-    short: "Expurger",
+    label: modeShortLabel("redact"),
     title: "Expurger",
-    color: COLOR.blue,
+    tone: "info",
     exposure: "Faible",
-    meter: 2,
-    description: "Masquer les secrets avant de partager.",
+    exposed: 2,
+    description: "Masque les secrets avant de partager.",
     effects: [
-      ["Envoi", "Masqué puis rescanné dans @secretguard et Claude raccordé"],
-      ["Ailleurs", "Envoi arrêté, copie expurgée via le presse-papiers"],
+      ["Envoi", "Masqué dans @secretguard et Claude raccordé"],
+      ["Ailleurs", "Arrêté, copie expurgée au presse-papiers"],
     ],
   },
   {
     mode: "block",
-    level: 3,
-    short: "Bloquer",
+    label: modeShortLabel("block"),
     title: "Bloquer",
-    color: COLOR.green,
+    tone: "ok",
     exposure: "Minimale",
-    meter: 1,
-    description: "Arrêter les messages contenant un secret détecté.",
+    exposed: 1,
+    description: "Arrête tout message contenant un secret.",
     effects: [
-      ["Envoi", "Arrêté : secret, ambiguïté ou analyse incomplète"],
-      ["Correction", "Retirez la valeur ou copiez la version expurgée"],
+      ["Envoi", "Arrêté : secret, ambiguïté, scan incomplet"],
+      ["Corriger", "Retirez ou expurgez la valeur"],
     ],
   },
 ];
-
-const HOST_MONOGRAMS: Record<HostHealth["id"], readonly [string, string]> = {
-  claude: ["CC", COLOR.blue],
-  codex: ["CX", COLOR.yellow],
-  windsurf: ["WS", COLOR.green],
-  vscode: ["VS", COLOR.purple],
-};
 
 const SCAN_SOURCES: Record<LastScan["source"], string> = {
   clipboard: "Presse-papiers",
@@ -130,7 +133,40 @@ const SCAN_SOURCES: Record<LastScan["source"], string> = {
   selection: "Sélection",
 };
 
-const NBSP = "&nbsp;";
+const HELP = {
+  levels:
+    "S’applique aux nouvelles sessions des assistants configurés sur ce poste.",
+  sharing:
+    "Le presse-papiers est vérifié à la demande. Les pièces PNG, PDF et Markdown sont analysées automatiquement dans le relais Claude raccordé.",
+  gateway:
+    "Le relais xSOM nettoie les messages et lit les pièces jointes avant Claude. L’audit ne contient ni prompt ni valeur détectée.",
+  attachmentsCovered:
+    "PNG, PDF et Markdown analysés dans les sessions Claude raccordées au relais xSOM.",
+  attachmentsUncovered:
+    "Non couvert hors relais Claude. Les pièces natives Codex et Copilot ne sont pas interceptées.",
+  attachmentsConnect:
+    "Les pièces PNG, PDF et Markdown ne sont analysées que par le relais xSOM, dans les sessions Claude. Cliquer pour raccorder ce poste.",
+} as const;
+
+interface Target {
+  readonly command: TooltipCommand;
+  readonly argument?: string;
+}
+
+interface Action extends Target {
+  readonly label: string;
+  readonly glyph: Icon;
+}
+
+interface Readiness {
+  readonly tone: Tone;
+  readonly summary: string;
+  readonly alert?: {
+    readonly title: string;
+    readonly reason: string;
+    readonly action: Action;
+  };
+}
 
 function escapeHtml(value: string): string {
   return value
@@ -141,303 +177,354 @@ function escapeHtml(value: string): string {
     );
 }
 
-function span(
-  content: string,
-  style: { color?: string; background?: string; radius?: number },
-): string {
-  const css = [
-    style.color === undefined ? "" : `color:${style.color};`,
-    style.background === undefined
-      ? ""
-      : `background-color:${style.background};`,
-    style.radius === undefined
-      ? ""
-      : `border-radius:${String(style.radius)}px;`,
-  ].join("");
-  return `<span style="${css}">${content}</span>`;
+function span(content: string, color: string): string {
+  return `<span style="color:${color};">${content}</span>`;
 }
 
-function small(content: string, color: string = COLOR.muted): string {
-  return `<small>${span(content, { color })}</small>`;
+function textLine(content: string): string {
+  return `<div>${content}</div>`;
 }
 
-function commandHref(command: TooltipCommand, argument?: string): string {
+function smallLine(content: string, color: string): string {
+  return textLine(`<small>${span(content, color)}</small>`);
+}
+
+function image(art: Art, alt: string, title?: string): string {
+  const source = Buffer.from(art.svg, "utf8").toString("base64");
+  const hint = title === undefined ? "" : ` title="${escapeHtml(title)}"`;
+  return `<img src="data:image/svg+xml;base64,${source}" width="${String(art.width)}" height="${String(art.height)}" alt="${escapeHtml(alt)}"${hint}>`;
+}
+
+function link(content: string, target: Target, title?: string): string {
   const query =
-    argument === undefined
+    target.argument === undefined
       ? ""
-      : `?${encodeURIComponent(JSON.stringify([argument]))}`;
-  return `command:${command}${query}`;
+      : `?${encodeURIComponent(JSON.stringify([target.argument]))}`;
+  const hint = title === undefined ? "" : ` title="${escapeHtml(title)}"`;
+  return `<a href="command:${target.command}${query}"${hint}>${content}</a>`;
 }
 
-function link(
-  content: string,
-  command: TooltipCommand,
-  options: { argument?: string; title?: string } = {},
-): string {
-  const title =
-    options.title === undefined ? "" : ` title="${escapeHtml(options.title)}"`;
-  return `<a href="${commandHref(command, options.argument)}"${title}>${content}</a>`;
+// Inline images in one block sit edge to edge; the block ends a band.
+function imageRow(...images: readonly string[]): string {
+  return `<div>${images.join("")}</div>`;
 }
 
-function button(
-  label: string,
-  command: TooltipCommand,
-  variant: "primary" | "secondary" | "attention",
-): string {
-  const style =
-    variant === "primary"
-      ? { color: COLOR.onPrimary, background: COLOR.primary }
-      : variant === "secondary"
-        ? { color: COLOR.onSecondary, background: COLOR.secondary }
-        : { color: COLOR.yellow, background: COLOR.surface };
-  return link(
-    span(`${NBSP}${NBSP}${label}${NBSP}${NBSP}`, { ...style, radius: 4 }),
-    command,
-  );
+function readiness(input: StatusTooltipInput, gateway: Gateway): Readiness {
+  const { health } = input;
+  if (input.modeApplicationFailed === true)
+    return {
+      tone: "warn",
+      summary: "Niveau non appliqué · assistants à mettre à jour",
+      alert: {
+        title: "Niveau non appliqué",
+        reason: "Le mode n’a pas pu être appliqué aux assistants.",
+        action: {
+          label: "Réessayer l’application",
+          glyph: "retry",
+          command: "secretGuard.enableHook",
+        },
+      },
+    };
+  if (health.state !== "active") {
+    const summaries = {
+      partial: "couverture partielle",
+      degraded: "envoi non garanti",
+      off: "prompts non analysés",
+    } as const;
+    return {
+      tone: health.state === "degraded" ? "danger" : "warn",
+      summary: `${HEALTH_LABELS[health.state]} · ${summaries[health.state]}`,
+      alert: {
+        title: HEALTH_LABELS[health.state],
+        reason: HEALTH_REASONS[health.reason],
+        action: {
+          label: "Configurer la protection",
+          glyph: "gear",
+          command: "secretGuard.enableHook",
+        },
+      },
+    };
+  }
+  if (input.warnMode === "allow")
+    return {
+      tone: "warn",
+      summary: "Ancien réglage permissif · ambiguïtés transmises",
+      alert: {
+        title: "Ancien réglage permissif",
+        reason: "Les détections ambiguës peuvent être transmises.",
+        action: {
+          label: "Appliquer Expurger",
+          glyph: "retry",
+          command: "secretGuard.setMode",
+          argument: "redact",
+        },
+      },
+    };
+  if (gateway.state === "retrying")
+    return {
+      tone: "warn",
+      summary: "Veille locale active · relais injoignable",
+    };
+  return {
+    tone: "ok",
+    summary: `${HEALTH_LABELS.active} · ${gateway.state === "online" ? "relais raccordé" : "détection locale"}`,
+  };
 }
 
-function pill(label: string, color: string): string {
-  return span(`${NBSP}${label}${NBSP}`, {
-    color,
-    background: COLOR.surface,
-    radius: 9,
-  });
-}
-
-function row(left: string, right = ""): string {
-  return `<table width="100%"><tr><td>${left}</td><td align="right">${right}</td></tr></table>`;
-}
-
-function sectionHeading(index: string, title: string, aside = ""): string {
-  return row(
-    `${small(`<b>${index}</b>`, COLOR.blue)}${NBSP}${NBSP}${small(`<b>${title}</b>`)}`,
-    aside === "" ? "" : small(aside),
-  );
-}
-
-function header(
-  health: HookHealth,
-  modeApplicationFailed: boolean,
+function headerBlocks(
+  appearance: Appearance,
+  state: Readiness,
 ): readonly string[] {
-  const ready = health.state === "active" && !modeApplicationFailed;
-  const label = modeApplicationFailed
-    ? "Mode à appliquer"
-    : HEALTH_LABELS[health.state];
-  const tone = ready
-    ? COLOR.green
-    : health.state === "off"
-      ? COLOR.muted
-      : COLOR.yellow;
-  const lines = [
-    row(
-      `${span("$(shield)", { color: COLOR.blue })}${NBSP}${small("<b>XSOM</b>")} ${span("/", { color: COLOR.faint })} <b>Secret Guard</b>${NBSP}${NBSP}${pill(`● ${label}`, tone)}`,
-      link("$(settings-gear)", "workbench.action.openSettings", {
-        argument: "@ext:xsom.xsom-secret-guard-vscode",
-        title: "Réglages",
-      }),
+  return [
+    imageRow(
+      link(
+        image(banner(appearance), "xSOM Secret Guard"),
+        { command: "secretGuard.showDashboard" },
+        "Ouvrir le centre de protection",
+      ),
+    ),
+    textLine(
+      `${span("●", TONE_COLORS[state.tone])}&nbsp;&nbsp;${span(state.summary, COLOR.dim)}`,
     ),
   ];
-  if (!ready) {
-    const reason = modeApplicationFailed
-      ? "Le mode n’a pas pu être appliqué aux assistants."
-      : HEALTH_REASONS[health.reason];
-    lines.push(
-      row(
-        `${span("$(warning)", { color: tone })} ${small(reason, COLOR.yellow)}`,
-        button(
-          modeApplicationFailed ? "Réessayer" : "Configurer",
-          "secretGuard.enableHook",
-          "primary",
+}
+
+function levelBlocks(
+  appearance: Appearance,
+  warnMode: WarnMode,
+  state: Readiness,
+): readonly string[] {
+  const active = TIERS.find((tier) => tier.mode === warnMode);
+  const tiles = TIERS.map((tier, rank) => {
+    const selected = tier === active;
+    const art = levelTile(appearance, { ...tier, rank }, selected);
+    if (selected) return image(art, `Niveau ${tier.label} (actif)`);
+    return link(
+      image(art, `Niveau ${tier.label}`),
+      { command: "secretGuard.setMode", argument: tier.mode },
+      `${tier.title} — ${tier.description}`,
+    );
+  });
+  const blocks = [
+    imageRow(
+      image(
+        sectionHeader(
+          appearance,
+          "01",
+          "NIVEAU DE PROTECTION",
+          "nouvelles sessions",
+        ),
+        "Niveau de protection",
+        HELP.levels,
+      ),
+    ),
+    imageRow(...tiles),
+  ];
+  if (state.alert !== undefined) {
+    const { title, reason, action } = state.alert;
+    return [
+      ...blocks,
+      imageRow(
+        image(
+          alertCard(appearance, title, reason, state.tone),
+          `${title}. ${reason}`,
         ),
       ),
-    );
-  }
-  return lines;
-}
-
-function tierSelector(active: ModeTier | undefined): string {
-  const cells = TIERS.map((tier) => {
-    if (tier === active) {
-      const badge = span(`${NBSP}<b>${String(tier.level)}</b>${NBSP}`, {
-        color: COLOR.onAccent,
-        background: tier.color,
-        radius: 9,
-      });
-      return `<td align="center">${span(`${NBSP}${NBSP}${badge} <b>${tier.short}</b>${NBSP}${NBSP}`, { background: COLOR.surface, radius: 5 })}</td>`;
-    }
-    const badge = span(`${NBSP}${String(tier.level)}${NBSP}`, {
-      color: COLOR.muted,
-      background: COLOR.surface,
-      radius: 9,
-    });
-    return `<td align="center">${link(`${badge} ${tier.short}`, "secretGuard.setMode", { argument: tier.mode, title: `${tier.title} — ${tier.description}` })}</td>`;
-  });
-  return `<table width="100%"><tr>${cells.join("")}</tr></table>`;
-}
-
-function exposureMeter(tier: ModeTier): string {
-  const bar = NBSP.repeat(7);
-  const segments = [0, 1, 2, 3]
-    .map(
-      (index) =>
-        `<small><small>${span(bar, {
-          background: index < tier.meter ? tier.color : COLOR.surface,
-          radius: 3,
-        })}</small></small>`,
-    )
-    .join(NBSP);
-  return `${small("Exposition")}${NBSP}${NBSP}${segments}${NBSP}${NBSP}<small><b>${span(tier.exposure, { color: tier.color })}</b></small>`;
-}
-
-function modeSection(warnMode: WarnMode): readonly string[] {
-  const active = TIERS.find((tier) => tier.mode === warnMode);
-  const lines = [
-    sectionHeading("01", "NIVEAU DE PROTECTION", "nouvelles sessions"),
-    tierSelector(active),
-  ];
-  if (active === undefined) {
-    lines.push(
-      `${span("$(warning)", { color: COLOR.yellow })} <b>Ancien réglage permissif</b><br>${small("Les détections ambiguës peuvent être transmises. Choisissez un niveau ci-dessus.")}`,
-    );
-  } else {
-    const effects = active.effects
-      .map(
-        ([name, effect]) =>
-          `<tr><td>${small(`<b>${name.toUpperCase()}</b>`, COLOR.faint)}</td><td>${small(effect)}</td></tr>`,
-      )
-      .join("");
-    lines.push(
-      row(
-        `${span("●", { color: active.color })} <b>${active.title}</b>`,
-        exposureMeter(active),
+      imageRow(
+        link(
+          image(
+            wideButton(appearance, action.label, action.glyph, "primary"),
+            action.label,
+          ),
+          action,
+        ),
       ),
-      small(active.description),
-      `<table>${effects}</table>`,
-    );
-  }
-  return lines;
-}
-
-function hostRow(
-  host: HostHealth,
-  health: HookHealth,
-  modeTitle: string | undefined,
-): string {
-  const [monogram, tint] = HOST_MONOGRAMS[host.id];
-  const healthy =
-    host.configured &&
-    (health.state === "active" || health.state === "partial");
-  const status = !host.configured
-    ? small("Non configuré", COLOR.yellow)
-    : !healthy
-      ? small("À vérifier", COLOR.yellow)
-      : host.id === "codex"
-        ? small("Configuré · approbation du hook à confirmer", COLOR.muted)
-        : small(
-            modeTitle === undefined ? "Configuré" : `Configuré · ${modeTitle}`,
-          );
-  const action = !healthy
-    ? button("Configurer", "secretGuard.enableHook", "attention")
-    : host.id === "codex"
-      ? button("Finaliser", "secretGuard.finishCodexSetup", "attention")
-      : "";
-  const badge = span(`${NBSP}<small><b>${monogram}</b></small>${NBSP}`, {
-    color: tint,
-    background: COLOR.surface,
-    radius: 5,
-  });
-  return `<tr><td width="34">${badge}</td><td><b>${escapeHtml(host.label)}</b><br>${status}</td><td align="right">${action}</td></tr>`;
-}
-
-function hostsSection(
-  health: HookHealth,
-  warnMode: WarnMode,
-): readonly string[] {
-  const configured = health.hosts.filter((host) => host.configured).length;
-  const heading = sectionHeading(
-    "02",
-    "ASSISTANTS COUVERTS",
-    health.hosts.length === 0
-      ? ""
-      : `${String(configured)}/${String(health.hosts.length)} configurés`,
-  );
-  if (health.hosts.length === 0)
-    return [
-      heading,
-      small("État indisponible. Survolez de nouveau pour réessayer."),
     ];
-  const modeTitle = TIERS.find((tier) => tier.mode === warnMode)?.short;
-  const rows = health.hosts
-    .map((host) => hostRow(host, health, modeTitle))
-    .join("");
-  return [heading, `<table width="100%">${rows}</table>`];
+  }
+  if (active === undefined) return blocks;
+  const effects = active.effects
+    .map(([name, value]) => `${name} : ${value}`)
+    .join(". ");
+  return [
+    ...blocks,
+    imageRow(
+      image(
+        stateCard(appearance, active),
+        `${active.title}. ${active.description} Exposition ${active.exposure}. ${effects}.`,
+      ),
+    ),
+  ];
 }
 
-function scanSummary(scan: LastScan): string {
+function promptCoverage(
+  health: HookHealth,
+): readonly [string, Tone | undefined] {
+  if (health.state === "active") return ["Surveillé", "ok"];
+  if (health.state === "partial") return ["Couverture partielle", "warn"];
+  if (health.state === "degraded") return ["Non garanti", "danger"];
+  return ["Non surveillé", undefined];
+}
+
+function scanLine(scan: LastScan): string {
   const source = SCAN_SOURCES[scan.source];
   const count = String(scan.findings);
-  const [color, text] = !scan.complete
-    ? [COLOR.yellow, `${source} · analyse incomplète`]
+  const [tone, summary]: readonly [Tone, string] = !scan.complete
+    ? ["warn", `${source} · analyse incomplète`]
     : scan.decision === "ALLOW"
-      ? [COLOR.green, `${source} · aucun secret détecté`]
+      ? ["ok", `${source} · aucun secret`]
       : scan.decision === "WARN"
-        ? [COLOR.yellow, `${source} · ${count} détection(s) à vérifier`]
-        : [COLOR.red, `${source} · ${count} secret(s) détecté(s)`];
-  return row(
-    `${span("●", { color })} ${small(text, COLOR.muted)}`,
-    small(escapeHtml(scan.time), COLOR.faint),
+        ? ["warn", `${source} · ${count} détection(s) à vérifier`]
+        : ["danger", `${source} · ${count} secret(s) détecté(s)`];
+  return textLine(
+    `<small>${span("●", TONE_COLORS[tone])}&nbsp;${span(`${summary} · ${escapeHtml(scan.time)}`, COLOR.dim)}</small>`,
   );
 }
 
-function scanSection(lastScan: LastScan | undefined): readonly string[] {
-  const lines = [
-    sectionHeading("03", "VÉRIFIER AVANT DE PARTAGER"),
-    `<table width="100%"><tr><td align="center">${button("$(clippy) Presse-papiers", "secretGuard.scanClipboard", "secondary")}</td><td align="center">${button("$(file-text) Document ouvert", "secretGuard.scanDocument", "secondary")}</td></tr></table>`,
-  ];
-  if (lastScan !== undefined) lines.push(scanSummary(lastScan));
-  return lines;
+// Attachments are only read by the xSOM relay (backend OCR), so the tile can
+// only be switched on by connecting it; once online, inspection is mandatory
+// and there is nothing left to toggle.
+function attachmentsTile(appearance: Appearance, state: GatewayState): string {
+  if (state === "online")
+    return image(
+      scopeTile(appearance, "paperclip", "Pièces jointes", "Analysées", "ok"),
+      "Pièces jointes analysées",
+      HELP.attachmentsCovered,
+    );
+  const art = scopeTile(
+    appearance,
+    "paperclip",
+    "Pièces jointes",
+    state === "retrying" ? "Relais injoignable" : "Raccorder le relais",
+    undefined,
+  );
+  if (state === "retrying")
+    return image(
+      art,
+      "Pièces jointes non analysées",
+      HELP.attachmentsUncovered,
+    );
+  return link(
+    image(art, "Pièces jointes non analysées : raccorder le relais"),
+    { command: "secretGuard.connectGateway" },
+    HELP.attachmentsConnect,
+  );
 }
 
-function gatewaySection(
-  gateway: NonNullable<StatusTooltipInput["gateway"]>,
+function perimeterBlocks(
+  appearance: Appearance,
+  health: HookHealth,
+  gateway: Gateway,
+  lastScan: LastScan | undefined,
 ): readonly string[] {
-  const tone =
-    gateway.state === "online"
-      ? COLOR.green
-      : gateway.state === "retrying"
-        ? COLOR.yellow
-        : COLOR.muted;
-  const details = [small(escapeHtml(gateway.status), tone)];
-  if (gateway.audit !== undefined)
-    details.push(small(escapeHtml(gateway.audit), COLOR.faint));
-  const action =
-    gateway.state === "offline"
-      ? button("Raccorder", "secretGuard.connectGateway", "primary")
-      : button("Déconnecter", "secretGuard.disconnectGateway", "secondary");
-  return [
-    sectionHeading("04", "PASSERELLE D’ENTREPRISE"),
-    `<table width="100%"><tr><td width="24">${span("$(plug)", { color: COLOR.muted })}</td><td><b>Passerelle xSOM · Claude</b><br>${details.join("<br>")}</td><td align="right">${action}</td></tr></table>`,
+  const covered = gateway.state === "online";
+  const [promptState, promptTone] = promptCoverage(health);
+  const clipboard: Action = {
+    label: "Analyser le presse-papiers",
+    glyph: "clipboard",
+    command: "secretGuard.scanClipboard",
+  };
+  const blocks = [
+    imageRow(
+      image(
+        sectionHeader(
+          appearance,
+          "02",
+          "PÉRIMÈTRE SURVEILLÉ",
+          covered ? "prompt + pièces jointes" : "prompt uniquement",
+        ),
+        "Périmètre surveillé",
+        HELP.sharing,
+      ),
+    ),
+    imageRow(
+      image(
+        scopeTile(appearance, "chat", "Prompt", promptState, promptTone),
+        `Prompt : ${promptState}`,
+      ),
+      attachmentsTile(appearance, gateway.state),
+    ),
+    imageRow(
+      link(
+        image(
+          wideButton(appearance, clipboard.label, clipboard.glyph, "secondary"),
+          clipboard.label,
+        ),
+        clipboard,
+        "Analyser localement le contenu du presse-papiers",
+      ),
+    ),
   ];
+  return lastScan === undefined ? blocks : [...blocks, scanLine(lastScan)];
 }
 
-function footer(): string {
-  return row(
-    `${span("$(check)", { color: COLOR.green })} ${small(`Analyse locale · Sans télémétrie · <b>xSOM</b>`)}`,
-    `<small>${link("Centre de protection", "secretGuard.showDashboard")}</small>`,
-  );
+function relayBlocks(
+  appearance: Appearance,
+  gateway: Gateway,
+): readonly string[] {
+  const tone: Tone | undefined =
+    gateway.state === "online"
+      ? "ok"
+      : gateway.state === "retrying"
+        ? "warn"
+        : undefined;
+  const action: Action =
+    gateway.state === "offline"
+      ? {
+          label: "Raccorder le relais",
+          glyph: "plug",
+          command: "secretGuard.connectGateway",
+        }
+      : {
+          label: "Déconnecter le relais",
+          glyph: "plug",
+          command: "secretGuard.disconnectGateway",
+        };
+  const details = [
+    smallLine(
+      escapeHtml(gateway.status),
+      tone === undefined ? COLOR.dim : TONE_COLORS[tone],
+    ),
+  ];
+  if (gateway.audit !== undefined)
+    details.push(smallLine(escapeHtml(gateway.audit), COLOR.dim));
+  return [
+    imageRow(
+      image(
+        sectionHeader(appearance, "03", "RELAIS DE PROTECTION"),
+        "Relais de protection",
+        HELP.gateway,
+      ),
+    ),
+    textLine(span("xSOM · Relais Claude", COLOR.body)),
+    ...details,
+    imageRow(
+      link(
+        image(
+          wideButton(
+            appearance,
+            action.label,
+            action.glyph,
+            gateway.state === "offline" ? "primary" : "secondary",
+          ),
+          action.label,
+        ),
+        action,
+      ),
+    ),
+  ];
 }
 
 export function statusTooltipMarkdown(input: StatusTooltipInput): string {
+  const { appearance } = input;
   const gateway = input.gateway ?? { state: "offline", status: "Non connecté" };
-  const sections: ReadonlyArray<readonly string[]> = [
-    header(input.health, input.modeApplicationFailed ?? false),
-    modeSection(input.warnMode),
-    hostsSection(input.health, input.warnMode),
-    scanSection(input.lastScan),
-    gatewaySection(gateway),
-    [footer()],
-  ];
-  return sections
-    .map((lines) => `<div>${lines.join("")}</div>`)
-    .join("\n\n<hr>\n\n");
+  const state = readiness(input, gateway);
+  return [
+    ...headerBlocks(appearance, state),
+    ...levelBlocks(appearance, input.warnMode, state),
+    ...perimeterBlocks(appearance, input.health, gateway, input.lastScan),
+    ...relayBlocks(appearance, gateway),
+    imageRow(
+      image(footer(appearance), "Détecteur local · Audit sans contenu · xSOM"),
+    ),
+  ].join("\n");
 }
