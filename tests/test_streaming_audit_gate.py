@@ -53,7 +53,7 @@ class _FakeStreamResp:
     status_code = 200
     headers: ClassVar[dict[str, str]] = {"content-type": "text/event-stream"}
 
-    async def aiter_raw(self) -> AsyncIterator[bytes]:
+    async def aiter_bytes(self) -> AsyncIterator[bytes]:
         yield b'data: {"choices":[{"delta":{"content":"bon"}}]}\n\n'
         yield b"data: [DONE]\n\n"
 
