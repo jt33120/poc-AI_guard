@@ -313,7 +313,9 @@ describe("bounded subscription-compatible Claude relay", () => {
           (chunk: Buffer) => (stderr += chunk.toString()),
         );
         child.on("error", reject);
-        child.on("close", (code) => { resolve({ code, stderr }); });
+        child.on("close", (code) => {
+          resolve({ code, stderr });
+        });
         child.stdin.end(
           JSON.stringify({
             hook_event_name: "UserPromptSubmit",

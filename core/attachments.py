@@ -22,6 +22,12 @@ _WORKERS = threading.BoundedSemaphore(2)
 _WORKER = Path(__file__).with_name("attachment_worker.py")
 
 
+# mypy narrows a platform check on a statement, not inside an expression.
+if sys.platform == "win32":
+    _NO_WINDOW = subprocess.CREATE_NO_WINDOW
+else:
+    _NO_WINDOW = 0
+
 class AttachmentError(ValueError):
     """Content-free, machine-readable refusal reason."""
 
@@ -47,7 +53,7 @@ def _extract_binary(data: bytes, media_type: str, timeout: float) -> str:
             timeout=timeout,
             check=False,
             env=env,
-            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+            creationflags=_NO_WINDOW,
         )
         if result.returncode != 0 or len(result.stdout) > MAX_TEXT_BYTES * 6 + 100:
             raise AttachmentError("attachment_extraction_failed")
