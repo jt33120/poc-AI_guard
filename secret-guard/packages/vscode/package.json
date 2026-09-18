@@ -40,6 +40,7 @@
     "onCommand:secretGuard.scanSelection",
     "onCommand:secretGuard.scanClipboard",
     "onCommand:secretGuard.purgeClipboard",
+    "onCommand:secretGuard.checkClipboard",
     "onCommand:secretGuard.scanDocument",
     "onCommand:secretGuard.enableHook",
     "onCommand:secretGuard.finishCodexSetup",
@@ -136,6 +137,11 @@
         "icon": "$(sparkle)"
       },
       {
+        "command": "secretGuard.checkClipboard",
+        "title": "Secret Guard: Vérifier le presse-papiers",
+        "icon": "$(check)"
+      },
+      {
         "command": "secretGuard.scanDocument",
         "title": "Secret Guard: Scanner le document ouvert",
         "icon": "$(file-text)"
@@ -185,12 +191,12 @@
           "enumItemLabels": [
             "🔒 Bloquer",
             "🧹 Expurger",
-            "👁️ Avertir et laisser passer"
+            "👁️ Avertir et laisser passer (1 heure)"
           ],
           "enumDescriptions": [
             "Bloque les messages avec des secrets détectés, les détections ambiguës et les analyses incomplètes.",
             "Nettoie automatiquement dans @secretguard et les sessions Claude raccordées à la passerelle xSOM. Sans passerelle, bloque ; un clic sur Secret Guard dans la barre d’état expurge alors le presse-papiers, prêt à coller.",
-            "Avertit et laisse passer le texte original, même avec des secrets. Aucun nettoyage."
+            "Avertit et laisse passer le texte original, même avec des secrets, pendant 1 heure au plus ; Secret Guard repasse ensuite en Expurger."
           ],
           "default": "block",
           "scope": "application",
@@ -201,21 +207,6 @@
           "default": true,
           "scope": "machine",
           "description": "Configure et vérifie automatiquement les hooks locaux au premier démarrage de l’extension. Codex conserve son approbation explicite obligatoire."
-        },
-        "secretGuard.hook.warnMode": {
-          "deprecationMessage": "Utilisez Secret Guard: Mode. Cet ancien réglage reste utilisé tant qu’aucun mode n’est explicitement choisi.",
-          "type": "string",
-          "enum": [
-            "block",
-            "allow"
-          ],
-          "enumDescriptions": [
-            "Bloquer aussi les détections ambiguës jusqu’à expurgation.",
-            "Afficher un avertissement et laisser continuer les détections ambiguës."
-          ],
-          "default": "block",
-          "scope": "machine",
-          "description": "Comportement du hook natif pour un verdict WARN. Les verdicts BLOCK ne sont jamais contournables."
         }
       }
     }

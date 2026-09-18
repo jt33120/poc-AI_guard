@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { MAX_INPUT_BYTES } from "@xsom/secret-guard-core";
 import {
+  checkFeedback,
+  CHECK_UNAVAILABLE,
   purgeClipboardText,
   purgeFeedback,
   PURGE_UNAVAILABLE,
@@ -73,5 +75,49 @@ describe("clipboard purge", () => {
     expect(residual.message).toContain("Un secret subsiste");
     expect(PURGE_UNAVAILABLE.failed).toBe(true);
     expect(PURGE_UNAVAILABLE.message).toContain("Ne le collez pas tel quel");
+  });
+});
+
+describe("clipboard check", () => {
+  it("flags secrets and offers the purge without touching the clipboard", () => {
+    const outcome = purgeClipboardText(`deploy with ${fakeToken}`);
+    const feedback = checkFeedback(outcome);
+    expect(feedback.text).toBe("$(warning) Presse-papiers · 1 secret détecté");
+    expect(feedback.failed).toBe(true);
+    expect(feedback.offerPurge).toBe(true);
+    expect(feedback.message).toContain("Ne le collez pas tel quel");
+    expect(JSON.stringify(feedback)).not.toContain(fakeToken);
+  });
+
+  it("reports a clean or empty clipboard like the purge", () => {
+    expect(checkFeedback({ status: "clean" })).toEqual(
+      purgeFeedback({ status: "clean" }),
+    );
+    expect(checkFeedback({ status: "empty" })).toEqual(
+      purgeFeedback({ status: "empty" }),
+    );
+  });
+
+  it("never offers a purge that would not be clean", () => {
+    const incomplete = checkFeedback({
+      status: "failed",
+      reason: "incomplete",
+      findings: 0,
+    });
+    expect(incomplete.text).toBe(
+      "$(error) Presse-papiers non vérifié en entier",
+    );
+    expect(incomplete.offerPurge).toBeUndefined();
+    const residual = checkFeedback({
+      status: "failed",
+      reason: "residual",
+      findings: 2,
+    });
+    expect(residual.text).toBe(
+      "$(warning) Presse-papiers · 2 secrets détectés",
+    );
+    expect(residual.offerPurge).toBeUndefined();
+    expect(residual.message).toContain("ne sait pas masquer");
+    expect(CHECK_UNAVAILABLE.failed).toBe(true);
   });
 });

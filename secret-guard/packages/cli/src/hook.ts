@@ -13,16 +13,18 @@ import {
 import { findingSummary, hookMessage } from "./report.js";
 
 export type ProtectionMode = "block" | "redact" | "observe";
-// "allow" preserves the older policy: only ambiguous findings may pass.
+// Hook arguments written before 0.6 could also say "allow" (ambiguous
+// findings passed). Such commands are still recognised so they can be
+// replaced, but they now run as "block".
 export type WarnMode = ProtectionMode | "allow";
 
-export function parseHookMode(args: readonly string[]): WarnMode {
+export function parseHookMode(args: readonly string[]): ProtectionMode {
   const mode = args.find((value) => value.startsWith("--mode="));
   if (mode !== undefined) {
     const value = mode.slice("--mode=".length);
     return value === "observe" || value === "redact" ? value : "block";
   }
-  return args.includes("--warn=allow") ? "allow" : "block";
+  return "block";
 }
 
 export function hookModeArgument(mode: WarnMode): string {
@@ -112,7 +114,7 @@ function fileDetail(name: string, result: ScanResult | undefined): string {
  */
 export function fileResponse(
   path: string,
-  warnMode: WarnMode,
+  mode: ProtectionMode,
   readFile: FileReader = readLocalFile,
 ): HookResponse {
   const file = readSafely(readFile, path);
@@ -121,19 +123,13 @@ export function fileResponse(
   if (result?.decision === "ALLOW" && result.complete)
     return { continue: true };
   const detail = fileDetail(basename(path), result);
-  if (warnMode === "observe")
+  if (mode === "observe")
     return {
       continue: true,
       systemMessage: `👁️ Secret Guard · Avertir et laisser passer\n${detail}\nLe fichier est transmis sans modification.`,
     };
-  if (
-    result?.complete === true &&
-    result.decision === "WARN" &&
-    warnMode === "allow"
-  )
-    return { continue: true, systemMessage: detail };
   const advice =
-    warnMode === "redact"
+    mode === "redact"
       ? "Cet assistant ne permet pas à Secret Guard de nettoyer un fichier : retirez la valeur, ou raccordez le relais xSOM pour un nettoyage automatique."
       : "Retirez la valeur du fichier avant de le partager.";
   return block(
@@ -155,14 +151,14 @@ function combine(responses: readonly HookResponse[]): HookResponse {
 function mentionedFilesResponse(
   prompt: string,
   cwd: string,
-  warnMode: WarnMode,
+  mode: ProtectionMode,
   readFile: FileReader,
 ): HookResponse {
   const paths = mentionedPaths(prompt, cwd);
   const checked = paths
     .slice(0, MAX_MENTIONED_FILES)
-    .map((path) => fileResponse(path, warnMode, readFile));
-  if (paths.length > MAX_MENTIONED_FILES && warnMode !== "observe")
+    .map((path) => fileResponse(path, mode, readFile));
+  if (paths.length > MAX_MENTIONED_FILES && mode !== "observe")
     checked.push(
       block(
         `🔒 Secret Guard · Trop de fichiers mentionnés\nAu-delà de ${String(MAX_MENTIONED_FILES)} mentions @, les fichiers ne sont pas tous vérifiés.`,
@@ -173,31 +169,28 @@ function mentionedFilesResponse(
 
 export function responseForResult(
   result: ScanResult,
-  warnMode: WarnMode,
+  mode: ProtectionMode,
 ): HookResponse {
   if (result.decision === "ALLOW" && result.complete) return { continue: true };
 
   const message = hookMessage(result);
-  if (warnMode === "observe") {
+  if (mode === "observe") {
     return {
       continue: true,
       systemMessage: `👁️ Secret Guard · Avertir et laisser passer\n${result.complete ? "Contenu sensible détecté." : "Analyse incomplète."} Le texte original est transmis sans modification.\n${message}`,
     };
   }
-  if (warnMode === "redact") {
+  if (mode === "redact") {
     return block(
       `🧹 Secret Guard · Message non envoyé\n${findingSummary(result)}\nCopiez votre message puis cliquez sur Secret Guard dans la barre d’état de VS Code : le presse-papiers est expurgé. Collez-le (Ctrl+V) et renvoyez.\nLes valeurs détectées ne sont pas affichées.`,
     );
-  }
-  if (result.decision === "WARN" && result.complete && warnMode === "allow") {
-    return { continue: true, systemMessage: message };
   }
   return block(message);
 }
 
 export function runHook(
   rawInput: string,
-  warnMode: WarnMode = "block",
+  mode: ProtectionMode = "block",
   readFile: FileReader = readLocalFile,
 ): HookResponse {
   let input: HookInput;
@@ -217,16 +210,16 @@ export function runHook(
   if (subject === null)
     return block("Secret Guard blocked an unexpected or invalid hook event.");
   if (subject.kind === "read")
-    return fileResponse(subject.path, warnMode, readFile);
+    return fileResponse(subject.path, mode, readFile);
 
   try {
     const result = scan({ content: subject.prompt, sourceKind: "prompt" });
     return combine([
-      responseForResult(result, warnMode),
-      mentionedFilesResponse(subject.prompt, subject.cwd, warnMode, readFile),
+      responseForResult(result, mode),
+      mentionedFilesResponse(subject.prompt, subject.cwd, mode, readFile),
     ]);
   } catch {
-    if (warnMode === "observe") {
+    if (mode === "observe") {
       return {
         continue: true,
         systemMessage:

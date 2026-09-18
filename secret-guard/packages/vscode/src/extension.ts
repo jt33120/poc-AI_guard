@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import * as vscode from "vscode";
-import type { ProtectionMode, WarnMode } from "@xsom/secret-guard-cli/hook";
+import type { ProtectionMode } from "@xsom/secret-guard-cli/hook";
 
 import {
   decodeScannableText,
@@ -41,6 +41,7 @@ import {
   PROTECTION_MODES,
 } from "./protection-mode.js";
 import {
+  CHECK_CLIPBOARD_COMMAND,
   PURGE_CLIPBOARD_COMMAND,
   statusBarClickCommand,
   statusTooltipMarkdown,
@@ -49,30 +50,48 @@ import {
   type LastScan,
 } from "./status-tooltip.js";
 import {
+  checkFeedback,
+  CHECK_UNAVAILABLE,
   purgeClipboardText,
   purgeFeedback,
   PURGE_UNAVAILABLE,
   type PurgeFeedback,
   type PurgeOutcome,
 } from "./clipboard-purge.js";
+import {
+  closeObserveWindow,
+  observeWindowOpen,
+  openObserveWindow,
+  readObserveDeadline,
+} from "./observe-window.js";
 
 const FINISH_CODEX_SETUP = "Finaliser Codex";
+const OBSERVE_CONFIRMATION = "Activer pour 1 heure";
+const PURGE_ACTION = "Expurger";
 let gateway: GatewayIntegration | undefined;
 // Metadata only: the scanned content and detected values are never retained.
 let lastScan: LastScan | undefined;
+// End of the running Avertir window, mirrored from the file the hook reads.
+let observeDeadline: number | undefined;
+
+function clockTime(epoch: number): string {
+  return new Date(epoch).toLocaleTimeString("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function observeUntil(): string | undefined {
+  return configuredMode() === "observe" && observeDeadline !== undefined
+    ? clockTime(observeDeadline)
+    : undefined;
+}
 
 function configuredMode(): ProtectionMode {
   return protectionMode(
     vscode.workspace.getConfiguration("secretGuard").inspect<unknown>("mode")
       ?.globalValue,
   );
-}
-
-function configuredWarnMode(): WarnMode {
-  const config = vscode.workspace.getConfiguration("secretGuard");
-  if (config.inspect<unknown>("mode")?.globalValue !== undefined)
-    return configuredMode();
-  return config.get<"allow" | "block">("hook.warnMode", "block");
 }
 
 function configuredAutoEnable(): boolean {
@@ -337,25 +356,24 @@ async function saveMode(mode: ProtectionMode): Promise<void> {
 }
 
 function scanTime(): string {
-  return new Date().toLocaleTimeString("fr-FR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return clockTime(Date.now());
 }
 
-const PURGE_AUDIT_OUTCOMES = {
-  clean: "clean",
-  purged: "redacted",
-  failed: "blocked",
+const CLIPBOARD_AUDIT_OUTCOMES = {
+  purge: { clean: "clean", purged: "redacted", failed: "blocked" },
+  check: { clean: "clean", purged: "warned", failed: "warned" },
 } as const;
 
-// The clipboard is rewritten only with a sanitized text that rescanned clean.
-async function purgeClipboard(): Promise<PurgeFeedback> {
+// A purge rewrites the clipboard only with a sanitized text that rescanned
+// clean; a check never writes it.
+async function clipboardShortcut(
+  action: "purge" | "check",
+): Promise<PurgeFeedback> {
   const outcome: PurgeOutcome = purgeClipboardText(
     await vscode.env.clipboard.readText(),
   );
-  if (outcome.status === "purged")
-    await vscode.env.clipboard.writeText(outcome.content);
+  const purged = action === "purge" && outcome.status === "purged";
+  if (purged) await vscode.env.clipboard.writeText(outcome.content);
   if (outcome.status !== "empty") {
     const findings = outcome.status === "clean" ? 0 : outcome.findings;
     lastScan = {
@@ -365,18 +383,18 @@ async function purgeClipboard(): Promise<PurgeFeedback> {
       complete: !(
         outcome.status === "failed" && outcome.reason === "incomplete"
       ),
-      purged: outcome.status === "purged",
+      purged,
       time: scanTime(),
     };
     gateway?.record({
       kind: "scan",
       assistant: "manual",
       mode: configuredMode(),
-      outcome: PURGE_AUDIT_OUTCOMES[outcome.status],
+      outcome: CLIPBOARD_AUDIT_OUTCOMES[action][outcome.status],
       findings,
     });
   }
-  return purgeFeedback(outcome);
+  return action === "purge" ? purgeFeedback(outcome) : checkFeedback(outcome);
 }
 
 function tooltipAppearance(kind: vscode.ColorThemeKind): Appearance {
@@ -424,14 +442,15 @@ async function updateStatus(
   } catch {
     health = { state: "degraded", reason: "canary_failed", hosts: [] };
   }
-  const warnMode = configuredWarnMode();
+  const mode = configuredMode();
+  const until = observeUntil();
   const warning = new vscode.ThemeColor("statusBarItem.warningBackground");
   item.name = "Secret Guard · Protection des prompts";
-  item.command = statusBarClickCommand(warnMode);
+  item.command = statusBarClickCommand(mode);
   idleBackground = undefined;
   if (health.state === "active") {
-    idleStatusText = `$(shield) Secret Guard : ${warnMode === "allow" ? "réglage permissif" : modeShortLabel(configuredMode())}`;
-    if (configuredMode() === "observe") idleBackground = warning;
+    idleStatusText = `$(shield) Secret Guard : ${modeShortLabel(mode)}${until === undefined ? "" : ` jusqu’à ${until}`}`;
+    if (mode === "observe") idleBackground = warning;
   } else if (health.state === "partial") {
     idleStatusText = "$(shield) Secret Guard : à compléter";
   } else if (health.state === "degraded") {
@@ -449,7 +468,8 @@ async function updateStatus(
     statusTooltipMarkdown({
       appearance: tooltipAppearance(vscode.window.activeColorTheme.kind),
       health,
-      warnMode,
+      mode,
+      ...(until === undefined ? {} : { observeUntil: until }),
       modeApplicationFailed,
       ...(gateway === undefined
         ? {}
@@ -468,7 +488,7 @@ async function updateStatus(
   tooltip.isTrusted = { enabledCommands: STATUS_TOOLTIP_COMMANDS };
   item.tooltip = tooltip;
   item.accessibilityInformation = {
-    label: `Secret Guard : ${HEALTH_LABELS[health.state]}. ${warnMode === "redact" ? "Expurger le presse-papiers." : "Ouvrir les contrôles."}`,
+    label: `Secret Guard : ${HEALTH_LABELS[health.state]}. ${mode === "redact" ? "Expurger le presse-papiers." : "Vérifier le presse-papiers."}`,
   };
   item.show();
   return health;
@@ -534,6 +554,54 @@ export async function activate(
     status.show();
   };
 
+  const storage = context.globalStorageUri.fsPath;
+  let observeTimer: ReturnType<typeof setTimeout> | undefined;
+  const expireObserveWindow = async (): Promise<void> => {
+    if (configuredMode() !== "observe") return;
+    await saveMode("redact");
+    void vscode.window.showInformationMessage(
+      "⏱️ L’heure en mode Avertir est écoulée : Secret Guard repasse en Expurger.",
+    );
+  };
+  // Avertir never outlives its window: the hook falls back to Expurger on its
+  // own, and this timer switches the setting back while VS Code is open.
+  const scheduleObserveExpiry = (): void => {
+    if (observeTimer !== undefined) clearTimeout(observeTimer);
+    observeTimer = undefined;
+    const deadline = readObserveDeadline(storage);
+    observeDeadline = deadline;
+    if (configuredMode() !== "observe") return;
+    const now = Date.now();
+    const remaining =
+      deadline !== undefined && observeWindowOpen(deadline, now)
+        ? deadline - now
+        : 0;
+    observeTimer = setTimeout(() => {
+      void expireObserveWindow();
+    }, remaining);
+  };
+  // Choosing Avertir opens a fresh window; leaving it closes the window.
+  const syncObserveWindow = async (): Promise<void> => {
+    if (configuredMode() === "observe")
+      await openObserveWindow(storage, Date.now());
+    else await closeObserveWindow(storage);
+    scheduleObserveExpiry();
+  };
+  const confirmMode = async (mode: ProtectionMode): Promise<boolean> => {
+    if (mode !== "observe" || configuredMode() === "observe") return true;
+    const answer = await vscode.window.showWarningMessage(
+      "Avertir transmet vos messages tels quels à l’assistant, secrets compris. Ce mode dure 1 heure, puis Secret Guard repasse en Expurger.",
+      { modal: true },
+      OBSERVE_CONFIRMATION,
+    );
+    return answer === OBSERVE_CONFIRMATION;
+  };
+  context.subscriptions.push({
+    dispose: () => {
+      if (observeTimer !== undefined) clearTimeout(observeTimer);
+    },
+  });
+
   let panel: vscode.WebviewPanel | undefined;
   let modeApplicationFailed = false;
   let modeUpdate = Promise.resolve();
@@ -543,7 +611,7 @@ export async function activate(
     if (panel !== undefined) {
       panel.webview.html = dashboardHtml(
         health,
-        configuredWarnMode(),
+        configuredMode(),
         randomBytes(16).toString("hex"),
         modeApplicationFailed,
         gateway?.summary,
@@ -583,13 +651,15 @@ export async function activate(
           matchOnDescription: true,
         },
       );
-      if (selected !== undefined) await saveMode(selected.mode);
+      if (selected !== undefined && (await confirmMode(selected.mode)))
+        await saveMode(selected.mode);
     }),
     vscode.commands.registerCommand(
       "secretGuard.setMode",
       async (mode?: unknown) => {
         closeStatusControls();
-        if (isProtectionMode(mode)) await saveMode(mode);
+        if (isProtectionMode(mode) && (await confirmMode(mode)))
+          await saveMode(mode);
       },
     ),
     vscode.window.onDidChangeActiveColorTheme(async () => {
@@ -622,6 +692,20 @@ export async function activate(
     }),
   );
 
+  // Avertir left on by an earlier session: an expired window ends now, and a
+  // setting without a window (edited by hand, or kept from 0.5) starts one.
+  try {
+    if (configuredMode() === "observe") {
+      const deadline = readObserveDeadline(storage);
+      if (deadline === undefined) await openObserveWindow(storage, Date.now());
+      else if (!observeWindowOpen(deadline, Date.now()))
+        await saveMode("redact");
+    }
+  } catch {
+    // Without a readable window the hook already applies Expurger.
+  }
+  scheduleObserveExpiry();
+
   try {
     const initial = await manager.getHealth();
     const strategy = activationStrategy(
@@ -630,9 +714,9 @@ export async function activate(
       context.extensionMode === vscode.ExtensionMode.Test,
     );
     if (strategy === "enable") {
-      await manager.enable(configuredWarnMode());
+      await manager.enable(configuredMode());
     } else {
-      await manager.refreshIfConfigured(configuredWarnMode());
+      await manager.refreshIfConfigured(configuredMode());
     }
   } catch {
     // Activation must preserve manual scanning even if the optional hook fails.
@@ -656,6 +740,35 @@ export async function activate(
       })
       .catch(() => undefined);
   }
+
+  const notify = async (feedback: PurgeFeedback): Promise<void> => {
+    if (feedback.message === undefined) return;
+    if (feedback.offerPurge !== true) {
+      await vscode.window.showErrorMessage(feedback.message);
+      return;
+    }
+    const choice = await vscode.window.showWarningMessage(
+      feedback.message,
+      PURGE_ACTION,
+    );
+    if (choice === PURGE_ACTION)
+      await vscode.commands.executeCommand(PURGE_CLIPBOARD_COMMAND);
+  };
+  const runClipboardShortcut = async (
+    action: "purge" | "check",
+  ): Promise<void> => {
+    closeStatusControls();
+    let feedback: PurgeFeedback;
+    try {
+      feedback = await clipboardShortcut(action);
+    } catch {
+      feedback = action === "purge" ? PURGE_UNAVAILABLE : CHECK_UNAVAILABLE;
+    }
+    // Feedback first: the developer is on the way to the prompt box.
+    showFlash(feedback);
+    void notify(feedback);
+    await refreshUi();
+  };
 
   context.subscriptions.push(
     vscode.commands.registerCommand("secretGuard.scanSelection", async () => {
@@ -682,20 +795,12 @@ export async function activate(
         refreshUi,
       );
     }),
-    vscode.commands.registerCommand(PURGE_CLIPBOARD_COMMAND, async () => {
-      closeStatusControls();
-      let feedback: PurgeFeedback;
-      try {
-        feedback = await purgeClipboard();
-      } catch {
-        feedback = PURGE_UNAVAILABLE;
-      }
-      // Feedback first: the developer is on the way to the prompt box.
-      showFlash(feedback);
-      if (feedback.message !== undefined)
-        void vscode.window.showErrorMessage(feedback.message);
-      await refreshUi();
-    }),
+    vscode.commands.registerCommand(PURGE_CLIPBOARD_COMMAND, () =>
+      runClipboardShortcut("purge"),
+    ),
+    vscode.commands.registerCommand(CHECK_CLIPBOARD_COMMAND, () =>
+      runClipboardShortcut("check"),
+    ),
     vscode.commands.registerCommand("secretGuard.scanDocument", async () => {
       const editor = vscode.window.activeTextEditor ?? lastEditor;
       if (editor === undefined || editor.document.isClosed) {
@@ -719,7 +824,7 @@ export async function activate(
     vscode.commands.registerCommand("secretGuard.enableHook", async () => {
       closeStatusControls();
       try {
-        await manager.enable(configuredWarnMode());
+        await manager.enable(configuredMode());
         modeApplicationFailed = false;
         await refreshUi();
         await offerCodexFinalization();
@@ -745,11 +850,7 @@ export async function activate(
       }
     }),
     vscode.workspace.onDidChangeConfiguration(async (event) => {
-      if (
-        !event.affectsConfiguration("secretGuard.hook.warnMode") &&
-        !event.affectsConfiguration("secretGuard.mode")
-      )
-        return;
+      if (!event.affectsConfiguration("secretGuard.mode")) return;
       modeUpdate = modeUpdate.then(async () => {
         gateway?.record({
           kind: "mode_changed",
@@ -759,12 +860,13 @@ export async function activate(
           findings: 0,
         });
         try {
-          const health =
-            await manager.refreshIfConfigured(configuredWarnMode());
+          await syncObserveWindow();
+          const health = await manager.refreshIfConfigured(configuredMode());
           if (health.state === "degraded") throw new Error("mode_not_applied");
           modeApplicationFailed = false;
+          const until = observeUntil();
           void vscode.window.showInformationMessage(
-            `${modeLabel(configuredMode())} · Réglage enregistré. Ouvrez une nouvelle session de votre assistant pour utiliser les hooks actualisés.`,
+            `${modeLabel(configuredMode())}${until === undefined ? "" : ` jusqu’à ${until}, puis retour automatique à Expurger`} · Réglage enregistré. Ouvrez une nouvelle session de votre assistant pour utiliser les hooks actualisés.`,
           );
         } catch {
           modeApplicationFailed = true;

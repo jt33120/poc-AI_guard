@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { HookHealth } from "../../packages/vscode/src/hook-manager.js";
 import {
+  CHECK_CLIPBOARD_COMMAND,
   PURGE_CLIPBOARD_COMMAND,
   statusBarClickCommand,
   statusTooltipMarkdown,
@@ -44,7 +45,7 @@ function render(overrides: Partial<StatusTooltipInput> = {}): string {
   return statusTooltipMarkdown({
     appearance: "dark",
     health: healthy,
-    warnMode: "block",
+    mode: "block",
     ...overrides,
   });
 }
@@ -88,9 +89,10 @@ function linkFor(markdown: string, alt: string): string | undefined {
 }
 
 describe("status bar tooltip controls", () => {
-  it("opens the compact controls on click outside Expurger", () => {
-    for (const mode of ["block", "observe", "allow"] as const)
-      expect(statusBarClickCommand(mode)).toBe("workbench.action.showHover");
+  it("checks the clipboard on click outside Expurger", () => {
+    for (const mode of ["block", "observe"] as const)
+      expect(statusBarClickCommand(mode)).toBe(CHECK_CLIPBOARD_COMMAND);
+    expect(STATUS_TOOLTIP_COMMANDS).toContain(CHECK_CLIPBOARD_COMMAND);
   });
 
   it("purges the clipboard on click in Expurger", () => {
@@ -99,7 +101,7 @@ describe("status bar tooltip controls", () => {
   });
 
   it("puts the purge first in Expurger and names the click shortcut", () => {
-    const markdown = render({ warnMode: "redact" });
+    const markdown = render({ mode: "redact" });
     expect(linkFor(markdown, "Expurger le presse-papiers")).toBe(
       PURGE_CLIPBOARD_COMMAND,
     );
@@ -119,7 +121,7 @@ describe("status bar tooltip controls", () => {
   });
 
   it("marks the active level and links the other level tiles", () => {
-    const markdown = render({ warnMode: "observe" });
+    const markdown = render({ mode: "observe" });
     expect(alts(markdown)).toContain("Niveau Avertir (actif)");
     expect(linkFor(markdown, "Niveau Avertir (actif)")).toBeUndefined();
     expect(modeLinks(markdown)).toEqual(["redact", "block"]);
@@ -130,26 +132,24 @@ describe("status bar tooltip controls", () => {
     expect(card?.svg).toContain("Transmet le texte original");
   });
 
-  it("offers every level and a one-click fix for the legacy permissive setting", () => {
-    const markdown = render({ warnMode: "allow" });
-    expect(alts(markdown)).not.toContainEqual(
-      expect.stringContaining("(actif)"),
+  it("shows when the Avertir window ends, and only in Avertir", () => {
+    const observe = render({ mode: "observe", observeUntil: "17:42" });
+    expect(observe).toContain(
+      "Avertir jusqu’à 17:42, puis retour automatique à Expurger.",
     );
-    expect(markdown).toContain("Ancien réglage permissif");
-    expect(modeLinks(markdown)).toEqual([
-      "observe",
-      "redact",
-      "block",
-      "redact",
-    ]);
-    expect(linkFor(markdown, "Appliquer Expurger")).toBe(
-      `secretGuard.setMode?${encodeURIComponent('["redact"]')}`,
+    const card = pictures(observe).find((picture) =>
+      picture.alt.startsWith("Avertir et laisser passer."),
     );
+    expect(card?.alt).toContain("Durée : 1 heure, puis retour à Expurger");
+    expect(render({ mode: "redact", observeUntil: "17:42" })).not.toContain(
+      "Avertir jusqu’à",
+    );
+    expect(render()).not.toContain("réglage permissif");
   });
 
   it("follows the color theme kind for drawn controls", () => {
     const card = (appearance: "dark" | "light"): string =>
-      pictures(render({ warnMode: "redact", appearance })).find((picture) =>
+      pictures(render({ mode: "redact", appearance })).find((picture) =>
         picture.alt.startsWith("Expurger."),
       )!.svg;
     expect(card("dark")).toContain("#4daafc");
@@ -178,8 +178,11 @@ describe("status bar tooltip controls", () => {
         "Relais de protection",
       ]),
     );
-    expect(linkFor(markdown, "Analyser le presse-papiers")).toBe(
-      "secretGuard.scanClipboard",
+    expect(linkFor(markdown, "Vérifier le presse-papiers")).toBe(
+      CHECK_CLIPBOARD_COMMAND,
+    );
+    expect(markdown).toContain(
+      "Raccourci : un clic sur Secret Guard dans la barre d’état.",
     );
   });
 
@@ -320,7 +323,7 @@ describe("status bar tooltip controls", () => {
     for (const appearance of ["dark", "light"] as const) {
       const markdown = render({
         appearance,
-        warnMode: "observe",
+        mode: "observe",
         health: { ...healthy, state: "partial", reason: "config_invalid" },
         gateway: { state: "retrying", status: "Connexion indisponible" },
         lastScan: {
@@ -351,7 +354,7 @@ describe("status bar tooltip controls", () => {
 
   it("fills every image row to the drawn width", () => {
     const markdown = render({
-      warnMode: "redact",
+      mode: "redact",
       gateway: { state: "online", status: "Claude raccordé" },
     });
     for (const [, row] of markdown.matchAll(/^<div>(.*<img .*)<\/div>$/gmu)) {

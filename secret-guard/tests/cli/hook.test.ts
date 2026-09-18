@@ -34,16 +34,10 @@ describe("hook bridge", () => {
     expect(JSON.stringify(response)).not.toContain(fakeToken);
   });
 
-  it("preserves the legacy allow mode's strong-secret block", () => {
-    expect(
-      runHook(JSON.stringify({ prompt: fakeToken }), "allow").continue,
-    ).toBe(false);
-  });
-
   it("parses modes without treating an invalid value as permissive", () => {
     expect(parseHookMode(["--mode=observe"])).toBe("observe");
     expect(parseHookMode(["--mode=redact"])).toBe("redact");
-    expect(parseHookMode(["--warn=allow"])).toBe("allow");
+    expect(parseHookMode(["--warn=allow"])).toBe("block");
     expect(parseHookMode(["--mode=typo", "--warn=allow"])).toBe("block");
   });
 
@@ -80,7 +74,7 @@ describe("hook bridge", () => {
     expect(response).toMatchObject({ continue: false });
   });
 
-  it("can explicitly surface a warning without blocking", () => {
+  it("lets an ambiguous finding through only in observe mode", () => {
     const result = {
       decision: "WARN" as const,
       level: "MEDIUM" as const,
@@ -103,10 +97,11 @@ describe("hook bridge", () => {
         },
       ],
     };
-    expect(responseForResult(result, "allow")).toMatchObject({
+    expect(responseForResult(result, "observe")).toMatchObject({
       continue: true,
       systemMessage: expect.stringContaining("generic_secret") as string,
     });
     expect(responseForResult(result, "block").continue).toBe(false);
+    expect(responseForResult(result, "redact").continue).toBe(false);
   });
 });

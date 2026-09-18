@@ -10,7 +10,7 @@ import {
   scan,
 } from "@xsom/secret-guard-core";
 
-import { parseHookMode, runHook, type WarnMode } from "./hook.js";
+import { parseHookMode, runHook, type ProtectionMode } from "./hook.js";
 import { humanReport } from "./report.js";
 
 const MAX_STDIN_BYTES = 1_200_000;
@@ -126,17 +126,22 @@ async function scanCommand(args: readonly string[]): Promise<number> {
   return exitCode(result.decision);
 }
 
-function warnMode(args: readonly string[]): WarnMode {
+function hookMode(args: readonly string[]): ProtectionMode {
   const mode = args.find((arg) => arg.startsWith("--mode="));
   if (mode !== undefined) {
     if (!["--mode=block", "--mode=redact", "--mode=observe"].includes(mode))
       throw new UsageError("--mode must be block, redact or observe");
     return parseHookMode(args);
   }
+  // --warn=allow is kept only so older hook commands still start; it blocks.
   const option = args.find((arg) => arg.startsWith("--warn="));
-  if (option === undefined || option === "--warn=block") return "block";
-  if (option === "--warn=allow") return "allow";
-  throw new UsageError("--warn must be block or allow");
+  if (
+    option === undefined ||
+    option === "--warn=block" ||
+    option === "--warn=allow"
+  )
+    return "block";
+  throw new UsageError("--warn must be block");
 }
 
 async function hookCommand(args: readonly string[]): Promise<number> {
@@ -147,7 +152,7 @@ async function hookCommand(args: readonly string[]): Promise<number> {
   } catch {
     raw = "";
   }
-  const response = runHook(raw, warnMode(args));
+  const response = runHook(raw, hookMode(args));
   if (!response.continue) {
     process.stderr.write(
       `${response.stopReason ?? "Secret Guard blocked this prompt."}\n`,
@@ -162,7 +167,7 @@ function usage(): string {
   return [
     "Usage:",
     "  secret-guard scan [--json|--redact] [file|-]",
-    "  secret-guard hook [--mode=block|redact|observe] [--warn=block|allow (legacy)]",
+    "  secret-guard hook [--mode=block|redact|observe]",
     "",
     "Exit codes: scan uses 0 allow, 1 warn, 2 block; hook uses 0 allow or 2 block.",
   ].join("\n");

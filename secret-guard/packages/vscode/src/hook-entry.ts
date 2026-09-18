@@ -2,6 +2,7 @@ import process from "node:process";
 import { dirname } from "node:path";
 import { canDelegate, relayConnected } from "./gateway-delegation.js";
 import { beginActivity } from "./hook-activity.js";
+import { effectiveMode, readObserveDeadline } from "./observe-window.js";
 
 import { parseHookMode, runHook } from "@xsom/secret-guard-cli/hook";
 
@@ -28,7 +29,11 @@ async function check(storage: string): Promise<void> {
   } catch {
     // Empty input produces the protocol's fail-closed response.
   }
-  const mode = parseHookMode(process.argv.slice(2));
+  const mode = effectiveMode(
+    parseHookMode(process.argv.slice(2)),
+    readObserveDeadline(storage),
+    Date.now(),
+  );
   const response = runHook(rawInput, mode);
   // Prompts, their @-mentioned files and Read tool results all reach the
   // provider inside the request the relay cleans; nothing else is delegated.

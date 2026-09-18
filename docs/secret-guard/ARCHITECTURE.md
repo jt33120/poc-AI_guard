@@ -164,8 +164,11 @@ Conséquences :
   code `0` et `{ "continue": true }` sur stdout ;
 - il ne tente pas de réécrire le prompt, car aucun champ de remplacement n’est documenté pour UserPromptSubmit ;
 - un résultat WARN devient BLOCK par défaut sur cette surface, faute de protocole de confirmation avant envoi ;
-- l’option technique `warn=allow` est un opt-in qui affaiblit la protection et ne
-  constitue pas une confirmation par requête ;
+- l’ancienne option `warn=allow` a été retirée en 0.6 : un hook qui la porte
+  encore bloque comme `block` ;
+- le mode Avertir (`observe`) ne vaut qu’une heure : le hook lit l’échéance
+  écrite par l’extension à côté de lui et applique Expurger dès qu’elle manque,
+  est illisible, dépassée ou située à plus d’une heure ;
 - des tests de contrat subprocess vérifient ces sorties, mais un test
   d’interception par l’hôte reste requis avant certification ;
 - l’extension contrôle le runner par canaris locaux. Elle n’exécute pas de canari
@@ -460,12 +463,12 @@ Le résultat global prend le score maximal ; les findings ne s’additionnent pa
 Les placeholders/exemples exacts et formes bénignes reconnues sont supprimés avant
 scoring plutôt que pondérés négativement.
 
-| Niveau   | Règle initiale                   | Action UI possédée                                                   | Action hook natif                                     |
-| -------- | -------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------- |
-| LOW      | score inférieur à 25             | ALLOW                                                                | ALLOW                                                 |
-| MEDIUM   | 25–49                            | WARN ; envoi brut seulement après confirmation explicite par requête | BLOCK par défaut ; `warn=allow` est hors mode protégé |
-| HIGH     | 50–74                            | BLOCK, redaction proposée                                            | BLOCK                                                 |
-| CRITICAL | 75–100 ou règle à blocage absolu | BLOCK sans bypass ponctuel                                           | BLOCK                                                 |
+| Niveau   | Règle initiale                   | Action UI possédée                                                   | Action hook natif                             |
+| -------- | -------------------------------- | -------------------------------------------------------------------- | --------------------------------------------- |
+| LOW      | score inférieur à 25             | ALLOW                                                                | ALLOW                                         |
+| MEDIUM   | 25–49                            | WARN ; envoi brut seulement après confirmation explicite par requête | BLOCK par défaut ; `warn=allow` retiré en 0.6 |
+| HIGH     | 50–74                            | BLOCK, redaction proposée                                            | BLOCK                                         |
+| CRITICAL | 75–100 ou règle à blocage absolu | BLOCK sans bypass ponctuel                                           | BLOCK                                         |
 
 Une clé privée PEM, un token fournisseur complet ou une URL contenant user et password est au minimum HIGH. L’entropie seule ne dépasse jamais MEDIUM.
 
@@ -535,6 +538,9 @@ Preview reste conditionnel, jamais une garantie universelle.
 - participant **@secretguard**, qui constitue le prompt possédé du V0 ;
 - messages modaux et Markdown sans contenu brut ;
 - action **Copier la version redacted** ;
+- commande **Vérifier le presse-papiers**, déclenchée par un clic sur la barre
+  d’état en modes Bloquer et Avertir : elle ne modifie jamais le presse-papiers
+  et propose Expurger si la version masquée serait propre ;
 - commande **Expurger le presse-papiers**, déclenchée par un clic sur la barre
   d’état en mode Expurger : le presse-papiers n’est remplacé que par un texte
   redacted rescanné ALLOW sans détection ; sinon il reste intact et l’échec est

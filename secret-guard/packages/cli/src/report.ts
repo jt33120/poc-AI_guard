@@ -43,5 +43,5 @@ export function findingSummary(result: ScanResult): string {
 export function hookMessage(result: ScanResult): string {
   const summary = findingSummary(result);
   if (result.findings.length === 0) return summary;
-  return `🛡️ Secret Guard · Contenu à vérifier\n\n${summary}\n\nPour nettoyer le texte : copiez votre message, cliquez sur Secret Guard dans la barre de VS Code, puis sur « Analyser le presse-papiers ». Si une version nettoyée est disponible, choisissez « Copier la version expurgée », puis collez-la dans votre chat.\nLes valeurs détectées ne sont pas affichées dans ce rapport.`;
+  return `🛡️ Secret Guard · Contenu à vérifier\n\n${summary}\n\nPour nettoyer le texte : copiez votre message, cliquez sur Secret Guard dans la barre d’état de VS Code, choisissez « Expurger » dans l’alerte, puis collez la version nettoyée dans votre chat.\nLes valeurs détectées ne sont pas affichées dans ce rapport.`;
 }

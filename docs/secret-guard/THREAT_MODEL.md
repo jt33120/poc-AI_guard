@@ -369,8 +369,8 @@ Le V0 autorise uniquement :
 
 - **envoyer quand même** un WARN brut dans le participant possédé, après
   confirmation explicite pour cette requête ;
-- `warn=allow` comme option technique globale du hook, explicitement hors du mode
-  protégé parce qu’elle ne demande pas de confirmation par requête.
+- `warn=allow`, retiré en 0.6 (un hook qui le porte encore bloque), et le mode
+  Avertir, borné à une heure par le hook lui-même.
 
 Le V0 refuse :
 

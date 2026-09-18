@@ -1,4 +1,4 @@
-import type { ProtectionMode, WarnMode } from "@xsom/secret-guard-cli/hook";
+import type { ProtectionMode } from "@xsom/secret-guard-cli/hook";
 import type { Decision } from "@xsom/secret-guard-core";
 import type { HookHealth } from "./hook-manager.js";
 import { HEALTH_LABELS, HEALTH_REASONS } from "./dashboard.js";
@@ -22,13 +22,13 @@ import {
 export type { Appearance } from "./tooltip-art.js";
 
 export const PURGE_CLIPBOARD_COMMAND = "secretGuard.purgeClipboard";
+export const CHECK_CLIPBOARD_COMMAND = "secretGuard.checkClipboard";
 
-// Hovering always shows the controls. In Expurger, a click is the shortcut the
-// mode exists for: purge the clipboard, then paste straight into the prompt.
-export function statusBarClickCommand(warnMode: WarnMode): string {
-  return warnMode === "redact"
-    ? PURGE_CLIPBOARD_COMMAND
-    : "workbench.action.showHover";
+// Hovering always shows the controls; a click acts on the clipboard the
+// developer is about to paste. Expurger cleans it in place, the other modes
+// check it and offer the cleaning.
+export function statusBarClickCommand(mode: ProtectionMode): string {
+  return mode === "redact" ? PURGE_CLIPBOARD_COMMAND : CHECK_CLIPBOARD_COMMAND;
 }
 
 // VS Code hovers keep only a sanitized HTML subset: tables, a few inline tags,
@@ -42,6 +42,7 @@ export const STATUS_TOOLTIP_COMMANDS = [
   "secretGuard.enableHook",
   "secretGuard.scanClipboard",
   PURGE_CLIPBOARD_COMMAND,
+  CHECK_CLIPBOARD_COMMAND,
   "secretGuard.connectGateway",
   "secretGuard.disconnectGateway",
   "secretGuard.showDashboard",
@@ -63,7 +64,9 @@ export interface LastScan {
 export interface StatusTooltipInput {
   readonly appearance: Appearance;
   readonly health: HookHealth;
-  readonly warnMode: WarnMode;
+  readonly mode: ProtectionMode;
+  // End of the running Avertir window, already formatted for display.
+  readonly observeUntil?: string;
   readonly modeApplicationFailed?: boolean;
   readonly gateway?: {
     readonly state: GatewayState;
@@ -106,7 +109,7 @@ const TIERS: readonly ModeTier[] = [
     description: "Transmet le texte original après avertissement.",
     effects: [
       ["Envoi", "Tel quel, secrets compris"],
-      ["Signal", "Avertissement affiché, aucun nettoyage"],
+      ["Durée", "1 heure, puis retour à Expurger"],
     ],
   },
   {
@@ -158,7 +161,10 @@ const HELP = {
     "Les pièces PNG, PDF et Markdown ne sont analysées que par le relais xSOM, dans les sessions Claude. Cliquer pour raccorder ce poste.",
   purge:
     "Remplace le presse-papiers par sa version expurgée, prête à coller. Rien n’est modifié si le nettoyage n’est pas complet.",
-  purgeShortcut: "Raccourci : un clic sur Secret Guard dans la barre d’état.",
+  check:
+    "Vérifie localement le presse-papiers et propose de l’expurger si un secret s’y trouve.",
+  clipboardShortcut:
+    "Raccourci : un clic sur Secret Guard dans la barre d’état.",
 } as const;
 
 interface Target {
@@ -258,21 +264,6 @@ function readiness(input: StatusTooltipInput, gateway: Gateway): Readiness {
       },
     };
   }
-  if (input.warnMode === "allow")
-    return {
-      tone: "warn",
-      summary: "Ancien réglage permissif · ambiguïtés transmises",
-      alert: {
-        title: "Ancien réglage permissif",
-        reason: "Les détections ambiguës peuvent être transmises.",
-        action: {
-          label: "Appliquer Expurger",
-          glyph: "retry",
-          command: "secretGuard.setMode",
-          argument: "redact",
-        },
-      },
-    };
   if (gateway.state === "retrying")
     return {
       tone: "warn",
@@ -304,10 +295,10 @@ function headerBlocks(
 
 function levelBlocks(
   appearance: Appearance,
-  warnMode: WarnMode,
+  input: StatusTooltipInput,
   state: Readiness,
 ): readonly string[] {
-  const active = TIERS.find((tier) => tier.mode === warnMode);
+  const active = TIERS.find((tier) => tier.mode === input.mode);
   const tiles = TIERS.map((tier, rank) => {
     const selected = tier === active;
     const art = levelTile(appearance, { ...tier, rank }, selected);
@@ -355,6 +346,15 @@ function levelBlocks(
     ];
   }
   if (active === undefined) return blocks;
+  const window =
+    active.mode === "observe" && input.observeUntil !== undefined
+      ? [
+          smallLine(
+            `Avertir jusqu’à ${escapeHtml(input.observeUntil)}, puis retour automatique à Expurger.`,
+            TONE_COLORS.warn,
+          ),
+        ]
+      : [];
   const effects = active.effects
     .map(([name, value]) => `${name} : ${value}`)
     .join(". ");
@@ -366,6 +366,7 @@ function levelBlocks(
         `${active.title}. ${active.description} Exposition ${active.exposure}. ${effects}.`,
       ),
     ),
+    ...window,
   ];
 }
 
@@ -425,45 +426,34 @@ function attachmentsTile(appearance: Appearance, state: GatewayState): string {
   );
 }
 
+// The same action as a click on the status bar item, for discoverability.
 function clipboardBlocks(
   appearance: Appearance,
-  warnMode: WarnMode,
+  mode: ProtectionMode,
 ): readonly string[] {
-  if (warnMode !== "redact")
-    return [
-      imageRow(
-        link(
-          image(
-            wideButton(
-              appearance,
-              "Analyser le presse-papiers",
-              "clipboard",
-              "secondary",
-            ),
-            "Analyser le presse-papiers",
-          ),
-          { command: "secretGuard.scanClipboard" },
-          "Analyser localement le contenu du presse-papiers",
-        ),
-      ),
-    ];
+  const [label, command, help, variant] =
+    mode === "redact"
+      ? ([
+          "Expurger le presse-papiers",
+          PURGE_CLIPBOARD_COMMAND,
+          HELP.purge,
+          "primary",
+        ] as const)
+      : ([
+          "Vérifier le presse-papiers",
+          CHECK_CLIPBOARD_COMMAND,
+          HELP.check,
+          "secondary",
+        ] as const);
   return [
     imageRow(
       link(
-        image(
-          wideButton(
-            appearance,
-            "Expurger le presse-papiers",
-            "clipboard",
-            "primary",
-          ),
-          "Expurger le presse-papiers",
-        ),
-        { command: PURGE_CLIPBOARD_COMMAND },
-        HELP.purge,
+        image(wideButton(appearance, label, "clipboard", variant), label),
+        { command },
+        help,
       ),
     ),
-    smallLine(HELP.purgeShortcut, COLOR.dim),
+    smallLine(HELP.clipboardShortcut, COLOR.dim),
   ];
 }
 
@@ -494,7 +484,7 @@ function perimeterBlocks(
       ),
       attachmentsTile(appearance, gateway.state),
     ),
-    ...clipboardBlocks(appearance, input.warnMode),
+    ...clipboardBlocks(appearance, input.mode),
   ];
   return input.lastScan === undefined
     ? blocks
@@ -564,7 +554,7 @@ export function statusTooltipMarkdown(input: StatusTooltipInput): string {
   const state = readiness(input, gateway);
   return [
     ...headerBlocks(appearance, state),
-    ...levelBlocks(appearance, input.warnMode, state),
+    ...levelBlocks(appearance, input, state),
     ...perimeterBlocks(appearance, input, gateway),
     ...relayBlocks(appearance, gateway),
     imageRow(

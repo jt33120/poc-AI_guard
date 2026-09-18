@@ -2,9 +2,9 @@
 
 Local CLI and VS Code Preview hook process for `@xsom/secret-guard-core`, supported
 on Node.js 22.13 or newer. Normal scan and hook responses contain no detected
-value. Keep the default `--warn=block`: `--warn=allow` is a compatibility escape
-hatch without per-request confirmation and is not part of the protected V0
-policy.
+value. `--mode=block` is the default. The former `--warn=allow` escape hatch
+was removed in 0.6: it is still accepted so older hook commands start, and it
+now blocks like `--mode=block`.
 
 ```bash
 printf '%s' 'Explain this function.' | secret-guard scan --json

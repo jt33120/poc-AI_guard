@@ -69,10 +69,11 @@ describe("protection dashboard boundaries", () => {
     expect(html).toContain("Configurer la protection");
   });
 
-  it("makes the permissive policy and pending Codex approval visible", () => {
-    const html = dashboardHtml(healthy, "allow", "nonce");
-    expect(html).toContain("Mode permissif");
-    expect(html).toContain("Les détections ambiguës peuvent être transmises");
+  it("makes the time-limited Avertir policy and pending Codex approval visible", () => {
+    const html = dashboardHtml(healthy, "observe", "nonce");
+    expect(html).toContain("pendant 1 heure");
+    expect(html).toContain("repasse automatiquement en Expurger");
+    expect(html).not.toContain("Mode permissif");
     expect(html).toContain("Approbation du hook requise dans Codex");
     expect(html).toContain("Validez le blocage dans chaque assistant");
   });

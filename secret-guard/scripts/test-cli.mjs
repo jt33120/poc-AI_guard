@@ -82,15 +82,16 @@ const blockedWarning = run(
   ["hook"],
   JSON.stringify({ hook_event_name: "UserPromptSubmit", prompt: warning }),
 );
-const allowedWarning = run(
+// The removed --warn=allow escape hatch still starts, and now blocks.
+const legacyWarning = run(
   ["hook", "--warn=allow"],
   JSON.stringify({ hook_event_name: "UserPromptSubmit", prompt: warning }),
 );
-if (blockedWarning.status !== 2 || allowedWarning.status !== 0) {
+if (blockedWarning.status !== 2 || legacyWarning.status !== 2) {
   throw new Error("hook WARN policy contract failed");
 }
 if (
-  `${blockedWarning.stdout}${blockedWarning.stderr}${allowedWarning.stdout}`.includes(
+  `${blockedWarning.stdout}${blockedWarning.stderr}${legacyWarning.stdout}${legacyWarning.stderr}`.includes(
     warning,
   )
 ) {

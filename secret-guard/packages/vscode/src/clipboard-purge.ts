@@ -20,6 +20,8 @@ export interface PurgeFeedback {
   readonly text: string;
   readonly failed: boolean;
   readonly message?: string;
+  // A check found secrets that a purge would remove cleanly.
+  readonly offerPurge?: boolean;
 }
 
 /**
@@ -48,6 +50,12 @@ export function purgeClipboardText(content: string): PurgeOutcome {
   )
     return { status: "purged", content: redacted, findings };
   return { status: "failed", reason: "residual", findings };
+}
+
+function detected(count: number): string {
+  return count > 1
+    ? `${String(count)} secrets détectés`
+    : `${String(count)} secret détecté`;
 }
 
 function secrets(count: number): string {
@@ -93,5 +101,42 @@ export function purgeFeedback(outcome: PurgeOutcome): PurgeFeedback {
         failed: true,
         message: FAILURE_MESSAGES[outcome.reason],
       };
+  }
+}
+
+export const CHECK_UNAVAILABLE: PurgeFeedback = {
+  text: "$(error) Presse-papiers non vérifié",
+  failed: true,
+  message:
+    "Le presse-papiers n’a pas pu être lu. Ne le collez pas sans l’avoir vérifié.",
+};
+
+/** The same outcome, reported by a check that leaves the clipboard as is. */
+export function checkFeedback(outcome: PurgeOutcome): PurgeFeedback {
+  switch (outcome.status) {
+    case "empty":
+    case "clean":
+      return purgeFeedback(outcome);
+    case "purged":
+      return {
+        text: `$(warning) Presse-papiers · ${detected(outcome.findings)}`,
+        failed: true,
+        message: `Le presse-papiers contient ${detected(outcome.findings)}. Ne le collez pas tel quel : Expurger le remplace par une version masquée.`,
+        offerPurge: true,
+      };
+    case "failed":
+      return outcome.reason === "incomplete"
+        ? {
+            text: "$(error) Presse-papiers non vérifié en entier",
+            failed: true,
+            message:
+              "Secret Guard n’a pas pu analyser tout le presse-papiers (plus de 1 Mio ou texte illisible). Ne le collez pas tel quel.",
+          }
+        : {
+            text: `$(warning) Presse-papiers · ${detected(outcome.findings)}`,
+            failed: true,
+            message:
+              "Le presse-papiers contient un secret que Secret Guard ne sait pas masquer. Retirez la valeur à la main avant de le coller.",
+          };
   }
 }

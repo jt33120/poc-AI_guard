@@ -110,10 +110,10 @@ describe("transactional hook lifecycle", () => {
       expect((await stat(configPath)).mode & 0o777).toBe(0o600);
     }
 
-    await expect(manager.refreshIfConfigured("allow")).resolves.toMatchObject({
+    await expect(manager.refreshIfConfigured("redact")).resolves.toMatchObject({
       state: "active",
     });
-    expect(await readFile(configPath, "utf8")).toContain("--warn=allow");
+    expect(await readFile(configPath, "utf8")).toContain("--mode=redact");
 
     await manager.disable();
     await manager.disable();

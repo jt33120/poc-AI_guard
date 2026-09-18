@@ -15,7 +15,10 @@ import process from "node:process";
 
 import type * as vscode from "vscode";
 
-import { hookModeArgument, type WarnMode } from "@xsom/secret-guard-cli/hook";
+import {
+  hookModeArgument,
+  type ProtectionMode,
+} from "@xsom/secret-guard-cli/hook";
 
 import { QUIET_ACTIVITY_ENV } from "./hook-activity.js";
 import {
@@ -152,7 +155,7 @@ function executeHook(
   executable: string,
   hookPath: string,
   input: string,
-  mode: WarnMode,
+  mode: ProtectionMode,
 ): Promise<HookExecution> {
   return new Promise((resolve) => {
     const child = spawn(executable, [hookPath, hookModeArgument(mode)], {
@@ -214,7 +217,7 @@ const SECRET_CANARY_TEXT = `Review candidate ${SYNTHETIC_CANARY}`;
 async function verifyContract(
   executable: string,
   hookPath: string,
-  mode: WarnMode,
+  mode: ProtectionMode,
   cleanInput: string,
   secretInput: string,
 ): Promise<boolean> {
@@ -268,7 +271,7 @@ async function verifyContract(
 export function verifyHookCanary(
   executable: string,
   hookPath: string,
-  mode: WarnMode = "block",
+  mode: ProtectionMode = "block",
 ): Promise<boolean> {
   return verifyContract(
     executable,
@@ -282,7 +285,7 @@ export function verifyHookCanary(
 export async function verifyFileReadCanary(
   executable: string,
   hookPath: string,
-  mode: WarnMode = "block",
+  mode: ProtectionMode = "block",
 ): Promise<boolean> {
   const directory = await mkdtemp(join(tmpdir(), "secret-guard-canary-"));
   try {
@@ -306,7 +309,7 @@ async function verifyCanaries(
   executable: string,
   hookPath: string,
   hosts: readonly HostDefinition[],
-  mode: WarnMode,
+  mode: ProtectionMode,
 ): Promise<boolean> {
   const checks = [verifyHookCanary(executable, hookPath, mode)];
   if (hosts.some((host) => host.guardsFileReads === true))
@@ -391,7 +394,7 @@ export class HookManager {
     return (await this.getHealth()).state === "active";
   }
 
-  public async enable(warnMode: WarnMode): Promise<HookHealth> {
+  public async enable(mode: ProtectionMode): Promise<HookHealth> {
     const previousConfigs = await Promise.all(
       this.hosts.map(async (host) => ({
         host,
@@ -405,7 +408,7 @@ export class HookManager {
         host,
         this.executable,
         this.installedHook,
-        warnMode,
+        mode,
       ),
     }));
     const previousHook = await readOptionalBytes(this.installedHook);
@@ -413,9 +416,7 @@ export class HookManager {
     await mkdir(dirname(this.installedHook), { recursive: true });
     await rm(candidate, { force: true });
     await copyFile(this.bundledHook, candidate);
-    if (
-      !(await verifyCanaries(this.executable, candidate, this.hosts, warnMode))
-    ) {
+    if (!(await verifyCanaries(this.executable, candidate, this.hosts, mode))) {
       await rm(candidate, { force: true });
       throw new Error("hook_canary_failed");
     }
@@ -440,12 +441,12 @@ export class HookManager {
     return this.getHealth();
   }
 
-  public async refreshIfConfigured(warnMode: WarnMode): Promise<HookHealth> {
+  public async refreshIfConfigured(mode: ProtectionMode): Promise<HookHealth> {
     const states = await this.configStates();
     if (states.every(({ state }) => state === "off")) return this.getHealth();
     if (states.some(({ state }) => state === "degraded"))
       return this.getHealth();
-    return this.enable(warnMode);
+    return this.enable(mode);
   }
 
   public async disable(): Promise<void> {

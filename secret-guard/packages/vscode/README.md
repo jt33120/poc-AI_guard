@@ -58,7 +58,7 @@ installation.
 | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 🔒 Bloquer (défaut)          | Arrête l’envoi en cas de secret détecté, de contenu ambigu ou d’analyse incomplète.                                                                             |
 | 🧹 Expurger                  | Dans `@secretguard`, masque les secrets puis rescane avant l’envoi. Dans les autres chats, arrête l’envoi ; un clic sur Secret Guard expurge le presse-papiers. |
-| 👁️ Avertir et laisser passer | Signale les détections et transmet le texte original, secrets compris, sans nettoyage.                                                                          |
+| 👁️ Avertir et laisser passer | Signale les détections et transmet le texte original, secrets compris, sans nettoyage. Dure 1 heure, puis retour automatique à Expurger.                        |
 
 En mode **Expurger**, un clic sur **Secret Guard** dans la barre d’état expurge
 le presse-papiers : copiez votre message, cliquez, puis collez directement dans
@@ -66,9 +66,14 @@ votre chat. La barre d’état confirme le résultat pendant quelques secondes
 (« Presse-papiers expurgé · 2 secrets masqués », « aucun secret » ou, en rouge,
 « non expurgé »). Le presse-papiers n’est remplacé que si la version expurgée
 est rescannée sans détection ; sinon il reste intact et une alerte explique
-pourquoi. Dans les modes Bloquer et Avertir, le clic ouvre le panneau de contrôle,
-dont **Analyser le presse-papiers** propose une copie expurgée si elle existe.
+pourquoi. Dans les modes Bloquer et Avertir, le même clic vérifie le
+presse-papiers sans le modifier ; si un secret s’y trouve, l’alerte propose
+**Expurger**. Le survol ouvre toujours le panneau de contrôle.
 Les hooks natifs actuels ne remplacent pas le prompt original par une copie nettoyée.
+
+**Avertir** est limité à 1 heure : VS Code demande confirmation à l’activation,
+affiche l’heure de fin dans la barre d’état, puis repasse en Expurger. Le hook
+applique lui-même cette limite, même si VS Code est fermé entre-temps.
 
 Après un changement de mode, ouvrez une nouvelle session de votre assistant.
 Codex peut demander de valider le hook actualisé. Le mode Avertir ne bloque pas
@@ -128,6 +133,7 @@ enforcement requires managed/system configuration.
 `secretGuard.mode` controls blocking, redaction, or observation. A redacted send
 is valid only when the exact redacted content rescans to ALLOW. Native hooks
 cannot replace the prompt and therefore block sensitive content in redact mode.
-The deprecated `hook.warnMode=allow` still allows only WARN findings until an
-explicit new mode is selected. Observe mode permits original text with findings
-or an incomplete analysis; malformed hook envelopes remain refused.
+The former `hook.warnMode=allow` setting was removed in 0.6: hooks written with
+it now block like `block`. Observe mode permits original text with findings or
+an incomplete analysis for one hour, after which the hook itself applies redact
+mode; malformed hook envelopes remain refused.

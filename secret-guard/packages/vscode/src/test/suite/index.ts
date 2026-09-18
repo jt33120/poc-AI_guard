@@ -28,6 +28,7 @@ function registerTests(mocha: Mocha): void {
         "secretGuard.scanSelection",
         "secretGuard.scanClipboard",
         "secretGuard.purgeClipboard",
+        "secretGuard.checkClipboard",
         "secretGuard.scanDocument",
         "secretGuard.enableHook",
         "secretGuard.finishCodexSetup",
@@ -52,8 +53,9 @@ function registerTests(mocha: Mocha): void {
         );
         await vscode.commands.executeCommand("secretGuard.setMode", "typo");
         assert.equal(config().inspect("mode")?.globalValue, undefined);
-        await vscode.commands.executeCommand("secretGuard.setMode", "observe");
-        assert.equal(config().inspect("mode")?.globalValue, "observe");
+        // Avertir asks for a modal confirmation, so Expurger stands in here.
+        await vscode.commands.executeCommand("secretGuard.setMode", "redact");
+        assert.equal(config().inspect("mode")?.globalValue, "redact");
         await config().update(
           "mode",
           undefined,
@@ -80,6 +82,14 @@ function registerTests(mocha: Mocha): void {
         assert.equal(
           await vscode.env.clipboard.readText(),
           "explain this function",
+        );
+
+        // A check reports the secret but never rewrites the clipboard.
+        await vscode.env.clipboard.writeText(`deploy with ${canary}`);
+        await vscode.commands.executeCommand("secretGuard.checkClipboard");
+        assert.equal(
+          await vscode.env.clipboard.readText(),
+          `deploy with ${canary}`,
         );
       },
     ),
