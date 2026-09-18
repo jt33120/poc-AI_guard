@@ -65,7 +65,7 @@ export const GUARD_HOME_COPY = {
     platformNote: "La console et les parcours d’intégration s’explorent en libre-service. La passerelle contraignante demande une installation, à préparer avec xSOM.",
     platformShotAlt: "La console AI Guard : registre des outils, règle effective pour l’outil choisi, et le récit d’un appel jusqu’à sa trace.",
     platformShotCaption: "La console d’inspection, avec des données de démonstration.",
-    glossaryTitle: "Mettre des mots sur les risques.", glossaryBody: "Injection de prompt, fuite de données, empoisonnement… Des définitions claires et des exemples concrets.", glossaryAction: "Ouvrir le glossaire des menaces IA",
+    glossaryTitle: "Mettre des mots sur les risques.", glossaryBody: "Injection de prompt, fuite de secrets, empoisonnement… Chaque menace avec son attaque type, sa parade, les outils libres et ce que couvre AI Guard.", glossaryAction: "Ouvrir le glossaire des menaces IA",
   },
   en: {
     navProducts: "Our products", navGlossary: "AI cyber threats",
@@ -128,7 +128,7 @@ export const GUARD_HOME_COPY = {
     platformNote: "The console and the integration paths are self-serve. The binding gateway takes an install, to plan with xSOM.",
     platformShotAlt: "The AI Guard console: the tool registry, the effective rule for the selected tool, and one call told through to its trace.",
     platformShotCaption: "The inspection console, with demonstration data.",
-    glossaryTitle: "Put a name to the risks.", glossaryBody: "Prompt injection, data leaks, poisoning… Clear definitions with concrete examples.", glossaryAction: "Open the AI threat glossary",
+    glossaryTitle: "Put a name to the risks.", glossaryBody: "Prompt injection, secret leakage, poisoning… Each threat with its typical attack, its mitigation, open-source tools and what AI Guard covers.", glossaryAction: "Open the AI threat glossary",
   },
 } as const;
 

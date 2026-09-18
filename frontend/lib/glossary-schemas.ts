@@ -4,8 +4,8 @@
  * Les figures du dépôt vivent dans `lib/schemas.ts`, indexées par **rang de menace** :
  * le garde y refuse toute clé qui ne soit pas un rang du classement, et une figure sans
  * menace en face y est du balisage relu et payé pour rien. Le glossaire, lui, est indexé
- * par **identifiant de fiche** et n'en retient que huit, choisies pour ce qu'elles
- * apprennent. Une figure écrite pour une fiche n'a donc pas de place dans `schemas.ts`,
+ * par **identifiant de fiche**, et ses fiches ne recoupent pas le classement une à une.
+ * Une figure écrite pour une fiche n'a donc pas de place dans `schemas.ts`,
  * et c'est la seule raison de ce fichier : même grammaire, même garde
  * — `tests/test_schemas_menaces.py` lit les deux — mais un autre index.
  *
