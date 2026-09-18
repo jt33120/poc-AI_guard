@@ -39,6 +39,7 @@
     "onCommand:secretGuard.chooseMode",
     "onCommand:secretGuard.scanSelection",
     "onCommand:secretGuard.scanClipboard",
+    "onCommand:secretGuard.purgeClipboard",
     "onCommand:secretGuard.scanDocument",
     "onCommand:secretGuard.enableHook",
     "onCommand:secretGuard.finishCodexSetup",
@@ -130,6 +131,11 @@
         "icon": "$(clippy)"
       },
       {
+        "command": "secretGuard.purgeClipboard",
+        "title": "Secret Guard: Expurger le presse-papiers",
+        "icon": "$(sparkle)"
+      },
+      {
         "command": "secretGuard.scanDocument",
         "title": "Secret Guard: Scanner le document ouvert",
         "icon": "$(file-text)"
@@ -183,7 +189,7 @@
           ],
           "enumDescriptions": [
             "Bloque les messages avec des secrets détectés, les détections ambiguës et les analyses incomplètes.",
-            "Nettoie automatiquement dans @secretguard et les sessions Claude raccordées à la passerelle xSOM. Sans passerelle, bloque puis propose un nettoyage via le presse-papiers.",
+            "Nettoie automatiquement dans @secretguard et les sessions Claude raccordées à la passerelle xSOM. Sans passerelle, bloque ; un clic sur Secret Guard dans la barre d’état expurge alors le presse-papiers, prêt à coller.",
             "Avertit et laisse passer le texte original, même avec des secrets. Aucun nettoyage."
           ],
           "default": "block",

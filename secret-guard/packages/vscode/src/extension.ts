@@ -41,12 +41,20 @@ import {
   PROTECTION_MODES,
 } from "./protection-mode.js";
 import {
-  STATUS_BAR_CLICK_COMMAND,
+  PURGE_CLIPBOARD_COMMAND,
+  statusBarClickCommand,
   statusTooltipMarkdown,
   STATUS_TOOLTIP_COMMANDS,
   type Appearance,
   type LastScan,
 } from "./status-tooltip.js";
+import {
+  purgeClipboardText,
+  purgeFeedback,
+  PURGE_UNAVAILABLE,
+  type PurgeFeedback,
+  type PurgeOutcome,
+} from "./clipboard-purge.js";
 
 const FINISH_CODEX_SETUP = "Finaliser Codex";
 let gateway: GatewayIntegration | undefined;
@@ -115,10 +123,7 @@ async function presentScan(
     decision: result.decision,
     findings: result.findings.length,
     complete: result.complete,
-    time: new Date().toLocaleTimeString("fr-FR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
+    time: scanTime(),
   };
   await onScanned();
   gateway?.record({
@@ -331,6 +336,49 @@ async function saveMode(mode: ProtectionMode): Promise<void> {
     .update("mode", mode, vscode.ConfigurationTarget.Global);
 }
 
+function scanTime(): string {
+  return new Date().toLocaleTimeString("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+const PURGE_AUDIT_OUTCOMES = {
+  clean: "clean",
+  purged: "redacted",
+  failed: "blocked",
+} as const;
+
+// The clipboard is rewritten only with a sanitized text that rescanned clean.
+async function purgeClipboard(): Promise<PurgeFeedback> {
+  const outcome: PurgeOutcome = purgeClipboardText(
+    await vscode.env.clipboard.readText(),
+  );
+  if (outcome.status === "purged")
+    await vscode.env.clipboard.writeText(outcome.content);
+  if (outcome.status !== "empty") {
+    const findings = outcome.status === "clean" ? 0 : outcome.findings;
+    lastScan = {
+      source: "clipboard",
+      decision: outcome.status === "clean" ? "ALLOW" : "BLOCK",
+      findings,
+      complete: !(
+        outcome.status === "failed" && outcome.reason === "incomplete"
+      ),
+      purged: outcome.status === "purged",
+      time: scanTime(),
+    };
+    gateway?.record({
+      kind: "scan",
+      assistant: "manual",
+      mode: configuredMode(),
+      outcome: PURGE_AUDIT_OUTCOMES[outcome.status],
+      findings,
+    });
+  }
+  return purgeFeedback(outcome);
+}
+
 function tooltipAppearance(kind: vscode.ColorThemeKind): Appearance {
   return kind === vscode.ColorThemeKind.Light ||
     kind === vscode.ColorThemeKind.HighContrastLight
@@ -340,7 +388,12 @@ function tooltipAppearance(kind: vscode.ColorThemeKind): Appearance {
 
 // The status text outside checks, and whether a hook is checking right now.
 let idleStatusText = "$(shield) Secret Guard";
+let idleBackground: vscode.ThemeColor | undefined;
 let checkRunning = false;
+// A purge result shown in place of the status text for a few seconds, where
+// the developer just clicked.
+let flash: PurgeFeedback | undefined;
+const FLASH_MS = 4000;
 // VS Code spins only a few built-in codicons, so the xSOM mark turns through
 // pre-rotated glyphs of media/xsom-icons.ttf (a third of a turn per cycle).
 const SPINNER_FRAMES = 6;
@@ -348,9 +401,16 @@ const SPINNER_FRAME_MS = 90;
 let spinnerFrame = 0;
 
 function showStatusText(item: vscode.StatusBarItem): void {
-  item.text = checkRunning
-    ? `$(xsom-mark-${String(spinnerFrame)}) Secret Guard : vérification…`
-    : idleStatusText;
+  if (checkRunning) {
+    item.text = `$(xsom-mark-${String(spinnerFrame)}) Secret Guard : vérification…`;
+    item.backgroundColor = idleBackground;
+    return;
+  }
+  item.text = flash?.text ?? idleStatusText;
+  item.backgroundColor =
+    flash?.failed === true
+      ? new vscode.ThemeColor("statusBarItem.errorBackground")
+      : idleBackground;
 }
 
 async function updateStatus(
@@ -364,37 +424,32 @@ async function updateStatus(
   } catch {
     health = { state: "degraded", reason: "canary_failed", hosts: [] };
   }
+  const warnMode = configuredWarnMode();
+  const warning = new vscode.ThemeColor("statusBarItem.warningBackground");
   item.name = "Secret Guard · Protection des prompts";
-  item.command = STATUS_BAR_CLICK_COMMAND;
-  item.backgroundColor = undefined;
+  item.command = statusBarClickCommand(warnMode);
+  idleBackground = undefined;
   if (health.state === "active") {
-    idleStatusText = `$(shield) Secret Guard : ${configuredWarnMode() === "allow" ? "réglage permissif" : modeShortLabel(configuredMode())}`;
-    if (configuredMode() === "observe")
-      item.backgroundColor = new vscode.ThemeColor(
-        "statusBarItem.warningBackground",
-      );
+    idleStatusText = `$(shield) Secret Guard : ${warnMode === "allow" ? "réglage permissif" : modeShortLabel(configuredMode())}`;
+    if (configuredMode() === "observe") idleBackground = warning;
   } else if (health.state === "partial") {
     idleStatusText = "$(shield) Secret Guard : à compléter";
   } else if (health.state === "degraded") {
     idleStatusText = "$(warning) Secret Guard : à vérifier";
-    item.backgroundColor = new vscode.ThemeColor(
-      "statusBarItem.warningBackground",
-    );
+    idleBackground = warning;
   } else {
     idleStatusText = "$(shield) Secret Guard : désactivé";
   }
   if (modeApplicationFailed) {
     idleStatusText = "$(warning) Secret Guard : niveau non appliqué";
-    item.backgroundColor = new vscode.ThemeColor(
-      "statusBarItem.warningBackground",
-    );
+    idleBackground = warning;
   }
   showStatusText(item);
   const tooltip = new vscode.MarkdownString(
     statusTooltipMarkdown({
       appearance: tooltipAppearance(vscode.window.activeColorTheme.kind),
       health,
-      warnMode: configuredWarnMode(),
+      warnMode,
       modeApplicationFailed,
       ...(gateway === undefined
         ? {}
@@ -413,7 +468,7 @@ async function updateStatus(
   tooltip.isTrusted = { enabledCommands: STATUS_TOOLTIP_COMMANDS };
   item.tooltip = tooltip;
   item.accessibilityInformation = {
-    label: `Secret Guard : ${HEALTH_LABELS[health.state]}. Ouvrir les contrôles.`,
+    label: `Secret Guard : ${HEALTH_LABELS[health.state]}. ${warnMode === "redact" ? "Expurger le presse-papiers." : "Ouvrir les contrôles."}`,
   };
   item.show();
   return health;
@@ -437,6 +492,17 @@ export async function activate(
     if (spinner !== undefined) clearInterval(spinner);
     spinner = undefined;
   };
+  let flashTimer: ReturnType<typeof setTimeout> | undefined;
+  const showFlash = (feedback: PurgeFeedback): void => {
+    if (flashTimer !== undefined) clearTimeout(flashTimer);
+    flash = feedback;
+    showStatusText(status);
+    flashTimer = setTimeout(() => {
+      flash = undefined;
+      flashTimer = undefined;
+      showStatusText(status);
+    }, FLASH_MS);
+  };
   context.subscriptions.push(
     status,
     new ActivityMonitor(context.globalStorageUri.fsPath, (running) => {
@@ -454,6 +520,11 @@ export async function activate(
       showStatusText(status);
     }),
     { dispose: stopSpinner },
+    {
+      dispose: () => {
+        if (flashTimer !== undefined) clearTimeout(flashTimer);
+      },
+    },
   );
   // An open status bar hover is a snapshot VS Code never refreshes. Re-adding
   // the item detaches the hover's target, which closes it, so acting from the
@@ -610,6 +681,20 @@ export async function activate(
         },
         refreshUi,
       );
+    }),
+    vscode.commands.registerCommand(PURGE_CLIPBOARD_COMMAND, async () => {
+      closeStatusControls();
+      let feedback: PurgeFeedback;
+      try {
+        feedback = await purgeClipboard();
+      } catch {
+        feedback = PURGE_UNAVAILABLE;
+      }
+      // Feedback first: the developer is on the way to the prompt box.
+      showFlash(feedback);
+      if (feedback.message !== undefined)
+        void vscode.window.showErrorMessage(feedback.message);
+      await refreshUi();
     }),
     vscode.commands.registerCommand("secretGuard.scanDocument", async () => {
       const editor = vscode.window.activeTextEditor ?? lastEditor;

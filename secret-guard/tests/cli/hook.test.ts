@@ -25,8 +25,12 @@ describe("hook bridge", () => {
       "redact",
     );
     expect(response.continue).toBe(false);
-    expect(response.stopReason).toContain("ne permet pas");
-    expect(response.stopReason).toContain("presse-papiers");
+    expect(response.stopReason).toContain("Message non envoyé");
+    expect(response.stopReason).toContain("line 1");
+    expect(response.stopReason).toContain(
+      "cliquez sur Secret Guard dans la barre d’état",
+    );
+    expect(response.stopReason).not.toContain("Analyser le presse-papiers");
     expect(JSON.stringify(response)).not.toContain(fakeToken);
   });
 

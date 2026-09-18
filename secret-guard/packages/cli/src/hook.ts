@@ -10,7 +10,7 @@ import {
   type FileReader,
   type FileText,
 } from "./file-guard.js";
-import { hookMessage } from "./report.js";
+import { findingSummary, hookMessage } from "./report.js";
 
 export type ProtectionMode = "block" | "redact" | "observe";
 // "allow" preserves the older policy: only ambiguous findings may pass.
@@ -186,7 +186,7 @@ export function responseForResult(
   }
   if (warnMode === "redact") {
     return block(
-      `🧹 Secret Guard · Nettoyage nécessaire\nCet assistant ne permet pas à Secret Guard de remplacer votre message automatiquement. Copiez votre message, puis cliquez sur Secret Guard → Vérifier le presse-papiers → Copier la version expurgée. Collez cette version et renvoyez-la.\n${message}`,
+      `🧹 Secret Guard · Message non envoyé\n${findingSummary(result)}\nCopiez votre message puis cliquez sur Secret Guard dans la barre d’état de VS Code : le presse-papiers est expurgé. Collez-le (Ctrl+V) et renvoyez.\nLes valeurs détectées ne sont pas affichées.`,
     );
   }
   if (result.decision === "WARN" && result.complete && warnMode === "allow") {

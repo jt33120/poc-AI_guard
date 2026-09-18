@@ -18,7 +18,7 @@ export const PROTECTION_MODES: ReadonlyArray<{
     label: "🧹 Expurger",
     description: "Masquer les secrets avant de partager.",
     detail:
-      "Automatique dans @secretguard et dans les sessions Claude raccordées à xSOM. Sans passerelle, dans les autres chats : envoi arrêté, puis nettoyage via le presse-papiers.",
+      "Automatique dans @secretguard et dans les sessions Claude raccordées à xSOM. Ailleurs : envoi arrêté, puis un clic sur Secret Guard dans la barre d’état expurge le presse-papiers.",
   },
   {
     mode: "observe",

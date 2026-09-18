@@ -27,6 +27,7 @@ function registerTests(mocha: Mocha): void {
         "secretGuard.disconnectGateway",
         "secretGuard.scanSelection",
         "secretGuard.scanClipboard",
+        "secretGuard.purgeClipboard",
         "secretGuard.scanDocument",
         "secretGuard.enableHook",
         "secretGuard.finishCodexSetup",
@@ -57,6 +58,28 @@ function registerTests(mocha: Mocha): void {
           "mode",
           undefined,
           vscode.ConfigurationTarget.Global,
+        );
+      },
+    ),
+  );
+
+  extensionSuite.addTest(
+    new Mocha.Test(
+      "purges the clipboard in place and leaves a clean one untouched",
+      async () => {
+        // Assembled at run time so the dogfood scan of this file stays clean.
+        const canary = ["ghp", "aB3d".repeat(9)].join("_");
+        await vscode.env.clipboard.writeText(`deploy with ${canary}`);
+        await vscode.commands.executeCommand("secretGuard.purgeClipboard");
+        const purged = await vscode.env.clipboard.readText();
+        assert.ok(purged.startsWith("deploy with "), "context is kept");
+        assert.ok(!purged.includes(canary), "the secret is gone");
+
+        await vscode.env.clipboard.writeText("explain this function");
+        await vscode.commands.executeCommand("secretGuard.purgeClipboard");
+        assert.equal(
+          await vscode.env.clipboard.readText(),
+          "explain this function",
         );
       },
     ),

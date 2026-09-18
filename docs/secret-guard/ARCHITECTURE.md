@@ -535,6 +535,10 @@ Preview reste conditionnel, jamais une garantie universelle.
 - participant **@secretguard**, qui constitue le prompt possédé du V0 ;
 - messages modaux et Markdown sans contenu brut ;
 - action **Copier la version redacted** ;
+- commande **Expurger le presse-papiers**, déclenchée par un clic sur la barre
+  d’état en mode Expurger : le presse-papiers n’est remplacé que par un texte
+  redacted rescanné ALLOW sans détection ; sinon il reste intact et l’échec est
+  signalé ;
 - commandes explicites d’installation et de retrait du hook ;
 - barre de statut à quatre états fondés sur la configuration gérée, son intégrité
   et le canari local.

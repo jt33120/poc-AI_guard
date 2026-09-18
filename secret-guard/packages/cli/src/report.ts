@@ -26,7 +26,8 @@ export function humanReport(result: ScanResult): string {
   return [heading, ...findings].join("\n");
 }
 
-export function hookMessage(result: ScanResult): string {
+/** One line saying what was found and where, never the value. */
+export function findingSummary(result: ScanResult): string {
   const first = result.findings[0];
   if (first === undefined) {
     return result.complete
@@ -36,5 +37,11 @@ export function hookMessage(result: ScanResult): string {
   const { line, column } = first.span.start;
   const extra =
     result.findings.length > 1 ? ` and ${result.findings.length - 1} more` : "";
-  return `🛡️ Secret Guard · Contenu à vérifier\n\nSecret Guard detected ${first.secretType} at line ${line}, column ${column}${extra}.\n\nPour nettoyer le texte : copiez votre message, cliquez sur Secret Guard dans la barre de VS Code, puis sur « Vérifier le presse-papiers ». Si une version nettoyée est disponible, choisissez « Copier la version expurgée », puis collez-la dans votre chat.\nLes valeurs détectées ne sont pas affichées dans ce rapport.`;
+  return `Secret Guard detected ${first.secretType} at line ${line}, column ${column}${extra}.`;
+}
+
+export function hookMessage(result: ScanResult): string {
+  const summary = findingSummary(result);
+  if (result.findings.length === 0) return summary;
+  return `🛡️ Secret Guard · Contenu à vérifier\n\n${summary}\n\nPour nettoyer le texte : copiez votre message, cliquez sur Secret Guard dans la barre de VS Code, puis sur « Analyser le presse-papiers ». Si une version nettoyée est disponible, choisissez « Copier la version expurgée », puis collez-la dans votre chat.\nLes valeurs détectées ne sont pas affichées dans ce rapport.`;
 }

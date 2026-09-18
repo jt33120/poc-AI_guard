@@ -45,7 +45,7 @@ et ne couvre pas les pièces des conversations natives Codex/Copilot.
 
 ### Choisir le comportement
 
-Cliquez sur **Secret Guard** dans la barre d’état : le panneau de contrôle permet
+Survolez **Secret Guard** dans la barre d’état : le panneau de contrôle permet
 de changer de niveau (1 Avertir, 2 Expurger, 3 Bloquer), de vérifier le
 presse-papiers ou le document, de voir le dernier résultat (métadonnées
 seulement, jamais la valeur) et de raccorder la passerelle xSOM. Le bouton
@@ -54,15 +54,20 @@ pouvez également lancer **Secret Guard → Changer de mode**, ou ouvrir les
 paramètres **Secret Guard: Mode**. Le choix est commun aux assistants de cette
 installation.
 
-| Mode                         | Comportement                                                                                                                                 |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| 🔒 Bloquer (défaut)          | Arrête l’envoi en cas de secret détecté, de contenu ambigu ou d’analyse incomplète.                                                          |
-| 🧹 Expurger                  | Dans `@secretguard`, masque les secrets puis rescane avant l’envoi. Dans les autres chats, arrête l’envoi et guide vers un nettoyage manuel. |
-| 👁️ Avertir et laisser passer | Signale les détections et transmet le texte original, secrets compris, sans nettoyage.                                                       |
+| Mode                         | Comportement                                                                                                                                                    |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🔒 Bloquer (défaut)          | Arrête l’envoi en cas de secret détecté, de contenu ambigu ou d’analyse incomplète.                                                                             |
+| 🧹 Expurger                  | Dans `@secretguard`, masque les secrets puis rescane avant l’envoi. Dans les autres chats, arrête l’envoi ; un clic sur Secret Guard expurge le presse-papiers. |
+| 👁️ Avertir et laisser passer | Signale les détections et transmet le texte original, secrets compris, sans nettoyage.                                                                          |
 
-**Vérifier le presse-papiers** est une commande VS Code, pas un skill : copiez
-votre message, lancez la commande depuis Secret Guard, choisissez **Copier la
-version expurgée** si elle est proposée, puis collez le résultat dans votre chat.
+En mode **Expurger**, un clic sur **Secret Guard** dans la barre d’état expurge
+le presse-papiers : copiez votre message, cliquez, puis collez directement dans
+votre chat. La barre d’état confirme le résultat pendant quelques secondes
+(« Presse-papiers expurgé · 2 secrets masqués », « aucun secret » ou, en rouge,
+« non expurgé »). Le presse-papiers n’est remplacé que si la version expurgée
+est rescannée sans détection ; sinon il reste intact et une alerte explique
+pourquoi. Dans les modes Bloquer et Avertir, le clic ouvre le panneau de contrôle,
+dont **Analyser le presse-papiers** propose une copie expurgée si elle existe.
 Les hooks natifs actuels ne remplacent pas le prompt original par une copie nettoyée.
 
 Après un changement de mode, ouvrez une nouvelle session de votre assistant.

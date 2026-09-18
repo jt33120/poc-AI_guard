@@ -21,7 +21,15 @@ import {
 
 export type { Appearance } from "./tooltip-art.js";
 
-export const STATUS_BAR_CLICK_COMMAND = "workbench.action.showHover";
+export const PURGE_CLIPBOARD_COMMAND = "secretGuard.purgeClipboard";
+
+// Hovering always shows the controls. In Expurger, a click is the shortcut the
+// mode exists for: purge the clipboard, then paste straight into the prompt.
+export function statusBarClickCommand(warnMode: WarnMode): string {
+  return warnMode === "redact"
+    ? PURGE_CLIPBOARD_COMMAND
+    : "workbench.action.showHover";
+}
 
 // VS Code hovers keep only a sanitized HTML subset: tables, a few inline tags,
 // <img> with data: sources and <span style> restricted to color,
@@ -33,6 +41,7 @@ export const STATUS_TOOLTIP_COMMANDS = [
   "secretGuard.setMode",
   "secretGuard.enableHook",
   "secretGuard.scanClipboard",
+  PURGE_CLIPBOARD_COMMAND,
   "secretGuard.connectGateway",
   "secretGuard.disconnectGateway",
   "secretGuard.showDashboard",
@@ -47,6 +56,7 @@ export interface LastScan {
   readonly decision: Decision;
   readonly findings: number;
   readonly complete: boolean;
+  readonly purged?: boolean;
   readonly time: string;
 }
 
@@ -109,7 +119,7 @@ const TIERS: readonly ModeTier[] = [
     description: "Masque les secrets avant de partager.",
     effects: [
       ["Envoi", "Masqué dans @secretguard et Claude raccordé"],
-      ["Ailleurs", "Arrêté, copie expurgée au presse-papiers"],
+      ["Ailleurs", "Arrêté · un clic expurge le presse-papiers"],
     ],
   },
   {
@@ -146,6 +156,9 @@ const HELP = {
     "Non couvert hors relais Claude. Les pièces natives Codex et Copilot ne sont pas interceptées.",
   attachmentsConnect:
     "Les pièces PNG, PDF et Markdown ne sont analysées que par le relais xSOM, dans les sessions Claude. Cliquer pour raccorder ce poste.",
+  purge:
+    "Remplace le presse-papiers par sa version expurgée, prête à coller. Rien n’est modifié si le nettoyage n’est pas complet.",
+  purgeShortcut: "Raccourci : un clic sur Secret Guard dans la barre d’état.",
 } as const;
 
 interface Target {
@@ -370,11 +383,13 @@ function scanLine(scan: LastScan): string {
   const count = String(scan.findings);
   const [tone, summary]: readonly [Tone, string] = !scan.complete
     ? ["warn", `${source} · analyse incomplète`]
-    : scan.decision === "ALLOW"
-      ? ["ok", `${source} · aucun secret`]
-      : scan.decision === "WARN"
-        ? ["warn", `${source} · ${count} détection(s) à vérifier`]
-        : ["danger", `${source} · ${count} secret(s) détecté(s)`];
+    : scan.purged === true
+      ? ["ok", `${source} · ${count} secret(s) masqué(s)`]
+      : scan.decision === "ALLOW"
+        ? ["ok", `${source} · aucun secret`]
+        : scan.decision === "WARN"
+          ? ["warn", `${source} · ${count} détection(s) à vérifier`]
+          : ["danger", `${source} · ${count} secret(s) détecté(s)`];
   return textLine(
     `<small>${span("●", TONE_COLORS[tone])}&nbsp;${span(`${summary} · ${escapeHtml(scan.time)}`, COLOR.dim)}</small>`,
   );
@@ -410,19 +425,55 @@ function attachmentsTile(appearance: Appearance, state: GatewayState): string {
   );
 }
 
+function clipboardBlocks(
+  appearance: Appearance,
+  warnMode: WarnMode,
+): readonly string[] {
+  if (warnMode !== "redact")
+    return [
+      imageRow(
+        link(
+          image(
+            wideButton(
+              appearance,
+              "Analyser le presse-papiers",
+              "clipboard",
+              "secondary",
+            ),
+            "Analyser le presse-papiers",
+          ),
+          { command: "secretGuard.scanClipboard" },
+          "Analyser localement le contenu du presse-papiers",
+        ),
+      ),
+    ];
+  return [
+    imageRow(
+      link(
+        image(
+          wideButton(
+            appearance,
+            "Expurger le presse-papiers",
+            "clipboard",
+            "primary",
+          ),
+          "Expurger le presse-papiers",
+        ),
+        { command: PURGE_CLIPBOARD_COMMAND },
+        HELP.purge,
+      ),
+    ),
+    smallLine(HELP.purgeShortcut, COLOR.dim),
+  ];
+}
+
 function perimeterBlocks(
   appearance: Appearance,
-  health: HookHealth,
+  input: StatusTooltipInput,
   gateway: Gateway,
-  lastScan: LastScan | undefined,
 ): readonly string[] {
   const covered = gateway.state === "online";
-  const [promptState, promptTone] = promptCoverage(health);
-  const clipboard: Action = {
-    label: "Analyser le presse-papiers",
-    glyph: "clipboard",
-    command: "secretGuard.scanClipboard",
-  };
+  const [promptState, promptTone] = promptCoverage(input.health);
   const blocks = [
     imageRow(
       image(
@@ -443,18 +494,11 @@ function perimeterBlocks(
       ),
       attachmentsTile(appearance, gateway.state),
     ),
-    imageRow(
-      link(
-        image(
-          wideButton(appearance, clipboard.label, clipboard.glyph, "secondary"),
-          clipboard.label,
-        ),
-        clipboard,
-        "Analyser localement le contenu du presse-papiers",
-      ),
-    ),
+    ...clipboardBlocks(appearance, input.warnMode),
   ];
-  return lastScan === undefined ? blocks : [...blocks, scanLine(lastScan)];
+  return input.lastScan === undefined
+    ? blocks
+    : [...blocks, scanLine(input.lastScan)];
 }
 
 function relayBlocks(
@@ -521,7 +565,7 @@ export function statusTooltipMarkdown(input: StatusTooltipInput): string {
   return [
     ...headerBlocks(appearance, state),
     ...levelBlocks(appearance, input.warnMode, state),
-    ...perimeterBlocks(appearance, input.health, gateway, input.lastScan),
+    ...perimeterBlocks(appearance, input, gateway),
     ...relayBlocks(appearance, gateway),
     imageRow(
       image(footer(appearance), "Détecteur local · Audit sans contenu · xSOM"),

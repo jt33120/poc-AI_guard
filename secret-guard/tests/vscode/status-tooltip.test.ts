@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { HookHealth } from "../../packages/vscode/src/hook-manager.js";
 import {
-  STATUS_BAR_CLICK_COMMAND,
+  PURGE_CLIPBOARD_COMMAND,
+  statusBarClickCommand,
   statusTooltipMarkdown,
   STATUS_TOOLTIP_COMMANDS,
   type StatusTooltipInput,
@@ -87,8 +88,26 @@ function linkFor(markdown: string, alt: string): string | undefined {
 }
 
 describe("status bar tooltip controls", () => {
-  it("opens the compact controls when the status bar item is clicked", () => {
-    expect(STATUS_BAR_CLICK_COMMAND).toBe("workbench.action.showHover");
+  it("opens the compact controls on click outside Expurger", () => {
+    for (const mode of ["block", "observe", "allow"] as const)
+      expect(statusBarClickCommand(mode)).toBe("workbench.action.showHover");
+  });
+
+  it("purges the clipboard on click in Expurger", () => {
+    expect(statusBarClickCommand("redact")).toBe(PURGE_CLIPBOARD_COMMAND);
+    expect(STATUS_TOOLTIP_COMMANDS).toContain(PURGE_CLIPBOARD_COMMAND);
+  });
+
+  it("puts the purge first in Expurger and names the click shortcut", () => {
+    const markdown = render({ warnMode: "redact" });
+    expect(linkFor(markdown, "Expurger le presse-papiers")).toBe(
+      PURGE_CLIPBOARD_COMMAND,
+    );
+    expect(linkedCommands(markdown)).not.toContain("secretGuard.scanClipboard");
+    expect(markdown).toContain(
+      "Raccourci : un clic sur Secret Guard dans la barre d’état.",
+    );
+    expect(linkedCommands(render())).not.toContain(PURGE_CLIPBOARD_COMMAND);
   });
 
   it("opens the dashboard from the whole banner", () => {
@@ -258,6 +277,18 @@ describe("status bar tooltip controls", () => {
         },
       }),
     ).toContain("Presse-papiers · analyse incomplète");
+    expect(
+      render({
+        lastScan: {
+          source: "clipboard",
+          decision: "BLOCK",
+          findings: 2,
+          complete: true,
+          purged: true,
+          time: "15:45",
+        },
+      }),
+    ).toContain("Presse-papiers · 2 secret(s) masqué(s) · 15:45");
   });
 
   it("escapes dynamic text, keeps it out of images and only links allowlisted commands", () => {
