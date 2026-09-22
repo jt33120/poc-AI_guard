@@ -54,7 +54,7 @@ export const GUARD_COPY = {
     title: ["La solution cyber", "pour tous vos usages IA."],
     intro: "Simple, efficace.",
     explore: "Voir les menaces",
-    signin: "Se connecter / Créer un compte",
+    signin: "Découvrir les solutions xSOM",
     evidence: "Périmètre & preuves",
     heroNote:
       "AI Guard est un POC du cabinet xSOM, ESN spécialisée en cybersécurité.",
@@ -190,7 +190,7 @@ export const GUARD_COPY = {
           "Imposer les hooks Codex par une politique administrée",
           "Organiser l’installation, les mises à jour et la validation",
         ],
-        action: "Préparer le déploiement",
+        action: "Contacter notre cabinet de conseil",
         note: "Parcours à préparer avec votre administrateur, selon vos assistants et votre parc.",
       },
       builder: {
@@ -201,7 +201,7 @@ export const GUARD_COPY = {
           "Approuver explicitement le hook dans Codex avec /hooks",
           "Valider le blocage avec un secret fictif dans chaque assistant",
         ],
-        action: "Découvrir l’extension gratuite",
+        action: "Découvrir les offres SaaS",
         note: "Sans compte. Vous gardez la main sur les hooks installés dans votre profil.",
       },
     },
@@ -376,7 +376,7 @@ export const GUARD_COPY = {
     title: ["The cybersecurity solution", "for every AI use case."],
     intro: "Simple. Effective.",
     explore: "See the threats",
-    signin: "Sign in / Create account",
+    signin: "Discover xSOM solutions",
     evidence: "Scope & evidence",
     heroNote:
       "AI Guard is a POC by xSOM, an IT services firm specialising in cybersecurity.",
@@ -508,7 +508,7 @@ export const GUARD_COPY = {
           "Enforce Codex hooks through managed policy",
           "Plan installation, updates and validation",
         ],
-        action: "Plan your deployment",
+        action: "Contact our consulting firm",
         note: "Prepare with your administrator for the assistants and devices you use.",
       },
       builder: {
@@ -519,7 +519,7 @@ export const GUARD_COPY = {
           "Explicitly trust the Codex hook using /hooks",
           "Verify blocking with a fake secret in each assistant",
         ],
-        action: "Discover the free extension",
+        action: "Discover the SaaS offers",
         note: "No account needed. You control the hooks installed in your profile.",
       },
     },
