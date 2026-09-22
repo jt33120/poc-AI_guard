@@ -474,7 +474,11 @@
   position: relative;
   display: block;
   width: 4rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--signal-accent-text);
+  cursor: zoom-in;
 }
 .guard-glossary__visual img {
   display: block;
@@ -498,17 +502,59 @@
 }
 .guard-glossary__visual:hover img,
 .guard-glossary__visual:focus-visible img {
-  position: absolute;
-  z-index: 3;
-  top: -0.5rem;
-  left: -0.5rem;
-  width: min(40rem, 58vw);
-  height: auto;
-  max-height: 80vh;
   border-color: var(--signal-accent);
-  border-radius: var(--r-md);
-  object-fit: contain;
-  box-shadow: 0 1.5rem 3rem color-mix(in srgb, var(--signal-text) 24%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal-accent) 16%, transparent);
+}
+.guard-glossary__modal-backdrop {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-5);
+  background: color-mix(in srgb, var(--signal-text) 62%, transparent);
+}
+.guard-glossary__modal {
+  width: min(60rem, 100%);
+  max-height: calc(100vh - 2 * var(--sp-5));
+  overflow: auto;
+  border: var(--signal-border) solid var(--signal-line-strong);
+  border-radius: var(--r-lg);
+  background: var(--signal-bg);
+  box-shadow: 0 2rem 5rem color-mix(in srgb, var(--signal-text) 42%, transparent);
+}
+.guard-glossary__modal header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: var(--signal-border) solid var(--signal-line);
+}
+.guard-glossary__modal h2 {
+  margin: 0;
+  font-family: var(--font-display), sans-serif;
+  font-size: var(--fs-h3);
+  color: var(--signal-text);
+}
+.guard-glossary__modal header button {
+  display: grid;
+  flex: 0 0 auto;
+  width: var(--signal-touch);
+  height: var(--signal-touch);
+  place-items: center;
+  border: var(--signal-border) solid var(--signal-line-strong);
+  border-radius: 50%;
+  background: transparent;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--signal-text);
+  cursor: pointer;
+}
+.guard-glossary__modal > img {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 /* --- Le détail d'une ligne -------------------------------------------------- */

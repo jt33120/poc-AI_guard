@@ -55,6 +55,7 @@ const NO_FILTERS: Filters = {
 const SORTS = ["category", "risk", "coverage", "name"] as const;
 type Sort = (typeof SORTS)[number];
 type SearchState = "idle" | "searching" | "ready" | "unavailable";
+type VisualPreview = { src: string; title: string };
 
 const COLUMNS = ["threat", "visual", "attack", "mitigation", "tools", "status", "guard"] as const;
 
@@ -117,6 +118,7 @@ export function ThreatGlossary() {
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const [semanticIds, setSemanticIds] = useState<string[] | null>(null);
   const [searchState, setSearchState] = useState<SearchState>("idle");
+  const [preview, setPreview] = useState<VisualPreview | null>(null);
 
   // Un lien profond `/menaces#<id>` ouvre la ligne qu'il vise : le navigateur y
   // défile déjà, il reste à montrer son détail.
@@ -180,6 +182,15 @@ export function ThreatGlossary() {
       window.clearTimeout(timer);
     };
   }, [query, lang]);
+
+  useEffect(() => {
+    if (!preview) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPreview(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [preview]);
 
   /** Combien de lignes resteraient si cette facette prenait cette valeur, les autres filtres tenant. */
   function countWith(facet: Facet, value: string) {
@@ -330,6 +341,7 @@ export function ThreatGlossary() {
                         showCategory={!grouped}
                         open={open.has(entry.id)}
                         onToggle={toggle}
+                        onPreview={setPreview}
                       />
                     ))}
                   </tbody>
@@ -354,6 +366,18 @@ export function ThreatGlossary() {
           </aside>
         </section>
       </main>
+
+      {preview && (
+        <div className="guard-glossary__modal-backdrop" role="presentation" onMouseDown={() => setPreview(null)}>
+          <section className="guard-glossary__modal" role="dialog" aria-modal="true" aria-labelledby="threat-visual-title" onMouseDown={(event) => event.stopPropagation()}>
+            <header>
+              <h2 id="threat-visual-title">{preview.title}</h2>
+              <button type="button" onClick={() => setPreview(null)} autoFocus aria-label={lang === "fr" ? "Fermer l’aperçu" : "Close preview"}>×</button>
+            </header>
+            <img src={preview.src} alt={preview.title} width="960" height="960" />
+          </section>
+        </div>
+      )}
 
       <footer className="guard-footer">
         <div className="guard-wrap">
@@ -498,6 +522,7 @@ function ThreatRows({
   showCategory,
   open,
   onToggle,
+  onPreview,
 }: {
   entry: GlossaryEntry;
   lang: Lang;
@@ -505,6 +530,7 @@ function ThreatRows({
   showCategory: boolean;
   open: boolean;
   onToggle: (id: string) => void;
+  onPreview: (preview: VisualPreview) => void;
 }) {
   const text = entry.copy[lang];
   const detailsId = `${entry.id}-details`;
@@ -522,10 +548,10 @@ function ThreatRows({
         </th>
         <td data-cell="visual" data-label={copy.columns.visual}>
           {visual ? (
-            <a className="guard-glossary__visual" href={visual} target="_blank" rel="noreferrer" aria-label={`${copy.columns.visual} : ${text.title}`}>
+            <button className="guard-glossary__visual" type="button" onClick={() => onPreview({ src: visual, title: text.title })} aria-label={`${copy.columns.visual} : ${text.title}`}>
               <img src={visual} alt="" width="960" height="960" />
               <span>{copy.columns.visual}</span>
-            </a>
+            </button>
           ) : <span aria-label={lang === "fr" ? "Aperçu non disponible" : "Preview unavailable"}>—</span>}
         </td>
         <td data-cell="attack" data-label={copy.columns.attack}>{text.attack}</td>
