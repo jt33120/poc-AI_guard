@@ -2262,6 +2262,7 @@ export const GLOSSARY_COPY = {
     statuses: { unsolved: "Non résolu", mitigated: "Atténué", mixed: "Selon le contexte", solved: "Maîtrisé" },
     columns: {
       threat: "Menace",
+      visual: "Aperçu",
       attack: "Attaque type · conséquence",
       mitigation: "Parade de référence",
       tools: "Outils libres",
@@ -2353,6 +2354,7 @@ export const GLOSSARY_COPY = {
     statuses: { unsolved: "Unsolved", mitigated: "Mitigated", mixed: "Context-dependent", solved: "Controlled" },
     columns: {
       threat: "Threat",
+      visual: "Preview",
       attack: "Typical attack · consequence",
       mitigation: "Reference mitigation",
       tools: "Open-source tools",
