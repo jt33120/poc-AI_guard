@@ -2214,7 +2214,7 @@ export const GLOSSARY_COPY = {
     sorts: { category: "Catégorie", risk: "Non résolu d’abord", coverage: "Couverture AI Guard", name: "Nom (A → Z)" },
     filter: "Filtrer par usage IA",
     all: "Tous les usages",
-    uses: { development: "Développeurs", workplace: "Collaborateurs", agents: "Agents", models: "Données & poids" },
+    uses: { development: "Développeurs", workplace: "Collaborateurs", agents: "Agents", models: "AI scientist" },
     coverageFilter: "Filtrer par couverture AI Guard",
     coverageAll: "Toutes",
     coverage: { yes: "Couvert", partial: "Partiel", no: "Non couvert" },

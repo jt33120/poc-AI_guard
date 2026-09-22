@@ -55,8 +55,9 @@ const NO_FILTERS: Filters = {
 const SORTS = ["category", "risk", "coverage", "name"] as const;
 type Sort = (typeof SORTS)[number];
 type SearchState = "idle" | "searching" | "ready" | "unavailable";
+type VisualPreview = { src: string; title: string };
 
-const COLUMNS = ["threat", "visual", "attack", "mitigation", "tools", "status", "guard"] as const;
+const COLUMNS = ["threat", "visual", "attack", "guard"] as const;
 
 function normalise(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -117,6 +118,7 @@ export function ThreatGlossary() {
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const [semanticIds, setSemanticIds] = useState<string[] | null>(null);
   const [searchState, setSearchState] = useState<SearchState>("idle");
+  const [preview, setPreview] = useState<VisualPreview | null>(null);
 
   // Un lien profond `/menaces#<id>` ouvre la ligne qu'il vise : le navigateur y
   // défile déjà, il reste à montrer son détail.
@@ -180,6 +182,15 @@ export function ThreatGlossary() {
       window.clearTimeout(timer);
     };
   }, [query, lang]);
+
+  useEffect(() => {
+    if (!preview) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPreview(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [preview]);
 
   /** Combien de lignes resteraient si cette facette prenait cette valeur, les autres filtres tenant. */
   function countWith(facet: Facet, value: string) {
@@ -330,6 +341,7 @@ export function ThreatGlossary() {
                         showCategory={!grouped}
                         open={open.has(entry.id)}
                         onToggle={toggle}
+                        onPreview={setPreview}
                       />
                     ))}
                   </tbody>
@@ -354,6 +366,18 @@ export function ThreatGlossary() {
           </aside>
         </section>
       </main>
+
+      {preview && (
+        <div className="guard-glossary__modal-backdrop" role="presentation" onMouseDown={() => setPreview(null)}>
+          <section className="guard-glossary__modal" role="dialog" aria-modal="true" aria-labelledby="threat-visual-title" onMouseDown={(event) => event.stopPropagation()}>
+            <header>
+              <h2 id="threat-visual-title">{preview.title}</h2>
+              <button type="button" onClick={() => setPreview(null)} autoFocus aria-label={lang === "fr" ? "Fermer l’aperçu" : "Close preview"}>×</button>
+            </header>
+            <img src={preview.src} alt={preview.title} width="960" height="960" />
+          </section>
+        </div>
+      )}
 
       <footer className="guard-footer">
         <div className="guard-wrap">
@@ -498,6 +522,7 @@ function ThreatRows({
   showCategory,
   open,
   onToggle,
+  onPreview,
 }: {
   entry: GlossaryEntry;
   lang: Lang;
@@ -505,6 +530,7 @@ function ThreatRows({
   showCategory: boolean;
   open: boolean;
   onToggle: (id: string) => void;
+  onPreview: (preview: VisualPreview) => void;
 }) {
   const text = entry.copy[lang];
   const detailsId = `${entry.id}-details`;
@@ -522,39 +548,45 @@ function ThreatRows({
         </th>
         <td data-cell="visual" data-label={copy.columns.visual}>
           {visual ? (
-            <a className="guard-glossary__visual" href={visual} target="_blank" rel="noreferrer" aria-label={`${copy.columns.visual} : ${text.title}`}>
+            <button className="guard-glossary__visual" type="button" onClick={() => onPreview({ src: visual, title: text.title })} aria-label={`${copy.columns.visual} : ${text.title}`}>
               <img src={visual} alt="" width="960" height="960" />
               <span>{copy.columns.visual}</span>
-            </a>
+            </button>
           ) : <span aria-label={lang === "fr" ? "Aperçu non disponible" : "Preview unavailable"}>—</span>}
         </td>
         <td data-cell="attack" data-label={copy.columns.attack}>{text.attack}</td>
-        <td data-cell="mitigation" data-label={copy.columns.mitigation}>{text.mitigation}</td>
-        <td data-cell="tools" data-label={copy.columns.tools}>
-          <ul className="guard-glossary__tools">
-            {entry.tools.map((tool) => (
-              <li key={toolLabel(tool, "en")} data-generic={typeof tool === "string" ? undefined : ""}>{toolLabel(tool, lang)}</li>
-            ))}
-          </ul>
-        </td>
-        <td data-cell="status" data-label={copy.columns.status}>
-          <span className="guard-glossary__status" data-status={entry.status}>
-            <span className="guard-glossary__dot" aria-hidden="true" />
-            {copy.statuses[entry.status]}
-          </span>
-          {text.statusNote && <span className="guard-glossary__note">{text.statusNote}</span>}
-        </td>
         <td data-cell="guard" data-label={copy.columns.guard}>
-          <span className="guard-glossary__coverage" data-coverage={entry.coverage}>
-            <CoverageIcon coverage={entry.coverage} />
-            {copy.coverage[entry.coverage]}
-          </span>
+          <OfferBadge coverage={entry.coverage} lang={lang} />
         </td>
       </tr>
       <tr id={detailsId} className="guard-glossary__details" hidden={!open}>
         <td colSpan={COLUMNS.length}>{open && <ThreatDetails entry={entry} lang={lang} copy={copy} />}</td>
       </tr>
     </Fragment>
+  );
+}
+
+function OfferBadge({ coverage, lang }: { coverage: GlossaryCoverage; lang: Lang }) {
+  const offer = coverage === "yes" ? "saas" : "consulting";
+  const copy = offer === "saas"
+    ? (lang === "fr" ? { label: "SaaS", detail: "Prêt à installer" } : { label: "SaaS", detail: "Ready to install" })
+    : (lang === "fr" ? { label: "Conseil", detail: "Réponse sur mesure" } : { label: "Consulting", detail: "Tailored response" });
+  return (
+    <span className="guard-glossary__offer" data-offer={offer}>
+      <OfferIcon offer={offer} />
+      <span>
+        <strong>{copy.label}</strong>
+        <small>{copy.detail}</small>
+      </span>
+    </span>
+  );
+}
+
+function OfferIcon({ offer }: { offer: "saas" | "consulting" }) {
+  return offer === "saas" ? (
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5z" /><path d="m8.5 12 2.2 2.2L15.8 9" /></svg>
+  ) : (
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="m12 8 2.5 4-2.5 4-2.5-4zM12 4v2M20 12h-2M12 20v-2M4 12h2" /></svg>
   );
 }
 
