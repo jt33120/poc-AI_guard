@@ -53,6 +53,7 @@ const NO_FILTERS: Filters = {
 
 const SORTS = ["category", "risk", "coverage", "name"] as const;
 type Sort = (typeof SORTS)[number];
+type SearchState = "idle" | "searching" | "ready" | "unavailable";
 
 const COLUMNS = ["threat", "attack", "mitigation", "tools", "status", "guard"] as const;
 
@@ -113,6 +114,8 @@ export function ThreatGlossary() {
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [sort, setSort] = useState<Sort>("category");
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
+  const [semanticIds, setSemanticIds] = useState<string[] | null>(null);
+  const [searchState, setSearchState] = useState<SearchState>("idle");
 
   // Un lien profond `/menaces#<id>` ouvre la ligne qu'il vise : le navigateur y
   // défile déjà, il reste à montrer son détail.
@@ -122,10 +125,15 @@ export function ThreatGlossary() {
   }, []);
 
   const words = normalise(query).trim().split(/\s+/).filter(Boolean);
-  const searched = THREAT_GLOSSARY.filter((entry) => {
+  const lexicalMatches = THREAT_GLOSSARY.filter((entry) => {
     const text = searchText(entry, lang, copy);
     return words.every((word) => text.includes(word));
   });
+  const searched = semanticIds
+    ? semanticIds
+        .map((id) => THREAT_GLOSSARY.find((entry) => entry.id === id))
+        .filter((entry): entry is GlossaryEntry => entry !== undefined)
+    : lexicalMatches;
   const entries = searched.filter((entry) => matchesFacets(entry, filters));
   const grouped = sort === "category";
   const groups = grouped
@@ -133,6 +141,44 @@ export function ThreatGlossary() {
         .filter((group) => group.entries.length > 0)
     : [{ id: "all" as const, entries: sortEntries(entries, sort, lang) }];
   const filtered = query !== "" || Object.values(filters).some((value) => value !== "all");
+
+  useEffect(() => {
+    const request = query.trim();
+    if (request.length < 3) {
+      setSemanticIds(null);
+      setSearchState("idle");
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setSearchState("searching");
+      try {
+        const response = await fetch("/api/threat-search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: request, lang }),
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("Semantic search unavailable");
+        const result: unknown = await response.json();
+        if (!result || typeof result !== "object" || !Array.isArray((result as { ids?: unknown }).ids)) {
+          throw new Error("Invalid semantic search response");
+        }
+        setSemanticIds((result as { ids: string[] }).ids);
+        setSearchState("ready");
+      } catch (error) {
+        if ((error as Error).name === "AbortError") return;
+        setSemanticIds(null);
+        setSearchState("unavailable");
+      }
+    }, 450);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [query, lang]);
 
   /** Combien de lignes resteraient si cette facette prenait cette valeur, les autres filtres tenant. */
   function countWith(facet: Facet, value: string) {
@@ -146,6 +192,8 @@ export function ThreatGlossary() {
 
   function resetFilters() {
     setQuery("");
+    setSemanticIds(null);
+    setSearchState("idle");
     setFilters(NO_FILTERS);
   }
 
@@ -199,6 +247,9 @@ export function ThreatGlossary() {
                     aria-controls="threat-definitions"
                   />
                 </div>
+                {searchState === "searching" && <p className="guard-glossary__search-status" role="status">{lang === "fr" ? "Recherche IA en cours…" : "AI search in progress…"}</p>}
+                {searchState === "ready" && <p className="guard-glossary__search-status" role="status">{lang === "fr" ? "Menaces pertinentes sélectionnées par IA." : "Relevant threats selected by AI."}</p>}
+                {searchState === "unavailable" && <p className="guard-glossary__search-status" role="status">{lang === "fr" ? "Recherche textuelle affichée ; la recherche IA est indisponible." : "Text search is shown; AI search is unavailable."}</p>}
               </div>
               <SelectField id="threat-sort" label={copy.sort} value={sort} onChange={(value) => setSort(value as Sort)}>
                 {SORTS.map((id) => <option key={id} value={id}>{copy.sorts[id]}</option>)}
