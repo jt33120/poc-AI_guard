@@ -57,7 +57,7 @@ type Sort = (typeof SORTS)[number];
 type SearchState = "idle" | "searching" | "ready" | "unavailable";
 type VisualPreview = { src: string; title: string };
 
-const COLUMNS = ["threat", "visual", "attack", "mitigation", "tools", "status", "guard"] as const;
+const COLUMNS = ["threat", "visual", "attack", "status", "guard"] as const;
 
 function normalise(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -555,14 +555,6 @@ function ThreatRows({
           ) : <span aria-label={lang === "fr" ? "Aperçu non disponible" : "Preview unavailable"}>—</span>}
         </td>
         <td data-cell="attack" data-label={copy.columns.attack}>{text.attack}</td>
-        <td data-cell="mitigation" data-label={copy.columns.mitigation}>{text.mitigation}</td>
-        <td data-cell="tools" data-label={copy.columns.tools}>
-          <ul className="guard-glossary__tools">
-            {entry.tools.map((tool) => (
-              <li key={toolLabel(tool, "en")} data-generic={typeof tool === "string" ? undefined : ""}>{toolLabel(tool, lang)}</li>
-            ))}
-          </ul>
-        </td>
         <td data-cell="status" data-label={copy.columns.status}>
           <span className="guard-glossary__status" data-status={entry.status}>
             <span className="guard-glossary__dot" aria-hidden="true" />

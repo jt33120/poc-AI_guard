@@ -327,23 +327,17 @@
   font-size: var(--fs-sm);
 }
 .guard-glossary__col--threat {
-  width: 17%;
-}
-.guard-glossary__col--visual {
-  width: 10%;
-}
-.guard-glossary__col--attack {
-  width: 19%;
-}
-.guard-glossary__col--mitigation {
   width: 21%;
 }
-.guard-glossary__col--tools {
-  width: 13%;
+.guard-glossary__col--visual {
+  width: 12%;
+}
+.guard-glossary__col--attack {
+  width: 32%;
 }
 .guard-glossary__col--status,
 .guard-glossary__col--guard {
-  width: 10%;
+  width: 17.5%;
 }
 .guard-glossary__table thead th {
   position: sticky;
@@ -797,9 +791,7 @@
   .guard-glossary__row > [data-cell="visual"] {
     order: 3;
   }
-  .guard-glossary__row > [data-cell="attack"],
-  .guard-glossary__row > [data-cell="mitigation"],
-  .guard-glossary__row > [data-cell="tools"] {
+  .guard-glossary__row > [data-cell="attack"] {
     order: 3;
     grid-column: 1 / -1;
   }
