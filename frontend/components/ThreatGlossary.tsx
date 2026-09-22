@@ -8,6 +8,7 @@ import { Diagramme, DiagrammeDefs } from "@/components/Diagramme";
 import { GuardNav } from "@/components/GuardNav";
 import { SignalPreferences } from "@/design-system/react";
 import { figureDeFiche } from "@/lib/glossary-figures";
+import { visualForThreat } from "@/lib/threat-visuals";
 import { useT } from "@/lib/i18n";
 import type { Lang } from "@/lib/strings";
 import {
@@ -55,7 +56,7 @@ const SORTS = ["category", "risk", "coverage", "name"] as const;
 type Sort = (typeof SORTS)[number];
 type SearchState = "idle" | "searching" | "ready" | "unavailable";
 
-const COLUMNS = ["threat", "attack", "mitigation", "tools", "status", "guard"] as const;
+const COLUMNS = ["threat", "visual", "attack", "mitigation", "tools", "status", "guard"] as const;
 
 function normalise(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -507,6 +508,7 @@ function ThreatRows({
 }) {
   const text = entry.copy[lang];
   const detailsId = `${entry.id}-details`;
+  const visual = visualForThreat(entry.id);
   return (
     <Fragment>
       <tr id={entry.id} className="guard-glossary__row" data-open={open ? "" : undefined}>
@@ -518,6 +520,14 @@ function ThreatRows({
           </button>
           {entry.owasp && <span className="guard-glossary__code">{entry.owasp}:2025</span>}
         </th>
+        <td data-cell="visual" data-label={copy.columns.visual}>
+          {visual ? (
+            <a className="guard-glossary__visual" href={visual} target="_blank" rel="noreferrer" aria-label={`${copy.columns.visual} : ${text.title}`}>
+              <img src={visual} alt="" width="960" height="960" />
+              <span>{copy.columns.visual}</span>
+            </a>
+          ) : <span aria-label={lang === "fr" ? "Aperçu non disponible" : "Preview unavailable"}>—</span>}
+        </td>
         <td data-cell="attack" data-label={copy.columns.attack}>{text.attack}</td>
         <td data-cell="mitigation" data-label={copy.columns.mitigation}>{text.mitigation}</td>
         <td data-cell="tools" data-label={copy.columns.tools}>

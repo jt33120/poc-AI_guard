@@ -327,20 +327,23 @@
   font-size: var(--fs-sm);
 }
 .guard-glossary__col--threat {
-  width: 19%;
+  width: 17%;
+}
+.guard-glossary__col--visual {
+  width: 10%;
 }
 .guard-glossary__col--attack {
-  width: 21%;
+  width: 19%;
 }
 .guard-glossary__col--mitigation {
-  width: 23%;
+  width: 21%;
 }
 .guard-glossary__col--tools {
-  width: 15%;
+  width: 13%;
 }
 .guard-glossary__col--status,
 .guard-glossary__col--guard {
-  width: 11%;
+  width: 10%;
 }
 .guard-glossary__table thead th {
   position: sticky;
@@ -466,6 +469,46 @@
   font-style: italic;
   color: var(--signal-muted);
   background: transparent;
+}
+.guard-glossary__visual {
+  position: relative;
+  display: block;
+  width: 4rem;
+  color: var(--signal-accent-text);
+}
+.guard-glossary__visual img {
+  display: block;
+  width: 4rem;
+  height: 4rem;
+  border: var(--signal-border) solid var(--signal-line-strong);
+  border-radius: var(--r-sm);
+  object-fit: cover;
+  background: var(--signal-bg);
+}
+.guard-glossary__visual span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.guard-glossary__visual:hover img,
+.guard-glossary__visual:focus-visible img {
+  position: absolute;
+  z-index: 3;
+  top: -0.5rem;
+  left: -0.5rem;
+  width: min(40rem, 58vw);
+  height: auto;
+  max-height: 80vh;
+  border-color: var(--signal-accent);
+  border-radius: var(--r-md);
+  object-fit: contain;
+  box-shadow: 0 1.5rem 3rem color-mix(in srgb, var(--signal-text) 24%, transparent);
 }
 
 /* --- Le détail d'une ligne -------------------------------------------------- */
@@ -704,6 +747,9 @@
   }
   .guard-glossary__row > [data-cell="guard"] {
     order: 2;
+  }
+  .guard-glossary__row > [data-cell="visual"] {
+    order: 3;
   }
   .guard-glossary__row > [data-cell="attack"],
   .guard-glossary__row > [data-cell="mitigation"],
