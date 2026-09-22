@@ -142,7 +142,7 @@ for (const width of [390, 768, 1440]) {
     // Sous 1024px, les lignes deviennent des fiches et l'en-tête de colonnes s'efface.
     await expect(page.getByRole("columnheader", { name: "Menace", exact: true })).toBeVisible({ visible: width > 1024 });
     await page.getByRole("group", { name: "Filtrer par usage IA", exact: true })
-      .getByRole("button", { name: "Données & poids", exact: true }).click();
+      .getByRole("button", { name: "AI scientist", exact: true }).click();
     await expect(page.locator("#empoisonnement")).toBeVisible();
     await page.getByRole("button", { name: "Empoisonnement des données d’entraînement", exact: true }).click();
     await expect(page.locator("#empoisonnement-details .diag")).toBeVisible();
