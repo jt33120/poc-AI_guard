@@ -43,14 +43,14 @@ test("the landing explains AI uses, introduces the extension and keeps both next
     (sections) => sections.map((section) => section.classList.contains("guard-masthead") ? "masthead" : section.id),
   )).toEqual(["masthead", "usages", "vous"]);
 
-  // Le menu tient en deux entrées, et chacune mène à une page. Les ancres d'accueil
-  // qu'il portait ne voulaient rien dire ailleurs que sur l'accueil : un visiteur
-  // arrivé par `/menaces` se faisait renvoyer ici pour un simple défilement.
+  // Le menu expose les produits, les besoins cyber et le cabinet, puis la porte de
+  // découverte des solutions xSOM.
   const navigation = page.getByRole("navigation", { name: "Navigation principale" });
-  await expect(navigation.getByRole("link")).toHaveCount(3);
+  await expect(navigation.getByRole("link")).toHaveCount(4);
   await expect(navigation.getByRole("link", { name: "Nos produits", exact: true })).toHaveAttribute("href", "/produits");
-  await expect(navigation.getByRole("link", { name: "Les menaces cyber IA", exact: true })).toHaveAttribute("href", "/menaces");
-  await expect(navigation.getByRole("link", { name: /Se connecter/ })).toHaveAttribute("href", "/login");
+  await expect(navigation.getByRole("link", { name: "Vos besoins cybers", exact: true })).toHaveAttribute("href", "/menaces");
+  await expect(navigation.getByRole("link", { name: /Notre cabinet/ })).toHaveAttribute("href", "https://www.xsom.fr");
+  await expect(navigation.getByRole("link", { name: "Découvrir les solutions xSOM", exact: true })).toHaveAttribute("href", "/produits");
 
   // Le masthead mène aux produits sans passer par le menu : c'est la sortie que lit
   // un visiteur qui ne remonte pas.
@@ -59,7 +59,7 @@ test("the landing explains AI uses, introduces the extension and keeps both next
   const chemins = page.locator("#vous .guard-path");
   await expect(chemins).toHaveCount(2);
   await expect(chemins.filter({ hasText: "Entreprise" }).getByRole("link")).toHaveAttribute("href", /^mailto:/);
-  await expect(chemins.filter({ hasText: "Individuelle / POC" }).getByRole("link")).toHaveAttribute("href", "/extension");
+  await expect(chemins.filter({ hasText: "Individuelle / POC" }).getByRole("link")).toHaveAttribute("href", "/saas");
 
   expect(apiRequests).toBe(0);
 
@@ -104,14 +104,15 @@ test("the products page gives both products the same billing, and the menu point
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Deux produits");
 });
 
-test("every public header carries the same two entries and the same account door", async ({ page }) => {
+test("every public header carries the same orientation menu", async ({ page }) => {
   for (const chemin of ["/", "/produits", "/saas", "/extension", "/menaces"]) {
     await page.goto(chemin);
     const navigation = page.getByRole("navigation", { name: "Navigation principale" });
     await expect(navigation.getByRole("link", { name: "Nos produits", exact: true })).toHaveAttribute("href", "/produits");
-    await expect(navigation.getByRole("link", { name: "Les menaces cyber IA", exact: true })).toHaveAttribute("href", "/menaces");
-    await expect(navigation.getByRole("link", { name: /Se connecter/ })).toHaveAttribute("href", "/login");
-    await expect(navigation.getByRole("link")).toHaveCount(3);
+    await expect(navigation.getByRole("link", { name: "Vos besoins cybers", exact: true })).toHaveAttribute("href", "/menaces");
+    await expect(navigation.getByRole("link", { name: /Notre cabinet/ })).toHaveAttribute("href", "https://www.xsom.fr");
+    await expect(navigation.getByRole("link", { name: "Découvrir les solutions xSOM", exact: true })).toHaveAttribute("href", "/produits");
+    await expect(navigation.getByRole("link")).toHaveCount(4);
   }
 });
 

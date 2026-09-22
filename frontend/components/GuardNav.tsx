@@ -3,20 +3,17 @@
 /**
  * Le menu, écrit une seule fois.
  *
- * Il portait quatre entrées, dont deux ancres de l'accueil : un visiteur arrivé sur
- * `/menaces` ou `/extension` y lisait « Nos usages » et se faisait renvoyer ailleurs
- * pour un simple défilement. Deux entrées suffisent à dire ce que le site contient :
- * ce qu'on propose, et le vocabulaire pour comprendre pourquoi. Le périmètre et les
- * preuves restent en pied de page, où on les cherche quand on les cherche.
+ * Le menu porte les trois portes publiques demandées par le site : les produits, les
+ * besoins cyber et le cabinet qui accompagne les déploiements. La quatrième action
+ * ouvre la découverte des solutions xSOM, sans confondre cette porte avec l'accès à
+ * une console.
  *
  * Une seule définition, partagée par tous les en-têtes publics. Chaque page portait sa
  * copie du menu, avec des entrées différentes : elles divergeaient déjà, et rien ne
  * l'aurait signalé.
  *
- * La classe `guard-nav__link` n'est pas décorative : la feuille de style masque le
- * premier lien du menu sous 1100 px, une règle héritée du temps où ce premier lien
- * était un « Retour à l'accueil » que la marque disait déjà. Sur deux entrées utiles,
- * elle en supprimerait une.
+ * La classe `guard-nav__link` permet à la feuille de style de garder les liens
+ * éditoriaux distincts de l'action principale sur les petits écrans.
  */
 
 import Link from "next/link";
@@ -39,8 +36,17 @@ export function GuardNav() {
       <Link className="guard-nav__link" href="/menaces">
         {home.navGlossary}
       </Link>
+      <a
+        className="guard-nav__link"
+        href="https://www.xsom.fr"
+        target="_blank"
+        rel="noreferrer"
+      >
+        {home.navCabinet}
+        <span aria-hidden="true">↗</span>
+      </a>
       <LanguageToggle />
-      <Link href="/login" className="guard-button guard-button--small">
+      <Link href="/produits" className="guard-button guard-button--small">
         {copy.signin}
         <span aria-hidden="true">↗</span>
       </Link>

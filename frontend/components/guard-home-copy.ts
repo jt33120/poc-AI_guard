@@ -1,7 +1,7 @@
 /** Public, illustrative positioning. Product availability stays on the offer pages. */
 export const GUARD_HOME_COPY = {
   fr: {
-    navProducts: "Nos produits", navGlossary: "Les menaces cyber IA",
+    navProducts: "Nos produits", navGlossary: "Vos besoins cybers", navCabinet: "Notre cabinet",
     eyebrow: "Monitoring & cybersécurité · Expertise française",
     title: ["Vos usages IA.", "Sous votre contrôle."],
     intro: "Des solutions françaises pour observer les usages, maîtriser les données et encadrer les actions de l’IA dans votre entreprise.",
@@ -68,7 +68,7 @@ export const GUARD_HOME_COPY = {
     glossaryTitle: "Mettre des mots sur les risques.", glossaryBody: "Injection de prompt, fuite de secrets, empoisonnement… Chaque menace avec son attaque type, sa parade, les outils libres et ce que couvre AI Guard.", glossaryAction: "Ouvrir le glossaire des menaces IA",
   },
   en: {
-    navProducts: "Our products", navGlossary: "AI cyber threats",
+    navProducts: "Our products", navGlossary: "Your cyber needs", navCabinet: "Our firm",
     eyebrow: "Monitoring & cybersecurity · French expertise",
     title: ["Your AI use cases.", "Under your control."],
     intro: "French solutions to observe AI usage, control data sharing and govern AI actions throughout your organisation.",
