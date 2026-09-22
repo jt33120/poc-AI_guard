@@ -57,7 +57,7 @@ type Sort = (typeof SORTS)[number];
 type SearchState = "idle" | "searching" | "ready" | "unavailable";
 type VisualPreview = { src: string; title: string };
 
-const COLUMNS = ["threat", "visual", "attack", "status", "guard"] as const;
+const COLUMNS = ["threat", "visual", "attack", "guard"] as const;
 
 function normalise(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -555,24 +555,38 @@ function ThreatRows({
           ) : <span aria-label={lang === "fr" ? "Aperçu non disponible" : "Preview unavailable"}>—</span>}
         </td>
         <td data-cell="attack" data-label={copy.columns.attack}>{text.attack}</td>
-        <td data-cell="status" data-label={copy.columns.status}>
-          <span className="guard-glossary__status" data-status={entry.status}>
-            <span className="guard-glossary__dot" aria-hidden="true" />
-            {copy.statuses[entry.status]}
-          </span>
-          {text.statusNote && <span className="guard-glossary__note">{text.statusNote}</span>}
-        </td>
         <td data-cell="guard" data-label={copy.columns.guard}>
-          <span className="guard-glossary__coverage" data-coverage={entry.coverage}>
-            <CoverageIcon coverage={entry.coverage} />
-            {copy.coverage[entry.coverage]}
-          </span>
+          <OfferBadge coverage={entry.coverage} lang={lang} />
         </td>
       </tr>
       <tr id={detailsId} className="guard-glossary__details" hidden={!open}>
         <td colSpan={COLUMNS.length}>{open && <ThreatDetails entry={entry} lang={lang} copy={copy} />}</td>
       </tr>
     </Fragment>
+  );
+}
+
+function OfferBadge({ coverage, lang }: { coverage: GlossaryCoverage; lang: Lang }) {
+  const offer = coverage === "yes" ? "saas" : "consulting";
+  const copy = offer === "saas"
+    ? (lang === "fr" ? { label: "SaaS", detail: "Prêt à installer" } : { label: "SaaS", detail: "Ready to install" })
+    : (lang === "fr" ? { label: "Conseil", detail: "Réponse sur mesure" } : { label: "Consulting", detail: "Tailored response" });
+  return (
+    <span className="guard-glossary__offer" data-offer={offer}>
+      <OfferIcon offer={offer} />
+      <span>
+        <strong>{copy.label}</strong>
+        <small>{copy.detail}</small>
+      </span>
+    </span>
+  );
+}
+
+function OfferIcon({ offer }: { offer: "saas" | "consulting" }) {
+  return offer === "saas" ? (
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5z" /><path d="m8.5 12 2.2 2.2L15.8 9" /></svg>
+  ) : (
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="m12 8 2.5 4-2.5 4-2.5-4zM12 4v2M20 12h-2M12 20v-2M4 12h2" /></svg>
   );
 }
 

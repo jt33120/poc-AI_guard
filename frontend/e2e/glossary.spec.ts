@@ -51,9 +51,7 @@ test("the glossary table combines search, facets and sorting, expands rows and t
   await expect(table.getByRole("columnheader", { name: "AI Guard", exact: true })).toBeVisible();
   await expect(page.locator(".guard-glossary__group")).toHaveCount(13);
   await expect(uses.getByRole("button", { name: "Tous les usages", exact: true })).toHaveAttribute("aria-pressed", "true");
-  for (const row of await rows.all()) {
-    await expect(row.locator(".guard-glossary__coverage")).toHaveText(/^(Couvert|Partiel|Non couvert)$/);
-  }
+  for (const row of await rows.all()) await expect(row.locator(".guard-glossary__offer")).toHaveText(/^(SaaS|Conseil)/);
   // Les codes du relevé ne s'affichent qu'au détail, comme lien vers la preuve.
   await expect(rows.getByText(/\bM-\d{2}\b/)).toHaveCount(0);
 
@@ -75,7 +73,7 @@ test("the glossary table combines search, facets and sorting, expands rows and t
   await expect(coverage.getByRole("button", { name: "Couvert", exact: true })).toContainText(String(covered.length));
   await coverage.getByRole("button", { name: "Couvert", exact: true }).click();
   await expect(rows).toHaveCount(covered.length);
-  for (const row of await rows.all()) await expect(row.locator(".guard-glossary__coverage")).toHaveText("Couvert");
+  for (const row of await rows.all()) await expect(row.locator(".guard-glossary__offer")).toHaveText(/SaaS/);
   await page.getByRole("combobox", { name: "Catégorie", exact: true }).selectOption("agents");
   await expect(rows).toHaveCount(covered.filter((entry) => entry.category === "agents").length);
   await page.getByRole("button", { name: "Réinitialiser les filtres", exact: true }).click();
@@ -86,7 +84,6 @@ test("the glossary table combines search, facets and sorting, expands rows and t
   // Hors du tri par catégorie, les groupes disparaissent et chaque ligne dit la sienne.
   await page.getByRole("combobox", { name: "Trier par", exact: true }).selectOption("risk");
   await expect(page.locator(".guard-glossary__group")).toHaveCount(0);
-  await expect(rows.first().locator(".guard-glossary__status")).toHaveText("Non résolu");
   await expect(rows.first().locator(".guard-glossary__kicker")).toBeVisible();
   await page.getByRole("combobox", { name: "Trier par", exact: true }).selectOption("category");
 
