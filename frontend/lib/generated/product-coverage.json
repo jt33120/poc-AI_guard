@@ -1,0 +1,1140 @@
+{
+  "schemaVersion": 1,
+  "product": "Developer Guard",
+  "threats": [
+    {
+      "id": "injection-directe",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "injection-de-prompt",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "injection-persistante",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "jailbreak",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "extraction-prompt-systeme",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "detournement-de-contexte",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "obfuscation",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "jailbreak-multilingue",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "injection-multimodale",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "autonomie-excessive",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "injection-appel-outil",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "depute-confus",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "escalade-privileges-agent",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "transactions-non-autorisees",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "boucle-agent",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "injection-inter-agents",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "memoire-empoisonnee",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "outil-piege",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "identite-empruntee",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "delegation-en-cascade",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "empoisonnement-rag",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "empoisonnement-vectoriel",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "inversion-embeddings",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "acces-rag",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "fuite-inter-clients-rag",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "empoisonnement",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "empoisonnement-fine-tuning",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "modele-piege",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "alteration-source-modele",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "modele-serialise-malveillant",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "vol-de-modele",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "extraction-par-api",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "inversion-de-modele",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "inference-appartenance",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "exemples-adverses",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "attaque-adverse-physique",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "patchs-adverses",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "attaques-par-transfert",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "sorties-non-maitrisees",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "code-vulnerable",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "injection-sql-via-llm",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "injection-de-commande",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "xss-contenu-genere",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "ssrf-via-agent",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "traversee-de-chemin",
+      "product": "Developer Guard",
+      "module": "Runner de ressources",
+      "status": "implemented_local",
+      "mode": "B",
+      "hosts": [
+        {
+          "assistant": "claude",
+          "events": [
+            "read"
+          ],
+          "environment": "local"
+        }
+      ],
+      "environment": "local",
+      "preconditions": [
+        "Politique signée présente",
+        "Lecture fournie par un événement Claude Code qualifié"
+      ],
+      "limit": "Une vérification de chemin ne protège pas une lecture réalisée par un processus non intercepté ; le profil renforcé Linux apporte la frontière système.",
+      "scenarios": [
+        "secret-guard/tests/runner/hook-input.test.ts",
+        "secret-guard/tests/policy/evaluate.test.ts"
+      ],
+      "sources": [
+        "secret-guard/tests/runner/hook-input.test.ts",
+        "secret-guard/tests/policy/evaluate.test.ts"
+      ]
+    },
+    {
+      "id": "fuite-de-donnees",
+      "product": "Developer Guard",
+      "module": "Runner de ressources",
+      "status": "implemented_local",
+      "mode": "B",
+      "hosts": [
+        {
+          "assistant": "claude",
+          "events": [
+            "read"
+          ],
+          "environment": "local"
+        }
+      ],
+      "environment": "local",
+      "preconditions": [
+        "Politique signée présente",
+        "Lecture fournie par un événement Claude Code qualifié"
+      ],
+      "limit": "Une vérification de chemin ne protège pas une lecture réalisée par un processus non intercepté ; le profil renforcé Linux apporte la frontière système.",
+      "scenarios": [
+        "secret-guard/tests/runner/hook-input.test.ts",
+        "secret-guard/tests/policy/evaluate.test.ts"
+      ],
+      "sources": [
+        "secret-guard/tests/runner/hook-input.test.ts",
+        "secret-guard/tests/policy/evaluate.test.ts"
+      ]
+    },
+    {
+      "id": "fuite-dans-les-journaux",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "fuite-de-secrets",
+      "product": "Developer Guard",
+      "module": "Secret Guard local",
+      "status": "implemented_local",
+      "mode": "B",
+      "hosts": [
+        {
+          "assistant": "claude",
+          "events": [
+            "prompt",
+            "read"
+          ],
+          "environment": "local"
+        },
+        {
+          "assistant": "codex",
+          "events": [
+            "prompt"
+          ],
+          "environment": "local"
+        },
+        {
+          "assistant": "copilot",
+          "events": [
+            "prompt"
+          ],
+          "environment": "local",
+          "verified": false
+        }
+      ],
+      "environment": "local",
+      "preconditions": [
+        "Extension installée",
+        "Hook de l'hôte activé et invoqué"
+      ],
+      "limit": "Les pièces jointes natives, un terminal hors session et les chemins non interceptés ne sont pas couverts par ce contrôle.",
+      "scenarios": [
+        "secret-guard/tests/core/scan.test.ts",
+        "secret-guard/tests/cli/hook.test.ts"
+      ],
+      "sources": [
+        "secret-guard/tests/core/scan.test.ts",
+        "secret-guard/tests/cli/hook.test.ts"
+      ]
+    },
+    {
+      "id": "memorisation-entrainement",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "inference-attributs-sensibles",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "depot-de-modeles-compromis",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "dependances-compromises",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "typosquatting",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "framework-compromis",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "format-de-modele-dangereux",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "vol-identifiants-cloud",
+      "product": "Developer Guard",
+      "module": "Secret Guard local",
+      "status": "implemented_local",
+      "mode": "B",
+      "hosts": [
+        {
+          "assistant": "claude",
+          "events": [
+            "prompt",
+            "read"
+          ],
+          "environment": "local"
+        },
+        {
+          "assistant": "codex",
+          "events": [
+            "prompt"
+          ],
+          "environment": "local"
+        },
+        {
+          "assistant": "copilot",
+          "events": [
+            "prompt"
+          ],
+          "environment": "local",
+          "verified": false
+        }
+      ],
+      "environment": "local",
+      "preconditions": [
+        "Extension installée",
+        "Hook de l'hôte activé et invoqué"
+      ],
+      "limit": "Les pièces jointes natives, un terminal hors session et les chemins non interceptés ne sont pas couverts par ce contrôle.",
+      "scenarios": [
+        "secret-guard/tests/core/scan.test.ts",
+        "secret-guard/tests/cli/hook.test.ts"
+      ],
+      "sources": [
+        "secret-guard/tests/core/scan.test.ts",
+        "secret-guard/tests/cli/hook.test.ts"
+      ]
+    },
+    {
+      "id": "vol-cle-api-ia",
+      "product": "Developer Guard",
+      "module": "Secret Guard local",
+      "status": "implemented_local",
+      "mode": "B",
+      "hosts": [
+        {
+          "assistant": "claude",
+          "events": [
+            "prompt",
+            "read"
+          ],
+          "environment": "local"
+        },
+        {
+          "assistant": "codex",
+          "events": [
+            "prompt"
+          ],
+          "environment": "local"
+        },
+        {
+          "assistant": "copilot",
+          "events": [
+            "prompt"
+          ],
+          "environment": "local",
+          "verified": false
+        }
+      ],
+      "environment": "local",
+      "preconditions": [
+        "Extension installée",
+        "Hook de l'hôte activé et invoqué"
+      ],
+      "limit": "Les pièces jointes natives, un terminal hors session et les chemins non interceptés ne sont pas couverts par ce contrôle.",
+      "scenarios": [
+        "secret-guard/tests/core/scan.test.ts",
+        "secret-guard/tests/cli/hook.test.ts"
+      ],
+      "sources": [
+        "secret-guard/tests/core/scan.test.ts",
+        "secret-guard/tests/cli/hook.test.ts"
+      ]
+    },
+    {
+      "id": "serveur-inference-compromis",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "evasion-de-conteneur",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "notebook-compromis",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "deni-de-service-modele",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "deni-de-portefeuille",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "complexite-algorithmique",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "epuisement-gpu",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "hallucinations",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "fausses-citations",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "manipulation-base-de-connaissances",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "phishing-augmente",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "usurpation-deepfake",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "fraude-voix-clonee",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "malware-genere",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "decouverte-vulnerabilites",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "shadow-ai",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "provenance-modele-inconnue",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "red-teaming-insuffisant",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "derive-de-modele",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    },
+    {
+      "id": "actions-non-tracables",
+      "product": "Developer Guard",
+      "module": "Aucun contrôle Developer Guard déclaré",
+      "status": "out_of_scope",
+      "mode": "X",
+      "hosts": [],
+      "environment": "non_applicable",
+      "preconditions": [],
+      "limit": "Cette menace ne reçoit pas de couverture Developer Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+      "scenarios": [],
+      "sources": []
+    }
+  ]
+}

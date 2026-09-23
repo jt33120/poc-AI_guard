@@ -9,7 +9,7 @@ function copyLeaves(value: unknown): string[] {
 }
 
 test("the entire nested orientation copy stays illustrative, without invented coverage counts", () => {
-  const coverage = /menace|ligne|facette|couvert|couvre|matrice|bloqu|threat|row|facet|cover|block/i;
+  const coverage = /menace|ligne|facette|(?<!\p{L})couvert|(?<!\p{L})couvre|matrice|bloqu|threat|row|facet|(?<!\p{L})cover|block/iu;
   const number = /\d+|\b(?:dix-sept|dix-huit|dix-neuf|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|quinze|seize|vingt|seventeen|eighteen|nineteen|two|three|four|five|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|twenty)\b/i;
   for (const language of ["fr", "en"] as const) {
     const phrases = copyLeaves([GUARD_COPY[language], GUARD_HOME_COPY[language]]);
@@ -35,7 +35,7 @@ test("the landing explains AI uses, introduces the extension and keeps both next
   await page.goto("/");
 
   // Le parcours présente les usages, puis les produits, puis les deux suites.
-  await expect(page.getByText("Prototype en expérimentation", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Secret Guard gratuit · Developer Guard en pilote accompagné", { exact: true }).first()).toBeVisible();
   await expect(page.locator(".guard-masthead")).toBeVisible();
   await expect(page.locator("#usages .guard-campus")).toBeVisible();
   await expect(page.locator("#menaces-accueil")).toHaveCount(0);
@@ -46,20 +46,20 @@ test("the landing explains AI uses, introduces the extension and keeps both next
   // Le menu expose les produits, les besoins cyber et le cabinet, puis la porte de
   // découverte des solutions xSOM.
   const navigation = page.getByRole("navigation", { name: "Navigation principale" });
-  await expect(navigation.getByRole("link")).toHaveCount(4);
+  await expect(navigation.getByRole("link")).toHaveCount(6);
   await expect(navigation.getByRole("link", { name: "Nos produits", exact: true })).toHaveAttribute("href", "/produits");
   await expect(navigation.getByRole("link", { name: "Vos besoins cybers", exact: true })).toHaveAttribute("href", "/menaces");
   await expect(navigation.getByRole("link", { name: /Notre cabinet/ })).toHaveAttribute("href", "https://www.xsom.fr");
-  await expect(navigation.getByRole("link", { name: "Découvrir les solutions xSOM", exact: true })).toHaveAttribute("href", "/produits");
+  await expect(navigation.getByRole("link", { name: "Commencer gratuitement", exact: true })).toHaveAttribute("href", "/extension");
 
   // Le masthead mène aux produits sans passer par le menu : c'est la sortie que lit
   // un visiteur qui ne remonte pas.
-  await expect(page.locator(".guard-masthead__actions").getByRole("link").nth(1)).toHaveAttribute("href", "/produits");
+  await expect(page.locator(".guard-masthead__actions").getByRole("link").nth(1)).toHaveAttribute("href", "/developpeurs");
 
   const chemins = page.locator("#vous .guard-path");
   await expect(chemins).toHaveCount(2);
   await expect(chemins.filter({ hasText: "Entreprise" }).getByRole("link")).toHaveAttribute("href", /^mailto:/);
-  await expect(chemins.filter({ hasText: "Individuelle / POC" }).getByRole("link")).toHaveAttribute("href", "/saas");
+  await expect(chemins.filter({ hasText: "Secret Guard Local" }).getByRole("link")).toHaveAttribute("href", "/extension");
 
   expect(apiRequests).toBe(0);
 
@@ -79,12 +79,12 @@ test("the products page gives both products the same billing, and the menu point
   // revenir au rang de note de bas de page sans que rien ne le signale.
   const produits = page.locator(".guard-product-feature");
   await expect(produits).toHaveCount(2);
-  await expect(produits.nth(0).getByRole("heading", { name: "Secret Guard", exact: true })).toBeVisible();
-  await expect(produits.nth(0).getByRole("link")).toHaveAttribute("href", "/extension");
+  await expect(produits.nth(0).getByRole("heading", { name: "Vos agents. Votre cadre.", exact: true })).toBeVisible();
+  await expect(produits.nth(0).getByRole("link")).toHaveAttribute("href", "/developpeurs");
   await expect(produits.nth(1).getByRole("heading", { name: "AI Guard, la plateforme", exact: true })).toBeVisible();
   // La sortie de la plateforme est la porte du compte, pas la page qui la décrit :
   // celle-ci reste accessible en second, sans être la première chose qu'on clique.
-  await expect(produits.nth(1).getByRole("link", { name: /inscrire/ })).toHaveAttribute("href", "/signup");
+  await expect(produits.nth(1).getByRole("link", { name: /Explorer la plateforme/ })).toHaveAttribute("href", "/saas");
   await expect(produits.nth(1).locator('a[href="/saas"]')).toHaveCount(1);
   await expect(page.locator(".guard-glossary-link a")).toHaveAttribute("href", "/menaces");
 
@@ -101,7 +101,7 @@ test("the products page gives both products the same billing, and the menu point
 
   // Le titre de la page est un `h1` : sans lui, la page des produits n'aurait pas de
   // tête et la hiérarchie repartirait à `h2`.
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Deux produits");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Du poste de travail à l’entreprise");
 });
 
 test("every public header carries the same orientation menu", async ({ page }) => {
@@ -111,8 +111,8 @@ test("every public header carries the same orientation menu", async ({ page }) =
     await expect(navigation.getByRole("link", { name: "Nos produits", exact: true })).toHaveAttribute("href", "/produits");
     await expect(navigation.getByRole("link", { name: "Vos besoins cybers", exact: true })).toHaveAttribute("href", "/menaces");
     await expect(navigation.getByRole("link", { name: /Notre cabinet/ })).toHaveAttribute("href", "https://www.xsom.fr");
-    await expect(navigation.getByRole("link", { name: "Découvrir les solutions xSOM", exact: true })).toHaveAttribute("href", "/produits");
-    await expect(navigation.getByRole("link")).toHaveCount(4);
+    await expect(navigation.getByRole("link", { name: "Commencer gratuitement", exact: true })).toHaveAttribute("href", "/extension");
+    await expect(navigation.getByRole("link")).toHaveCount(6);
   }
 });
 
@@ -231,7 +231,7 @@ test("the self-serve page says what the product does, and where that stops", asy
   await page.locator('a[href="/saas"]').click();
   await expect(page).toHaveURL(/\/saas$/);
 
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Encadrez vos agents");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Une règle avant chaque action raccordée");
 
   // L'inventaire : six familles, et chacune porte des lignes concrètes. Le compte
   // par famille est ce qui distingue cette page de celle d'avant, qui tenait en six
@@ -275,7 +275,7 @@ test("the self-serve page says what the product does, and where that stops", asy
 
 test("the extension page hands over a file that installs, and names its limits", async ({ page }) => {
   await page.goto("/produits");
-  await page.locator('a[href="/extension"]').click();
+  await page.locator('[data-offer="local"] a').click();
   await expect(page).toHaveURL(/\/extension$/);
 
   // Le bouton est le produit de cette page. Un lien relatif ou un chemin de
@@ -303,10 +303,10 @@ test("the extension page hands over a file that installs, and names its limits",
   await expect(page.locator("#enterprise")).toContainText("MDM");
   await expect(page.locator("#enterprise")).toContainText("requirements.toml");
   await expect(page.locator("#enterprise")).toContainText("Codex ne distribue pas les scripts");
-  await expect(page.locator("#enterprise a.guard-button")).toHaveAttribute("href", /^mailto:/);
+  await expect(page.locator("#enterprise a.guard-button")).toHaveAttribute("href", "/developpeurs/tarifs");
 
   // Une installation, quatre assistants : c'est l'argument, il doit être vérifiable.
-  await expect(page.locator(".guard-ext-hosts li")).toHaveCount(4);
+  await expect(page.locator(".guard-ext-hosts li")).toHaveCount(3);
   const claude = page.locator(".guard-ext-hosts li", { hasText: "Claude Code" });
   await expect(claude.locator('img[src*="claude-ai-icon"]')).toBeVisible();
 
@@ -316,7 +316,7 @@ test("the extension page hands over a file that installs, and names its limits",
   // bonne commande. Les deux planchers sont donc tenus tous les deux, parce que
   // ne nommer que 1.137 laissait croire qu'on installe quand même en 1.133 pour
   // couvrir les trois autres assistants.
-  const bornes = page.locator(".guard-ext-limits li");
+  const bornes = page.locator(".guard-ext-limits").last().locator("li");
   await expect(bornes).toHaveCount(4);
   await expect(bornes.nth(1)).toContainText("1.136");
   await expect(bornes.nth(1)).toContainText("1.137");
@@ -324,7 +324,7 @@ test("the extension page hands over a file that installs, and names its limits",
 
   // Tant que la fiche n'existe pas, la page ne propose pas de l'ouvrir.
   await expect(page.getByRole("link", { name: /Installer depuis VS Code/ })).toHaveCount(0);
-  await expect(page.getByText("compte éditeur", { exact: false })).toBeVisible();
+  await expect(page.getByText("n’est pas encore distribuée", { exact: false })).toBeVisible();
 });
 
 for (const width of [390, 768, 1440]) {

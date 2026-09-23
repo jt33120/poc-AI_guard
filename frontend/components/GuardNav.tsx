@@ -18,13 +18,11 @@
 
 import Link from "next/link";
 
-import { GUARD_COPY } from "@/components/guard-copy";
 import { GUARD_HOME_COPY } from "@/components/guard-home-copy";
 import { LanguageToggle, useT } from "@/lib/i18n";
 
 export function GuardNav() {
   const { lang } = useT();
-  const copy = GUARD_COPY[lang];
   const home = GUARD_HOME_COPY[lang];
   return (
     <nav
@@ -32,6 +30,9 @@ export function GuardNav() {
     >
       <Link className="guard-nav__link" href="/produits">
         {home.navProducts}
+      </Link>
+      <Link className="guard-nav__link" href="/developpeurs">
+        {home.navDevelopers}
       </Link>
       <Link className="guard-nav__link" href="/menaces">
         {home.navGlossary}
@@ -45,9 +46,10 @@ export function GuardNav() {
         {home.navCabinet}
         <span aria-hidden="true">↗</span>
       </a>
+      <Link className="guard-nav__link" href="/developpeurs/tarifs">{lang === "fr" ? "Tarifs" : "Pricing"}</Link>
       <LanguageToggle />
-      <Link href="/produits" className="guard-button guard-button--small">
-        {copy.signin}
+      <Link href="/extension" className="guard-button guard-button--small">
+        {lang === "fr" ? "Commencer gratuitement" : "Start for free"}
         <span aria-hidden="true">↗</span>
       </Link>
     </nav>

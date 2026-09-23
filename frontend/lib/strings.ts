@@ -465,12 +465,12 @@ export const STR = {
   // 58 caractères et le sous-titre 350 : repris tels quels, un moteur de recherche
   // tronque les deux. Ces deux clés-ci sont taillées pour la place réellement offerte.
   "meta.tagline": {
-    en: "An experimental AI governance POC",
-    fr: "Un POC expérimental pour encadrer les usages IA",
+    en: "French governance for AI agents",
+    fr: "La gouvernance française des agents IA",
   },
   "meta.description": {
-    en: "Explore xSOM’s AI Guard prototype: employee, developer and confidential-data use cases, with explicit integration boundaries and published evidence.",
-    fr: "Explorez AI Guard, le prototype de xSOM : usages collaborateurs, développeurs et données confidentielles, avec un périmètre d’intégration explicite et des preuves publiées.",
+    en: "Developer Guard by xSOM Consulting, a French cybersecurity publisher. Free local secret detection, team policies and 90 days of qualified team discovery.",
+    fr: "Developer Guard, édité en France par xSOM Consulting. Détection locale gratuite, règles d’équipe et 90 jours de découverte sur un périmètre qualifié.",
   },
   "land.hero.title": {
     en: "Ship AI agents to production. Without losing control.",

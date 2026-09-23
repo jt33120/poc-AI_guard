@@ -1,180 +1,51 @@
 "use client";
 
-/**
- * La page des produits.
- *
- * Les deux produits vivaient dans une section d'ancre de l'accueil, et le menu y
- * renvoyait par un `#`. Deux conséquences : un visiteur qui cherchait ce qu'on propose
- * atterrissait au milieu d'une page qui parle d'abord des risques, et la plateforme s'y
- * réduisait à une ligne posée sous l'extension. Ils ont maintenant une page, et le même
- * traitement : ce que le produit garde, à quel moment, et ce qu'on obtient sans nous
- * parler.
- *
- * Les deux aperçus sont des **illustrations**, pas des captures : ils montrent la forme
- * d'une décision, pas un relevé. La page le dit sur chacun, et la borne de chaque
- * produit est écrite sous son bouton plutôt qu'en bas de page.
- */
-
 import Image from "next/image";
 import Link from "next/link";
-
 import { Wordmark, XsomMark } from "@/components/brand";
-import { GUARD_COPY } from "@/components/guard-copy";
-import {
-  GUARD_HOME_COPY,
-  type GuardHomeCopy,
-} from "@/components/guard-home-copy";
+import { CONTACT_MAILTO, GUARD_COPY } from "@/components/guard-copy";
+import { GUARD_HOME_COPY } from "@/components/guard-home-copy";
 import { GuardNav } from "@/components/GuardNav";
+import { GuardOffers, GuardPublisher } from "@/components/GuardOffers";
 import { SignalPreferences } from "@/design-system/react";
 import { useT } from "@/lib/i18n";
-
-// Les dimensions naturelles des deux captures. `next/image` les exige pour
-// réserver la place avant le chargement ; une valeur fausse ferait sauter la mise
-// en page à l'arrivée de l'image.
-const PANNEAU = { width: 958, height: 1110 };
-const CONSOLE = { width: 2880, height: 2600 };
-
-/** Le poste de travail : ce qui part du clavier, avant d'atteindre le modèle. */
-function SecretGuard({ copy }: { copy: GuardHomeCopy }) {
-  return (
-    <article className="guard-product-feature">
-      <div className="guard-product-feature__copy reveal" data-delay="1">
-        <p className="guard-product-feature__tag">
-          <span aria-hidden="true" />
-          {copy.extensionTag}
-        </p>
-        <h2>{copy.extensionTitle}</h2>
-        <p className="guard-product-feature__lead">{copy.extensionIntro}</p>
-        <p>{copy.extensionBody}</p>
-        <p className="guard-product-feature__hosts">{copy.extensionHosts}</p>
-        <ul>
-          {copy.extensionFeatures.map((feature) => (
-            <li key={feature}>{feature}</li>
-          ))}
-        </ul>
-        <Link href="/extension" className="guard-button">
-          {copy.extensionAction}
-          <span aria-hidden="true">↗</span>
-        </Link>
-        <p className="guard-product-feature__note">
-          <span className="guard-product-feature__price">{copy.featured}</span>
-          {copy.extensionNote}
-        </p>
-      </div>
-      <figure className="guard-product-shot reveal" data-delay="2">
-        <Image
-          src="/signal-media/secret-guard-panneau.png"
-          alt={copy.extensionShotAlt}
-          width={PANNEAU.width}
-          height={PANNEAU.height}
-          sizes="(max-width: 800px) 100vw, 46vw"
-        />
-        <figcaption>{copy.extensionShotCaption}</figcaption>
-      </figure>
-    </article>
-  );
-}
-
-/** La passerelle : ce que l'agent fait, une fois le prompt parti. */
-function Platform({ copy }: { copy: GuardHomeCopy }) {
-  return (
-    <article className="guard-product-feature">
-      <div className="guard-product-feature__copy reveal" data-delay="1">
-        <p className="guard-product-feature__tag">
-          <span aria-hidden="true" />
-          {copy.platformTag}
-        </p>
-        <h2>{copy.platformTitle}</h2>
-        <p className="guard-product-feature__lead">{copy.platformIntro}</p>
-        <p>{copy.platformBody}</p>
-        <ul>
-          {copy.platformFeatures.map((feature) => (
-            <li key={feature}>{feature}</li>
-          ))}
-        </ul>
-        <Link href="/signup" className="guard-button">
-          {copy.platformAction}
-          <span aria-hidden="true">↗</span>
-        </Link>
-        <Link href="/saas" className="guard-link guard-product-feature__learn">
-          {copy.platformLearn}
-          <span aria-hidden="true">↗</span>
-        </Link>
-        <p className="guard-product-feature__note">{copy.platformNote}</p>
-      </div>
-      <figure className="guard-product-shot reveal" data-delay="2">
-        <Image
-          src="/signal-media/ai-guard-console.png"
-          alt={copy.platformShotAlt}
-          width={CONSOLE.width}
-          height={CONSOLE.height}
-          sizes="(max-width: 800px) 100vw, 46vw"
-        />
-        <figcaption>{copy.platformShotCaption}</figcaption>
-      </figure>
-    </article>
-  );
-}
 
 export function ProductsOffer() {
   const { lang } = useT();
   const copy = GUARD_COPY[lang];
   const home = GUARD_HOME_COPY[lang];
-  return (
-    <main className="guard-landing guard-home">
-      <header className="guard-header">
-        <div className="guard-wrap guard-header__inner">
-          <Link href="/" className="brand">
-            <XsomMark />
-            <Wordmark />
-          </Link>
-          <GuardNav />
+  return <main className="guard-landing guard-home">
+    <header className="guard-header"><div className="guard-wrap guard-header__inner"><Link href="/" className="brand"><XsomMark /><Wordmark /></Link><GuardNav /></div></header>
+    <section className="guard-home-section guard-products-page guard-wrap" aria-labelledby="products-heading">
+      <div className="guard-home-heading"><p className="guard-kicker">{lang === "fr" ? "LA GAMME XSOM · ÉDITEUR FRANÇAIS" : "XSOM PRODUCTS · FRENCH PUBLISHER"}</p><h1 id="products-heading">{home.productsTitle}</h1><p>{home.productsIntro}</p></div>
+      <article className="guard-product-feature">
+        <div className="guard-product-feature__copy">
+          <p className="guard-product-feature__tag">01 / DEVELOPER GUARD</p>
+          <h2>{lang === "fr" ? "Vos agents. Votre cadre." : "Your agents. Your rules."}</h2>
+          <p className="guard-product-feature__lead">{lang === "fr" ? "Gardez la vitesse de l’IA et la maîtrise de vos décisions." : "Keep AI’s speed and control over your decisions."}</p>
+          <p>{lang === "fr" ? "Démarrez avec Secret Guard Local gratuit. Passez au cadre Équipe pour distribuer vos règles, faire valider les actions sensibles et suivre les décisions. xSOM accompagne la qualification de vos assistants et de votre environnement." : "Start with free Secret Guard Local. Move to Team to distribute policies, approve sensitive actions and track decisions. xSOM helps qualify your assistants and environment."}</p>
+          <ul><li>{lang === "fr" ? "Détection de secrets sur le poste" : "On-device secret detection"}</li><li>{lang === "fr" ? "Politiques d’entreprise et validations ciblées" : "Company policies and focused approvals"}</li><li>{lang === "fr" ? "Un éditeur français identifié pour le support et le contrat" : "An identified French publisher for support and contract"}</li></ul>
+          <Link href="/developpeurs" className="guard-button">{lang === "fr" ? "Découvrir Developer Guard" : "Discover Developer Guard"} ↗</Link>
+          <p className="guard-product-feature__note">{lang === "fr" ? "Claude Code, Codex, Copilot : le pilote vérifie chaque capacité dans vos versions. Le VSIX gratuit ne vaut pas activation du service Équipe." : "Claude Code, Codex, Copilot: the pilot checks each capability in your versions. The free VSIX does not activate the Team service."}</p>
         </div>
-      </header>
-
-      <section
-        className="guard-home-section guard-products guard-products-page guard-wrap"
-        aria-labelledby="products-heading"
-      >
-        <div className="guard-home-heading reveal">
-          <p className="guard-kicker">{home.productsKicker}</p>
-          <h1 id="products-heading">{home.productsTitle}</h1>
-          <p>{home.productsIntro}</p>
+        <figure className="guard-product-shot"><Image src="/signal-media/secret-guard-panneau.png" alt={home.extensionShotAlt} width={958} height={1110} sizes="(max-width: 800px) 100vw, 46vw" /><figcaption>{home.extensionShotCaption}</figcaption></figure>
+      </article>
+    </section>
+    <GuardOffers />
+    <section className="guard-commercial guard-wrap" aria-labelledby="platform-heading">
+      <article className="guard-product-feature">
+        <div className="guard-product-feature__copy">
+          <p className="guard-product-feature__tag">02 / AI GUARD</p><h2 id="platform-heading">{home.platformTitle}</h2><p className="guard-product-feature__lead">{home.platformIntro}</p><p>{home.platformBody}</p>
+          <ul>{home.platformFeatures.map((feature) => <li key={feature}>{feature}</li>)}</ul>
+          <Link href="/saas" className="guard-button">{lang === "fr" ? "Explorer la plateforme" : "Explore the platform"} ↗</Link>
+          <a className="guard-link" href={CONTACT_MAILTO}>{lang === "fr" ? "Chiffrer une intégration" : "Request an integration quote"} ↗</a>
+          <p className="guard-product-feature__note">{lang === "fr" ? "Console de découverte gratuite. Passerelle et intégration sur devis, distinctes des tarifs Developer Guard. Seuls les outils raccordés sont contrôlés." : "Free discovery console. Gateway and integration quoted separately from Developer Guard pricing. Only connected tools are controlled."}</p>
         </div>
-        <SecretGuard copy={home} />
-        <Platform copy={home} />
-        <aside className="guard-glossary-link reveal">
-          <span className="guard-glossary-link__icon" aria-hidden="true">
-            Aa
-          </span>
-          <div>
-            <h3>{home.glossaryTitle}</h3>
-            <p>{home.glossaryBody}</p>
-          </div>
-          <Link href="/menaces">
-            {home.glossaryAction}
-            <span aria-hidden="true">↗</span>
-          </Link>
-        </aside>
-      </section>
-
-      <footer className="guard-footer">
-        <div className="guard-wrap">
-          <div className="brand">
-            <XsomMark />
-            <Wordmark />
-          </div>
-          <p>{copy.footer}</p>
-          <Link href="/evidence">{copy.evidence}</Link>
-          <a href="https://www.xsom.fr" target="_blank" rel="noreferrer">
-            {copy.cabinet} ↗
-          </a>
-          <details>
-            <summary>{lang === "fr" ? "Affichage" : "Display"}</summary>
-            <SignalPreferences lang={lang} />
-          </details>
-        </div>
-      </footer>
-    </main>
-  );
+        <figure className="guard-product-shot"><Image src="/signal-media/ai-guard-console.png" alt={home.platformShotAlt} width={2880} height={2600} sizes="(max-width: 800px) 100vw, 46vw" /><figcaption>{home.platformShotCaption}</figcaption></figure>
+      </article>
+    </section>
+    <aside className="guard-glossary-link guard-wrap reveal"><span className="guard-glossary-link__icon" aria-hidden="true">Aa</span><div><h3>{home.glossaryTitle}</h3><p>{home.glossaryBody}</p></div><Link href="/menaces">{home.glossaryAction} ↗</Link></aside>
+    <GuardPublisher />
+    <footer className="guard-footer"><div className="guard-wrap"><div className="brand"><XsomMark /><Wordmark /></div><p>{copy.footer}</p><Link href="/developpeurs/confiance">{lang === "fr" ? "Engagement xSOM" : "xSOM commitment"}</Link><a href="https://www.xsom.fr" target="_blank" rel="noreferrer">{copy.cabinet} ↗</a><details><summary>{lang === "fr" ? "Affichage" : "Display"}</summary><SignalPreferences lang={lang} /></details></div></footer>
+  </main>;
 }

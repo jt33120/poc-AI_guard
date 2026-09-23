@@ -8,7 +8,7 @@ cybersecurity. Do not shorten, replace or repurpose its original content to suit
 a layout. The explicit exceptions are removal of AI Guard promotion and an
 accurate technical privacy notice about local fonts/preferences.
 
-The separate AI Guard site presents an experimental POC. Introduce user needs
+The AI Guard site now presents the French xSOM publisher, free local protection and qualified Developer Guard pilots. Public launch prices are targets confirmed by quote. Introduce user needs
 (employees, developers, confidential data) before integration vocabulary. A
 provider selection is an illustration, not a connection or a protection claim.
 Personal ChatGPT/Claude web use is not automatically covered by the gateway.
