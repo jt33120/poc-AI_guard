@@ -50,14 +50,14 @@ export const EXTENSION_ON_MARKETPLACE: boolean = false;
 /** Concrete orientation copy; none of these illustrative paths claims live coverage. */
 export const GUARD_COPY = {
   fr: {
-    poc: "Prototype en expérimentation",
+    poc: "Secret Guard gratuit · Developer Guard en pilote accompagné",
     title: ["La solution cyber", "pour tous vos usages IA."],
     intro: "Simple, efficace.",
     explore: "Voir les menaces",
     signin: "Découvrir les solutions xSOM",
     evidence: "Périmètre & preuves",
     heroNote:
-      "AI Guard est un POC du cabinet xSOM, ESN spécialisée en cybersécurité.",
+      "AI Guard est édité par XSOM CONSULTING, entreprise française de cybersécurité.",
     demo: "Scénario illustratif · aucune action réelle",
     choose: "Choisir un exemple",
     scene: "Parcours illustratif d’une demande IA",
@@ -194,23 +194,23 @@ export const GUARD_COPY = {
         note: "Parcours à préparer avec votre administrateur, selon vos assistants et votre parc.",
       },
       builder: {
-        tag: "Individuelle / POC · Gratuit",
+        tag: "Secret Guard Local · Gratuit",
         title: "Commencez sur votre poste de travail.",
         list: [
           "Télécharger l’extension et l’installer localement",
           "Approuver explicitement le hook dans Codex avec /hooks",
           "Valider le blocage avec un secret fictif dans chaque assistant",
         ],
-        action: "Découvrir les offres SaaS",
+        action: "Installer Secret Guard gratuitement",
         note: "Sans compte. Vous gardez la main sur les hooks installés dans votre profil.",
       },
     },
     saasKicker: "Libre-service",
-    saasTitle: "Encadrez vos agents, sans nous appeler.",
+    saasTitle: "Une règle avant chaque action raccordée.",
     saasIntro:
-      "Vous créez un compte, vous branchez vos agents, vous écrivez vos règles. L’action refusée par la règle n’a pas lieu, et ce qui passe est écrit.",
+      "Explorez la console AI Guard puis préparez votre passerelle avec xSOM. Elle applique vos règles aux appels d’outils qui la traversent, sollicite les validations nécessaires et garde une trace des décisions.",
     saasOpen:
-      "Tout est ouvert à l’inscription, rien n’est facturé : on montre ce que le produit sait faire.",
+      "Console de découverte gratuite. Passerelle et intégration sur devis, distinctes des tarifs Developer Guard.",
     saasIncluded: "Ce que ça sait faire",
     saasFamilies: [
       {
@@ -306,17 +306,17 @@ export const GUARD_COPY = {
     saasCta: "Créer un compte",
     saasNote:
       "Le périmètre dépend de ce que vous branchez : ce qui ne passe pas par nous n’est pas contrôlé.",
-    extKicker: "Secret Guard · Individuelle / POC gratuit",
-    extTitle: "Repérez les secrets avant l’envoi.",
+    extKicker: "SECRET GUARD LOCAL · GRATUIT · ÉDITEUR FRANÇAIS",
+    extTitle: "Vos secrets restent sur votre poste.",
     extIntro:
-      "Une extension gratuite pour analyser vos prompts localement. Sur un chemin d’envoi testé et pris en charge, le hook bloque la demande lorsqu’un secret est détecté.",
+      "Détectez les clés, jetons et mots de passe avant l’envoi dans les prompts pris en charge. Analyse locale, sans compte obligatoire, sans carte et sans quota de scans. Édité par xSOM Consulting en France.",
     extPlansTitle: "Sur votre poste ou dans votre entreprise",
-    extFreeTitle: "Individuelle / POC",
+    extFreeTitle: "Secret Guard Local",
     extFreeLabel: "Gratuit",
     extFreeBody: "Extension et installation locale, sans compte. Vous activez la protection puis approuvez explicitement sa définition dans /hooks, dans Codex CLI.",
     extFreeNote: "Un hook utilisateur reste désactivable. Toute modification de sa définition demande une nouvelle approbation dans Codex.",
-    extEnterpriseTitle: "Entreprise",
-    extEnterpriseLabel: "Déploiement accompagné",
+    extEnterpriseTitle: "Developer Guard Équipe",
+    extEnterpriseLabel: "90 jours de découverte offerts",
     extEnterpriseBody: "Votre administrateur distribue les scripts via MDM, l’outil de gestion des postes, et impose les hooks Codex dans requirements.toml. La politique d’entreprise les déclare fiables ; ils ne peuvent pas être désactivés depuis l’interface de gestion des hooks.",
     extEnterpriseNote: "Codex ne distribue pas les scripts. Leur installation et leurs mises à jour restent à la charge de l’éditeur ou de l’entreprise. Ce parcours doit être préparé et validé sur votre parc.",
     extEnterpriseAction: "Préparer le déploiement",
@@ -324,7 +324,7 @@ export const GUARD_COPY = {
     extInstallVsix: "Télécharger l’extension",
     extInstallMarket: "Installer depuis VS Code",
     extMarketSoon:
-      "La Place de marché VS Code demande un compte éditeur, que ce prototype n’a pas encore ouvert. Le fichier ci-dessus est donc le canal, et il s’installe en deux gestes.",
+      "Installez la version publiée au format VSIX. L’extension n’est pas encore distribuée sur la Place de marché VS Code.",
     extStepsTitle: "Trois gestes",
     extSteps: [
       {
@@ -342,16 +342,25 @@ export const GUARD_COPY = {
     ],
     extHostsTitle: "Des intégrations à vérifier dans chaque assistant",
     extHostsBody:
-      "L’activation configure les hooks des assistants ci-dessous. Claude Code : blocage observé en session. Codex : intégration en cours de validation. Pour chaque assistant, la présence d’un hook ne suffit pas : testez le refus avant de vous fier à la protection.",
+      "L’activation configure les chemins actuellement testés. Une capacité inconnue reste non vérifiée ; elle ne devient jamais une promesse commerciale par la seule présence d’un hook.",
     extHosts: [
       "VS Code et Copilot",
       "Claude Code",
       "Codex",
-      "Windsurf Cascade",
     ],
+    extGuardTitle: "Évoluer vers Developer Guard",
+    extGuardItems: [
+      "Secrets : détection locale avant les prompts et lectures de fichiers prises en charge.",
+      "Ressources : fichiers de credentials et racines hors périmètre refusés dans les événements supportés.",
+      "Actions : écriture, suppression, publication, déploiement, réseau et MCP reçoivent une décision explicite.",
+      "Exceptions : une action sensible attend une approbation courte et liée à son contexte exact.",
+      "Preuves : inventaire du poste, politique, décision et statut d’interception restent distincts.",
+    ],
+    extGuardLimit:
+      "Un hook utilisateur ne contrôle ni un terminal lancé hors session ni un autre binaire. Le profil renforcé impose en plus l’environnement système et les sorties réseau.",
     extCheckTitle: "Vérifier que ça tient",
     extCheckBody:
-      "Composez un faux jeton : les lettres « ghp_ » suivies de trente-six caractères alphanumériques quelconques. Collez-le dans la conversation de l’un des quatre assistants. L’envoi doit être refusé avant d’atteindre le modèle.",
+      "Composez un faux jeton : les lettres « ghp_ » suivies de trente-six caractères alphanumériques quelconques. Collez-le dans la conversation de l’un des assistants pris en charge. L’envoi doit être refusé avant d’atteindre le modèle.",
     extLocalTitle: "Rien ne sort pour décider",
     extLocalBody:
       "La détection est locale et déterministe. Aucun candidat n’est vérifié en ligne, aucune télémétrie n’est émise, et un résultat porte la règle et sa raison, jamais la valeur détectée.",
@@ -369,10 +378,10 @@ export const GUARD_COPY = {
     finalBody: "Commençons par votre équipe, vos données et vos contraintes.",
     contact: "Échanger avec xSOM",
     cabinet: "Le cabinet xSOM",
-    footer: "Un terrain d’expérimentation, pas une offre généralisée.",
+    footer: "Édité par XSOM CONSULTING · Arcachon, France. Gratuit local et offres d’équipe sur qualification.",
   },
   en: {
-    poc: "Experimental prototype",
+    poc: "Free Secret Guard · guided Developer Guard pilots",
     title: ["The cybersecurity solution", "for every AI use case."],
     intro: "Simple. Effective.",
     explore: "See the threats",
@@ -512,23 +521,23 @@ export const GUARD_COPY = {
         note: "Prepare with your administrator for the assistants and devices you use.",
       },
       builder: {
-        tag: "Individual / POC · Free",
+        tag: "Secret Guard Local · Free",
         title: "Start on your workstation.",
         list: [
           "Download the extension and install it locally",
           "Explicitly trust the Codex hook using /hooks",
           "Verify blocking with a fake secret in each assistant",
         ],
-        action: "Discover the SaaS offers",
+        action: "Install Secret Guard for free",
         note: "No account needed. You control the hooks installed in your profile.",
       },
     },
     saasKicker: "Self-serve",
-    saasTitle: "Govern your agents, without calling us.",
+    saasTitle: "A rule before every connected action.",
     saasIntro:
-      "Create an account, connect your agents, write your rules. An action the rule refuses does not happen, and whatever passes is recorded.",
+      "Explore the AI Guard console, then prepare your gateway with xSOM. It applies your rules to tool calls that pass through it, requests the required approvals and records decisions.",
     saasOpen:
-      "Everything is open on sign-up and nothing is billed: we are showing what the product can do.",
+      "Free discovery console. Gateway and integration quoted separately from Developer Guard pricing.",
     saasIncluded: "What it can do",
     saasFamilies: [
       {
@@ -623,17 +632,17 @@ export const GUARD_COPY = {
     saasCta: "Create an account",
     saasNote:
       "Scope depends on what you connect: anything that does not go through us is not governed.",
-    extKicker: "Secret Guard · Free individual / POC",
-    extTitle: "Detect secrets before sending.",
+    extKicker: "SECRET GUARD LOCAL · FREE · FRENCH PUBLISHER",
+    extTitle: "Your secrets stay on your workstation.",
     extIntro:
-      "A free extension to scan prompts locally. On a tested, supported submission path, the hook blocks the request when a secret is detected.",
+      "Detect keys, tokens and passwords before they leave in supported prompts. Local analysis, no mandatory account, no card and no scan quota. Published in France by xSOM Consulting.",
     extPlansTitle: "On your workstation or across your organisation",
-    extFreeTitle: "Individual / POC",
+    extFreeTitle: "Secret Guard Local",
     extFreeLabel: "Free",
     extFreeBody: "Extension and local installation, with no account needed. Enable protection, then explicitly trust its definition using /hooks in Codex CLI.",
     extFreeNote: "User hooks remain removable. Changing a hook definition requires a new trust review in Codex.",
-    extEnterpriseTitle: "Enterprise",
-    extEnterpriseLabel: "Assisted deployment",
+    extEnterpriseTitle: "Developer Guard Team",
+    extEnterpriseLabel: "90 days of free discovery",
     extEnterpriseBody: "Your administrator distributes scripts through MDM, your device management system, and enforces Codex hooks in requirements.toml. Enterprise policy trusts these hooks; they cannot be disabled from the hook management interface.",
     extEnterpriseNote: "Codex does not distribute scripts. The publisher or your organisation handles installation and updates. This deployment path needs preparation and validation on your devices.",
     extEnterpriseAction: "Plan your deployment",
@@ -641,7 +650,7 @@ export const GUARD_COPY = {
     extInstallVsix: "Download the extension",
     extInstallMarket: "Install from VS Code",
     extMarketSoon:
-      "The VS Code Marketplace requires a publisher account, which this prototype has not opened yet. The file above is the channel, and it installs in two steps.",
+      "Install the published VSIX release. The extension is not yet distributed on the VS Code Marketplace.",
     extStepsTitle: "Three steps",
     extSteps: [
       {
@@ -659,16 +668,25 @@ export const GUARD_COPY = {
     ],
     extHostsTitle: "Verify integration in each assistant",
     extHostsBody:
-      "Activation configures hooks for the assistants below. Claude Code: blocking observed in a session. Codex: integration undergoing validation. For every assistant, a configured hook is not enough: test rejection before relying on protection.",
+      "Activation configures currently tested paths. An unknown capability stays unverified; a hook being present never becomes a commercial claim on its own.",
     extHosts: [
       "VS Code and Copilot",
       "Claude Code",
       "Codex",
-      "Windsurf Cascade",
     ],
+    extGuardTitle: "Move to Developer Guard",
+    extGuardItems: [
+      "Secrets: local detection before supported prompts and file reads.",
+      "Resources: credential files and out-of-scope roots are denied for supported events.",
+      "Actions: writes, deletion, publishing, deployment, network and MCP receive an explicit decision.",
+      "Exceptions: a sensitive action waits for a short-lived approval tied to its exact context.",
+      "Evidence: workstation inventory, policy, decision and interception status remain distinct.",
+    ],
+    extGuardLimit:
+      "A user hook controls neither a terminal launched outside the session nor another binary. The reinforced profile additionally imposes the system environment and network egress.",
     extCheckTitle: "Check that it holds",
     extCheckBody:
-      "Compose a fake token: the letters “ghp_” followed by thirty six alphanumeric characters of your choice. Paste it into any of the four assistants. The send must be refused before it reaches the model.",
+      "Compose a fake token: the letters “ghp_” followed by thirty six alphanumeric characters of your choice. Paste it into a supported assistant. The send must be refused before it reaches the model.",
     extLocalTitle: "Nothing leaves to decide",
     extLocalBody:
       "Detection is local and deterministic. No candidate is verified online, no telemetry is emitted, and a result carries the rule and its reason, never the detected value.",
@@ -686,6 +704,6 @@ export const GUARD_COPY = {
     finalBody: "Let’s start with your team, data and constraints.",
     contact: "Talk to xSOM",
     cabinet: "The xSOM firm",
-    footer: "An experimental project, not a generally available offering.",
+    footer: "Published by XSOM CONSULTING · Arcachon, France. Free local protection and qualified team pilots.",
   },
 } as const;

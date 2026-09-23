@@ -26,7 +26,6 @@ import Image from "next/image";
 
 import { Wordmark, XsomMark } from "@/components/brand";
 import {
-  CONTACT_MAILTO,
   EXTENSION_HERO_MEDIA,
   EXTENSION_MARKETPLACE_URL,
   EXTENSION_ON_MARKETPLACE,
@@ -38,6 +37,7 @@ import { GuardHeroVideo } from "@/components/GuardHeroVideo";
 import { GuardNav } from "@/components/GuardNav";
 import { SignalPreferences } from "@/design-system/react";
 import { useT } from "@/lib/i18n";
+
 
 export function ExtensionOffer() {
   const { lang } = useT();
@@ -114,7 +114,7 @@ export function ExtensionOffer() {
             <p className="guard-path__tag">{copy.extEnterpriseLabel}</p>
             <h3>{copy.extEnterpriseTitle}</h3>
             <p>{copy.extEnterpriseBody}</p>
-            <a className="guard-button" href={CONTACT_MAILTO}>{copy.extEnterpriseAction} ↗</a>
+            <Link className="guard-button" href="/developpeurs/tarifs">{lang === "fr" ? "Voir l’offre Équipe" : "See the Team offer"} ↗</Link>
             <p className="guard-path__note">{copy.extEnterpriseNote}</p>
             <a className="guard-link" href="https://learn.chatgpt.com/fr-FR/docs/hooks#hooks-gérés-définis-dans-requirementstoml" target="_blank" rel="noreferrer">{copy.extEnterpriseDocs} ↗</a>
           </article>
@@ -158,6 +158,22 @@ export function ExtensionOffer() {
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="guard-gateway guard-wrap" aria-labelledby="ext-guard">
+        <h2 id="ext-guard">{copy.extGuardTitle}</h2>
+        <ul className="guard-ext-limits">
+          {copy.extGuardItems.map((item, index) => (
+            <li key={item} className="reveal" data-delay={String(index + 1)}>
+              <span aria-hidden="true">↗</span>{item}
+            </li>
+          ))}
+        </ul>
+        <p className="guard-start__note">{copy.extGuardLimit}</p>
+        <div className="guard-ext-links">
+          <Link className="guard-link" href="/developpeurs">{lang === "fr" ? "Découvrir l’évolution Developer Guard" : "Discover the Developer Guard evolution"} ↗</Link>
+          <Link className="guard-link" href="/menaces">{lang === "fr" ? "Voir les menaces et leur couverture publiée" : "See threats and published coverage"} ↗</Link>
+        </div>
       </section>
 
       <section className="guard-gateway guard-wrap" aria-labelledby="ext-check">
