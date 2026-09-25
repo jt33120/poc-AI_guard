@@ -77,4 +77,45 @@ describe("protection dashboard boundaries", () => {
     expect(html).toContain("Approbation du hook requise dans Codex");
     expect(html).toContain("Validez le blocage dans chaque assistant");
   });
+
+  it("shows the monitored scope and relay action according to live state", () => {
+    const offline = dashboardHtml(healthy, "block", "nonce");
+    expect(offline).toContain("Périmètre surveillé");
+    expect(offline).toContain("Prompts · Surveillé");
+    expect(offline).toContain("Pièces jointes · Non analysées");
+    expect(offline).toContain('href="command:secretGuard.connectGateway"');
+    expect(offline).not.toContain(
+      'href="command:secretGuard.disconnectGateway"',
+    );
+
+    const online = dashboardHtml(healthy, "block", "nonce", false, {
+      state: "online",
+      status: "Claude raccordé",
+      audit: "Audit : 0 en attente",
+    });
+    expect(online).toContain("Pièces jointes · Analysées");
+    expect(online).toContain("Audit : 0 en attente");
+    expect(online).toContain('href="command:secretGuard.disconnectGateway"');
+    expect(online).not.toContain('href="command:secretGuard.connectGateway"');
+
+    const off = dashboardHtml(
+      { ...healthy, state: "off", reason: "not_configured" },
+      "block",
+      "nonce",
+    );
+    expect(off).toContain("Prompts · Non surveillé");
+    expect(off).not.toContain("Prompts · Surveillé");
+  });
+
+  it("escapes relay status and audit in the protection center", () => {
+    const html = dashboardHtml(healthy, "block", "nonce", false, {
+      state: "retrying",
+      status: '<img src=x onerror="alert(1)">',
+      audit: "<script>alert(1)</script>",
+    });
+    expect(html).toContain("&lt;img");
+    expect(html).toContain("&lt;script&gt;");
+    expect(html).not.toContain("<script");
+    expect(html).toContain('href="command:secretGuard.disconnectGateway"');
+  });
 });

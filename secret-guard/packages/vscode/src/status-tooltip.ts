@@ -8,7 +8,6 @@ import {
   banner,
   footer,
   levelTile,
-  scopeTile,
   sectionHeader,
   stateCard,
   wideButton,
@@ -40,17 +39,12 @@ export function statusBarClickCommand(mode: ProtectionMode): string {
 export const STATUS_TOOLTIP_COMMANDS = [
   "secretGuard.setMode",
   "secretGuard.enableHook",
-  "secretGuard.scanClipboard",
   PURGE_CLIPBOARD_COMMAND,
   CHECK_CLIPBOARD_COMMAND,
-  "secretGuard.connectGateway",
-  "secretGuard.disconnectGateway",
   "secretGuard.showDashboard",
 ] as const;
 
 type TooltipCommand = (typeof STATUS_TOOLTIP_COMMANDS)[number];
-
-export type GatewayState = "online" | "retrying" | "offline";
 
 export interface LastScan {
   readonly source: "selection" | "clipboard" | "document";
@@ -68,18 +62,10 @@ export interface StatusTooltipInput {
   // End of the running Avertir window, already formatted for display.
   readonly observeUntil?: string;
   readonly modeApplicationFailed?: boolean;
-  readonly gateway?: {
-    readonly state: GatewayState;
-    readonly status: string;
-    readonly audit?: string;
-  };
   readonly lastScan?: LastScan;
 }
 
-type Gateway = NonNullable<StatusTooltipInput["gateway"]>;
-
 const COLOR = {
-  body: "var(--vscode-editorHoverWidget-foreground)",
   dim: "var(--vscode-descriptionForeground)",
 } as const;
 
@@ -149,16 +135,6 @@ const SCAN_SOURCES: Record<LastScan["source"], string> = {
 const HELP = {
   levels:
     "S’applique aux nouvelles sessions des assistants configurés sur ce poste.",
-  sharing:
-    "Le presse-papiers est vérifié à la demande. Les pièces PNG, PDF et Markdown sont analysées automatiquement dans le relais Claude raccordé.",
-  gateway:
-    "Le relais xSOM nettoie les messages et lit les pièces jointes avant Claude. L’audit ne contient ni prompt ni valeur détectée.",
-  attachmentsCovered:
-    "PNG, PDF et Markdown analysés dans les sessions Claude raccordées au relais xSOM.",
-  attachmentsUncovered:
-    "Non couvert hors relais Claude. Les pièces natives Codex et Copilot ne sont pas interceptées.",
-  attachmentsConnect:
-    "Les pièces PNG, PDF et Markdown ne sont analysées que par le relais xSOM, dans les sessions Claude. Cliquer pour raccorder ce poste.",
   purge:
     "Remplace le presse-papiers par sa version expurgée, prête à coller. Rien n’est modifié si le nettoyage n’est pas complet.",
   check:
@@ -228,7 +204,7 @@ function imageRow(...images: readonly string[]): string {
   return `<div>${images.join("")}</div>`;
 }
 
-function readiness(input: StatusTooltipInput, gateway: Gateway): Readiness {
+function readiness(input: StatusTooltipInput): Readiness {
   const { health } = input;
   if (input.modeApplicationFailed === true)
     return {
@@ -264,14 +240,9 @@ function readiness(input: StatusTooltipInput, gateway: Gateway): Readiness {
       },
     };
   }
-  if (gateway.state === "retrying")
-    return {
-      tone: "warn",
-      summary: "Veille locale active · relais injoignable",
-    };
   return {
     tone: "ok",
-    summary: `${HEALTH_LABELS.active} · ${gateway.state === "online" ? "relais raccordé" : "détection locale"}`,
+    summary: `${HEALTH_LABELS.active} · détection locale`,
   };
 }
 
@@ -370,15 +341,6 @@ function levelBlocks(
   ];
 }
 
-function promptCoverage(
-  health: HookHealth,
-): readonly [string, Tone | undefined] {
-  if (health.state === "active") return ["Surveillé", "ok"];
-  if (health.state === "partial") return ["Couverture partielle", "warn"];
-  if (health.state === "degraded") return ["Non garanti", "danger"];
-  return ["Non surveillé", undefined];
-}
-
 function scanLine(scan: LastScan): string {
   const source = SCAN_SOURCES[scan.source];
   const count = String(scan.findings);
@@ -393,36 +355,6 @@ function scanLine(scan: LastScan): string {
           : ["danger", `${source} · ${count} secret(s) détecté(s)`];
   return textLine(
     `<small>${span("●", TONE_COLORS[tone])}&nbsp;${span(`${summary} · ${escapeHtml(scan.time)}`, COLOR.dim)}</small>`,
-  );
-}
-
-// Attachments are only read by the xSOM relay (backend OCR), so the tile can
-// only be switched on by connecting it; once online, inspection is mandatory
-// and there is nothing left to toggle.
-function attachmentsTile(appearance: Appearance, state: GatewayState): string {
-  if (state === "online")
-    return image(
-      scopeTile(appearance, "paperclip", "Pièces jointes", "Analysées", "ok"),
-      "Pièces jointes analysées",
-      HELP.attachmentsCovered,
-    );
-  const art = scopeTile(
-    appearance,
-    "paperclip",
-    "Pièces jointes",
-    state === "retrying" ? "Relais injoignable" : "Raccorder le relais",
-    undefined,
-  );
-  if (state === "retrying")
-    return image(
-      art,
-      "Pièces jointes non analysées",
-      HELP.attachmentsUncovered,
-    );
-  return link(
-    image(art, "Pièces jointes non analysées : raccorder le relais"),
-    { command: "secretGuard.connectGateway" },
-    HELP.attachmentsConnect,
   );
 }
 
@@ -457,106 +389,14 @@ function clipboardBlocks(
   ];
 }
 
-function perimeterBlocks(
-  appearance: Appearance,
-  input: StatusTooltipInput,
-  gateway: Gateway,
-): readonly string[] {
-  const covered = gateway.state === "online";
-  const [promptState, promptTone] = promptCoverage(input.health);
-  const blocks = [
-    imageRow(
-      image(
-        sectionHeader(
-          appearance,
-          "02",
-          "PÉRIMÈTRE SURVEILLÉ",
-          covered ? "prompt + pièces jointes" : "prompt uniquement",
-        ),
-        "Périmètre surveillé",
-        HELP.sharing,
-      ),
-    ),
-    imageRow(
-      image(
-        scopeTile(appearance, "chat", "Prompt", promptState, promptTone),
-        `Prompt : ${promptState}`,
-      ),
-      attachmentsTile(appearance, gateway.state),
-    ),
-    ...clipboardBlocks(appearance, input.mode),
-  ];
-  return input.lastScan === undefined
-    ? blocks
-    : [...blocks, scanLine(input.lastScan)];
-}
-
-function relayBlocks(
-  appearance: Appearance,
-  gateway: Gateway,
-): readonly string[] {
-  const tone: Tone | undefined =
-    gateway.state === "online"
-      ? "ok"
-      : gateway.state === "retrying"
-        ? "warn"
-        : undefined;
-  const action: Action =
-    gateway.state === "offline"
-      ? {
-          label: "Raccorder le relais",
-          glyph: "plug",
-          command: "secretGuard.connectGateway",
-        }
-      : {
-          label: "Déconnecter le relais",
-          glyph: "plug",
-          command: "secretGuard.disconnectGateway",
-        };
-  const details = [
-    smallLine(
-      escapeHtml(gateway.status),
-      tone === undefined ? COLOR.dim : TONE_COLORS[tone],
-    ),
-  ];
-  if (gateway.audit !== undefined)
-    details.push(smallLine(escapeHtml(gateway.audit), COLOR.dim));
-  return [
-    imageRow(
-      image(
-        sectionHeader(appearance, "03", "RELAIS DE PROTECTION"),
-        "Relais de protection",
-        HELP.gateway,
-      ),
-    ),
-    textLine(span("xSOM · Relais Claude", COLOR.body)),
-    ...details,
-    imageRow(
-      link(
-        image(
-          wideButton(
-            appearance,
-            action.label,
-            action.glyph,
-            gateway.state === "offline" ? "primary" : "secondary",
-          ),
-          action.label,
-        ),
-        action,
-      ),
-    ),
-  ];
-}
-
 export function statusTooltipMarkdown(input: StatusTooltipInput): string {
   const { appearance } = input;
-  const gateway = input.gateway ?? { state: "offline", status: "Non connecté" };
-  const state = readiness(input, gateway);
+  const state = readiness(input);
   return [
     ...headerBlocks(appearance, state),
     ...levelBlocks(appearance, input, state),
-    ...perimeterBlocks(appearance, input, gateway),
-    ...relayBlocks(appearance, gateway),
+    ...clipboardBlocks(appearance, input.mode),
+    ...(input.lastScan === undefined ? [] : [scanLine(input.lastScan)]),
     imageRow(
       image(footer(appearance), "Détecteur local · Audit sans contenu · xSOM"),
     ),

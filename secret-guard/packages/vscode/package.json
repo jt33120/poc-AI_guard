@@ -1,7 +1,7 @@
 {
   "name": "xsom-secret-guard-vscode",
   "displayName": "xSOM Secret Guard",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Vos idées à l’IA, vos secrets à l’abri. Détection locale et protection des prompts pour Claude Code, Codex et GitHub Copilot.",
   "publisher": "xsom",
   "type": "module",
