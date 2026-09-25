@@ -157,13 +157,10 @@ describe("status bar tooltip controls", () => {
     expect(card("light")).not.toContain("#4daafc");
   });
 
-  it("explains each section on hover", () => {
+  it("keeps level guidance on hover", () => {
     const titles = pictures(render()).map((picture) => picture.title);
     expect(titles).toContain(
-      "Le presse-papiers est vérifié à la demande. Les pièces PNG, PDF et Markdown sont analysées automatiquement dans le relais Claude raccordé.",
-    );
-    expect(titles).toContain(
-      "Le relais xSOM nettoie les messages et lit les pièces jointes avant Claude. L’audit ne contient ni prompt ni valeur détectée.",
+      "S’applique aux nouvelles sessions des assistants configurés sur ce poste.",
     );
   });
 
@@ -171,13 +168,9 @@ describe("status bar tooltip controls", () => {
     const markdown = render();
     expect(markdown).not.toContain("Claude Code");
     expect(markdown).not.toContain("Finaliser Codex");
-    expect(alts(markdown)).toEqual(
-      expect.arrayContaining([
-        "Niveau de protection",
-        "Périmètre surveillé",
-        "Relais de protection",
-      ]),
-    );
+    expect(alts(markdown)).toContain("Niveau de protection");
+    expect(alts(markdown)).not.toContain("Périmètre surveillé");
+    expect(alts(markdown)).not.toContain("Relais de protection");
     expect(linkFor(markdown, "Vérifier le presse-papiers")).toBe(
       CHECK_CLIPBOARD_COMMAND,
     );
@@ -186,50 +179,17 @@ describe("status bar tooltip controls", () => {
     );
   });
 
-  it("switches attachments on only by connecting the relay that reads them", () => {
-    const offline = render();
-    expect(
-      linkFor(offline, "Pièces jointes non analysées : raccorder le relais"),
-    ).toBe("secretGuard.connectGateway");
-
-    const retrying = render({
-      gateway: { state: "retrying", status: "Connexion indisponible" },
-    });
-    expect(alts(retrying)).toContain("Pièces jointes non analysées");
-    expect(linkFor(retrying, "Pièces jointes non analysées")).toBeUndefined();
-
-    const online = render({
-      gateway: { state: "online", status: "Claude raccordé" },
-    });
-    expect(alts(online)).toContain("Pièces jointes analysées");
-    expect(linkFor(online, "Pièces jointes analysées")).toBeUndefined();
-    expect(online).toContain("Prêt à veiller · relais raccordé");
-  });
-
-  it("only claims prompt monitoring when protection is verified", () => {
-    expect(alts(render())).toContain("Prompt : Surveillé");
-    const off = render({
-      health: { ...healthy, state: "off", reason: "not_configured" },
-    });
-    expect(alts(off)).toContain("Prompt : Non surveillé");
-    expect(alts(off)).not.toContain("Prompt : Surveillé");
-  });
-
-  it("offers connection when offline and disconnection otherwise", () => {
-    expect(linkFor(render(), "Raccorder le relais")).toBe(
+  it("keeps relay setup in the protection center", () => {
+    const markdown = render();
+    expect(alts(markdown)).not.toContain("Périmètre surveillé");
+    expect(alts(markdown)).not.toContain("Relais de protection");
+    expect(linkedCommands(markdown)).not.toContain(
       "secretGuard.connectGateway",
     );
-    for (const state of ["online", "retrying"] as const) {
-      const markdown = render({
-        gateway: { state, status: "Claude raccordé", audit: "Audit : 0" },
-      });
-      expect(linkFor(markdown, "Déconnecter le relais")).toBe(
-        "secretGuard.disconnectGateway",
-      );
-      expect(linkedCommands(markdown)).not.toContain(
-        "secretGuard.connectGateway",
-      );
-    }
+    expect(linkedCommands(markdown)).not.toContain(
+      "secretGuard.disconnectGateway",
+    );
+    expect(linkedCommands(markdown)).toContain("secretGuard.showDashboard");
   });
 
   it("replaces the level card with an alert and a fix when protection is not ready", () => {
@@ -298,7 +258,6 @@ describe("status bar tooltip controls", () => {
     const injected =
       '<a href="command:secretGuard.disableHook">x</a><img src=x onerror="alert(1)"> $(bug)';
     const markdown = render({
-      gateway: { state: "online", status: injected, audit: injected },
       lastScan: {
         source: "clipboard",
         decision: "BLOCK",
@@ -325,7 +284,6 @@ describe("status bar tooltip controls", () => {
         appearance,
         mode: "observe",
         health: { ...healthy, state: "partial", reason: "config_invalid" },
-        gateway: { state: "retrying", status: "Connexion indisponible" },
         lastScan: {
           source: "selection",
           decision: "WARN",

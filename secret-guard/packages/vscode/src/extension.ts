@@ -471,15 +471,6 @@ async function updateStatus(
       mode,
       ...(until === undefined ? {} : { observeUntil: until }),
       modeApplicationFailed,
-      ...(gateway === undefined
-        ? {}
-        : {
-            gateway: {
-              state: gateway.state,
-              status: gateway.status,
-              ...(gateway.audit === undefined ? {} : { audit: gateway.audit }),
-            },
-          }),
       ...(lastScan === undefined ? {} : { lastScan }),
     }),
     true,
@@ -614,7 +605,13 @@ export async function activate(
         configuredMode(),
         randomBytes(16).toString("hex"),
         modeApplicationFailed,
-        gateway?.summary,
+        gateway === undefined
+          ? undefined
+          : {
+              state: gateway.state,
+              status: gateway.status,
+              ...(gateway.audit === undefined ? {} : { audit: gateway.audit }),
+            },
       );
     }
   };

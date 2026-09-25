@@ -11,7 +11,8 @@ import {
 } from "./gateway-client.js";
 import { startGatewayBridge, type GatewayBridge } from "./gateway-bridge.js";
 import { canDelegate, routeFile } from "./gateway-delegation.js";
-import type { GatewayState } from "./status-tooltip.js";
+
+export type GatewayState = "online" | "retrying" | "offline";
 
 interface Connection {
   endpoint: string;
@@ -43,10 +44,6 @@ export class GatewayIntegration implements vscode.Disposable {
   private retry: ReturnType<typeof setTimeout> | undefined;
   public status = "Non connecté";
   public constructor(private readonly context: vscode.ExtensionContext) {}
-  public get summary(): string {
-    const audit = this.audit;
-    return `${this.status}${audit === undefined ? "" : ` · ${audit}`}`;
-  }
   public get audit(): string | undefined {
     return this.queue
       ? `Audit : ${this.queue.pending} en attente, ${this.queue.dropped} perdu(s) · ${this.queue.lastSync}`

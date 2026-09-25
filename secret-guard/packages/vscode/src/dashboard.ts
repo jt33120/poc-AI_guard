@@ -1,6 +1,13 @@
 import type { HookHealth } from "./hook-manager.js";
 import type { ProtectionMode } from "@xsom/secret-guard-cli/hook";
 import { PROTECTION_MODES, modeLabel } from "./protection-mode.js";
+import type { GatewayState } from "./gateway-integration.js";
+
+export interface DashboardGateway {
+  readonly state: GatewayState;
+  readonly status: string;
+  readonly audit?: string;
+}
 
 export const DASHBOARD_COMMANDS = [
   "secretGuard.showDashboard",
@@ -47,8 +54,19 @@ export function dashboardHtml(
   mode: ProtectionMode,
   nonce: string,
   modeApplicationFailed = false,
-  gatewaySummary = "Non connecté",
+  gateway: DashboardGateway = { state: "offline", status: "Non connecté" },
 ): string {
+  const promptCoverage = {
+    active: "Surveillé",
+    partial: "Couverture partielle",
+    degraded: "Non garanti",
+    off: "Non surveillé",
+  }[health.state];
+  const attachmentsCovered = gateway.state === "online";
+  const gatewayAction =
+    gateway.state === "offline"
+      ? '<a class="button" href="command:secretGuard.connectGateway">Raccorder ce poste →</a>'
+      : '<a class="button" href="command:secretGuard.disconnectGateway">Déconnecter le relais</a>';
   const hosts = health.hosts
     .map((host) => {
       const healthy =
@@ -80,7 +98,8 @@ export function dashboardHtml(
 <section aria-labelledby="assistants"><div class="section-heading"><h2 id="assistants">Vos assistants</h2><span>État de la configuration locale</span></div><div class="hosts">${hosts || '<p class="note">État des assistants indisponible. Actualisez pour réessayer.</p>'}</div><p class="note">Les sessions distantes et les politiques d’entreprise peuvent modifier la prise en charge. Un test dans chaque assistant confirme l’interception.</p></section>
 <section aria-labelledby="actions"><div class="section-heading"><h2 id="actions">Un doute avant de partager ?</h2><span>Analyse à votre demande</span></div><div class="actions"><a class="action" href="command:secretGuard.scanClipboard"><span class="action-icon" aria-hidden="true">📋</span><span><strong>Vérifier le presse-papiers</strong><small>Scannez le texte que vous allez coller.</small></span></a><a class="action" href="command:secretGuard.purgeClipboard"><span class="action-icon" aria-hidden="true">🧹</span><span><strong>Expurger le presse-papiers</strong><small>Remplacez-le par sa version expurgée, prête à coller.</small></span></a><a class="action" href="command:secretGuard.scanDocument"><span class="action-icon" aria-hidden="true">🔎</span><span><strong>Vérifier le document</strong><small>Analysez le fichier ouvert dans l’éditeur.</small></span></a></div></section>
 <section aria-labelledby="mode"><div class="section-heading"><h2 id="mode">Votre mode de protection</h2><a class="button" href="command:secretGuard.chooseMode">Changer de mode ▾</a></div><div class="policy"><strong>${modeLabel(mode)}</strong><p>${PROTECTION_MODES.find((entry) => entry.mode === mode)?.description}</p><p>${PROTECTION_MODES.find((entry) => entry.mode === mode)?.detail}</p></div><p class="note">Réglage commun aux assistants de cette installation. Après un changement, ouvrez une nouvelle session de votre assistant ; Codex peut demander de valider le hook actualisé.</p></section>
-<section aria-labelledby="gateway"><div class="section-heading"><h2 id="gateway">🌐 Passerelle xSOM · Claude</h2></div><div class="policy"><strong>${escapeHtml(gatewaySummary)}</strong><p>Nettoyage obligatoire avant transmission, dans les sessions Claude raccordées. L’abonnement et la connexion restent gérés par Claude. Les autres assistants gardent leurs protections locales.</p><p>Après connexion, seules des métadonnées d’audit sont enregistrées : poste, date, résultat et nombre de détections. Aucun prompt ni secret dans ce journal. Le contenu original transite par votre passerelle pour être nettoyé.</p><p>La passerelle reste en mode Expurger, même si le mode local change. Pièces jointes non analysables : envoi refusé.</p><a class="button" href="command:secretGuard.connectGateway">Raccorder ce poste →</a> <a href="command:secretGuard.disconnectGateway">Déconnecter</a></div></section>
+<section aria-labelledby="scope"><div class="section-heading"><h2 id="scope">Périmètre surveillé</h2><span>État de cette installation</span></div><div class="policy"><strong>Prompts · ${promptCoverage}</strong><p>Les assistants configurés utilisent la protection locale. Un test dans chaque assistant confirme l’interception.</p></div><div class="policy"><strong>Pièces jointes · ${attachmentsCovered ? "Analysées" : "Non analysées"}</strong><p>${attachmentsCovered ? "PNG, PDF et Markdown sont analysés dans les sessions Claude raccordées au relais xSOM." : "Hors relais Claude raccordé, les pièces jointes ne sont pas analysées. Les pièces natives Codex et Copilot ne sont pas interceptées."}</p></div><p class="note">Le presse-papiers est vérifié à la demande avec les actions ci-dessus.</p></section>
+<section aria-labelledby="gateway"><div class="section-heading"><h2 id="gateway">Relais de protection · Claude</h2></div><div class="policy"><strong>${escapeHtml(gateway.status)}</strong>${gateway.audit === undefined ? "" : `<p>${escapeHtml(gateway.audit)}</p>`}<p>Nettoyage obligatoire avant transmission, dans les sessions Claude raccordées. L’abonnement et la connexion restent gérés par Claude. Les autres assistants gardent leurs protections locales.</p><p>Après connexion, seules des métadonnées d’audit sont enregistrées : poste, date, résultat et nombre de détections. Aucun prompt ni secret dans ce journal. Le contenu original transite par votre passerelle pour être nettoyé.</p><p>La passerelle reste en mode Expurger, même si le mode local change. Pièces jointes non analysables : envoi refusé.</p>${gatewayAction}</div></section>
 <footer><span>Analyse locale · Aucun appel réseau du détecteur</span><span>Audit distant uniquement après raccordement xSOM</span></footer>
 </main></body></html>`;
 }
