@@ -84,3 +84,9 @@ Claude Opus 5.5
   anchor-restricted scanning.
 - Custom detections are never delegated to the Claude relay (it does not know the tuning).
 - Largest pack: 16 KiB 16 ms, 256 KiB 250 ms, 1 MiB ≈ 1 s p95 (complete); hook load 28 ms.
+- Adversarial review (blind hunter, edge cases, verification gaps, acceptance audit) fixed:
+  no relay delegation of custom or incomplete scans, one budget per hook decision, invisible
+  characters, label sanitisation, tenant-scoped history, atomic merged writes, verified policy
+  tenant, §7 fields gated on platform support, native RegExp fast path for bounded context-only
+  patterns. Open (documented): enrollment needs the Claude relay, unsigned `null` removal,
+  unauthenticated local state, hook refusals not reported to posture.
