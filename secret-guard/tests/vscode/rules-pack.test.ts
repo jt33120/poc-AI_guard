@@ -197,6 +197,35 @@ describe("rules pack synchronisation", () => {
     });
   });
 
+  it("never replaces a newer pack applied meanwhile by another window", async () => {
+    const directory = await freshStorage();
+    let release: () => void = () => undefined;
+    const slow = syncRulesPack("https://xsom.test", "token", directory, {
+      keys,
+      now: NOW,
+      fetchPack: () =>
+        new Promise((resolve) => {
+          release = () => {
+            resolve(envelope(reference));
+          };
+        }),
+    });
+    await syncRulesPack("https://xsom.test", "token", directory, {
+      keys,
+      now: NOW,
+      ...serving(envelope({ ...reference, version: 4 })),
+    });
+    release();
+    await slow;
+    expect(await view(directory)).toMatchObject({
+      state: "active",
+      version: 4,
+    });
+    expect(
+      (await readRulesPackState(directory)).highest["acme-main"]?.version,
+    ).toBe(4);
+  });
+
   it("goes back to the built-in rules when the tenant has no tuning any more", async () => {
     const directory = await freshStorage();
     await syncRulesPack("https://xsom.test", "token", directory, {

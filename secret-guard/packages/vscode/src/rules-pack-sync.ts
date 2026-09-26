@@ -13,6 +13,7 @@ import {
   verifyRulesPackEnvelope,
   writePrivateFile,
   writeRulesPackState,
+  type AcceptedVersion,
   type AppliedRulesPack,
   type AuthorityKey,
   type RulesPackRefusal,
@@ -173,13 +174,19 @@ export async function syncRulesPack(
     });
     return { outcome: "rejected", reason: accepted.reason };
   }
+  // Several VS Code windows may synchronise at once: re-read the state and
+  // never replace a newer pack another window has already applied.
+  const fresh = await readRulesPackState(storage);
+  const newer = fresh.highest[accepted.pack.packId];
+  if (newer !== undefined && newer.version > accepted.pack.version)
+    return { outcome: "applied", digest: newer.digest };
   await writePrivateFile(rulesPackPath(storage), JSON.stringify(envelope));
   await writeRulesPackState(storage, {
     schemaVersion: 1,
     tenantId: accepted.pack.tenantId,
     tenantSource: tenant?.source ?? "first_pack",
     highest: {
-      ...state.highest,
+      ...mergeHighest(state.highest, fresh.highest),
       [accepted.pack.packId]: {
         version: accepted.pack.version,
         digest: accepted.digest,
@@ -189,6 +196,19 @@ export async function syncRulesPack(
     lastSync: record(now, "applied"),
   });
   return { outcome: "applied", digest: accepted.digest };
+}
+
+function mergeHighest(
+  left: RulesPackState["highest"],
+  right: RulesPackState["highest"],
+): Record<string, AcceptedVersion> {
+  const merged: Record<string, AcceptedVersion> = { ...left };
+  for (const [packId, entry] of Object.entries(right)) {
+    const current = merged[packId];
+    if (current === undefined || entry.version > current.version)
+      merged[packId] = entry;
+  }
+  return merged;
 }
 
 /** Forget the tenant learned from this enrollment (on disconnection). */
