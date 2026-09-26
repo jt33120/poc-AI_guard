@@ -203,6 +203,26 @@ test.describe("client : lecture seule", () => {
     await expect(page.getByRole("link", { name: "xSOM operator workshop →" })).toBeVisible();
   });
 
+  test("une chaîne rompue s'annonce, et un lecteur ne voit pas les motifs", async ({ page, context }) => {
+    await authenticate(context);
+    const hidden = {
+      ...TENANT_VIEW,
+      chainIntact: false,
+      pack: {
+        ...PACK,
+        detectors: PACK.detectors.map((detector) => {
+          const { pattern: _pattern, ...rest } = detector as typeof detector & { pattern?: string };
+          return rest;
+        }),
+      },
+    };
+    await control(page, { "v1/rules-pack": (route) => route.fulfill({ json: hidden }) });
+    await page.goto("/extensions/reglage");
+    await expect(page.getByRole("alert").filter({ hasText: "ne se vérifie plus" })).toBeVisible();
+    await expect(page.getByText("Motif réservé aux administrateurs").first()).toBeVisible();
+    await expect(page.getByText("CLI-[0-9]{8}")).toHaveCount(0);
+  });
+
   test("la page des postes mène au réglage", async ({ page, context }) => {
     await authenticate(context);
     await control(page, {
@@ -290,7 +310,7 @@ test.describe("opérateur xSOM : composer, éprouver, signer", () => {
     const confirmTitle = page.getByRole("heading", { name: "Signer la version 3 pour ACME ?" });
     await expect(confirmTitle).toBeFocused();
     await page.getByRole("button", { name: "Signer et publier", exact: true }).click();
-    await expect(page.getByText(/Version 3 signée et publiée · empreinte 3e02ed3f19f8/)).toBeVisible();
+    await expect(page.getByText(/Version 3 signée et publiée pour ACME · empreinte 3e02ed3f19f8/)).toBeFocused();
     expect(published).not.toBeNull();
     const body = published as unknown as {
       expectedVersion: number;
@@ -344,5 +364,91 @@ test.describe("opérateur xSOM : composer, éprouver, signer", () => {
     await expect(page.getByText(/Clé de signature xSOM absente sur ce serveur/)).toBeVisible();
     await expect(page.getByText("Paquet valide : prêt à signer en version 3.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Signer et publier la version 3" })).toBeDisabled();
+  });
+});
+
+test.describe("opérateur xSOM : ce que la signature protège", () => {
+  function operatorRoutes(view: typeof OPERATOR_VIEW, publish: Handler) {
+    return {
+      "v1/xsom/tenants": (route: Route) =>
+        route.fulfill({ json: [{ id: TENANT, name: "ACME", packId: "acme-main", version: 2, publishedAt: null }] }),
+      [`v1/xsom/tenants/${TENANT}/rules-pack`]: (route: Route) => route.fulfill({ json: view }),
+      [`v1/xsom/tenants/${TENANT}/rules-pack/dry-run`]: (route: Route) =>
+        route.fulfill({ json: { valid: true, error: null, version: 3, detections: [] } }),
+      [`v1/xsom/tenants/${TENANT}/rules-pack/publish`]: publish,
+    };
+  }
+
+  test("republier conserve contexte, casse et entropie, et jamais un positif sur des termes", async ({ page, context }) => {
+    await authenticate(context);
+    const view = structuredClone(OPERATOR_VIEW);
+    const detectors = view.draft.detectors as unknown as Record<string, unknown>[];
+    detectors[0] = {
+      ...view.draft.detectors[0],
+      context: { keywords: ["client", "dossier"], window: 32 },
+      match: { type: "pattern", pattern: "CLI-[0-9]{8}", caseInsensitive: true, minEntropyTenths: 25 },
+    };
+    let sent: { draft: { detectors: Record<string, unknown>[] } } | null = null;
+    await control(
+      page,
+      operatorRoutes(view, (route) => {
+        sent = route.request().postDataJSON() as typeof sent;
+        return route.fulfill({ json: { version: 3, packId: "acme-main", payloadDigest: DIGEST, keyId: KEY } });
+      }),
+    );
+    await page.goto("/xsom/regles");
+    await page.getByLabel("Client").selectOption(TENANT);
+    const expected = page.getByLabel("Détecteur attendu").first();
+    await expect(expected.locator("option")).toHaveText(["—", "Identifiant client ACME"]);
+    await expect(page.getByText("Paquet valide : prêt à signer en version 3.")).toBeVisible();
+    await page.getByRole("button", { name: "Signer et publier la version 3" }).click();
+    await page.getByRole("button", { name: "Signer et publier", exact: true }).click();
+    await expect(page.getByText(/Version 3 signée et publiée pour ACME/)).toBeVisible();
+    const detector = (sent as unknown as { draft: { detectors: Record<string, unknown>[] } }).draft.detectors[0];
+    expect(detector.context).toEqual({ keywords: ["client", "dossier"], window: 32 });
+    expect(detector.match).toEqual({
+      type: "pattern",
+      pattern: "CLI-[0-9]{8}",
+      caseInsensitive: true,
+      minEntropyTenths: 25,
+    });
+  });
+
+  test("modifier après avoir ouvert la confirmation la referme ; Échap rend le focus", async ({ page, context }) => {
+    await authenticate(context);
+    await control(page, operatorRoutes(OPERATOR_VIEW, (route) => route.fulfill({ status: 500, json: {} })));
+    await page.goto("/xsom/regles");
+    await page.getByLabel("Client").selectOption(TENANT);
+    const open = page.getByRole("button", { name: "Signer et publier la version 3" });
+    await expect(open).toBeEnabled();
+    await open.click();
+    await expect(page.getByRole("heading", { name: /Signer la version 3/ })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(open).toBeFocused();
+    await open.click();
+    await page.getByLabel("Libellé affiché").first().fill("Identifiant client ACME (modifié)");
+    await expect(page.getByRole("heading", { name: /Signer la version 3/ })).toHaveCount(0);
+  });
+
+  test("une publication concurrente est annoncée, pas écrasée", async ({ page, context }) => {
+    await authenticate(context);
+    await control(
+      page,
+      operatorRoutes(OPERATOR_VIEW, (route) => route.fulfill({ status: 409, json: { detail: { code: "version_conflict" } } })),
+    );
+    await page.goto("/xsom/regles");
+    await page.getByLabel("Client").selectOption(TENANT);
+    await page.getByRole("button", { name: "Signer et publier la version 3" }).click();
+    await page.getByRole("button", { name: "Signer et publier", exact: true }).click();
+    await expect(page.getByText("Une autre version a été publiée entre-temps. Rechargez le client.")).toBeFocused();
+  });
+
+  test("l'atelier se lit en anglais", async ({ page, context }) => {
+    await authenticate(context, "en");
+    await control(page, operatorRoutes(OPERATOR_VIEW, (route) => route.fulfill({ status: 500, json: {} })));
+    await page.goto("/xsom/regles");
+    await expect(page.getByRole("heading", { name: "Compose, test, sign", level: 1 })).toBeVisible();
+    await page.getByLabel("Customer").selectOption(TENANT);
+    await expect(page.getByText("Valid pack: ready to sign as version 3.")).toBeVisible();
   });
 });

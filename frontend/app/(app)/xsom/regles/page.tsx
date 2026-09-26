@@ -34,8 +34,10 @@ export default function XsomRulesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const [revision, setRevision] = useState(0);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState("");
   const generation = useRef(0);
+  const selectedRef = useRef("");
+  const noticeRef = useRef<HTMLParagraphElement>(null);
 
   const loadTenants = useCallback(async () => {
     setLoading(true);
@@ -57,9 +59,12 @@ export default function XsomRulesPage() {
   const loadTenant = useCallback(async (tenantId: string) => {
     const run = ++generation.current;
     setView(null);
-    if (!tenantId) return;
-    setLoading(true);
     setError(null);
+    if (!tenantId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     try {
       const result = await apiGet<OperatorRulesView>(
         `v1/xsom/tenants/${tenantId}/rules-pack`,
@@ -76,6 +81,7 @@ export default function XsomRulesPage() {
   }, []);
 
   useEffect(() => {
+    selectedRef.current = selected;
     void loadTenant(selected);
   }, [selected, loadTenant]);
 
@@ -107,7 +113,7 @@ export default function XsomRulesPage() {
                     id="rules-tenant"
                     value={selected}
                     onChange={(event) => {
-                      setNotice(null);
+                      setNotice("");
                       setSelected(event.target.value);
                     }}
                   >
@@ -122,7 +128,7 @@ export default function XsomRulesPage() {
                 </div>
                 {view && (
                   <p className="rules-tenant-state">
-                    {copy.current} :{" "}
+                    {copy.current}{" "}
                     <strong className="console-mono">
                       {view.pack
                         ? `v${view.pack.version} · ${view.pack.packId}`
@@ -147,19 +153,26 @@ export default function XsomRulesPage() {
               )}
             </section>
           )}
-          {notice && (
-            <p className="rules-status" role="status" data-tone="allow">
-              {notice}
-            </p>
-          )}
+          <p
+            className="rules-status"
+            role="status"
+            data-tone={notice ? "allow" : undefined}
+            tabIndex={-1}
+            ref={noticeRef}
+          >
+            {notice}
+          </p>
           {loading && <ConsoleSkeleton rows={3} />}
           {view && !loading && (
             <RulesWorkshop
               key={`${view.tenant.id}-${revision}`}
               view={view}
-              onPublished={(message) => {
+              onPublished={(tenantId, message) => {
                 setNotice(message);
-                void loadTenant(selected);
+                noticeRef.current?.focus();
+                // L'opérateur a pu changer de client pendant la signature : ne recharger
+                // que celui qui est encore affiché.
+                if (tenantId === selectedRef.current) void loadTenant(tenantId);
               }}
             />
           )}

@@ -15,7 +15,7 @@ export function CoverageList({ coverage }: { coverage: Coverage | null }) {
   }
   return (
     <>
-      <div className="rules-coverage" aria-label={copy.tenant.coverage}>
+      <div className="rules-coverage" role="group" aria-label={copy.tenant.coverage}>
         <p className="rules-coverage-main">
           {fill(copy.tenant.coverageLine, {
             up: coverage.up_to_date,

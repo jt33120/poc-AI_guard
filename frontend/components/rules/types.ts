@@ -133,7 +133,7 @@ export interface DryRunResult {
   error: PackError | null;
   version: number;
   detections: { detector: string; label: string; start: number; end: number }[];
-  digests: number;
+  truncated?: boolean;
 }
 
 export interface PublishResult {

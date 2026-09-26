@@ -125,25 +125,64 @@ function keywords(text: string): string[] {
     .filter(Boolean);
 }
 
-/** Les défauts évidents, signalés avant tout appel : identifiant, libellé, contexte. */
+/** Les champs d'un détecteur qui ne passeraient pas la validation du serveur. */
+export function detectorProblems(detector: DetectorForm): Set<string> {
+  const problems = new Set<string>();
+  if (!ID.test(detector.id)) problems.add("id");
+  if (!detector.label.trim()) problems.add("label");
+  if (detector.type === "pattern" && !detector.pattern) problems.add("pattern");
+  const words = keywords(detector.keywords);
+  if (words.some((word) => !KEYWORD.test(word))) problems.add("keywords");
+  const window = Number(detector.window);
+  if (words.length && (!Number.isInteger(window) || window < 1 || window > 256))
+    problems.add("window");
+  if (detector.entropy.trim()) {
+    const bits = Number(detector.entropy.replace(",", "."));
+    if (!Number.isFinite(bits) || bits < 0 || bits > 8) problems.add("entropy");
+  }
+  return problems;
+}
+
+/** Une ligne de test à moitié remplie : du texte sans détecteur, ou l'inverse. */
+function incompletePositive(test: TestForm): boolean {
+  return Boolean(test.text.trim()) !== Boolean(test.detector);
+}
+
+/** Le premier défaut évident, signalé avant tout appel : sa clé, ou le nom du champ. */
 export function localProblem(form: DraftForm): string | null {
   if (!ID.test(form.packId)) return "packId";
   const days = Number(form.validityDays);
   if (!Number.isInteger(days) || days < 1 || days > 730) return "validityDays";
   for (const detector of form.detectors) {
-    if (!ID.test(detector.id) || !detector.label.trim()) return detector.key;
-    const words = keywords(detector.keywords);
-    if (words.some((word) => !KEYWORD.test(word))) return detector.key;
-    const window = Number(detector.window);
-    if (words.length && (!Number.isInteger(window) || window < 1 || window > 256))
-      return detector.key;
-    if (detector.type === "pattern" && !detector.pattern) return detector.key;
-    if (detector.entropy.trim()) {
-      const bits = Number(detector.entropy.replace(",", "."));
-      if (!Number.isFinite(bits) || bits < 0 || bits > 8) return detector.key;
-    }
+    if (detectorProblems(detector).size) return detector.key;
+  }
+  for (const test of form.positives) {
+    if (incompletePositive(test)) return test.key;
   }
   return null;
+}
+
+function sentPositives(form: DraftForm): number[] {
+  return form.positives.flatMap((test, index) =>
+    test.text.trim() && test.detector ? [index] : [],
+  );
+}
+
+function sentNegatives(form: DraftForm): number[] {
+  return form.negatives.flatMap((test, index) => (test.text.trim() ? [index] : []));
+}
+
+/**
+ * Le numéro affiché d'un test cité par le serveur. Le serveur compte les tests envoyés ;
+ * le formulaire, ses lignes — une ligne vide ne part pas et décalerait tout.
+ */
+export function displayedTest(
+  form: DraftForm,
+  kind: "positive" | "negative",
+  sent: number,
+): number {
+  const rows = kind === "positive" ? sentPositives(form) : sentNegatives(form);
+  return (rows[sent] ?? sent) + 1;
 }
 
 export function toDraft(form: DraftForm): Record<string, unknown> {
@@ -176,12 +215,11 @@ export function toDraft(form: DraftForm): Record<string, unknown> {
       };
     }),
     tests: {
-      positives: form.positives
-        .filter((test) => test.text.trim() && test.detector)
-        .map((test) => ({ detector: test.detector, text: test.text })),
-      negatives: form.negatives
-        .filter((test) => test.text.trim())
-        .map((test) => test.text),
+      positives: sentPositives(form).map((index) => ({
+        detector: form.positives[index].detector,
+        text: form.positives[index].text,
+      })),
+      negatives: sentNegatives(form).map((index) => form.negatives[index].text),
     },
   };
 }

@@ -68,7 +68,7 @@
 }
 .rules-coverage-main {
   font-family: var(--font-display);
-  font-size: var(--fs-h3, 1.25rem);
+  font-size: var(--fs-h3);
   font-weight: 600;
 }
 .rules-coverage-counts {
@@ -208,6 +208,13 @@
 .rules-detector[data-problem] {
   border-color: var(--signal-deny);
 }
+.rules-field-problem {
+  color: var(--signal-deny);
+  font-size: var(--console-small-size);
+}
+.rules-page [aria-invalid="true"] {
+  border-color: var(--signal-deny);
+}
 .rules-detector legend,
 .rules-tests legend {
   padding: 0 var(--sp-2);
@@ -228,6 +235,9 @@
 }
 .rules-test[data-with-detector] {
   grid-template-columns: minmax(0, 14rem) minmax(0, 1fr) auto;
+}
+.rules-status:empty {
+  min-height: 0;
 }
 .rules-status {
   min-height: var(--sp-6);
@@ -292,7 +302,7 @@
 }
 .rules-confirm h3 {
   font-family: var(--font-display);
-  font-size: var(--fs-h3, 1.25rem);
+  font-size: var(--fs-h3);
   font-weight: 600;
 }
 .rules-confirm p,

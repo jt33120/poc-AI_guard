@@ -1,12 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 
 import { EmptyState } from "@/components/ConsoleUI";
 import { apiSend } from "@/lib/client";
 import { useT } from "@/lib/i18n";
 
 import {
+  detectorProblems,
+  displayedTest,
   emptyDetector,
   formFromView,
   localProblem,
@@ -48,6 +58,8 @@ function Field({
   wide?: boolean;
   children: ReactNode;
 }) {
+  // Le champ lui-même porte `aria-invalid` et `aria-describedby` ; ce conteneur ne fait
+  // que les ranger.
   return (
     <div className={wide ? "rules-field rules-span" : "rules-field"}>
       <label htmlFor={id}>{label}</label>
@@ -99,12 +111,25 @@ function DetectorEditor({
   const id = (name: string) => `${detector.key}-${name}`;
   const set = <K extends keyof DetectorForm>(key: K, value: DetectorForm[K]) =>
     onChange({ ...detector, [key]: value });
+  const problems = detectorProblems(detector);
+  const invalid = (name: string) => (problems.has(name) ? true : undefined);
+  const describe = (name: string, help = false) =>
+    [help ? `${id(name)}-help` : "", problems.has(name) ? id("problems") : ""]
+      .filter(Boolean)
+      .join(" ") || undefined;
   return (
     <fieldset className="rules-detector" data-problem={problem || undefined}>
       <legend>
         {index + 1}. {copy.types[detector.type]}
         {detector.label ? ` · ${detector.label}` : ""}
       </legend>
+      {problems.size > 0 && (
+        <p className="rules-field-problem" id={id("problems")}>
+          {fill(op.incomplete, {
+            fields: [...problems].map((name) => copy.fields[name as keyof typeof copy.fields]).join(", "),
+          })}
+        </p>
+      )}
       <div className="rules-fields">
         <Field id={id("id")} label={op.id}>
           <input
@@ -113,6 +138,8 @@ function DetectorEditor({
             value={detector.id}
             spellCheck={false}
             autoComplete="off"
+            aria-invalid={invalid("id")}
+            aria-describedby={describe("id")}
             onChange={(event) => set("id", event.target.value)}
           />
         </Field>
@@ -121,6 +148,10 @@ function DetectorEditor({
             id={id("label")}
             value={detector.label}
             maxLength={80}
+            spellCheck={false}
+            autoComplete="off"
+            aria-invalid={invalid("label")}
+            aria-describedby={describe("label")}
             onChange={(event) => set("label", event.target.value)}
           />
         </Field>
@@ -161,7 +192,8 @@ function DetectorEditor({
               maxLength={256}
               spellCheck={false}
               autoComplete="off"
-              aria-describedby={id("pattern-help")}
+              aria-invalid={invalid("pattern")}
+              aria-describedby={describe("pattern", true)}
               onChange={(event) => set("pattern", event.target.value)}
             />
           </Field>
@@ -178,6 +210,9 @@ function DetectorEditor({
             <input
               id={id("entropy")}
               inputMode="decimal"
+              autoComplete="off"
+              aria-invalid={invalid("entropy")}
+              aria-describedby={describe("entropy")}
               value={detector.entropy}
               onChange={(event) => set("entropy", event.target.value)}
             />
@@ -215,6 +250,10 @@ function DetectorEditor({
           <input
             id={id("keywords")}
             value={detector.keywords}
+            spellCheck={false}
+            autoComplete="off"
+            aria-invalid={invalid("keywords")}
+            aria-describedby={describe("keywords")}
             onChange={(event) => set("keywords", event.target.value)}
           />
         </Field>
@@ -222,13 +261,21 @@ function DetectorEditor({
           <input
             id={id("window")}
             inputMode="numeric"
+            autoComplete="off"
+            aria-invalid={invalid("window")}
+            aria-describedby={describe("window")}
             value={detector.window}
             onChange={(event) => set("window", event.target.value)}
           />
         </Field>
       </div>
       {onRemove && (
-        <button type="button" className="btn btn-ghost" onClick={onRemove}>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          aria-label={fill(op.removeDetector, { n: index + 1 })}
+          onClick={onRemove}
+        >
           {op.remove}
         </button>
       )}
@@ -277,7 +324,9 @@ function TestList({
               >
                 <option value="">—</option>
                 {detectors
-                  .filter((detector) => detector.id)
+                  // Jamais un détecteur de termes : un positif est signé en clair,
+                  // et il contiendrait le terme confidentiel.
+                  .filter((detector) => detector.id && detector.type === "pattern")
                   .map((detector) => (
                     <option key={detector.key} value={detector.id}>
                       {detector.label || detector.id}
@@ -292,12 +341,15 @@ function TestList({
               rows={2}
               value={test.text}
               maxLength={2000}
+              spellCheck={false}
+              autoComplete="off"
               onChange={(event) => update(test.key, { text: event.target.value })}
             />
           </Field>
           <button
             type="button"
             className="btn btn-ghost"
+            aria-label={fill(copy.removeTest, { n: index + 1 })}
             onClick={() => onChange(tests.filter((item) => item.key !== test.key))}
           >
             {copy.remove}
@@ -317,37 +369,54 @@ function TestList({
   );
 }
 
+/** Le dernier essai rendu, avec la composition et le texte exacts qu'il a éprouvés. */
+interface Checked {
+  draft: string;
+  sample: string;
+  result: DryRunResult;
+}
+
+const DEBOUNCE_MS = 900;
+const RETRY_AFTER_LIMIT_MS = 8000;
+
 /**
  * L'atelier d'un client : composer la version suivante, l'éprouver en direct, la signer.
- * Chaque modification relance un essai après une courte pause ; la publication n'est
- * offerte que sur un essai valide et une clé présente, et demande une confirmation.
+ * Chaque modification relance un essai après une courte pause. On ne signe que la
+ * composition **exacte** qu'un essai a trouvée valide : toute modification ultérieure
+ * ferme la confirmation et exige un nouvel essai.
  */
 export function RulesWorkshop({
   view,
   onPublished,
 }: {
   view: OperatorRulesView;
-  onPublished: (message: string) => void;
+  onPublished: (tenantId: string, message: string) => void;
 }) {
   const { lang } = useT();
   const copy = RULES_COPY[lang].operator;
   const [form, setForm] = useState<DraftForm>(() => formFromView(view));
   const [sample, setSample] = useState("");
-  const [result, setResult] = useState<DryRunResult | null>(null);
+  const [checked, setChecked] = useState<Checked | null>(null);
   const [checking, setChecking] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
   const [confirming, setConfirming] = useState(false);
   const [publishing, setPublishing] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState("");
   const generation = useRef(0);
   const confirmRef = useRef<HTMLHeadingElement>(null);
+  const publishRef = useRef<HTMLButtonElement>(null);
+  const noticeRef = useRef<HTMLParagraphElement>(null);
   const problem = useMemo(() => localProblem(form), [form]);
+  const draft = useMemo(() => JSON.stringify(toDraft(form)), [form]);
   const nextVersion = (view.pack?.version ?? 0) + 1;
 
   useEffect(() => {
     const run = ++generation.current;
+    // Une composition modifiée n'est plus celle que l'on s'apprêtait à signer.
+    setConfirming(false);
     if (problem) {
-      setResult(null);
+      setChecked(null);
       setChecking(false);
       return;
     }
@@ -356,24 +425,30 @@ export function RulesWorkshop({
       apiSend<DryRunResult>(
         `v1/xsom/tenants/${view.tenant.id}/rules-pack/dry-run`,
         "POST",
-        { draft: toDraft(form), sample: sample || null },
+        { draft: JSON.parse(draft) as unknown, sample: sample || null },
       )
-        .then((answer) => {
+        .then((result) => {
           if (run !== generation.current) return;
-          setResult(answer);
+          setChecked({ draft, sample, result });
           setFailure(null);
         })
         .catch((err: unknown) => {
           if (run !== generation.current) return;
-          setResult(null);
-          setFailure(String(err).includes("422") ? copy.malformed : copy.failed);
+          setChecked(null);
+          const status = String(err);
+          if (status.includes("429")) {
+            setFailure(copy.rateLimited);
+            setTimeout(() => setRetry((value) => value + 1), RETRY_AFTER_LIMIT_MS);
+          } else {
+            setFailure(status.includes("422") ? copy.malformed : copy.failed);
+          }
         })
         .finally(() => {
           if (run === generation.current) setChecking(false);
         });
-    }, 600);
+    }, DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [form, sample, problem, view.tenant.id, copy.malformed, copy.failed]);
+  }, [draft, sample, problem, retry, view.tenant.id, copy]);
 
   useEffect(() => {
     if (confirming) confirmRef.current?.focus();
@@ -387,19 +462,40 @@ export function RulesWorkshop({
       ),
     }));
 
+  const current = checked !== null && checked.draft === draft ? checked : null;
+  const result = current?.result ?? null;
+  const canPublish =
+    view.signingReady && !problem && !checking && Boolean(result?.valid) && !publishing;
+
+  const cancel = useCallback(() => {
+    setConfirming(false);
+    // Rendre le focus au bouton qui a ouvert la confirmation, une fois celui-ci remonté.
+    setTimeout(() => publishRef.current?.focus(), 0);
+  }, []);
+
+  function onConfirmKey(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape" && !publishing) {
+      event.stopPropagation();
+      cancel();
+    }
+  }
+
   async function publish() {
+    if (!current?.result.valid) return;
     setPublishing(true);
-    setNotice(null);
+    setNotice("");
     try {
       const done = await apiSend<PublishResult>(
         `v1/xsom/tenants/${view.tenant.id}/rules-pack/publish`,
         "POST",
-        { draft: toDraft(form), expectedVersion: view.pack?.version ?? 0 },
+        { draft: JSON.parse(current.draft) as unknown, expectedVersion: view.pack?.version ?? 0 },
       );
       setConfirming(false);
       onPublished(
+        view.tenant.id,
         fill(copy.published, {
           v: done.version,
+          tenant: view.tenant.name,
           d: shortDigest(done.payloadDigest),
         }),
       );
@@ -413,13 +509,22 @@ export function RulesWorkshop({
             ? copy.unavailable
             : status.includes("422")
               ? copy.rejected
-              : copy.failed,
+              : status.includes("429")
+                ? copy.rateLimited
+                : copy.failed,
       );
+      setTimeout(() => noticeRef.current?.focus(), 0);
     } finally {
       setPublishing(false);
     }
   }
 
+  const testNumber = (code: string) => (sent: number) =>
+    displayedTest(
+      form,
+      code === "negative_detected" || code === "negative_reveals_term" ? "negative" : "positive",
+      sent,
+    );
   const statusLine = problem
     ? copy.malformed
     : checking
@@ -427,16 +532,11 @@ export function RulesWorkshop({
       : failure
         ? failure
         : result?.error
-          ? explain(result.error, lang)
+          ? explain(result.error, lang, testNumber(result.error.code))
           : result
             ? fill(copy.valid, { v: nextVersion })
             : "";
-  const canPublish =
-    view.signingReady &&
-    !problem &&
-    !checking &&
-    Boolean(result?.valid) &&
-    !publishing;
+  const shown = current && !checking && current.sample === sample ? current : null;
 
   return (
     <div className="rules-workshop">
@@ -458,6 +558,9 @@ export function RulesWorkshop({
                 className="console-mono"
                 value={form.packId}
                 readOnly={Boolean(view.pack)}
+                spellCheck={false}
+                autoComplete="off"
+                aria-invalid={problem === "packId" ? true : undefined}
                 onChange={(event) =>
                   setForm({ ...form, packId: event.target.value })
                 }
@@ -467,6 +570,8 @@ export function RulesWorkshop({
               <input
                 id="pack-validity"
                 inputMode="numeric"
+                autoComplete="off"
+                aria-invalid={problem === "validityDays" ? true : undefined}
                 value={form.validityDays}
                 onChange={(event) =>
                   setForm({ ...form, validityDays: event.target.value })
@@ -575,17 +680,18 @@ export function RulesWorkshop({
           >
             {statusLine}
           </p>
-          {sample && result && (
+          {sample && shown && (
             <>
-              <Highlighted text={sample} detections={result.detections} />
+              <Highlighted text={sample} detections={shown.result.detections} />
               <p className="rules-status">
-                {result.detections.length
-                  ? fill(copy.detections, { n: result.detections.length })
+                {shown.result.detections.length
+                  ? fill(copy.detections, { n: shown.result.detections.length })
                   : copy.noDetection}
+                {shown.result.truncated ? ` ${copy.truncated}` : ""}
               </p>
-              {result.detections.length > 0 && (
+              {shown.result.detections.length > 0 && (
                 <ul className="rules-detections">
-                  {result.detections.map((found) => (
+                  {shown.result.detections.map((found) => (
                     <li key={`${found.detector}-${found.start}`}>
                       <strong>{found.label}</strong>
                       <code>{sample.slice(found.start, found.end)}</code>
@@ -605,16 +711,21 @@ export function RulesWorkshop({
           <h2 id="workshop-publish" className="sr-only">
             {fill(copy.publish, { v: nextVersion })}
           </h2>
-          {notice && (
-            <p className="rules-status" role="status" data-tone="deny">
-              {notice}
-            </p>
-          )}
+          <p
+            className="rules-status"
+            role="status"
+            data-tone={notice ? "deny" : undefined}
+            tabIndex={-1}
+            ref={noticeRef}
+          >
+            {notice}
+          </p>
           {confirming ? (
             <div
               className="rules-confirm"
               role="group"
               aria-labelledby="confirm-title"
+              onKeyDown={onConfirmKey}
             >
               <h3 id="confirm-title" tabIndex={-1} ref={confirmRef}>
                 {fill(copy.confirmTitle, {
@@ -627,7 +738,7 @@ export function RulesWorkshop({
                 <button
                   type="button"
                   className="btn btn-primary"
-                  disabled={publishing}
+                  disabled={!canPublish}
                   onClick={() => void publish()}
                 >
                   {publishing ? copy.publishing : copy.confirm}
@@ -636,7 +747,7 @@ export function RulesWorkshop({
                   type="button"
                   className="btn btn-ghost"
                   disabled={publishing}
-                  onClick={() => setConfirming(false)}
+                  onClick={cancel}
                 >
                   {copy.cancel}
                 </button>
@@ -646,6 +757,7 @@ export function RulesWorkshop({
             <button
               type="button"
               className="btn btn-primary"
+              ref={publishRef}
               disabled={!canPublish}
               onClick={() => setConfirming(true)}
             >

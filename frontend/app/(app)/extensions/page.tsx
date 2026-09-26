@@ -191,8 +191,9 @@ export default function ExtensionsPage() {
         </div>
         <p className="console-note">
           Secret Guard Équipe : des règles calibrées par xSOM sur vos
-          identifiants et projets, signées, puis appliquées hors ligne par
-          chaque poste. Vous les lisez ; xSOM les ajuste à votre demande.
+          identifiants et projets, signées, que les postes compatibles
+          vérifient puis appliquent hors ligne. Vous les lisez ; xSOM les
+          ajuste à votre demande.
         </p>
       </section>
       {error != null && (

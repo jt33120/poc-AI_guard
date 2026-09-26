@@ -10,14 +10,12 @@ import type { Lang } from "@/lib/strings";
 
 import type { Action, Category, DeviceState, PackError } from "./types";
 
-type Messages = Record<string, string>;
-
 const FR = {
   tenant: {
     eyebrow: "11 / EXTENSION VS CODE · RÉGLAGE SUR MESURE",
     title: "Réglage sur mesure",
     description:
-      "Des règles calibrées par xSOM sur vos propres données, signées, puis appliquées hors ligne par chaque poste Secret Guard Équipe. Vous les lisez ; xSOM les ajuste à votre demande.",
+      "Des règles calibrées par xSOM sur vos propres données et signées, que les postes Secret Guard Équipe compatibles vérifient puis appliquent hors ligne. Vous les lisez ; xSOM les ajuste à votre demande.",
     back: "← Postes et journal",
     refresh: "Actualiser",
     ask: "Demander un ajustement à xSOM",
@@ -25,7 +23,7 @@ const FR = {
     operatorLink: "Atelier opérateur xSOM →",
     emptyTitle: "Aucun réglage sur mesure pour l’instant",
     emptyBody:
-      "Le réglage fait partie de Secret Guard Équipe : xSOM calibre des détecteurs sur vos identifiants clients, noms de projets et formats internes, les signe, et vos postes les appliquent sans réseau. Les règles intégrées restent actives dans tous les cas.",
+      "Le réglage fait partie de Secret Guard Équipe : xSOM calibre des détecteurs sur vos identifiants clients, noms de projets et formats internes, et les signe ; un poste compatible les applique sans réseau. Les règles intégrées restent actives dans tous les cas.",
     status: "État du réglage",
     version: "Version",
     validity: "Valide jusqu’au",
@@ -33,13 +31,13 @@ const FR = {
     digest: "Empreinte du paquet",
     key: "Clé d’autorité",
     published: "Publié le",
-    expired: "Expiré : les postes l’appliquent encore et le signalent",
+    expired: "Expiré : un poste compatible l’applique encore et le signale",
     revoked: "Retiré de la distribution",
     active: "En distribution",
     chainOk: "Historique des publications chaîné et intact.",
     chainBroken: "ALERTE : l’historique des publications ne se vérifie plus.",
     signatureNote:
-      "Le poste n’accepte que la clé d’autorité xSOM intégrée à l’extension : un paquet modifié ou signé ailleurs est refusé.",
+      "Un poste compatible n’accepte que la clé d’autorité xSOM intégrée à son extension : un paquet modifié ou signé ailleurs y est refusé.",
     coverage: "Postes",
     upToDate: "à jour",
     behind: "en retard",
@@ -48,7 +46,7 @@ const FR = {
     coverageNone:
       "Aucun poste enregistré. Les postes récupèrent le réglage à leur prochaine synchronisation.",
     coverageNote:
-      "Déclaré par l’extension : « à jour » signifie que le poste rapporte l’empreinte de la version publiée.",
+      "Déclaré par l’extension : « à jour » signifie que le poste rapporte l’empreinte de la version publiée. Un poste dont l’extension ne prend pas encore en charge le réglage sur mesure reste « en retard ».",
     applied: "Appliqué : v{v}",
     notApplied: "Aucune version rapportée",
     expiredOnDevice: "signalé expiré",
@@ -83,7 +81,7 @@ const FR = {
     tenant: "Client",
     chooseTenant: "Choisir un client",
     noTenants: "Aucun client.",
-    current: "Version publiée",
+    current: "Version publiée :",
     none: "aucune",
     signingMissing:
       "Clé de signature xSOM absente sur ce serveur : l’essai fonctionne, la publication est fermée.",
@@ -119,6 +117,7 @@ const FR = {
     checking: "Vérification…",
     valid: "Paquet valide : prêt à signer en version {v}.",
     detections: "{n} détection(s) sur l’essai",
+    truncated: "Seules les 1 000 premières détections sont affichées.",
     noDetection: "Aucune détection sur l’essai.",
     publish: "Signer et publier la version {v}",
     confirmTitle: "Signer la version {v} pour {tenant} ?",
@@ -127,13 +126,17 @@ const FR = {
     confirm: "Signer et publier",
     cancel: "Annuler",
     publishing: "Signature…",
-    published: "Version {v} signée et publiée · empreinte {d}",
+    published: "Version {v} signée et publiée pour {tenant} · empreinte {d}",
     conflict: "Une autre version a été publiée entre-temps. Rechargez le client.",
     unavailable: "Publication indisponible : clé de signature ou moteur de vérification absent.",
     rejected: "La plateforme a refusé de signer ce paquet. Relancez l’essai.",
     malformed:
       "Composition mal formée : identifiants en minuscules (a-z, 0-9, . _ -), libellés remplis, mots-clés simples.",
     failed: "Le service n’a pas répondu. Rien n’a été publié.",
+    rateLimited: "Trop d’essais en une minute : nouvel essai automatique dans quelques secondes.",
+    incomplete: "À compléter : {fields}.",
+    removeDetector: "Retirer le détecteur {n}",
+    removeTest: "Retirer le test {n}",
     coverage: "{up} / {total} postes à jour · {behind} en retard · {refused} refusé(s)",
   },
   categories: {
@@ -150,6 +153,14 @@ const FR = {
     refused: "Refusé par le poste",
   } satisfies Record<DeviceState, string>,
   types: { pattern: "Motif", terms: "Termes" },
+  fields: {
+    id: "identifiant",
+    label: "libellé",
+    pattern: "motif",
+    keywords: "mots-clés",
+    window: "fenêtre",
+    entropy: "entropie",
+  },
   codes: {
     schema: "Le paquet ne respecte pas le format du contrat.",
     duplicate_detector: "Deux détecteurs portent le même identifiant.",
@@ -163,13 +174,25 @@ const FR = {
     term_empty: "Un terme de « {d} » ne contient aucune lettre ni aucun chiffre.",
     term_too_many_words: "Un terme de « {d} » dépasse quatre mots.",
     terms_required: "Saisissez les termes de « {d} » : aucune version publiée ne les porte.",
-    term_not_detected: "Un terme de « {d} » ne serait pas détecté.",
     budget_exceeded:
       "La vérification a dépassé son budget de temps : simplifiez les motifs (quantificateurs successifs qui se recouvrent).",
     engine_busy: "Le moteur de vérification est occupé. Réessayez.",
     engine_failed: "Le moteur de vérification a échoué. Rien n’a été signé.",
     sample_too_large: "L’essai dépasse 20 000 caractères.",
-  } as Messages,
+    test_reveals_term:
+      "Le test positif n° {t} contient un terme confidentiel de « {d} » : un positif est signé en clair, retirez-le.",
+    unassigned_character:
+      "Un texte contient un caractère Unicode que la plateforme ne sait pas encore lire comme le poste.",
+    pack_id_mismatch: "Ce client a déjà un paquet sous un autre identifiant.",
+    negative_reveals_term:
+      "Le test négatif n° {t} contient un terme confidentiel de « {d} » : il serait signé en clair, retirez-le.",
+    field_reveals_term:
+      "Un libellé, un mot-clé ou le motif du détecteur « {d} » contient un terme confidentiel : il serait signé en clair.",
+    too_complex:
+      "Le motif de « {d} » enchaîne trop de répétitions qui se disputent les mêmes caractères : il ralentirait chaque analyse sur le poste.",
+    pattern_too_slow:
+      "Le motif de « {d} » est trop lent sur un texte d’épreuve : simplifiez ses répétitions.",
+  },
   reasons: {
     length: "plus de 256 caractères.",
     invalid_character: "caractère hors ASCII imprimable (accent, tabulation…).",
@@ -194,7 +217,7 @@ const FR = {
     too_long: "une correspondance pourrait dépasser 256 caractères.",
     no_anchor: "il faut trois caractères fixes consécutifs, ou un contexte.",
     bad_literal: "« ] » ou « } » isolé : échappez-le.",
-  } as Messages,
+  },
 };
 
 type RulesCopy = typeof FR;
@@ -204,7 +227,7 @@ const EN: RulesCopy = {
     eyebrow: "11 / VS CODE EXTENSION · CUSTOM TUNING",
     title: "Custom tuning",
     description:
-      "Rules calibrated by xSOM on your own data, signed, then applied offline by every Secret Guard Team workstation. You read them; xSOM adjusts them on request.",
+      "Rules calibrated by xSOM on your own data and signed, which compatible Secret Guard Team workstations verify and then apply offline. You read them; xSOM adjusts them on request.",
     back: "← Workstations and log",
     refresh: "Refresh",
     ask: "Ask xSOM for an adjustment",
@@ -212,7 +235,7 @@ const EN: RulesCopy = {
     operatorLink: "xSOM operator workshop →",
     emptyTitle: "No custom tuning yet",
     emptyBody:
-      "Tuning is part of Secret Guard Team: xSOM calibrates detectors on your customer identifiers, project names and internal formats, signs them, and your workstations apply them without network access. Built-in rules stay active either way.",
+      "Tuning is part of Secret Guard Team: xSOM calibrates detectors on your customer identifiers, project names and internal formats, and signs them; a compatible workstation applies them without network access. Built-in rules stay active either way.",
     status: "Tuning status",
     version: "Version",
     validity: "Valid until",
@@ -220,13 +243,13 @@ const EN: RulesCopy = {
     digest: "Pack digest",
     key: "Authority key",
     published: "Published",
-    expired: "Expired: workstations still apply it and report it",
+    expired: "Expired: a compatible workstation still applies it and reports it",
     revoked: "Withdrawn from distribution",
     active: "Distributed",
     chainOk: "Publication history is chained and intact.",
     chainBroken: "ALERT: the publication history no longer verifies.",
     signatureNote:
-      "Workstations only accept the xSOM authority key built into the extension: a modified pack, or one signed elsewhere, is rejected.",
+      "A compatible workstation only accepts the xSOM authority key built into its extension: a modified pack, or one signed elsewhere, is rejected there.",
     coverage: "Workstations",
     upToDate: "up to date",
     behind: "behind",
@@ -235,7 +258,7 @@ const EN: RulesCopy = {
     coverageNone:
       "No registered workstation. Workstations fetch the tuning at their next synchronisation.",
     coverageNote:
-      "Declared by the extension: “up to date” means the workstation reports the digest of the published version.",
+      "Declared by the extension: “up to date” means the workstation reports the digest of the published version. A workstation whose extension does not support custom tuning yet stays “behind”.",
     applied: "Applied: v{v}",
     notApplied: "No version reported",
     expiredOnDevice: "reported expired",
@@ -270,7 +293,7 @@ const EN: RulesCopy = {
     tenant: "Customer",
     chooseTenant: "Choose a customer",
     noTenants: "No customer.",
-    current: "Published version",
+    current: "Published version:",
     none: "none",
     signingMissing:
       "No xSOM signing key on this server: testing works, publishing is closed.",
@@ -306,6 +329,7 @@ const EN: RulesCopy = {
     checking: "Checking…",
     valid: "Valid pack: ready to sign as version {v}.",
     detections: "{n} detection(s) in the test",
+    truncated: "Only the first 1,000 detections are shown.",
     noDetection: "No detection in the test.",
     publish: "Sign and publish version {v}",
     confirmTitle: "Sign version {v} for {tenant}?",
@@ -314,13 +338,17 @@ const EN: RulesCopy = {
     confirm: "Sign and publish",
     cancel: "Cancel",
     publishing: "Signing…",
-    published: "Version {v} signed and published · digest {d}",
+    published: "Version {v} signed and published for {tenant} · digest {d}",
     conflict: "Another version was published meanwhile. Reload the customer.",
     unavailable: "Publishing unavailable: signing key or verification engine missing.",
     rejected: "The platform refused to sign this pack. Run the test again.",
     malformed:
       "Malformed composition: lowercase identifiers (a-z, 0-9, . _ -), labels filled in, simple keywords.",
     failed: "The service did not respond. Nothing was published.",
+    rateLimited: "Too many tests in one minute: retrying automatically in a few seconds.",
+    incomplete: "To complete: {fields}.",
+    removeDetector: "Remove detector {n}",
+    removeTest: "Remove test {n}",
     coverage: "{up} / {total} up to date · {behind} behind · {refused} rejected",
   },
   categories: {
@@ -337,6 +365,14 @@ const EN: RulesCopy = {
     refused: "Rejected by the workstation",
   },
   types: { pattern: "Pattern", terms: "Terms" },
+  fields: {
+    id: "identifier",
+    label: "label",
+    pattern: "pattern",
+    keywords: "keywords",
+    window: "window",
+    entropy: "entropy",
+  },
   codes: {
     schema: "The pack does not follow the contract format.",
     duplicate_detector: "Two detectors share the same identifier.",
@@ -350,12 +386,24 @@ const EN: RulesCopy = {
     term_empty: "A term of “{d}” contains no letter or digit.",
     term_too_many_words: "A term of “{d}” is longer than four words.",
     terms_required: "Type the terms of “{d}”: no published version carries them.",
-    term_not_detected: "A term of “{d}” would not be detected.",
     budget_exceeded:
       "Verification exceeded its time budget: simplify the patterns (successive overlapping quantifiers).",
     engine_busy: "The verification engine is busy. Try again.",
     engine_failed: "The verification engine failed. Nothing was signed.",
     sample_too_large: "The test is longer than 20,000 characters.",
+    test_reveals_term:
+      "Positive test #{t} contains a confidential term of “{d}”: positives are signed in clear, remove it.",
+    unassigned_character:
+      "A text contains a Unicode character the platform cannot yet read the way the workstation does.",
+    pack_id_mismatch: "This customer already has a pack under another identifier.",
+    negative_reveals_term:
+      "Negative test #{t} contains a confidential term of “{d}”: it would be signed in clear, remove it.",
+    field_reveals_term:
+      "A label, keyword or the pattern of detector “{d}” contains a confidential term: it would be signed in clear.",
+    too_complex:
+      "The pattern of “{d}” chains too many repetitions competing for the same characters: it would slow every scan on the workstation.",
+    pattern_too_slow:
+      "The pattern of “{d}” is too slow on a probe text: simplify its repetitions.",
   },
   reasons: {
     length: "longer than 256 characters.",
@@ -395,17 +443,23 @@ export function fill(
   );
 }
 
-/** Le message lisible d'un refus, avec le détecteur ou le test en cause. */
-export function explain(error: PackError, lang: Lang): string {
+/**
+ * Le message lisible d'un refus, avec le détecteur ou le test en cause. ``testNumber``
+ * traduit l'index envoyé par le serveur en numéro de ligne du formulaire.
+ */
+export function explain(
+  error: PackError,
+  lang: Lang,
+  testNumber: (sent: number) => number = (sent) => sent + 1,
+): string {
   const copy = RULES_COPY[lang];
-  const template = copy.codes[error.code];
+  const template = (copy.codes as Record<string, string>)[error.code];
   if (!template) return error.code;
-  const reason = error.reason
-    ? (copy.reasons[error.reason] ?? error.reason)
-    : "";
+  const reasons = copy.reasons as Record<string, string>;
+  const reason = error.reason ? (reasons[error.reason] ?? error.reason) : "";
   return fill(template, {
     d: error.detector ?? "",
-    t: error.test === null ? "" : error.test + 1,
+    t: error.test === null ? "" : testNumber(error.test),
     r: reason,
   });
 }

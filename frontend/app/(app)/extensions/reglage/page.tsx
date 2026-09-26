@@ -34,7 +34,7 @@ import "../../../rules-pack.css";
  * aucun champ : un ajustement se demande à xSOM, qui le compose et le signe.
  */
 export default function RulesPackPage() {
-  const { lang } = useT();
+  const { lang, t } = useT();
   const copy = RULES_COPY[lang].tenant;
   const [view, setView] = useState<TenantRulesView | null>(null);
   const [loading, setLoading] = useState(true);
@@ -150,10 +150,7 @@ export default function RulesPackPage() {
                 <code title={pack.payloadDigest}>
                   {shortDigest(pack.payloadDigest)}
                 </code>{" "}
-                <CopyButton
-                  text={pack.payloadDigest}
-                  label={lang === "fr" ? "Copier" : "Copy"}
-                />
+                <CopyButton text={pack.payloadDigest} label={t("common.copy")} />
               </DataPair>
               <DataPair label={copy.key}>
                 <code title={pack.keyId}>{shortDigest(pack.keyId)}</code>
