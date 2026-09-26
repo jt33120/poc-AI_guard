@@ -63,6 +63,9 @@
   gap: var(--sp-6);
   font-size: var(--fs-sm);
 }
+.guard-nav-shell {
+  display: contents;
+}
 .guard-header nav > a:not(.guard-button) {
   color: var(--signal-muted);
   min-height: var(--signal-touch);
@@ -71,6 +74,33 @@
 }
 .guard-header nav > a:hover {
   color: var(--signal-accent-text);
+}
+/* La langue se change, mais ne concurrence ni le menu ni l'action principale :
+   deux lettres sans cadre, la langue active seulement plus lisible. */
+.guard-header .console-language {
+  border: 0;
+  background: none;
+  padding: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+.guard-header .console-language button {
+  min-width: 2rem;
+  padding-inline: 0.25rem;
+  border-radius: 0;
+  background: none;
+  color: var(--signal-muted);
+}
+.guard-header .console-language button:hover {
+  color: var(--signal-accent-text);
+}
+.guard-header .console-language button[aria-pressed="true"] {
+  background: none;
+  color: var(--signal-text);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.4em;
 }
 /* Les liens éditoriaux restent visibles : le menu est une vraie orientation,
    pas seulement une porte vers la page produit. */

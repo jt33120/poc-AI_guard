@@ -8,6 +8,8 @@ Construire **xSOM AI Guard** : un **gateway MCP de contrôle des actions** pour 
 
 Le différenciateur principal : on contrôle ce que l'agent **fait**, pas seulement les prompts. Le module séparé `secret-guard/` ajoute une protection locale ciblée contre les credentials dans les chemins de prompt qu'il contrôle ; ce n'est PAS un firewall universel de tout VS Code.
 
+Nom commercial : le produit poste s'appelle **Secret Guard**, en trois éditions — Local (gratuit), Équipe, Renforcé. « Developer Guard » reste le nom interne des paquets, identifiants et documents de conception ; il n'apparaît plus dans les textes visibles (site, console, extension).
+
 ## 2. Scope MVP — et non-objectifs
 
 **DANS** : auth multi-tenant (Supabase + RLS + RBAC) ; gateway MCP (proxy de serveurs d'outils en aval) ; moteur de policy déterministe + classification d'action ; HITL (dry-run, approbation, timeout) ; audit immuable hash-chaîné + exports AI Act/RGPD ; LLM juge mince (cas ambigus + génération des narratifs de conformité) ; frontend (inspecteur, file d'approbation, explorateur d'audit, éditeur de policy) ; Secret Guard V0 local (`docs/secret-guard/`) ; tests + CI.

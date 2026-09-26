@@ -6,8 +6,8 @@ import { GLOSSARY_COPY } from "@/lib/threat-glossary";
 import "../guard-landing.css";
 import "../threat-glossary.css";
 
-export function generateMetadata(): Metadata {
-  const copy = GLOSSARY_COPY[getLang()];
+export async function generateMetadata(): Promise<Metadata> {
+  const copy = GLOSSARY_COPY[await getLang()];
   return { title: copy.title, description: copy.description };
 }
 

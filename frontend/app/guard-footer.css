@@ -1,0 +1,24 @@
+.studio-footer { padding: clamp(2rem, 5vw, 5rem) 0 1.5rem; background: #10243b; color: #e4edf7; }
+.studio-footer__grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: clamp(2rem, 5vw, 5rem); }
+.studio-footer__identity p { max-width: 34ch; margin: 1.2rem 0; color: #b7c7d9; line-height: 1.6; }
+.studio-footer nav { display: flex; flex-direction: column; align-items: flex-start; gap: .8rem; }
+.studio-footer h2 { font-size: .9rem; font-weight: 600; color: #91b8e6; margin-bottom: .4rem; }
+.studio-footer a, .studio-footer summary { font-size: .9rem; padding-block: .25rem; }
+.studio-footer a:hover { color: #fff; text-decoration: underline; text-underline-offset: .25rem; }
+.studio-footer a:focus-visible, .studio-footer summary:focus-visible { outline: 2px solid #91b8e6; outline-offset: 5px; }
+.studio-footer__bottom { border-top: 1px solid #ffffff26; margin-top: 3rem; padding-top: 1.5rem; display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; color: #b7c7d9; font-size: .8rem; }
+.studio-footer details { max-width: 100%; }
+.studio-footer summary { cursor: pointer; }
+.studio-footer signal-preferences { display: block; margin-top: 1rem; }
+.studio-legal { padding-block: clamp(3rem, 7vw, 6rem); max-width: 850px; }
+.studio-legal h1 { font-size: clamp(2rem, 4vw, 3.4rem); line-height: 1.15; margin-bottom: 1rem; }
+.studio-legal section { margin-top: 2rem; }
+.studio-legal h2 { font-size: 1.3rem; margin-bottom: .7rem; }
+.studio-legal p { line-height: 1.75; margin-bottom: .75rem; }
+.studio-legal a { text-decoration: underline; text-underline-offset: .2rem; }
+.studio-legal__draft { padding: 1rem; background: #fff4d9; color: #604407; border-left: 3px solid #b48420; }
+@media (max-width: 700px) { .studio-footer__grid { grid-template-columns: 1fr; gap: 2rem; } .studio-footer__bottom { flex-direction: column; } }
+.studio-footer .brand__name { color: #f5f9ff; font-size: 1.2rem; }
+.studio-footer .brand__product { color: #c9dcf2; }
+.studio-footer .xsom-brand-mark__dark { display: none; }
+.studio-footer .xsom-brand-mark__light { display: block; }

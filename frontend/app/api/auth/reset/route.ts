@@ -10,17 +10,28 @@ export async function POST(request: Request) {
     password?: unknown;
   };
   const { code, password } = payload;
-  if (typeof code !== "string" || typeof password !== "string" || password.length < 8) {
+  if (
+    typeof code !== "string" ||
+    typeof password !== "string" ||
+    password.length < 8
+  ) {
     return NextResponse.json(
-      { detail: "A reset code and a password of at least 8 characters are required" },
+      {
+        detail:
+          "A reset code and a password of at least 8 characters are required",
+      },
       { status: 400 },
     );
   }
-  const supabase = createSupabaseServerClient();
-  const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+  const supabase = await createSupabaseServerClient();
+  const { error: exchangeError } =
+    await supabase.auth.exchangeCodeForSession(code);
   if (exchangeError) {
     return NextResponse.json(
-      { detail: "This reset link is invalid or has expired — request a new one." },
+      {
+        detail:
+          "This reset link is invalid or has expired — request a new one.",
+      },
       { status: 400 },
     );
   }

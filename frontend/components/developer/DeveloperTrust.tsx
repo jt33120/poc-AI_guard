@@ -9,12 +9,12 @@ const COPY = {
   fr: {
     kicker: "XSOM CONSULTING SASU · ÉDITEUR FRANÇAIS",
     title: "Un produit de sécurité doit aussi avoir un responsable.",
-    intro: "Developer Guard est édité, contracté, facturé et supporté par xSOM Consulting SASU. La promesse porte sur un périmètre opéré et documenté, jamais sur une sécurité absolue.",
+    intro: "Secret Guard est édité, contracté, facturé et supporté par xSOM Consulting SASU. La promesse porte sur un périmètre opéré et documenté, jamais sur une sécurité absolue.",
     identity: "RCS Bordeaux 498 029 289 · TVA FR80498029289 · Arcachon, France",
     commitmentTitle: "Quatre engagements à contractualiser.",
     commitmentIntro: "Chaque offre sépare le droit d’usage, le produit livré, la maintenance et la responsabilité.",
     commitments: [
-      ["01", "Licence claire", "Secret Guard Local reste gratuit avec un droit d’usage explicite. Developer Guard est fourni par souscription B2B."],
+      ["01", "Licence claire", "Secret Guard Local reste gratuit avec un droit d’usage explicite. Ses éditions Équipe et Renforcé sont fournies par souscription B2B."],
       ["02", "Périmètre publié", "Le contrat précisera les hôtes, versions, systèmes et limites. Une cellule non qualifiée n’est pas vendue comme une protection."],
       ["03", "Maintenance sécurité", "Les vulnérabilités, correctifs, versions et artefacts de livraison sont traités dans un processus documenté."],
       ["04", "Responsabilité xSOM", "Le contrat définit support, conformité à la documentation, recours et responsabilité de xSOM sur le périmètre souscrit."],
@@ -22,7 +22,7 @@ const COPY = {
     documentsTitle: "Le dossier qui accompagne une souscription.",
     documents: [
       ["Licence Secret Guard Local", "Droit d’installer et d’utiliser l’offre gratuite, avec ses limites."],
-      ["Conditions Developer Guard B2B", "Périmètre, garantie de conformité documentaire, réversibilité, données et responsabilité."],
+      ["Conditions Secret Guard B2B", "Périmètre, garantie de conformité documentaire, réversibilité, données et responsabilité."],
       ["Politique support & maintenance", "Canal de support, versions couvertes, traitement des incidents et éventuel SLA."],
       ["Politique vulnérabilités", "Signalement, avis de sécurité, correctifs et preuves de chaîne de livraison."],
     ],
@@ -36,12 +36,12 @@ const COPY = {
   en: {
     kicker: "XSOM CONSULTING SASU · FRENCH PUBLISHER",
     title: "A security product also needs an accountable publisher.",
-    intro: "Developer Guard is published, contracted, billed and supported by xSOM Consulting SASU. The commitment covers a documented operated scope, never absolute security.",
+    intro: "Secret Guard is published, contracted, billed and supported by xSOM Consulting SASU. The commitment covers a documented operated scope, never absolute security.",
     identity: "Bordeaux Trade Register 498 029 289 · VAT FR80498029289 · Arcachon, France",
     commitmentTitle: "Four commitments to put in writing.",
     commitmentIntro: "Each offer separates usage rights, delivered product, maintenance and liability.",
     commitments: [
-      ["01", "Clear licence", "Secret Guard Local stays free with explicit usage rights. Developer Guard is provided under a B2B subscription."],
+      ["01", "Clear licence", "Secret Guard Local stays free with explicit usage rights. Its Team and Reinforced editions are provided under a B2B subscription."],
       ["02", "Published scope", "The contract will specify hosts, versions, systems and limits. An unqualified cell is never sold as protection."],
       ["03", "Security maintenance", "Vulnerabilities, fixes, versions and delivery artifacts follow a documented process."],
       ["04", "xSOM accountability", "The contract defines support, documentation conformity, remedies and xSOM's liability for the subscribed scope."],
@@ -49,7 +49,7 @@ const COPY = {
     documentsTitle: "The subscription pack.",
     documents: [
       ["Secret Guard Local licence", "The right to install and use the free offer, with its limits."],
-      ["Developer Guard B2B terms", "Scope, documentation conformity warranty, reversibility, data and liability."],
+      ["Secret Guard B2B terms", "Scope, documentation conformity warranty, reversibility, data and liability."],
       ["Support & maintenance policy", "Support channel, covered versions, incident handling and any SLA."],
       ["Vulnerability policy", "Reporting, security advisories, fixes and software supply-chain evidence."],
     ],

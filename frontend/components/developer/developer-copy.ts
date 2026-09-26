@@ -1,8 +1,8 @@
 export const DEVELOPER_COPY = {
   fr: {
     nav: { overview: "Vue d’ensemble", security: "Sécurité & preuves", pricing: "Offres & tarifs" },
-    shellLabel: "Developer Guard",
-    footer: "Developer Guard encadre les agents sur les chemins raccordés. Les limites restent visibles.",
+    shellLabel: "Secret Guard",
+    footer: "Secret Guard encadre les agents sur les chemins raccordés. Les limites restent visibles.",
     display: "Affichage",
     landing: {
       kicker: "AGENTS DE CODE · CADRE FRANÇAIS D’ENTREPRISE",
@@ -47,7 +47,7 @@ export const DEVELOPER_COPY = {
     security: {
       kicker: "MODÈLE DE SÉCURITÉ",
       title: "Savoir où la décision est prise. Et ce qu’elle ne prouve pas.",
-      intro: "Developer Guard sépare le contrôle local, l’autorité d’organisation, la preuve collectée et l’isolation système. Aucun voyant unique ne résume ces quatre réalités.",
+      intro: "Secret Guard sépare le contrôle local, l’autorité d’organisation, la preuve collectée et l’isolation système. Aucun voyant unique ne résume ces quatre réalités.",
       flowTitle: "Le flux supervisé",
       flow: [
         { marker: "01", title: "Événement hôte", body: "Claude, Codex ou Copilot produit un événement dont le contrat et la version doivent être reconnus." },
@@ -61,20 +61,20 @@ export const DEVELOPER_COPY = {
         D: ["Détecté", "Le signal est observé ; l’effet peut déjà avoir eu lieu."],
         O: ["Orchestré", "Un contrôle tiers est appelé et son verdict est attribué."],
         A: ["Attesté", "Une posture est déclarée ou observée avec sa provenance."],
-        X: ["Hors périmètre", "Aucune protection Developer Guard n’est revendiquée."],
+        X: ["Hors périmètre", "Aucune protection Secret Guard n’est revendiquée."],
       },
       requirementsTitle: "Préconditions de la promesse",
       requirements: ["Version d’hôte qualifiée et événement réellement invoqué", "Politique signée, non expirée et runner compatible", "Poste enrôlé dans le bon tenant", "Outil ou relais raccordé au chemin contrôlé", "Pour le niveau renforcé : identité, montages et réseau imposés"],
       limitsTitle: "Limites résiduelles",
       limits: ["Un administrateur local peut retirer un contrôle utilisateur.", "Un hook après outil ne retire pas un effet déjà produit.", "Les processus lancés hors de la session renforcée ne sont pas bornés par elle.", "La posture client n’est pas une attestation matérielle.", "Une couverture Claude ne devient pas automatiquement une couverture Codex ou Copilot."],
-      explorerTitle: "Registre Developer Guard",
+      explorerTitle: "Registre Secret Guard",
       explorerIntro: "Ce registre reflète les validations locales du produit. Il ne vaut pas qualification de votre environnement ni disponibilité générale. Les entrées hors périmètre restent visibles.",
     },
   },
   en: {
     nav: { overview: "Overview", security: "Security & evidence", pricing: "Plans & pricing" },
-    shellLabel: "Developer Guard",
-    footer: "Developer Guard governs agents on connected paths. The limits stay visible.",
+    shellLabel: "Secret Guard",
+    footer: "Secret Guard governs agents on connected paths. The limits stay visible.",
     display: "Display",
     landing: {
       kicker: "CODING AGENTS · FRENCH ENTERPRISE BOUNDARIES",
@@ -107,17 +107,17 @@ export const DEVELOPER_COPY = {
       }, boundary: "The result describes the selected path. A binary or session outside that path remains outside the promise.",
     },
     security: {
-      kicker: "SECURITY MODEL", title: "Know where the decision is made. And what it does not prove.", intro: "Developer Guard separates local control, organisation authority, collected evidence and system isolation. No single status light summarises all four.", flowTitle: "The supervised flow",
+      kicker: "SECURITY MODEL", title: "Know where the decision is made. And what it does not prove.", intro: "Secret Guard separates local control, organisation authority, collected evidence and system isolation. No single status light summarises all four.", flowTitle: "The supervised flow",
       flow: [
         { marker: "01", title: "Host event", body: "Claude, Codex or Copilot emits an event whose contract and version must be recognised." },
         { marker: "02", title: "Local decision", body: "The scanner and deterministic policy allow, deny or request approval." },
         { marker: "03", title: "Bounded effect", body: "The tool runs only after the decision on a connected path; system isolation bounds covered bypasses." },
         { marker: "04", title: "Minimal evidence", body: "The console receives verdict, provenance and posture without prompt, code, secret or personal path." },
       ],
-      evidenceTitle: "Five evidence modes that are never interchangeable.", modes: { B: ["Blocked", "The dangerous effect does not happen on the proven path."], D: ["Detected", "The signal is observed; the effect may already have happened."], O: ["Orchestrated", "A third-party control is called and its verdict attributed."], A: ["Attested", "Posture is declared or observed with provenance."], X: ["Out of scope", "No Developer Guard protection is claimed."] },
+      evidenceTitle: "Five evidence modes that are never interchangeable.", modes: { B: ["Blocked", "The dangerous effect does not happen on the proven path."], D: ["Detected", "The signal is observed; the effect may already have happened."], O: ["Orchestrated", "A third-party control is called and its verdict attributed."], A: ["Attested", "Posture is declared or observed with provenance."], X: ["Out of scope", "No Secret Guard protection is claimed."] },
       requirementsTitle: "Preconditions for the claim", requirements: ["Qualified host version and actually invoked event", "Signed, unexpired policy and compatible runner", "Workstation enrolled in the correct tenant", "Tool or relay connected to the controlled path", "For reinforced mode: enforced identity, mounts and network"],
       limitsTitle: "Residual limits", limits: ["A local administrator can remove a user-level control.", "A post-tool hook cannot undo an effect that already happened.", "Processes outside the reinforced session are not bounded by it.", "Client posture is not hardware attestation.", "Claude evidence does not automatically become Codex or Copilot evidence."],
-      explorerTitle: "Developer Guard record", explorerIntro: "This record reflects local product validations. It does not establish qualification of your environment or general availability. Out-of-scope entries remain visible.",
+      explorerTitle: "Secret Guard record", explorerIntro: "This record reflects local product validations. It does not establish qualification of your environment or general availability. Out-of-scope entries remain visible.",
     },
   },
 } as const;

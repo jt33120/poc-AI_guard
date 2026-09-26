@@ -1,0 +1,256 @@
+/* Page des produits. Elle reprend l'en-tête et le film de l'accueil (`home.css`,
+   sous `.xhome`) ; ce qui lui est propre vit sous `.xproducts`. Couleurs et durées
+   viennent des jetons ; les transparences passent par color-mix. */
+
+/* ---- La gamme : un carrousel sombre qui prolonge le film. */
+.xproducts .xp-range {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding-block: var(--section-y);
+  background: var(--home-ink);
+  color: var(--home-ink-text);
+  box-shadow: 0 -1px 0 var(--home-ink);
+}
+.xproducts .xp-range::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(ellipse 50% 45% at 78% 55%, color-mix(in srgb, var(--signal-accent) 30%, transparent), transparent 70%),
+    repeating-linear-gradient(0deg, color-mix(in srgb, var(--home-ink-line) 40%, transparent) 0 1px, transparent 1px var(--signal-grid)),
+    repeating-linear-gradient(90deg, color-mix(in srgb, var(--home-ink-line) 40%, transparent) 0 1px, transparent 1px var(--signal-grid));
+  mask-image: radial-gradient(ellipse 85% 75% at 50% 50%, black, transparent 85%);
+}
+.xproducts .xp-range :is(h1, h2) {
+  color: var(--home-ink-text);
+}
+.xproducts .xp-range .home-kicker {
+  color: var(--home-ink-muted);
+}
+.xproducts .xp-range :is(a, button):focus-visible {
+  outline-color: var(--home-ink-text);
+}
+
+/* ---- Les commandes : un sélecteur par produit, puis précédent et suivant. */
+.xproducts .xp-carousel {
+  margin-top: var(--sp-12);
+}
+.xproducts .xp-carousel__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding-bottom: var(--sp-6);
+  border-bottom: var(--signal-border) solid var(--home-ink-line);
+}
+.xproducts .xp-carousel__pickers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+.xproducts .xp-carousel__pickers button {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  min-height: 44px;
+  padding: var(--sp-2) var(--sp-5);
+  border: var(--signal-border) solid var(--home-ink-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--home-ink-muted);
+  font-family: var(--font-display), sans-serif;
+  font-size: var(--fs-lead);
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    color var(--t-fast) var(--ease),
+    background var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease);
+}
+.xproducts .xp-carousel__pickers button span {
+  font-family: var(--font-mono), monospace;
+  font-size: var(--fs-label);
+  font-weight: 400;
+  letter-spacing: 0.1em;
+}
+.xproducts .xp-carousel__pickers button:hover {
+  color: var(--home-ink-text);
+  border-color: color-mix(in srgb, var(--home-ink-text) 40%, transparent);
+}
+.xproducts .xp-carousel__pickers button[aria-pressed="true"] {
+  color: var(--home-ink);
+  border-color: var(--home-ink-text);
+  background: var(--home-ink-text);
+}
+.xproducts .xp-carousel__arrows {
+  display: flex;
+  gap: var(--sp-2);
+}
+.xproducts .xp-carousel__arrows button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: var(--signal-border) solid color-mix(in srgb, var(--home-ink-text) 30%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--home-ink) 60%, transparent);
+  color: var(--home-ink-text);
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease), opacity var(--t-fast) var(--ease);
+}
+.xproducts .xp-carousel__arrows button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--home-ink-text) 14%, transparent);
+}
+.xproducts .xp-carousel__arrows button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* ---- Les diapositives : une piste à défilement horizontal, aimantée diapositive par diapositive. */
+.xproducts .xp-carousel__track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.xproducts .xp-carousel__track::-webkit-scrollbar {
+  display: none;
+}
+.xproducts .xp-slide {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: center;
+  gap: var(--sp-16);
+  padding-top: var(--sp-10);
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+.xproducts .xp-slide__tag {
+  margin: 0 0 var(--sp-4);
+  font-family: var(--font-mono), monospace;
+  font-size: var(--fs-label);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--home-ink-muted);
+}
+.xproducts .xp-slide h2 {
+  margin: 0;
+  font-size: var(--fs-display);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.035em;
+}
+.xproducts .xp-slide__lead {
+  margin: var(--sp-5) 0 0;
+  font-family: var(--font-display), sans-serif;
+  font-size: var(--fs-h3);
+  font-weight: 600;
+  line-height: var(--signal-heading-leading);
+  text-wrap: balance;
+}
+.xproducts .xp-slide__body,
+.xproducts .xp-slide__note {
+  color: var(--home-ink-muted);
+  line-height: var(--signal-leading);
+}
+.xproducts .xp-slide__body {
+  margin: var(--sp-4) 0 0;
+  max-width: 58ch;
+}
+.xproducts .xp-slide ul {
+  display: grid;
+  gap: var(--sp-2);
+  margin: var(--sp-6) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.xproducts .xp-slide li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  font-weight: 600;
+}
+.xproducts .xp-slide li::before {
+  content: "";
+  flex: none;
+  width: var(--sp-2);
+  height: var(--sp-2);
+  border-radius: 50%;
+  background: var(--signal-accent);
+  translate: 0 -0.15em;
+}
+.xproducts .xp-slide__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-5);
+  margin-top: var(--sp-8);
+}
+.xproducts .xp-slide__link {
+  color: var(--home-ink-text);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--home-ink-text) 40%, transparent);
+  text-underline-offset: 0.3em;
+}
+.xproducts .xp-slide__link:hover {
+  text-decoration-color: currentColor;
+}
+.xproducts .xp-slide__note {
+  margin: var(--sp-5) 0 0;
+  max-width: 58ch;
+  font-size: var(--fs-sm);
+}
+.xproducts .xp-slide__shot {
+  margin: 0;
+  overflow: hidden;
+  border: var(--signal-border) solid color-mix(in srgb, var(--home-ink-text) 14%, transparent);
+  border-radius: var(--r-lg);
+  box-shadow: 0 var(--sp-10) var(--sp-24) color-mix(in srgb, black 50%, transparent);
+}
+.xproducts .xp-slide__shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* ---- Écrans étroits : le texte, puis la capture ; la piste se balaie au doigt. */
+@media (max-width: 900px) {
+  .xproducts .xp-slide {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: var(--sp-8);
+    padding-top: var(--sp-8);
+  }
+  .xproducts .xp-slide h2 {
+    font-size: var(--fs-h2);
+  }
+  .xproducts .xp-slide__lead {
+    font-size: var(--fs-lead);
+  }
+}
+@media (max-width: 600px) {
+  .xproducts .xp-carousel__controls {
+    flex-wrap: nowrap;
+  }
+  .xproducts .xp-carousel__pickers button {
+    padding-inline: var(--sp-4);
+    font-size: var(--fs-body);
+  }
+  .xproducts .xp-carousel__pickers button span {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .xproducts .xp-carousel__pickers button,
+  .xproducts .xp-carousel__arrows button {
+    transition: none;
+  }
+}

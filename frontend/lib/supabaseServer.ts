@@ -11,8 +11,8 @@ const HTTP_ONLY: Partial<CookieOptions> = {
   path: "/",
 };
 
-export function createSupabaseServerClient() {
-  const store = cookies();
+export async function createSupabaseServerClient() {
+  const store = await cookies();
   return createServerClient(config.supabaseUrl, config.supabaseAnonKey, {
     cookies: {
       getAll() {

@@ -57,7 +57,6 @@ _MOTIF = re.compile(
 _CONNU: dict[str, int] = {
     "app/(app)/onboarding/page.tsx": 8,
     "app/auth/reset/page.tsx": 2,
-    "app/executive-preview/page.tsx": 3,
     "app/forgot-password/page.tsx": 2,
     "components/ApiKeys.tsx": 3,
     "components/ClientScope.tsx": 3,

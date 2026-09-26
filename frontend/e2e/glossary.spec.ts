@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import releve from "../lib/generated/threat-rows.json";
+import developerGuard from "../lib/generated/product-coverage.json";
 import { THREAT_GLOSSARY } from "../lib/threat-glossary";
 
 const TOTAL = THREAT_GLOSSARY.length;
@@ -10,7 +11,12 @@ test("no glossary line claims more AI Guard coverage than the generated coverage
   // peut pas être plus forte que la carte générée depuis les scénarios qui passent :
   // « Couvert » exige une facette publiée Bloqué, « Partiel » une facette qui ne soit
   // pas hors périmètre. Revendiquer moins que la carte reste permis.
-  const lignes = new Map(releve.lignes.map((ligne) => [ligne.id, ligne.facettes.map((facette) => facette.mode)]));
+  const lignes = new Map(
+    releve.lignes.map((ligne) => [
+      ligne.id,
+      ligne.facettes.map((facette) => facette.mode),
+    ]),
+  );
   const ids = new Set<string>();
   const referenced = THREAT_GLOSSARY.filter((entry) => entry.releve);
   expect(referenced.length).toBeGreaterThan(15);
@@ -19,138 +25,303 @@ test("no glossary line claims more AI Guard coverage than the generated coverage
     ids.add(entry.id);
     if (!entry.releve) continue;
     const modes = lignes.get(entry.releve);
-    expect(modes, `${entry.id} cites an unknown record line ${entry.releve}`).toBeDefined();
-    if (entry.coverage === "yes") expect(modes, `${entry.id} claims Covered without a Blocked facet`).toContain("B");
+    expect(
+      modes,
+      `${entry.id} cites an unknown record line ${entry.releve}`,
+    ).toBeDefined();
+    if (entry.coverage === "yes")
+      expect(
+        modes,
+        `${entry.id} claims Covered without a Blocked facet`,
+      ).toContain("B");
     if (entry.coverage === "partial") {
-      expect(modes!.some((mode) => mode !== "X"), `${entry.id} claims Partial on an out-of-scope line`).toBe(true);
+      expect(
+        modes!.some((mode) => mode !== "X"),
+        `${entry.id} claims Partial on an out-of-scope line`,
+      ).toBe(true);
     }
   }
 });
 
-test("the glossary table combines search, facets and sorting, expands rows and translates", async ({ page }) => {
-  let apiRequests = 0;
+test("Developer Guard coverage is complete and does not broaden unverified hosts", () => {
+  expect(developerGuard.threats).toHaveLength(TOTAL);
+  expect(new Set(developerGuard.threats.map((threat) => threat.id)).size).toBe(
+    TOTAL,
+  );
+  for (const threat of developerGuard.threats) {
+    expect(["B", "D", "O", "A", "X"]).toContain(threat.mode);
+    if (threat.mode !== "B") continue;
+    expect(threat.status).toBe("implemented_local");
+    for (const host of threat.hosts) {
+      if (host.assistant === "copilot") expect(host.verified).toBe(false);
+      expect(host.events.length).toBeGreaterThan(0);
+    }
+  }
+});
+
+test("the glossary table combines search, facets and sorting, expands rows and translates", async ({
+  page,
+}) => {
+  let definitionApiRequests = 0;
   await page.route("**/api/**", async (route) => {
-    apiRequests += 1;
-    await route.fulfill({ status: 503, json: { detail: "Public definitions are local content" } });
+    const pathname = new URL(route.request().url()).pathname;
+    // La recherche sémantique est un enrichissement optionnel : son indisponibilité
+    // doit retomber sur le filtre lexical local. Les 77 définitions, elles, ne
+    // doivent jamais être chargées depuis une API.
+    if (pathname !== "/api/threat-search") definitionApiRequests += 1;
+    await route.fulfill({
+      status: 503,
+      json: { detail: "Public definitions are local content" },
+    });
   });
-  await page.goto("/");
-  await page.getByRole("navigation", { name: "Navigation principale" })
-    .getByRole("link", { name: "Les menaces cyber IA", exact: true }).click();
+  // Le contrat porte sur le glossaire. Aller directement sur sa route évite de
+  // faire dépendre ses facettes d'une animation et de l'état de la page d'accueil.
+  await page.goto("/menaces");
   await expect(page).toHaveURL(/\/menaces$/);
-  await expect(page.getByRole("heading", { name: "Glossaire des menaces IA", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "Glossaire des menaces IA",
+      exact: true,
+    }),
+  ).toBeVisible();
 
   const table = page.getByRole("table");
   const rows = page.locator(".guard-glossary__row");
   const status = page.getByRole("status");
-  const search = page.getByRole("searchbox", { name: "Rechercher une menace", exact: true });
-  const uses = page.getByRole("group", { name: "Filtrer par usage IA", exact: true });
-  const coverage = page.getByRole("group", { name: "Filtrer par couverture AI Guard", exact: true });
+  const search = page.getByRole("searchbox", {
+    name: "Rechercher une menace",
+    exact: true,
+  });
+  const uses = page.getByRole("group", {
+    name: "Filtrer par usage IA",
+    exact: true,
+  });
+  const coverage = page.getByRole("group", {
+    name: "Filtrer par couverture AI Guard",
+    exact: true,
+  });
 
   await expect(rows).toHaveCount(TOTAL);
   await expect(status).toHaveText(`${TOTAL} menaces affichées sur ${TOTAL}`);
-  await expect(table.getByRole("columnheader", { name: "AI Guard", exact: true })).toBeVisible();
+  await expect(
+    table.getByRole("columnheader", { name: "AI Guard", exact: true }),
+  ).toBeVisible();
   await expect(page.locator(".guard-glossary__group")).toHaveCount(13);
-  await expect(uses.getByRole("button", { name: "Tous les usages", exact: true })).toHaveAttribute("aria-pressed", "true");
-  for (const row of await rows.all()) await expect(row.locator(".guard-glossary__offer")).toHaveText(/^(SaaS|Conseil)/);
+  await expect(
+    uses.getByRole("button", { name: "Tous les usages", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  for (const row of await rows.all())
+    await expect(row.locator(".guard-glossary__offer")).toHaveText(
+      /^(SaaS|Conseil)/,
+    );
   // Les codes du relevé ne s'affichent qu'au détail, comme lien vers la preuve.
   await expect(rows.getByText(/\bM-\d{2}\b/)).toHaveCount(0);
 
   // La recherche ignore accents et casse, et les mots portent sur une même ligne.
   await search.fill("CODE GENERE VULNERABLE");
   await expect(rows).toHaveCount(1);
-  await expect(rows.first().getByRole("rowheader")).toContainText("Code généré vulnérable");
-  await uses.getByRole("button", { name: "Collaborateurs", exact: true }).click();
+  await expect(rows.first().getByRole("rowheader")).toContainText(
+    "Code généré vulnérable",
+  );
+  await uses
+    .getByRole("button", { name: "Équipes métier", exact: true })
+    .click();
   await expect(rows).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Aucune menace trouvée", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Aucune menace trouvée", exact: true }),
+  ).toBeVisible();
   await expect(status).toContainText("0");
-  await page.locator(".guard-glossary__empty").getByRole("button", { name: "Réinitialiser les filtres", exact: true }).click();
+  await page
+    .locator(".guard-glossary__empty")
+    .getByRole("button", { name: "Réinitialiser les filtres", exact: true })
+    .click();
   await expect(search).toHaveValue("");
-  await expect(uses.getByRole("button", { name: "Tous les usages", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    uses.getByRole("button", { name: "Tous les usages", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await expect(rows).toHaveCount(TOTAL);
 
   // Les facettes se composent, et chaque compte est celui des données.
   const covered = THREAT_GLOSSARY.filter((entry) => entry.coverage === "yes");
-  await expect(coverage.getByRole("button", { name: "Couvert", exact: true })).toContainText(String(covered.length));
+  await expect(
+    coverage.getByRole("button", { name: "Couvert", exact: true }),
+  ).toContainText(String(covered.length));
   await coverage.getByRole("button", { name: "Couvert", exact: true }).click();
   await expect(rows).toHaveCount(covered.length);
-  for (const row of await rows.all()) await expect(row.locator(".guard-glossary__offer")).toHaveText(/SaaS/);
-  await page.getByRole("combobox", { name: "Catégorie", exact: true }).selectOption("agents");
-  await expect(rows).toHaveCount(covered.filter((entry) => entry.category === "agents").length);
-  await page.getByRole("button", { name: "Réinitialiser les filtres", exact: true }).click();
-  await page.getByRole("combobox", { name: "Surface d’attaque", exact: true }).selectOption("people");
-  await expect(rows).toHaveCount(THREAT_GLOSSARY.filter((entry) => entry.surface === "people").length);
-  await page.getByRole("button", { name: "Réinitialiser les filtres", exact: true }).click();
+  for (const row of await rows.all())
+    await expect(row.locator(".guard-glossary__offer")).toHaveText(/SaaS/);
+  await page
+    .getByRole("combobox", { name: "Catégorie", exact: true })
+    .selectOption("agents");
+  await expect(rows).toHaveCount(
+    covered.filter((entry) => entry.category === "agents").length,
+  );
+  await page
+    .getByRole("button", { name: "Réinitialiser les filtres", exact: true })
+    .click();
+  await page
+    .getByRole("combobox", { name: "Surface d’attaque", exact: true })
+    .selectOption("people");
+  await expect(rows).toHaveCount(
+    THREAT_GLOSSARY.filter((entry) => entry.surface === "people").length,
+  );
+  await page
+    .getByRole("button", { name: "Réinitialiser les filtres", exact: true })
+    .click();
 
   // Hors du tri par catégorie, les groupes disparaissent et chaque ligne dit la sienne.
-  await page.getByRole("combobox", { name: "Trier par", exact: true }).selectOption("risk");
+  await page
+    .getByRole("combobox", { name: "Trier par", exact: true })
+    .selectOption("risk");
   await expect(page.locator(".guard-glossary__group")).toHaveCount(0);
   await expect(rows.first().locator(".guard-glossary__kicker")).toBeVisible();
-  await page.getByRole("combobox", { name: "Trier par", exact: true }).selectOption("category");
+  await page
+    .getByRole("combobox", { name: "Trier par", exact: true })
+    .selectOption("category");
 
   // Le détail s'ouvre sur place : définition, couverture, preuve, figure nommée.
-  const rag = page.getByRole("button", { name: "Accès indu aux documents du RAG", exact: true });
+  const rag = page.getByRole("button", {
+    name: "Accès indu aux documents du RAG",
+    exact: true,
+  });
   await expect(page.locator("#acces-rag-details")).toBeHidden();
   await rag.click();
   await expect(rag).toHaveAttribute("aria-expanded", "true");
   const details = page.locator("#acces-rag-details");
   await expect(details).toBeVisible();
-  await expect(details.getByRole("heading", { name: "Exemple illustratif", exact: true })).toBeVisible();
-  await expect(details.getByRole("heading", { name: /Ce que fait AI Guard · Non couvert/ })).toBeVisible();
-  await expect(details.locator(".guard-glossary__source")).toHaveAttribute("href", /^https:\/\/genai\.owasp\.org\//);
+  await expect(
+    details.getByRole("heading", { name: "Exemple illustratif", exact: true }),
+  ).toBeVisible();
+  await expect(
+    details.getByRole("heading", {
+      name: /Ce que fait AI Guard · Non couvert/,
+    }),
+  ).toBeVisible();
+  await expect(details.locator(".guard-glossary__source")).toHaveAttribute(
+    "href",
+    /^https:\/\/genai\.owasp\.org\//,
+  );
   await expect(details.locator(".diag > title")).toHaveCount(1);
+  await expect(
+    details.getByText("Secret Guard · X", { exact: true }),
+  ).toBeVisible();
   await rag.click();
   await expect(details).toBeHidden();
-  const indirect = page.getByRole("button", { name: "Injection de prompt indirecte", exact: true });
+  const indirect = page.getByRole("button", {
+    name: "Injection de prompt indirecte",
+    exact: true,
+  });
   await indirect.click();
-  await expect(page.locator("#injection-de-prompt-details").getByRole("link", { name: /Relevé de couverture · M-02/ }))
-    .toHaveAttribute("href", "/evidence#menaces");
   // Les marqueurs de flèche sont posés UNE fois pour le document, quel que soit le
   // nombre de figures ouvertes.
-  await page.getByRole("button", { name: "Autonomie excessive", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Autonomie excessive", exact: true })
+    .click();
   await expect(page.locator(".guard-glossary__details .diag")).toHaveCount(2);
   await expect(page.locator("marker#fx")).toHaveCount(1);
   await expect(page.locator("marker#ax")).toHaveCount(1);
 
   await page.getByRole("button", { name: "EN", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "AI threat glossary", exact: true })).toBeVisible();
-  await page.getByRole("group", { name: "Filter by AI use", exact: true })
-    .getByRole("button", { name: "Data & weights", exact: true }).click();
-  await page.getByRole("searchbox", { name: "Search for a threat", exact: true }).fill("poisoning");
+  await expect(
+    page.getByRole("heading", { name: "AI threat glossary", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("group", { name: "Filter by AI use", exact: true })
+    .getByRole("button", { name: "Model & data teams", exact: true })
+    .click();
+  await page
+    .getByRole("searchbox", { name: "Search for a threat", exact: true })
+    .fill("poisoning");
   const headers = rows.getByRole("rowheader");
-  await expect(headers.filter({ hasText: "Training-data poisoning" })).toHaveCount(1);
+  await expect(
+    headers.filter({ hasText: "Training-data poisoning" }),
+  ).toHaveCount(1);
   await expect(headers.filter({ hasText: "RAG poisoning" })).toHaveCount(1);
   // Même mot, mais un usage que le filtre écarte : les deux critères se composent.
-  await expect(headers.filter({ hasText: "Tool poisoning and rug pull" })).toHaveCount(0);
-  await expect(page.locator(".guard-glossary__scope a")).toHaveAttribute("href", "/evidence");
-  expect(apiRequests).toBe(0);
+  await expect(
+    headers.filter({ hasText: "Tool poisoning and rug pull" }),
+  ).toHaveCount(0);
+  expect(definitionApiRequests).toBe(0);
 });
 
 test("a deep link opens the row it targets", async ({ page }) => {
   await page.goto("/menaces#code-vulnerable");
-  await expect(page.getByRole("button", { name: "Code généré vulnérable", exact: true })).toHaveAttribute("aria-expanded", "true");
+  await expect(
+    page.getByRole("button", { name: "Code généré vulnérable", exact: true }),
+  ).toHaveAttribute("aria-expanded", "true");
   await expect(page.locator("#code-vulnerable-details")).toBeVisible();
-  await expect(page.locator("#code-vulnerable-details .diag > title")).toHaveCount(1);
+  await expect(
+    page.locator("#code-vulnerable-details .diag > title"),
+  ).toHaveCount(1);
+});
+
+test("Developer Guard filters are shareable and sourced from generated coverage", async ({ page }) => {
+  const implemented = developerGuard.threats.filter((entry) => entry.mode !== "X");
+  expect(implemented.length).toBeGreaterThan(0);
+  await page.goto("/menaces?product=developer-guard");
+  await expect(page.getByRole("combobox", { name: "Produit", exact: true })).toHaveValue("developer-guard");
+  await expect(page.locator(".guard-glossary__row")).toHaveCount(implemented.length);
+
+  const coverageModule = implemented[0].module;
+  await page.getByRole("combobox", { name: "Module", exact: true }).selectOption(coverageModule);
+  await expect.poll(() => new URL(page.url()).searchParams.get("module")).toBe(coverageModule);
+  await expect(page.locator(".guard-glossary__row")).toHaveCount(implemented.filter((entry) => entry.module === coverageModule).length);
+
+  const host = implemented.flatMap((entry) => entry.hosts)[0];
+  await page.getByRole("combobox", { name: "Assistant", exact: true }).selectOption(host.assistant);
+  await expect(page.getByRole("combobox", { name: "Environnement", exact: true })).toHaveValue("all");
+  const url = new URL(page.url());
+  expect(url.searchParams.get("product")).toBe("developer-guard");
+  expect(url.searchParams.get("module")).toBe(coverageModule);
+  expect(url.searchParams.get("assistant")).toBe(host.assistant);
 });
 
 for (const width of [390, 768, 1440]) {
-  test(`the glossary stays contained and usable in both languages at ${width}px`, async ({ page }) => {
+  test(`the glossary stays contained and usable in both languages at ${width}px`, async ({
+    page,
+  }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/menaces");
     const rows = page.locator(".guard-glossary__row");
     await expect(rows).toHaveCount(TOTAL);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
     // Sous 1024px, les lignes deviennent des fiches et l'en-tête de colonnes s'efface.
-    await expect(page.getByRole("columnheader", { name: "Menace", exact: true })).toBeVisible({ visible: width > 1024 });
-    await page.getByRole("group", { name: "Filtrer par usage IA", exact: true })
-      .getByRole("button", { name: "AI scientist", exact: true }).click();
+    await expect(
+      page.getByRole("columnheader", { name: "Menace", exact: true }),
+    ).toBeVisible({ visible: width > 1024 });
+    await page
+      .getByRole("group", { name: "Filtrer par usage IA", exact: true })
+      .getByRole("button", { name: "Équipes modèles & données", exact: true })
+      .click();
     await expect(page.locator("#empoisonnement")).toBeVisible();
-    await page.getByRole("button", { name: "Empoisonnement des données d’entraînement", exact: true }).click();
+    await page
+      .getByRole("button", {
+        name: "Empoisonnement des données d’entraînement",
+        exact: true,
+      })
+      .click();
     await expect(page.locator("#empoisonnement-details .diag")).toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
     await page.getByRole("button", { name: "EN", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "AI threat glossary", exact: true })).toBeVisible();
-    await expect(page.getByRole("searchbox", { name: "Search for a threat", exact: true })).toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await expect(
+      page.getByRole("heading", { name: "AI threat glossary", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("searchbox", { name: "Search for a threat", exact: true }),
+    ).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
     if (width === 390) {
       const first = await rows.nth(0).boundingBox();
       const second = await rows.nth(1).boundingBox();

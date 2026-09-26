@@ -79,8 +79,9 @@ _CHAINE = re.compile(r'\b(en|fr): "((?:[^"\\]|\\.)*)"')
 _PLACEHOLDER = re.compile(r"\{(\w+)\}")
 
 #: Un mot qui fait d'un nombre une revendication de couverture.
+#: En début de mot seulement : « découverte » et « discovery » ne parlent pas de couverture.
 _MOT_COUVERTURE = re.compile(
-    r"menace|ligne|facette|couvert|couvre|matrice|bloqu|threat|row|facet|cover|block",
+    r"(?<![^\W\d_])(?:menace|ligne|facette|couvert|couvre|matrice|bloqu|threat|row|facet|cover|block)",
     re.IGNORECASE,
 )
 

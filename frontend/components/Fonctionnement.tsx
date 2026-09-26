@@ -63,7 +63,7 @@ function FlecheFlux() {
  * après l'autre. L'extrait est replié — il sert à celui qui a déjà choisi, et déplié
  * par défaut il transformait la section en mur de code.
  */
-function Voie({
+async function Voie({
   numero,
   titre,
   garantie,
@@ -80,7 +80,7 @@ function Voie({
   code: string;
   langue: string;
 }) {
-  const { t } = serverT();
+  const { t } = await serverT();
   return (
     <div className="card flex flex-col p-6">
       <span className="font-mono text-sm text-[color:var(--copper-text)]">
@@ -110,8 +110,8 @@ function Voie({
   );
 }
 
-export function Fonctionnement() {
-  const { t } = serverT();
+export async function Fonctionnement() {
+  const { t } = await serverT();
   return (
     <section id="how" className="section section--light scroll-mt-20">
       {/* 1 — Le principe. Les trois blocs partagent `wrap--wide` : deux largeurs

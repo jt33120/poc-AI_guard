@@ -31,8 +31,16 @@ export const EXTENSION_MARKETPLACE_URL =
  * rend son fond uni. Le jour où le fichier arrive, c'est elle qui bascule.
  */
 export const HOME_HERO_MEDIA = {
-  webm: "/signal-media/ai-guard-hero-v2.webm",
-  poster: "/signal-media/ai-guard-hero-v2.png",
+  fr: {
+    mp4: "/signal-media/xsom-ai-home-v3-fr.mp4",
+    poster: "/signal-media/xsom-ai-home-v3-fr.jpg",
+    label: "xSOM AI Studio : vos équipes adoptent l’IA. Secrets, données, actions d’agents : exposés. Détecter les secrets, bloquer les actions à risque, tracer chaque décision. La couche cybersécurité de vos usages IA. Logiciels et conseil.",
+  },
+  en: {
+    mp4: "/signal-media/xsom-ai-home-v3-en.mp4",
+    poster: "/signal-media/xsom-ai-home-v3-en.jpg",
+    label: "xSOM AI Studio: your teams embrace AI. Secrets, data, agent actions: exposed. Detect secrets, block risky actions, trace every decision. The cybersecurity layer for every AI use case. Software and consulting.",
+  },
 };
 
 export const EXTENSION_HERO_MEDIA: { webm: string; poster: string } | null = {
@@ -50,7 +58,7 @@ export const EXTENSION_ON_MARKETPLACE: boolean = false;
 /** Concrete orientation copy; none of these illustrative paths claims live coverage. */
 export const GUARD_COPY = {
   fr: {
-    poc: "Secret Guard gratuit · Developer Guard en pilote accompagné",
+    poc: "Secret Guard gratuit · éditions Équipe et Renforcé en pilote accompagné",
     title: ["La solution cyber", "pour tous vos usages IA."],
     intro: "Simple, efficace.",
     explore: "Voir les menaces",
@@ -210,7 +218,7 @@ export const GUARD_COPY = {
     saasIntro:
       "Explorez la console AI Guard puis préparez votre passerelle avec xSOM. Elle applique vos règles aux appels d’outils qui la traversent, sollicite les validations nécessaires et garde une trace des décisions.",
     saasOpen:
-      "Console de découverte gratuite. Passerelle et intégration sur devis, distinctes des tarifs Developer Guard.",
+      "Console de découverte gratuite. Passerelle et intégration sur devis, distinctes des tarifs Secret Guard.",
     saasIncluded: "Ce que ça sait faire",
     saasFamilies: [
       {
@@ -315,7 +323,7 @@ export const GUARD_COPY = {
     extFreeLabel: "Gratuit",
     extFreeBody: "Extension et installation locale, sans compte. Vous activez la protection puis approuvez explicitement sa définition dans /hooks, dans Codex CLI.",
     extFreeNote: "Un hook utilisateur reste désactivable. Toute modification de sa définition demande une nouvelle approbation dans Codex.",
-    extEnterpriseTitle: "Developer Guard Équipe",
+    extEnterpriseTitle: "Secret Guard Équipe",
     extEnterpriseLabel: "90 jours de découverte offerts",
     extEnterpriseBody: "Votre administrateur distribue les scripts via MDM, l’outil de gestion des postes, et impose les hooks Codex dans requirements.toml. La politique d’entreprise les déclare fiables ; ils ne peuvent pas être désactivés depuis l’interface de gestion des hooks.",
     extEnterpriseNote: "Codex ne distribue pas les scripts. Leur installation et leurs mises à jour restent à la charge de l’éditeur ou de l’entreprise. Ce parcours doit être préparé et validé sur votre parc.",
@@ -348,7 +356,7 @@ export const GUARD_COPY = {
       "Claude Code",
       "Codex",
     ],
-    extGuardTitle: "Évoluer vers Developer Guard",
+    extGuardTitle: "Évoluer vers Secret Guard Équipe",
     extGuardItems: [
       "Secrets : détection locale avant les prompts et lectures de fichiers prises en charge.",
       "Ressources : fichiers de credentials et racines hors périmètre refusés dans les événements supportés.",
@@ -381,7 +389,7 @@ export const GUARD_COPY = {
     footer: "Édité par XSOM CONSULTING · Arcachon, France. Gratuit local et offres d’équipe sur qualification.",
   },
   en: {
-    poc: "Free Secret Guard · guided Developer Guard pilots",
+    poc: "Free Secret Guard · guided Team and Reinforced pilots",
     title: ["The cybersecurity solution", "for every AI use case."],
     intro: "Simple. Effective.",
     explore: "See the threats",
@@ -537,7 +545,7 @@ export const GUARD_COPY = {
     saasIntro:
       "Explore the AI Guard console, then prepare your gateway with xSOM. It applies your rules to tool calls that pass through it, requests the required approvals and records decisions.",
     saasOpen:
-      "Free discovery console. Gateway and integration quoted separately from Developer Guard pricing.",
+      "Free discovery console. Gateway and integration quoted separately from Secret Guard pricing.",
     saasIncluded: "What it can do",
     saasFamilies: [
       {
@@ -641,7 +649,7 @@ export const GUARD_COPY = {
     extFreeLabel: "Free",
     extFreeBody: "Extension and local installation, with no account needed. Enable protection, then explicitly trust its definition using /hooks in Codex CLI.",
     extFreeNote: "User hooks remain removable. Changing a hook definition requires a new trust review in Codex.",
-    extEnterpriseTitle: "Developer Guard Team",
+    extEnterpriseTitle: "Secret Guard Team",
     extEnterpriseLabel: "90 days of free discovery",
     extEnterpriseBody: "Your administrator distributes scripts through MDM, your device management system, and enforces Codex hooks in requirements.toml. Enterprise policy trusts these hooks; they cannot be disabled from the hook management interface.",
     extEnterpriseNote: "Codex does not distribute scripts. The publisher or your organisation handles installation and updates. This deployment path needs preparation and validation on your devices.",
@@ -674,7 +682,7 @@ export const GUARD_COPY = {
       "Claude Code",
       "Codex",
     ],
-    extGuardTitle: "Move to Developer Guard",
+    extGuardTitle: "Move to Secret Guard Team",
     extGuardItems: [
       "Secrets: local detection before supported prompts and file reads.",
       "Resources: credential files and out-of-scope roots are denied for supported events.",

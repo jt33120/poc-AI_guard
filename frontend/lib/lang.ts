@@ -25,8 +25,8 @@ export const LANG_COOKIE = "xsom_lang";
 export const DEFAULT_LANG: Lang = "fr";
 
 /** La langue de cette requête. Fail-soft : une valeur inconnue retombe sur le défaut. */
-export function getLang(): Lang {
-  const brut = cookies().get(LANG_COOKIE)?.value;
+export async function getLang(): Promise<Lang> {
+  const brut = (await cookies()).get(LANG_COOKIE)?.value;
   return brut === "en" || brut === "fr" ? brut : DEFAULT_LANG;
 }
 
@@ -43,32 +43,38 @@ export function translate(
   vars?: Record<string, string | number>,
 ): string {
   let s: string = STR[key]?.[lang] ?? STR[key]?.en ?? String(key);
-  if (vars) for (const [k, v] of Object.entries(vars)) s = s.replace(`{${k}}`, String(v));
+  if (vars)
+    for (const [k, v] of Object.entries(vars))
+      s = s.replace(`{${k}}`, String(v));
   return s;
 }
 
 /** Le traducteur de cette requête, prêt à passer à un composant serveur. */
-export function serverT(): { t: (k: StrKey, vars?: Record<string, string | number>) => string; lang: Lang } {
-  const lang = getLang();
+export async function serverT(): Promise<{
+  t: (k: StrKey, vars?: Record<string, string | number>) => string;
+  lang: Lang;
+}> {
+  const lang = await getLang();
   return { t: (k, vars) => translate(lang, k, vars), lang };
 }
 
 /**
  * La `metadata` d'une page, dans la langue de la requête.
  *
- * Le gabarit de titre est posé par le layout racine (`%s · xSOM AI Guard`) : une
+ * Le gabarit de titre est posé par le layout racine (`%s · xSOM AI Studio`) : une
  * page ne fournit donc que son propre titre. `noindex` sert aux écrans qui n'ont
  * rien à faire dans un index public — les formulaires d'authentification et la
  * console derrière session : indexés, ils feraient entrer des pages vides, et
  * pour la console, une arborescence privée, dans les résultats de recherche.
  */
-export function pageMetadata(
+export async function pageMetadata(
   titleKey: StrKey,
   opts: { descriptionKey?: StrKey; noindex?: boolean } = {},
-): Metadata {
-  const lang = getLang();
+): Promise<Metadata> {
+  const lang = await getLang();
   const meta: Metadata = { title: translate(lang, titleKey) };
-  if (opts.descriptionKey) meta.description = translate(lang, opts.descriptionKey);
+  if (opts.descriptionKey)
+    meta.description = translate(lang, opts.descriptionKey);
   if (opts.noindex) meta.robots = { index: false, follow: false };
   return meta;
 }

@@ -5,7 +5,7 @@ export type DeveloperGuardStatus = "implemented_local" | "out_of_scope";
 
 export type DeveloperGuardCoverage = {
   readonly id: string;
-  readonly product: "Developer Guard";
+  readonly product: "Secret Guard";
   readonly module: string;
   readonly status: DeveloperGuardStatus;
   readonly mode: DeveloperGuardMode;
@@ -24,7 +24,7 @@ export type DeveloperGuardCoverage = {
 
 type CoverageDocument = {
   readonly schemaVersion: 1;
-  readonly product: "Developer Guard";
+  readonly product: "Secret Guard";
   readonly threats: readonly DeveloperGuardCoverage[];
 };
 

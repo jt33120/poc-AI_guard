@@ -26,7 +26,7 @@ import { MARK_CHECK, MARK_SHIELD, MARK_VIEWBOX } from "@/lib/mark";
 /**
  * Original xSOM variants, selected by the shared theme without altering the SVG.
  *
- * `alt=""` : le logo est décoratif. Le nom accessible « xSOM AI Guard » est porté
+ * `alt=""` : le logo est décoratif. Le nom accessible « xSOM AI Studio » est porté
  * par le texte posé à côté ; donner un `alt` au signe le ferait annoncer deux fois
  * par un lecteur d'écran, et `e2e/smoke.spec.ts` cherche ce nom-là sur le `h1`,
  * pas sur l'image.
@@ -83,13 +83,13 @@ export function Wordmark({
   className?: string;
   tagline?: string;
 }) {
-  // Le contenu textuel reste « xSOM AI Guard » : le nom accessible ne bouge pas.
+  // Le contenu textuel porte le nom du site « xSOM AI Studio ».
   // La baseline est un frère du nom, jamais un enfant, sinon elle entrerait dans
   // le nom accessible que le test e2e cherche.
   return (
     <span>
       <span className={`brand__name ${className}`}>
-        xSOM <span className="brand__product">AI Guard</span>
+        xSOM <span className="brand__product">AI Studio</span>
       </span>
       {tagline ? <span className="brand__tag">{tagline}</span> : null}
     </span>
