@@ -1,0 +1,1554 @@
+{
+  "description": "Vecteurs de conformité du contrat RULES-PACK.md. Toute implémentation (TypeScript du poste, Python de la plateforme) doit les reproduire à l'identique. Générés une fois, figés : ne pas modifier sans changer schemaVersion.",
+  "grammar": [
+    {
+      "pattern": "CLI-[0-9]{8}",
+      "hasContext": false,
+      "valid": true
+    },
+    {
+      "pattern": "@acme\\.fr",
+      "hasContext": false,
+      "valid": true
+    },
+    {
+      "pattern": "acme-(?:prod|staging)-db[0-9]{1,2}",
+      "hasContext": false,
+      "valid": true
+    },
+    {
+      "pattern": "(?:FR|BE)[0-9]{2}[A-Z0-9]{10,30}",
+      "hasContext": true,
+      "valid": true
+    },
+    {
+      "pattern": "sk_live_[A-Za-z0-9]{24,64}",
+      "hasContext": false,
+      "valid": true
+    },
+    {
+      "pattern": "PRJ-(?:[A-Z]{2}-)?[0-9]{4}",
+      "hasContext": false,
+      "valid": true
+    },
+    {
+      "pattern": "(?:ab){2,3}xyz",
+      "hasContext": false,
+      "valid": true
+    },
+    {
+      "pattern": "[\\d\\-]{8,16}ACME",
+      "hasContext": false,
+      "valid": true
+    },
+    {
+      "pattern": "\\d{3}\\.int\\.acme",
+      "hasContext": false,
+      "valid": true
+    },
+    {
+      "pattern": "CLI-?",
+      "hasContext": false,
+      "valid": true
+    },
+    {
+      "pattern": "CLI-(?:[0-9]{2})?",
+      "hasContext": false,
+      "valid": true
+    },
+    {
+      "pattern": "[0-9]{14}",
+      "hasContext": true,
+      "valid": true
+    },
+    {
+      "pattern": "key=[a-f0-9]{32}",
+      "hasContext": false,
+      "valid": true
+    },
+    {
+      "pattern": "[.*+(|)$]{3}END",
+      "hasContext": false,
+      "valid": true
+    },
+    {
+      "pattern": "ACME[a-z]{64}[a-z]{64}[a-z]{60}",
+      "hasContext": false,
+      "valid": true
+    },
+    {
+      "pattern": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "hasContext": false,
+      "valid": false,
+      "error": "length"
+    },
+    {
+      "pattern": "café-[0-9]{3}",
+      "hasContext": false,
+      "valid": false,
+      "error": "invalid_character"
+    },
+    {
+      "pattern": "CLI-\t[0-9]{3}",
+      "hasContext": false,
+      "valid": false,
+      "error": "invalid_character"
+    },
+    {
+      "pattern": "CLI-\\d+",
+      "hasContext": false,
+      "valid": false,
+      "error": "unbounded_quantifier"
+    },
+    {
+      "pattern": "CLI-\\d*",
+      "hasContext": false,
+      "valid": false,
+      "error": "unbounded_quantifier"
+    },
+    {
+      "pattern": "CLI-\\d{2,}",
+      "hasContext": false,
+      "valid": false,
+      "error": "unbounded_quantifier"
+    },
+    {
+      "pattern": "CLI-[0-9]{0,65}",
+      "hasContext": false,
+      "valid": false,
+      "error": "bad_quantifier"
+    },
+    {
+      "pattern": "CLI-[0-9]{5,2}",
+      "hasContext": false,
+      "valid": false,
+      "error": "bad_quantifier"
+    },
+    {
+      "pattern": "CLI-[0-9]{01}",
+      "hasContext": false,
+      "valid": false,
+      "error": "bad_quantifier"
+    },
+    {
+      "pattern": "CLI-[0-9]{0}",
+      "hasContext": false,
+      "valid": false,
+      "error": "bad_quantifier"
+    },
+    {
+      "pattern": "CLI-[0-9]{1, 3}",
+      "hasContext": false,
+      "valid": false,
+      "error": "bad_quantifier"
+    },
+    {
+      "pattern": "CLI-(?:[0-9]{2}){2}",
+      "hasContext": false,
+      "valid": false,
+      "error": "nested_repetition"
+    },
+    {
+      "pattern": "CLI-(?:a|b){3}",
+      "hasContext": false,
+      "valid": false,
+      "error": "nested_repetition"
+    },
+    {
+      "pattern": "CLI-.{4}",
+      "hasContext": false,
+      "valid": false,
+      "error": "dot_not_allowed"
+    },
+    {
+      "pattern": "^CLI-[0-9]{4}",
+      "hasContext": false,
+      "valid": false,
+      "error": "anchor_not_allowed"
+    },
+    {
+      "pattern": "CLI-[0-9]{4}$",
+      "hasContext": false,
+      "valid": false,
+      "error": "anchor_not_allowed"
+    },
+    {
+      "pattern": "(CLI)-[0-9]{4}",
+      "hasContext": false,
+      "valid": false,
+      "error": "group_not_allowed"
+    },
+    {
+      "pattern": "(?=CLI)CLI-[0-9]{4}",
+      "hasContext": false,
+      "valid": false,
+      "error": "group_not_allowed"
+    },
+    {
+      "pattern": "CLI-(?<n>[0-9]{4})",
+      "hasContext": false,
+      "valid": false,
+      "error": "group_not_allowed"
+    },
+    {
+      "pattern": "CLI-[0-9]\\1",
+      "hasContext": false,
+      "valid": false,
+      "error": "bad_escape"
+    },
+    {
+      "pattern": "CLI-\\b[0-9]{4}",
+      "hasContext": false,
+      "valid": false,
+      "error": "bad_escape"
+    },
+    {
+      "pattern": "CLI-\\D{4}",
+      "hasContext": false,
+      "valid": false,
+      "error": "bad_escape"
+    },
+    {
+      "pattern": "CLI-\\x41",
+      "hasContext": false,
+      "valid": false,
+      "error": "bad_escape"
+    },
+    {
+      "pattern": "CLI-\\n[0-9]{2}",
+      "hasContext": false,
+      "valid": false,
+      "error": "bad_escape"
+    },
+    {
+      "pattern": "CLI-[^0-9]{4}",
+      "hasContext": false,
+      "valid": false,
+      "error": "negated_class"
+    },
+    {
+      "pattern": "CLI-[]{4}",
+      "hasContext": false,
+      "valid": false,
+      "error": "empty_class"
+    },
+    {
+      "pattern": "CLI-[a-]",
+      "hasContext": false,
+      "valid": false,
+      "error": "bad_class_char"
+    },
+    {
+      "pattern": "CLI-[-a]",
+      "hasContext": false,
+      "valid": false,
+      "error": "bad_class_char"
+    },
+    {
+      "pattern": "CLI-[z-a]",
+      "hasContext": false,
+      "valid": false,
+      "error": "bad_range"
+    },
+    {
+      "pattern": "CLI-[0-9",
+      "hasContext": false,
+      "valid": false,
+      "error": "unbalanced_class"
+    },
+    {
+      "pattern": "CLI-(?:[0-9]{4}",
+      "hasContext": false,
+      "valid": false,
+      "error": "unbalanced_group"
+    },
+    {
+      "pattern": "CLI-[0-9]{4})",
+      "hasContext": false,
+      "valid": false,
+      "error": "unbalanced_group"
+    },
+    {
+      "pattern": "CLI-[0-9]{4}?",
+      "hasContext": false,
+      "valid": false,
+      "error": "stacked_quantifier"
+    },
+    {
+      "pattern": "CLI-[0-9]??",
+      "hasContext": false,
+      "valid": false,
+      "error": "stacked_quantifier"
+    },
+    {
+      "pattern": "?CLI",
+      "hasContext": false,
+      "valid": false,
+      "error": "dangling_quantifier"
+    },
+    {
+      "pattern": "CLI||XYZ",
+      "hasContext": false,
+      "valid": false,
+      "error": "empty_alternative"
+    },
+    {
+      "pattern": "(?:)CLI",
+      "hasContext": false,
+      "valid": false,
+      "error": "empty_alternative"
+    },
+    {
+      "pattern": "(?:(?:(?:(?:(?:CLI)))))",
+      "hasContext": false,
+      "valid": false,
+      "error": "too_deep"
+    },
+    {
+      "pattern": "ab",
+      "hasContext": false,
+      "valid": false,
+      "error": "too_short"
+    },
+    {
+      "pattern": "a(?:bc)?",
+      "hasContext": false,
+      "valid": false,
+      "error": "too_short"
+    },
+    {
+      "pattern": "ACME[a-z]{64}[a-z]{64}[a-z]{64}[a-z]{64}",
+      "hasContext": false,
+      "valid": false,
+      "error": "too_long"
+    },
+    {
+      "pattern": "[0-9]{14}",
+      "hasContext": false,
+      "valid": false,
+      "error": "no_anchor"
+    },
+    {
+      "pattern": "C{3}LI[0-9]{2}",
+      "hasContext": false,
+      "valid": false,
+      "error": "no_anchor"
+    },
+    {
+      "pattern": "ABC|DEF",
+      "hasContext": false,
+      "valid": false,
+      "error": "no_anchor"
+    }
+  ],
+  "detection": [
+    {
+      "name": "prefix and exact length",
+      "detector": {
+        "id": "d",
+        "label": "Détecteur",
+        "category": "customer_data",
+        "action": "block",
+        "match": {
+          "type": "pattern",
+          "pattern": "CLI-[0-9]{8}"
+        }
+      },
+      "text": "Dossier CLI-12345678 et CLI-87654321, pas CLI-1234.",
+      "matches": ["CLI-12345678", "CLI-87654321"]
+    },
+    {
+      "name": "case sensitive by default",
+      "detector": {
+        "id": "d",
+        "label": "Détecteur",
+        "category": "customer_data",
+        "action": "block",
+        "match": {
+          "type": "pattern",
+          "pattern": "CLI-[0-9]{8}"
+        }
+      },
+      "text": "cli-12345678",
+      "matches": []
+    },
+    {
+      "name": "case insensitive, alternation, greedy bound",
+      "detector": {
+        "id": "d",
+        "label": "Détecteur",
+        "category": "customer_data",
+        "action": "block",
+        "match": {
+          "type": "pattern",
+          "pattern": "acme-(?:prod|staging)-db[0-9]{1,2}",
+          "caseInsensitive": true
+        }
+      },
+      "text": "connect to ACME-Prod-DB7 then acme-staging-db12x",
+      "matches": ["ACME-Prod-DB7", "acme-staging-db12"]
+    },
+    {
+      "name": "leftmost-first backtracking through alternation",
+      "detector": {
+        "id": "d",
+        "label": "Détecteur",
+        "category": "customer_data",
+        "action": "block",
+        "match": {
+          "type": "pattern",
+          "pattern": "PRJ-(?:A|AB)[0-9]{2}"
+        }
+      },
+      "text": "ticket PRJ-AB12 ok",
+      "matches": ["PRJ-AB12"]
+    },
+    {
+      "name": "leftmost-first, not leftmost-longest",
+      "detector": {
+        "id": "d",
+        "label": "Détecteur",
+        "category": "customer_data",
+        "action": "block",
+        "match": {
+          "type": "pattern",
+          "pattern": "XYZ(?:a)?(?:ab)?"
+        }
+      },
+      "text": "id XYZab end",
+      "matches": ["XYZa"]
+    },
+    {
+      "name": "non-overlapping successive matches",
+      "detector": {
+        "id": "d",
+        "label": "Détecteur",
+        "category": "customer_data",
+        "action": "block",
+        "match": {
+          "type": "pattern",
+          "pattern": "ABA"
+        }
+      },
+      "text": "ABABA",
+      "matches": ["ABA"]
+    },
+    {
+      "name": "\\w is ASCII only",
+      "detector": {
+        "id": "d",
+        "label": "Détecteur",
+        "category": "customer_data",
+        "action": "block",
+        "match": {
+          "type": "pattern",
+          "pattern": "REF-\\w{4}"
+        }
+      },
+      "text": "REF-été1 REF-ab_9",
+      "matches": ["REF-ab_9"]
+    },
+    {
+      "name": "\\s is ASCII only (no NBSP)",
+      "detector": {
+        "id": "d",
+        "label": "Détecteur",
+        "category": "customer_data",
+        "action": "block",
+        "match": {
+          "type": "pattern",
+          "pattern": "ACME\\s[0-9]{3}"
+        }
+      },
+      "text": "ACME 123 ACME 456",
+      "matches": ["ACME 456"]
+    },
+    {
+      "name": "entropy threshold filters low-entropy matches",
+      "detector": {
+        "id": "d",
+        "label": "Détecteur",
+        "category": "customer_data",
+        "action": "block",
+        "match": {
+          "type": "pattern",
+          "pattern": "tok_[A-Za-z0-9]{16}",
+          "minEntropyTenths": 30
+        }
+      },
+      "text": "tok_aaaaaaaaaaaaaaaa tok_x7Kq9Lm2Pz4Rt8Vw",
+      "matches": ["tok_x7Kq9Lm2Pz4Rt8Vw"]
+    },
+    {
+      "name": "context keyword within window",
+      "detector": {
+        "id": "d",
+        "label": "Détecteur",
+        "category": "customer_data",
+        "action": "block",
+        "match": {
+          "type": "pattern",
+          "pattern": "[0-9]{14}"
+        },
+        "context": {
+          "keywords": ["siret"],
+          "window": 20
+        }
+      },
+      "text": "SIRET : 12345678901234. Commande 98765432109876 livrée.",
+      "matches": ["12345678901234"]
+    },
+    {
+      "name": "context window counted in code points (inside)",
+      "detector": {
+        "id": "d",
+        "label": "Détecteur",
+        "category": "customer_data",
+        "action": "block",
+        "match": {
+          "type": "pattern",
+          "pattern": "FR[0-9]{12}"
+        },
+        "context": {
+          "keywords": ["iban"],
+          "window": 10
+        }
+      },
+      "text": "iban 😀😀😀😀 FR761234567890",
+      "matches": ["FR761234567890"]
+    },
+    {
+      "name": "context window counted in code points (outside)",
+      "detector": {
+        "id": "d",
+        "label": "Détecteur",
+        "category": "customer_data",
+        "action": "block",
+        "match": {
+          "type": "pattern",
+          "pattern": "FR[0-9]{12}"
+        },
+        "context": {
+          "keywords": ["iban"],
+          "window": 10
+        }
+      },
+      "text": "iban 😀😀😀😀😀 FR761234567890",
+      "matches": []
+    },
+    {
+      "name": "context keyword after the match, fully inside the window",
+      "detector": {
+        "id": "d",
+        "label": "Détecteur",
+        "category": "customer_data",
+        "action": "block",
+        "match": {
+          "type": "pattern",
+          "pattern": "[0-9]{14}"
+        },
+        "context": {
+          "keywords": ["siret"],
+          "window": 16
+        }
+      },
+      "text": "Le 12345678901234 est notre SIRET.",
+      "matches": ["12345678901234"]
+    },
+    {
+      "name": "context keyword cut by the window edge does not count",
+      "detector": {
+        "id": "d",
+        "label": "Détecteur",
+        "category": "customer_data",
+        "action": "block",
+        "match": {
+          "type": "pattern",
+          "pattern": "[0-9]{14}"
+        },
+        "context": {
+          "keywords": ["siret"],
+          "window": 12
+        }
+      },
+      "text": "Le 12345678901234 est notre SIRET.",
+      "matches": []
+    },
+    {
+      "name": "astral characters never match and do not shift results",
+      "detector": {
+        "id": "d",
+        "label": "Détecteur",
+        "category": "customer_data",
+        "action": "block",
+        "match": {
+          "type": "pattern",
+          "pattern": "CLI-[0-9]{4}"
+        }
+      },
+      "text": "🔒CLI-1234🔒 CLI-5678",
+      "matches": ["CLI-1234", "CLI-5678"]
+    },
+    {
+      "name": "terms: separators, accents, compatibility forms, underscores",
+      "detector": {
+        "id": "d",
+        "label": "Termes",
+        "category": "project",
+        "action": "block",
+        "match": {
+          "type": "terms",
+          "salt": "ZGVmZ2hpamtsbW5vcHFycw==",
+          "digests": [
+            "b4a2b9d27b63501a1148ceb60b447e15ac46aa264fbfafc78efdebe48a3963fa",
+            "0905b76e862cd25382c438746e4135b0474f464ad9da38f6b0e21b4bd3a0e08e"
+          ],
+          "maxWords": 2
+        }
+      },
+      "text": "Le projet-FAUCON avance ; la nebuleuse aussi. Projet Faucons non. Nébuleuse ! projet ＦＡＵＣＯＮ et PROJET_FAUCON.",
+      "matches": [
+        "projet-FAUCON",
+        "nebuleuse",
+        "Nébuleuse",
+        "projet ＦＡＵＣＯＮ",
+        "PROJET_FAUCON"
+      ]
+    },
+    {
+      "name": "terms: leftmost then non-overlapping",
+      "detector": {
+        "id": "d",
+        "label": "Termes",
+        "category": "project",
+        "action": "block",
+        "match": {
+          "type": "terms",
+          "salt": "ZGVmZ2hpamtsbW5vcHFycw==",
+          "digests": [
+            "811b790a6a64c847fec67ceba0e334de1ed607b96fae6f53bf812d300b5c0e06",
+            "5acfe9465e1036cb29f5b36830d9d766d60bd2c1e625fb132678a5c53d0fcf85"
+          ],
+          "maxWords": 2
+        }
+      },
+      "text": "alpha beta gamma",
+      "matches": ["alpha beta"]
+    },
+    {
+      "name": "terms: longest candidate at the same start wins",
+      "detector": {
+        "id": "d",
+        "label": "Termes",
+        "category": "project",
+        "action": "block",
+        "match": {
+          "type": "terms",
+          "salt": "ZGVmZ2hpamtsbW5vcHFycw==",
+          "digests": [
+            "afe9933aa74a40d49319d942c621ef17b64c3e411b9ad216a42584d0dcba533c",
+            "811b790a6a64c847fec67ceba0e334de1ed607b96fae6f53bf812d300b5c0e06"
+          ],
+          "maxWords": 2
+        }
+      },
+      "text": "alpha beta",
+      "matches": ["alpha beta"]
+    },
+    {
+      "name": "terms: maxWords bounds the n-grams",
+      "detector": {
+        "id": "d",
+        "label": "Termes",
+        "category": "project",
+        "action": "block",
+        "match": {
+          "type": "terms",
+          "salt": "ZGVmZ2hpamtsbW5vcHFycw==",
+          "digests": [
+            "b4a2b9d27b63501a1148ceb60b447e15ac46aa264fbfafc78efdebe48a3963fa",
+            "0905b76e862cd25382c438746e4135b0474f464ad9da38f6b0e21b4bd3a0e08e"
+          ],
+          "maxWords": 1
+        }
+      },
+      "text": "projet faucon",
+      "matches": []
+    },
+    {
+      "name": "terms with context",
+      "detector": {
+        "id": "d",
+        "label": "Termes",
+        "category": "project",
+        "action": "block",
+        "match": {
+          "type": "terms",
+          "salt": "ZGVmZ2hpamtsbW5vcHFycw==",
+          "digests": [
+            "b4a2b9d27b63501a1148ceb60b447e15ac46aa264fbfafc78efdebe48a3963fa",
+            "0905b76e862cd25382c438746e4135b0474f464ad9da38f6b0e21b4bd3a0e08e"
+          ],
+          "maxWords": 2
+        },
+        "context": {
+          "keywords": ["code"],
+          "window": 8
+        }
+      },
+      "text": "nom de code : Projet Faucon. Rien sur la nébuleuse ici, vraiment rien du tout.",
+      "matches": ["Projet Faucon"]
+    }
+  ],
+  "terms": {
+    "salt": "ZGVmZ2hpamtsbW5vcHFycw==",
+    "cases": [
+      {
+        "term": "Projet Faucon",
+        "normalized": "projet faucon",
+        "digest": "b4a2b9d27b63501a1148ceb60b447e15ac46aa264fbfafc78efdebe48a3963fa"
+      },
+      {
+        "term": "Nébuleuse",
+        "normalized": "nebuleuse",
+        "digest": "0905b76e862cd25382c438746e4135b0474f464ad9da38f6b0e21b4bd3a0e08e"
+      },
+      {
+        "term": "  PROJET faucon ",
+        "normalized": "projet faucon",
+        "digest": "b4a2b9d27b63501a1148ceb60b447e15ac46aa264fbfafc78efdebe48a3963fa"
+      },
+      {
+        "term": "Nébuleuse",
+        "normalized": "nebuleuse",
+        "digest": "0905b76e862cd25382c438746e4135b0474f464ad9da38f6b0e21b4bd3a0e08e"
+      },
+      {
+        "term": "ＦＡＵＣＯＮ",
+        "normalized": "faucon",
+        "digest": "5e497781edf9488e71fbd527486c7a9e3861f534f7c08f1594eee11517203796"
+      },
+      {
+        "term": "Côte-d'Ivoire 2026",
+        "normalized": "cote d ivoire 2026",
+        "digest": "1d2d36115fc1faee525568d90aea4b3a0aa1cba89bf6e6d1df4bf811e0bb793a"
+      },
+      {
+        "term": "straße",
+        "normalized": "straße",
+        "digest": "85cde136514e0ad388ddbe0d6fe5e6f53569fd742efdd741d6bb599347fabe69"
+      }
+    ]
+  },
+  "packs": [
+    {
+      "name": "reference pack",
+      "pack": {
+        "schemaVersion": 1,
+        "kind": "xsom.secret-guard.rules-pack",
+        "packId": "acme-main",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "version": 3,
+        "issuedAt": "2026-09-01T00:00:00Z",
+        "expiresAt": "2027-09-01T00:00:00Z",
+        "issuer": "xSOM Consulting",
+        "detectors": [
+          {
+            "id": "acme.customer-id",
+            "label": "Identifiant client ACME",
+            "category": "customer_data",
+            "action": "block",
+            "match": {
+              "type": "pattern",
+              "pattern": "CLI-[0-9]{8}"
+            }
+          },
+          {
+            "id": "acme.siret",
+            "label": "Numéro SIRET d'un client",
+            "category": "customer_data",
+            "action": "warn",
+            "match": {
+              "type": "pattern",
+              "pattern": "[0-9]{14}"
+            },
+            "context": {
+              "keywords": ["siret"],
+              "window": 24
+            }
+          },
+          {
+            "id": "acme.codenames",
+            "label": "Nom de code de projet",
+            "category": "project",
+            "action": "block",
+            "match": {
+              "type": "terms",
+              "salt": "ZGVmZ2hpamtsbW5vcHFycw==",
+              "digests": [
+                "b4a2b9d27b63501a1148ceb60b447e15ac46aa264fbfafc78efdebe48a3963fa",
+                "0905b76e862cd25382c438746e4135b0474f464ad9da38f6b0e21b4bd3a0e08e"
+              ],
+              "maxWords": 2
+            }
+          }
+        ],
+        "tests": {
+          "positives": [
+            {
+              "detector": "acme.customer-id",
+              "text": "Le client CLI-00421337 a appelé."
+            },
+            {
+              "detector": "acme.siret",
+              "text": "SIRET 55210055400013 — facture jointe."
+            }
+          ],
+          "negatives": [
+            "Le ticket JIRA-12345678 est clos.",
+            "Commande 55210055400013 livrée.\nMerci\u0001 « bon travail » \\ \"ok\" /fin"
+          ]
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "duplicate detector id",
+      "pack": {
+        "schemaVersion": 1,
+        "kind": "xsom.secret-guard.rules-pack",
+        "packId": "acme-main",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "version": 3,
+        "issuedAt": "2026-09-01T00:00:00Z",
+        "expiresAt": "2027-09-01T00:00:00Z",
+        "issuer": "xSOM Consulting",
+        "detectors": [
+          {
+            "id": "acme.customer-id",
+            "label": "Identifiant client ACME",
+            "category": "customer_data",
+            "action": "block",
+            "match": {
+              "type": "pattern",
+              "pattern": "CLI-[0-9]{8}"
+            }
+          },
+          {
+            "id": "acme.siret",
+            "label": "Numéro SIRET d'un client",
+            "category": "customer_data",
+            "action": "warn",
+            "match": {
+              "type": "pattern",
+              "pattern": "[0-9]{14}"
+            },
+            "context": {
+              "keywords": ["siret"],
+              "window": 24
+            }
+          },
+          {
+            "id": "acme.codenames",
+            "label": "Nom de code de projet",
+            "category": "project",
+            "action": "block",
+            "match": {
+              "type": "terms",
+              "salt": "ZGVmZ2hpamtsbW5vcHFycw==",
+              "digests": [
+                "b4a2b9d27b63501a1148ceb60b447e15ac46aa264fbfafc78efdebe48a3963fa",
+                "0905b76e862cd25382c438746e4135b0474f464ad9da38f6b0e21b4bd3a0e08e"
+              ],
+              "maxWords": 2
+            }
+          },
+          {
+            "id": "acme.customer-id",
+            "label": "Identifiant client ACME",
+            "category": "customer_data",
+            "action": "block",
+            "match": {
+              "type": "pattern",
+              "pattern": "CLI-[0-9]{8}"
+            }
+          }
+        ],
+        "tests": {
+          "positives": [
+            {
+              "detector": "acme.customer-id",
+              "text": "Le client CLI-00421337 a appelé."
+            },
+            {
+              "detector": "acme.siret",
+              "text": "SIRET 55210055400013 — facture jointe."
+            }
+          ],
+          "negatives": [
+            "Le ticket JIRA-12345678 est clos.",
+            "Commande 55210055400013 livrée.\nMerci\u0001 « bon travail » \\ \"ok\" /fin"
+          ]
+        }
+      },
+      "valid": false,
+      "error": "duplicate_detector"
+    },
+    {
+      "name": "expiry not after issue",
+      "pack": {
+        "schemaVersion": 1,
+        "kind": "xsom.secret-guard.rules-pack",
+        "packId": "acme-main",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "version": 3,
+        "issuedAt": "2026-09-01T00:00:00Z",
+        "expiresAt": "2026-09-01T00:00:00Z",
+        "issuer": "xSOM Consulting",
+        "detectors": [
+          {
+            "id": "acme.customer-id",
+            "label": "Identifiant client ACME",
+            "category": "customer_data",
+            "action": "block",
+            "match": {
+              "type": "pattern",
+              "pattern": "CLI-[0-9]{8}"
+            }
+          },
+          {
+            "id": "acme.siret",
+            "label": "Numéro SIRET d'un client",
+            "category": "customer_data",
+            "action": "warn",
+            "match": {
+              "type": "pattern",
+              "pattern": "[0-9]{14}"
+            },
+            "context": {
+              "keywords": ["siret"],
+              "window": 24
+            }
+          },
+          {
+            "id": "acme.codenames",
+            "label": "Nom de code de projet",
+            "category": "project",
+            "action": "block",
+            "match": {
+              "type": "terms",
+              "salt": "ZGVmZ2hpamtsbW5vcHFycw==",
+              "digests": [
+                "b4a2b9d27b63501a1148ceb60b447e15ac46aa264fbfafc78efdebe48a3963fa",
+                "0905b76e862cd25382c438746e4135b0474f464ad9da38f6b0e21b4bd3a0e08e"
+              ],
+              "maxWords": 2
+            }
+          }
+        ],
+        "tests": {
+          "positives": [
+            {
+              "detector": "acme.customer-id",
+              "text": "Le client CLI-00421337 a appelé."
+            },
+            {
+              "detector": "acme.siret",
+              "text": "SIRET 55210055400013 — facture jointe."
+            }
+          ],
+          "negatives": [
+            "Le ticket JIRA-12345678 est clos.",
+            "Commande 55210055400013 livrée.\nMerci\u0001 « bon travail » \\ \"ok\" /fin"
+          ]
+        }
+      },
+      "valid": false,
+      "error": "validity_window"
+    },
+    {
+      "name": "invalid pattern",
+      "pack": {
+        "schemaVersion": 1,
+        "kind": "xsom.secret-guard.rules-pack",
+        "packId": "acme-main",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "version": 3,
+        "issuedAt": "2026-09-01T00:00:00Z",
+        "expiresAt": "2027-09-01T00:00:00Z",
+        "issuer": "xSOM Consulting",
+        "detectors": [
+          {
+            "id": "acme.customer-id",
+            "label": "Identifiant client ACME",
+            "category": "customer_data",
+            "action": "block",
+            "match": {
+              "type": "pattern",
+              "pattern": "CLI-\\d+"
+            }
+          },
+          {
+            "id": "acme.siret",
+            "label": "Numéro SIRET d'un client",
+            "category": "customer_data",
+            "action": "warn",
+            "match": {
+              "type": "pattern",
+              "pattern": "[0-9]{14}"
+            },
+            "context": {
+              "keywords": ["siret"],
+              "window": 24
+            }
+          },
+          {
+            "id": "acme.codenames",
+            "label": "Nom de code de projet",
+            "category": "project",
+            "action": "block",
+            "match": {
+              "type": "terms",
+              "salt": "ZGVmZ2hpamtsbW5vcHFycw==",
+              "digests": [
+                "b4a2b9d27b63501a1148ceb60b447e15ac46aa264fbfafc78efdebe48a3963fa",
+                "0905b76e862cd25382c438746e4135b0474f464ad9da38f6b0e21b4bd3a0e08e"
+              ],
+              "maxWords": 2
+            }
+          }
+        ],
+        "tests": {
+          "positives": [
+            {
+              "detector": "acme.customer-id",
+              "text": "Le client CLI-00421337 a appelé."
+            },
+            {
+              "detector": "acme.siret",
+              "text": "SIRET 55210055400013 — facture jointe."
+            }
+          ],
+          "negatives": [
+            "Le ticket JIRA-12345678 est clos.",
+            "Commande 55210055400013 livrée.\nMerci\u0001 « bon travail » \\ \"ok\" /fin"
+          ]
+        }
+      },
+      "valid": false,
+      "error": "invalid_pattern"
+    },
+    {
+      "name": "anchor provided only by context: removing context invalidates",
+      "pack": {
+        "schemaVersion": 1,
+        "kind": "xsom.secret-guard.rules-pack",
+        "packId": "acme-main",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "version": 3,
+        "issuedAt": "2026-09-01T00:00:00Z",
+        "expiresAt": "2027-09-01T00:00:00Z",
+        "issuer": "xSOM Consulting",
+        "detectors": [
+          {
+            "id": "acme.customer-id",
+            "label": "Identifiant client ACME",
+            "category": "customer_data",
+            "action": "block",
+            "match": {
+              "type": "pattern",
+              "pattern": "CLI-[0-9]{8}"
+            }
+          },
+          {
+            "id": "acme.siret",
+            "label": "Numéro SIRET d'un client",
+            "category": "customer_data",
+            "action": "warn",
+            "match": {
+              "type": "pattern",
+              "pattern": "[0-9]{14}"
+            }
+          },
+          {
+            "id": "acme.codenames",
+            "label": "Nom de code de projet",
+            "category": "project",
+            "action": "block",
+            "match": {
+              "type": "terms",
+              "salt": "ZGVmZ2hpamtsbW5vcHFycw==",
+              "digests": [
+                "b4a2b9d27b63501a1148ceb60b447e15ac46aa264fbfafc78efdebe48a3963fa",
+                "0905b76e862cd25382c438746e4135b0474f464ad9da38f6b0e21b4bd3a0e08e"
+              ],
+              "maxWords": 2
+            }
+          }
+        ],
+        "tests": {
+          "positives": [
+            {
+              "detector": "acme.customer-id",
+              "text": "Le client CLI-00421337 a appelé."
+            },
+            {
+              "detector": "acme.siret",
+              "text": "SIRET 55210055400013 — facture jointe."
+            }
+          ],
+          "negatives": [
+            "Le ticket JIRA-12345678 est clos.",
+            "Commande 55210055400013 livrée.\nMerci\u0001 « bon travail » \\ \"ok\" /fin"
+          ]
+        }
+      },
+      "valid": false,
+      "error": "invalid_pattern"
+    },
+    {
+      "name": "test names an unknown detector",
+      "pack": {
+        "schemaVersion": 1,
+        "kind": "xsom.secret-guard.rules-pack",
+        "packId": "acme-main",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "version": 3,
+        "issuedAt": "2026-09-01T00:00:00Z",
+        "expiresAt": "2027-09-01T00:00:00Z",
+        "issuer": "xSOM Consulting",
+        "detectors": [
+          {
+            "id": "acme.customer-id",
+            "label": "Identifiant client ACME",
+            "category": "customer_data",
+            "action": "block",
+            "match": {
+              "type": "pattern",
+              "pattern": "CLI-[0-9]{8}"
+            }
+          },
+          {
+            "id": "acme.siret",
+            "label": "Numéro SIRET d'un client",
+            "category": "customer_data",
+            "action": "warn",
+            "match": {
+              "type": "pattern",
+              "pattern": "[0-9]{14}"
+            },
+            "context": {
+              "keywords": ["siret"],
+              "window": 24
+            }
+          },
+          {
+            "id": "acme.codenames",
+            "label": "Nom de code de projet",
+            "category": "project",
+            "action": "block",
+            "match": {
+              "type": "terms",
+              "salt": "ZGVmZ2hpamtsbW5vcHFycw==",
+              "digests": [
+                "b4a2b9d27b63501a1148ceb60b447e15ac46aa264fbfafc78efdebe48a3963fa",
+                "0905b76e862cd25382c438746e4135b0474f464ad9da38f6b0e21b4bd3a0e08e"
+              ],
+              "maxWords": 2
+            }
+          }
+        ],
+        "tests": {
+          "positives": [
+            {
+              "detector": "acme.customer-id",
+              "text": "Le client CLI-00421337 a appelé."
+            },
+            {
+              "detector": "acme.siret",
+              "text": "SIRET 55210055400013 — facture jointe."
+            },
+            {
+              "detector": "nope",
+              "text": "x"
+            }
+          ],
+          "negatives": [
+            "Le ticket JIRA-12345678 est clos.",
+            "Commande 55210055400013 livrée.\nMerci\u0001 « bon travail » \\ \"ok\" /fin"
+          ]
+        }
+      },
+      "valid": false,
+      "error": "unknown_test_detector"
+    },
+    {
+      "name": "pattern detector without positive",
+      "pack": {
+        "schemaVersion": 1,
+        "kind": "xsom.secret-guard.rules-pack",
+        "packId": "acme-main",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "version": 3,
+        "issuedAt": "2026-09-01T00:00:00Z",
+        "expiresAt": "2027-09-01T00:00:00Z",
+        "issuer": "xSOM Consulting",
+        "detectors": [
+          {
+            "id": "acme.customer-id",
+            "label": "Identifiant client ACME",
+            "category": "customer_data",
+            "action": "block",
+            "match": {
+              "type": "pattern",
+              "pattern": "CLI-[0-9]{8}"
+            }
+          },
+          {
+            "id": "acme.siret",
+            "label": "Numéro SIRET d'un client",
+            "category": "customer_data",
+            "action": "warn",
+            "match": {
+              "type": "pattern",
+              "pattern": "[0-9]{14}"
+            },
+            "context": {
+              "keywords": ["siret"],
+              "window": 24
+            }
+          },
+          {
+            "id": "acme.codenames",
+            "label": "Nom de code de projet",
+            "category": "project",
+            "action": "block",
+            "match": {
+              "type": "terms",
+              "salt": "ZGVmZ2hpamtsbW5vcHFycw==",
+              "digests": [
+                "b4a2b9d27b63501a1148ceb60b447e15ac46aa264fbfafc78efdebe48a3963fa",
+                "0905b76e862cd25382c438746e4135b0474f464ad9da38f6b0e21b4bd3a0e08e"
+              ],
+              "maxWords": 2
+            }
+          }
+        ],
+        "tests": {
+          "positives": [
+            {
+              "detector": "acme.siret",
+              "text": "SIRET 55210055400013 — facture jointe."
+            }
+          ],
+          "negatives": [
+            "Le ticket JIRA-12345678 est clos.",
+            "Commande 55210055400013 livrée.\nMerci\u0001 « bon travail » \\ \"ok\" /fin"
+          ]
+        }
+      },
+      "valid": false,
+      "error": "missing_positive"
+    },
+    {
+      "name": "positive not detected",
+      "pack": {
+        "schemaVersion": 1,
+        "kind": "xsom.secret-guard.rules-pack",
+        "packId": "acme-main",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "version": 3,
+        "issuedAt": "2026-09-01T00:00:00Z",
+        "expiresAt": "2027-09-01T00:00:00Z",
+        "issuer": "xSOM Consulting",
+        "detectors": [
+          {
+            "id": "acme.customer-id",
+            "label": "Identifiant client ACME",
+            "category": "customer_data",
+            "action": "block",
+            "match": {
+              "type": "pattern",
+              "pattern": "CLI-[0-9]{8}"
+            }
+          },
+          {
+            "id": "acme.siret",
+            "label": "Numéro SIRET d'un client",
+            "category": "customer_data",
+            "action": "warn",
+            "match": {
+              "type": "pattern",
+              "pattern": "[0-9]{14}"
+            },
+            "context": {
+              "keywords": ["siret"],
+              "window": 24
+            }
+          },
+          {
+            "id": "acme.codenames",
+            "label": "Nom de code de projet",
+            "category": "project",
+            "action": "block",
+            "match": {
+              "type": "terms",
+              "salt": "ZGVmZ2hpamtsbW5vcHFycw==",
+              "digests": [
+                "b4a2b9d27b63501a1148ceb60b447e15ac46aa264fbfafc78efdebe48a3963fa",
+                "0905b76e862cd25382c438746e4135b0474f464ad9da38f6b0e21b4bd3a0e08e"
+              ],
+              "maxWords": 2
+            }
+          }
+        ],
+        "tests": {
+          "positives": [
+            {
+              "detector": "acme.customer-id",
+              "text": "Le client CLI-0042 a appelé."
+            },
+            {
+              "detector": "acme.siret",
+              "text": "SIRET 55210055400013 — facture jointe."
+            }
+          ],
+          "negatives": [
+            "Le ticket JIRA-12345678 est clos.",
+            "Commande 55210055400013 livrée.\nMerci\u0001 « bon travail » \\ \"ok\" /fin"
+          ]
+        }
+      },
+      "valid": false,
+      "error": "positive_not_detected"
+    },
+    {
+      "name": "negative detected",
+      "pack": {
+        "schemaVersion": 1,
+        "kind": "xsom.secret-guard.rules-pack",
+        "packId": "acme-main",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "version": 3,
+        "issuedAt": "2026-09-01T00:00:00Z",
+        "expiresAt": "2027-09-01T00:00:00Z",
+        "issuer": "xSOM Consulting",
+        "detectors": [
+          {
+            "id": "acme.customer-id",
+            "label": "Identifiant client ACME",
+            "category": "customer_data",
+            "action": "block",
+            "match": {
+              "type": "pattern",
+              "pattern": "CLI-[0-9]{8}"
+            }
+          },
+          {
+            "id": "acme.siret",
+            "label": "Numéro SIRET d'un client",
+            "category": "customer_data",
+            "action": "warn",
+            "match": {
+              "type": "pattern",
+              "pattern": "[0-9]{14}"
+            },
+            "context": {
+              "keywords": ["siret"],
+              "window": 24
+            }
+          },
+          {
+            "id": "acme.codenames",
+            "label": "Nom de code de projet",
+            "category": "project",
+            "action": "block",
+            "match": {
+              "type": "terms",
+              "salt": "ZGVmZ2hpamtsbW5vcHFycw==",
+              "digests": [
+                "b4a2b9d27b63501a1148ceb60b447e15ac46aa264fbfafc78efdebe48a3963fa",
+                "0905b76e862cd25382c438746e4135b0474f464ad9da38f6b0e21b4bd3a0e08e"
+              ],
+              "maxWords": 2
+            }
+          }
+        ],
+        "tests": {
+          "positives": [
+            {
+              "detector": "acme.customer-id",
+              "text": "Le client CLI-00421337 a appelé."
+            },
+            {
+              "detector": "acme.siret",
+              "text": "SIRET 55210055400013 — facture jointe."
+            }
+          ],
+          "negatives": [
+            "Le ticket JIRA-12345678 est clos.",
+            "Commande 55210055400013 livrée.\nMerci\u0001 « bon travail » \\ \"ok\" /fin",
+            "SIRET du client : 55210055400013"
+          ]
+        }
+      },
+      "valid": false,
+      "error": "negative_detected"
+    },
+    {
+      "name": "terms detectors need no positive",
+      "pack": {
+        "schemaVersion": 1,
+        "kind": "xsom.secret-guard.rules-pack",
+        "packId": "acme-main",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "version": 3,
+        "issuedAt": "2026-09-01T00:00:00Z",
+        "expiresAt": "2027-09-01T00:00:00Z",
+        "issuer": "xSOM Consulting",
+        "detectors": [
+          {
+            "id": "acme.customer-id",
+            "label": "Identifiant client ACME",
+            "category": "customer_data",
+            "action": "block",
+            "match": {
+              "type": "pattern",
+              "pattern": "CLI-[0-9]{8}"
+            }
+          },
+          {
+            "id": "acme.siret",
+            "label": "Numéro SIRET d'un client",
+            "category": "customer_data",
+            "action": "warn",
+            "match": {
+              "type": "pattern",
+              "pattern": "[0-9]{14}"
+            },
+            "context": {
+              "keywords": ["siret"],
+              "window": 24
+            }
+          },
+          {
+            "id": "acme.codenames",
+            "label": "Nom de code de projet",
+            "category": "project",
+            "action": "block",
+            "match": {
+              "type": "terms",
+              "salt": "ZGVmZ2hpamtsbW5vcHFycw==",
+              "digests": [
+                "b4a2b9d27b63501a1148ceb60b447e15ac46aa264fbfafc78efdebe48a3963fa",
+                "0905b76e862cd25382c438746e4135b0474f464ad9da38f6b0e21b4bd3a0e08e"
+              ],
+              "maxWords": 2
+            }
+          }
+        ],
+        "tests": {
+          "positives": [
+            {
+              "detector": "acme.customer-id",
+              "text": "Le client CLI-00421337 a appelé."
+            },
+            {
+              "detector": "acme.siret",
+              "text": "SIRET 55210055400013 — facture jointe."
+            }
+          ],
+          "negatives": [
+            "Le ticket JIRA-12345678 est clos.",
+            "Commande 55210055400013 livrée.\nMerci\u0001 « bon travail » \\ \"ok\" /fin"
+          ]
+        }
+      },
+      "valid": true
+    }
+  ],
+  "signature": {
+    "seedBase64": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+    "publicKeyBase64": "A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=",
+    "keyId": "56475aa75463474c0285df5dbf2bcab73da651358839e9b77481b2eab107708c",
+    "canonicalPayload": "{\"detectors\":[{\"action\":\"block\",\"category\":\"customer_data\",\"id\":\"acme.customer-id\",\"label\":\"Identifiant client ACME\",\"match\":{\"pattern\":\"CLI-[0-9]{8}\",\"type\":\"pattern\"}},{\"action\":\"warn\",\"category\":\"customer_data\",\"context\":{\"keywords\":[\"siret\"],\"window\":24},\"id\":\"acme.siret\",\"label\":\"Numéro SIRET d'un client\",\"match\":{\"pattern\":\"[0-9]{14}\",\"type\":\"pattern\"}},{\"action\":\"block\",\"category\":\"project\",\"id\":\"acme.codenames\",\"label\":\"Nom de code de projet\",\"match\":{\"digests\":[\"b4a2b9d27b63501a1148ceb60b447e15ac46aa264fbfafc78efdebe48a3963fa\",\"0905b76e862cd25382c438746e4135b0474f464ad9da38f6b0e21b4bd3a0e08e\"],\"maxWords\":2,\"salt\":\"ZGVmZ2hpamtsbW5vcHFycw==\",\"type\":\"terms\"}}],\"expiresAt\":\"2027-09-01T00:00:00Z\",\"issuedAt\":\"2026-09-01T00:00:00Z\",\"issuer\":\"xSOM Consulting\",\"kind\":\"xsom.secret-guard.rules-pack\",\"packId\":\"acme-main\",\"schemaVersion\":1,\"tenantId\":\"00000000-0000-4000-8000-000000000001\",\"tests\":{\"negatives\":[\"Le ticket JIRA-12345678 est clos.\",\"Commande 55210055400013 livrée.\\nMerci\\u0001 « bon travail » \\\\ \\\"ok\\\" /fin\"],\"positives\":[{\"detector\":\"acme.customer-id\",\"text\":\"Le client CLI-00421337 a appelé.\"},{\"detector\":\"acme.siret\",\"text\":\"SIRET 55210055400013 — facture jointe.\"}]},\"version\":3}",
+    "payloadDigest": "3e02ed3f19f8a0180a54830ea71ff600f057b56c82f631bda3065a42cf798ea5",
+    "envelope": {
+      "payload": {
+        "schemaVersion": 1,
+        "kind": "xsom.secret-guard.rules-pack",
+        "packId": "acme-main",
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "version": 3,
+        "issuedAt": "2026-09-01T00:00:00Z",
+        "expiresAt": "2027-09-01T00:00:00Z",
+        "issuer": "xSOM Consulting",
+        "detectors": [
+          {
+            "id": "acme.customer-id",
+            "label": "Identifiant client ACME",
+            "category": "customer_data",
+            "action": "block",
+            "match": {
+              "type": "pattern",
+              "pattern": "CLI-[0-9]{8}"
+            }
+          },
+          {
+            "id": "acme.siret",
+            "label": "Numéro SIRET d'un client",
+            "category": "customer_data",
+            "action": "warn",
+            "match": {
+              "type": "pattern",
+              "pattern": "[0-9]{14}"
+            },
+            "context": {
+              "keywords": ["siret"],
+              "window": 24
+            }
+          },
+          {
+            "id": "acme.codenames",
+            "label": "Nom de code de projet",
+            "category": "project",
+            "action": "block",
+            "match": {
+              "type": "terms",
+              "salt": "ZGVmZ2hpamtsbW5vcHFycw==",
+              "digests": [
+                "b4a2b9d27b63501a1148ceb60b447e15ac46aa264fbfafc78efdebe48a3963fa",
+                "0905b76e862cd25382c438746e4135b0474f464ad9da38f6b0e21b4bd3a0e08e"
+              ],
+              "maxWords": 2
+            }
+          }
+        ],
+        "tests": {
+          "positives": [
+            {
+              "detector": "acme.customer-id",
+              "text": "Le client CLI-00421337 a appelé."
+            },
+            {
+              "detector": "acme.siret",
+              "text": "SIRET 55210055400013 — facture jointe."
+            }
+          ],
+          "negatives": [
+            "Le ticket JIRA-12345678 est clos.",
+            "Commande 55210055400013 livrée.\nMerci\u0001 « bon travail » \\ \"ok\" /fin"
+          ]
+        }
+      },
+      "keyId": "56475aa75463474c0285df5dbf2bcab73da651358839e9b77481b2eab107708c",
+      "signature": "jguzylGh5s6b6vkVRv4tEb5hjOWFo1nuRmUySGlFuszRRz5Kcg/g+/lvwieMvRadAoD79/RfCUcAPg0nNQmmAw=="
+    },
+    "tampered": {
+      "description": "Même enveloppe, version modifiée : la signature ne doit plus être acceptée.",
+      "payloadPatch": {
+        "version": 4
+      }
+    }
+  }
+}
