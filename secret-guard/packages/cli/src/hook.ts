@@ -2,7 +2,9 @@ import { basename, resolve } from "node:path";
 import process from "node:process";
 
 import {
+  CUSTOM_RULES_WORK_BUDGET,
   scan,
+  WorkMeter,
   type CompiledRulesPack,
   type ScanResult,
 } from "@xsom/secret-guard-core";
@@ -94,9 +96,32 @@ function readSafely(readFile: FileReader, path: string): FileText {
 /** Sees every scan result of one hook decision (metadata only). */
 export type ScanObserver = (result: ScanResult) => void;
 
+/** The tuning of one hook decision, with the budget all its scans share. */
+interface Tuning {
+  readonly rules: CompiledRulesPack;
+  readonly meter: WorkMeter;
+}
+
+function tuningFor(rules: CompiledRulesPack | undefined): Tuning | undefined {
+  // One budget for the prompt and every file it mentions: the hook answers
+  // well before the host's timeout, whatever the number of files.
+  return rules === undefined
+    ? undefined
+    : { rules, meter: new WorkMeter(CUSTOM_RULES_WORK_BUDGET) };
+}
+
+function tuningInput(tuning: Tuning | undefined): {
+  rules?: CompiledRulesPack;
+  workMeter?: WorkMeter;
+} {
+  return tuning === undefined
+    ? {}
+    : { rules: tuning.rules, workMeter: tuning.meter };
+}
+
 function fileVerdict(
   file: FileText,
-  rules?: CompiledRulesPack,
+  tuning?: Tuning,
   observe?: ScanObserver,
 ): ScanResult | undefined {
   if (file.status !== "text") return undefined;
@@ -104,7 +129,7 @@ function fileVerdict(
     const result = scan({
       content: file.content,
       sourceKind: "document",
-      ...(rules === undefined ? {} : { rules }),
+      ...tuningInput(tuning),
     });
     observe?.(result);
     return result;
@@ -136,9 +161,19 @@ export function fileResponse(
   rules?: CompiledRulesPack,
   observe?: ScanObserver,
 ): HookResponse {
+  return tunedFileResponse(path, mode, readFile, tuningFor(rules), observe);
+}
+
+function tunedFileResponse(
+  path: string,
+  mode: ProtectionMode,
+  readFile: FileReader,
+  tuning: Tuning | undefined,
+  observe?: ScanObserver,
+): HookResponse {
   const file = readSafely(readFile, path);
   if (file.status === "absent") return { continue: true };
-  const result = fileVerdict(file, rules, observe);
+  const result = fileVerdict(file, tuning, observe);
   if (result?.decision === "ALLOW" && result.complete)
     return { continue: true };
   const detail = fileDetail(basename(path), result);
@@ -172,13 +207,13 @@ function mentionedFilesResponse(
   cwd: string,
   mode: ProtectionMode,
   readFile: FileReader,
-  rules?: CompiledRulesPack,
+  tuning?: Tuning,
   observe?: ScanObserver,
 ): HookResponse {
   const paths = mentionedPaths(prompt, cwd);
   const checked = paths
     .slice(0, MAX_MENTIONED_FILES)
-    .map((path) => fileResponse(path, mode, readFile, rules, observe));
+    .map((path) => tunedFileResponse(path, mode, readFile, tuning, observe));
   if (paths.length > MAX_MENTIONED_FILES && mode !== "observe")
     checked.push(
       block(
@@ -237,14 +272,15 @@ export function runHook(
   const subject = hookSubject(input);
   if (subject === null)
     return block("Secret Guard blocked an unexpected or invalid hook event.");
+  const tuning = tuningFor(rules);
   if (subject.kind === "read")
-    return fileResponse(subject.path, mode, readFile, rules, observe);
+    return tunedFileResponse(subject.path, mode, readFile, tuning, observe);
 
   try {
     const result = scan({
       content: subject.prompt,
       sourceKind: "prompt",
-      ...(rules === undefined ? {} : { rules }),
+      ...tuningInput(tuning),
     });
     observe?.(result);
     return combine([
@@ -254,7 +290,7 @@ export function runHook(
         subject.cwd,
         mode,
         readFile,
-        rules,
+        tuning,
         observe,
       ),
     ]);

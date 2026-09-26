@@ -98,12 +98,22 @@ export async function dispatchGuarded(
     return { initial, final: initial, sent: true, redacted: false };
   }
 
-  const sanitized = redact(content, initial.findings);
-  let final: ScanResult;
-  try {
-    final = scanner({ content: sanitized, sourceKind: "prompt", ...rules });
-  } catch {
-    final = scannerFailure(sanitized);
+  const rescan = (text: string): ScanResult => {
+    try {
+      return scanner({ content: text, sourceKind: "prompt", ...rules });
+    } catch {
+      return scannerFailure(text);
+    }
+  };
+  let sanitized = redact(content, initial.findings);
+  let final = rescan(sanitized);
+  if (
+    !(final.complete && final.decision === "ALLOW") &&
+    initial.findings.some((finding) => finding.custom !== undefined)
+  ) {
+    // A tuning label can contain a word the tuning itself detects.
+    sanitized = redact(content, initial.findings, { neutralCustomNames: true });
+    final = rescan(sanitized);
   }
   if (
     !final.complete ||
