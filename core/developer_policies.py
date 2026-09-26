@@ -167,9 +167,9 @@ def _canonical(payload: dict[str, Any]) -> bytes:
     octets, donc les enveloppes déjà publiées restent valides
     (``tests/test_developer_policy_canonical.py``).
     """
-    return json.dumps(
-        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    ).encode("utf-8")
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode(
+        "utf-8"
+    )
 
 
 def signer(settings: Settings) -> Ed25519Signer:

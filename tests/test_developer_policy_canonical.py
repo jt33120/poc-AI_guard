@@ -71,7 +71,7 @@ def test_non_ascii_characters_are_signed_as_raw_utf8() -> None:
         '"rules":[{"effect":"deny","id":"no-prod-delete","match":{"actionClasses":["delete"],'
         '"assistants":null,"events":null,"resourcePrefixes":null,"tools":null},'
         f'"reason":"{_FRENCH}"}}],"schemaVersion":1,"tenantId":"{_TENANT}","version":2}}'
-    ).encode("utf-8")
+    ).encode()
     assert canonical == expected
     assert b"\\u" not in canonical
 
