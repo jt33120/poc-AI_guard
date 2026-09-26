@@ -1,7 +1,24 @@
 import { build } from "esbuild";
 
+import {
+  authorityKeyId,
+  readAuthorityKeys,
+} from "../../scripts/rules-authority.mjs";
+
+// The xSOM rules authority is part of the build, never of the runtime: no
+// setting, file or environment variable of the workstation can add a key.
+const authorityKeys = readAuthorityKeys();
+process.stdout.write(
+  authorityKeys.length === 0
+    ? "Rules authority: no key — this build refuses every rules pack.\n"
+    : `Rules authority: ${String(authorityKeys.length)} key(s): ${authorityKeys.map((key) => authorityKeyId(key).slice(0, 12)).join(", ")}\n`,
+);
+
 const common = {
   bundle: true,
+  define: {
+    __XSOM_RULES_AUTHORITY_KEYS__: JSON.stringify(authorityKeys.join(",")),
+  },
   logLevel: "info",
   minify: false,
   platform: "node",
