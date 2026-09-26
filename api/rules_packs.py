@@ -215,12 +215,15 @@ def _utf16_offsets(text: str) -> list[int]:
 def _payload(
     draft: rules_packs.PackDraft, tenant: str, latest: rules_packs.Published | None
 ) -> dict[str, Any]:
-    """La version suivante telle qu'elle serait signée ; ``publish`` en refixe le numéro."""
+    """La version suivante telle qu'elle serait signée ; ``publish`` en refixe le numéro.
+
+    Une version retirée ne prête pas ses empreintes : il faut ressaisir les termes.
+    """
     return rules_packs.build_payload(
         draft,
         tenant_id=tenant,
         version=(latest.version if latest else 0) + 1,
-        previous=latest.payload if latest else None,
+        previous=latest.payload if latest and not latest.revoked else None,
     )
 
 
@@ -248,7 +251,13 @@ def operator_dry_run(
         if exc.code in _INFRASTRUCTURE:
             raise _refusal(exc) from None
         # Un refus de la composition est une réponse de l'essai, pas une panne.
-        return {"valid": False, "error": exc.as_dict(), "version": version, "detections": []}
+        return {
+            "valid": False,
+            "error": exc.as_dict(),
+            "version": version,
+            "detections": [],
+            "truncated": False,
+        }
     labels = {d["id"]: d["label"] for d in payload["detectors"]}
     offsets = _utf16_offsets(body.sample or "")
     return {
@@ -264,6 +273,7 @@ def operator_dry_run(
             }
             for found in evaluation.detections
         ],
+        "truncated": evaluation.truncated,
     }
 
 
@@ -293,6 +303,7 @@ def operator_publish(
                 expected_version=body.expected_version,
                 signing=signing,
                 created_by=user.user_id,
+                expected_revoked=latest.revoked if latest else False,
             )
             conn.commit()
     except rules_packs.RulesPackError as exc:

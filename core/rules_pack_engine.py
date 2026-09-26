@@ -26,6 +26,7 @@ import json
 import math
 import re
 import sys
+import time
 import unicodedata
 from dataclasses import dataclass
 from typing import Any
@@ -522,14 +523,149 @@ def check_pack(payload: dict[str, Any]) -> None:
                 raise PackError("negative_detected", test=index, detector=detector["id"])
 
 
-def detect_all(payload: dict[str, Any], text: str) -> list[dict[str, Any]]:
-    """Toutes les détections du paquet sur ``text`` — pour l'essai de l'opérateur."""
+#: Chemins de retour arrière au plus, depuis une même position (voir :func:`paths`).
+MAX_PATHS = 4096
+#: Longueur des textes d'épreuve, et temps accordé à un détecteur pour les parcourir.
+PROBE_LENGTH = 1000
+PROBE_BUDGET_SECONDS = 0.05
+#: Détections rendues au plus pour l'essai de l'opérateur.
+MAX_DETECTIONS = 1000
+
+
+def paths(alternatives: Alternatives) -> int:
+    """Majorant des chemins qu'un moteur à retour arrière explore depuis une position.
+
+    Chaque alternative ajoute ses chemins, chaque terme d'une séquence les multiplie, et
+    une répétition bornée ``{n,m}`` en offre ``m - n + 1``. Le contrat interdit déjà la
+    répétition imbriquée ; il n'interdit pas la *succession* de répétitions qui se
+    disputent les mêmes caractères (``[a-z]{0,60}`` quatre fois, ``(?:a|aa)?`` vingt-sept
+    fois), dont le coût est ce produit.
+    """
+    total = 0
+    for sequence in alternatives:
+        product = 1
+        for term in sequence:
+            inner = 1 if isinstance(term.atom, CharSet) else paths(term.atom.alternatives)
+            if term.quantified and (term.low, term.high) == (0, 1):
+                product *= inner + 1
+            elif term.quantified:
+                product *= term.high - term.low + 1
+            else:
+                product *= inner
+            product = min(product, MAX_PATHS + 1)
+        total = min(total + product, MAX_PATHS + 1)
+    return total
+
+
+def _charsets(alternatives: Alternatives) -> list[frozenset[str]]:
+    found: list[frozenset[str]] = []
+    for sequence in alternatives:
+        for term in sequence:
+            if isinstance(term.atom, CharSet):
+                found.append(term.atom.chars)
+            else:
+                found.extend(_charsets(term.atom.alternatives))
+    return found
+
+
+def _representative(chars: frozenset[str]) -> str:
+    alphanumeric = sorted(char for char in chars if char.isalnum())
+    return alphanumeric[0] if alphanumeric else sorted(chars)[0]
+
+
+def probe_texts(detector: dict[str, Any]) -> list[str]:
+    """Des textes qui poussent un motif dans ses retours arrière les plus coûteux.
+
+    Chaque caractère représentatif répété sur toute la longueur, puis tous alternés,
+    précédés du contexte éventuel pour que le préfiltre du poste laisse passer le texte.
+    """
+    alternatives = parse_pattern(
+        detector["match"]["pattern"], has_context=detector.get("context") is not None
+    )
+    representatives = sorted({_representative(chars) for chars in _charsets(alternatives)})
+    context = detector.get("context")
+    prefix = f"{context['keywords'][0]} " if context else ""
+    texts = [prefix + char * PROBE_LENGTH for char in representatives]
+    cycle = "".join(representatives)
+    texts.append(prefix + (cycle * (PROBE_LENGTH // len(cycle) + 1))[:PROBE_LENGTH])
+    return texts
+
+
+def _check_cost(detector: dict[str, Any]) -> None:
+    match = detector["match"]
+    has_context = detector.get("context") is not None
+    if paths(parse_pattern(match["pattern"], has_context=has_context)) > MAX_PATHS:
+        raise PackError("too_complex", detector=detector["id"])
+    regex = compile_pattern(
+        match["pattern"],
+        has_context=has_context,
+        case_insensitive=bool(match.get("caseInsensitive", False)),
+    )
+    started = time.perf_counter()
+    for text in probe_texts(detector):
+        for _ in regex.finditer(text):
+            pass
+        if time.perf_counter() - started > PROBE_BUDGET_SECONDS:
+            raise PackError("pattern_too_slow", detector=detector["id"])
+
+
+def _reveals(terms: list[dict[str, Any]], text: str) -> str | None:
+    """L'identifiant du détecteur ``terms`` que ce texte révèle, contexte ignoré."""
+    for detector in terms:
+        if _detect_terms({**detector, "context": None}, text):
+            return str(detector["id"])
+    return None
+
+
+def check_platform(payload: dict[str, Any]) -> None:
+    """Ce que la plateforme exige en plus du contrat, avant de signer (§6).
+
+    **Aucun terme en clair dans ce qui est signé.** Tests, libellés, mots-clés et motifs
+    partent en clair vers chaque poste et restent dans l'historique en ajout seul. Un
+    texte qui déclencherait un détecteur ``terms`` — contexte ignoré, puisque c'est la
+    présence du terme qui compte, pas sa détection — contient un terme confidentiel :
+    c'est précisément ce que le contrat évite en ne demandant pas de positif pour ces
+    détecteurs (§2.7).
+
+    **Aucun motif trop coûteux.** Un paquet valide peut contenir un motif conforme dont
+    le retour arrière explose sur un texte ordinaire ; sur le poste, un budget dépassé
+    bloque l'envoi (§5). Signer ce motif bloquerait tout un parc.
+    """
+    detectors: list[dict[str, Any]] = payload["detectors"]
+    terms = [detector for detector in detectors if detector["match"]["type"] == "terms"]
+    if terms:
+        for index, positive in enumerate(payload["tests"]["positives"]):
+            revealed = _reveals(terms, positive["text"])
+            if revealed:
+                raise PackError("test_reveals_term", test=index, detector=revealed)
+        for index, negative in enumerate(payload["tests"]["negatives"]):
+            revealed = _reveals(terms, negative)
+            if revealed:
+                raise PackError("negative_reveals_term", test=index, detector=revealed)
+        for detector in detectors:
+            fields = {"label": detector["label"]}
+            if detector.get("context"):
+                fields["keywords"] = " ".join(detector["context"]["keywords"])
+            if detector["match"]["type"] == "pattern":
+                fields["pattern"] = detector["match"]["pattern"]
+            for name, text in fields.items():
+                if _reveals(terms, text):
+                    raise PackError("field_reveals_term", detector=detector["id"], reason=name)
+    for detector in detectors:
+        if detector["match"]["type"] == "pattern":
+            _check_cost(detector)
+
+
+def detect_all(payload: dict[str, Any], text: str) -> tuple[list[dict[str, Any]], bool]:
+    """Les détections du paquet sur ``text``, bornées, et si la liste a été tronquée."""
     found: list[dict[str, Any]] = []
     for detector in payload["detectors"]:
         for start, end in detect(detector, text):
             found.append({"detector": detector["id"], "start": start, "end": end})
+            if len(found) > MAX_DETECTIONS:
+                break
     found.sort(key=lambda item: (item["start"], -item["end"], item["detector"]))
-    return found
+    return found[:MAX_DETECTIONS], len(found) > MAX_DETECTIONS
 
 
 def evaluate(payload: dict[str, Any], sample: str | None) -> dict[str, Any]:
@@ -542,17 +678,21 @@ def evaluate(payload: dict[str, Any], sample: str | None) -> dict[str, Any]:
     error: dict[str, Any] | None = None
     try:
         check_pack(payload)
+        check_platform(payload)
     except PackError as exc:
         error = exc.as_dict()
     detections: list[dict[str, Any]] = []
+    truncated = False
     runnable = error is None or error["code"] not in (
         "duplicate_detector",
         "too_many_digests",
         "invalid_pattern",
+        "too_complex",
+        "pattern_too_slow",
     )
     if sample and runnable:
-        detections = detect_all(payload, sample)
-    return {"error": error, "detections": detections}
+        detections, truncated = detect_all(payload, sample)
+    return {"error": error, "detections": detections, "truncated": truncated}
 
 
 def main() -> None:

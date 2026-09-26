@@ -7,12 +7,13 @@ Fields are added milestone by milestone; M0 only declares what M0 uses.
 
 from __future__ import annotations
 
+import base64
 import json
 from functools import lru_cache
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 Env = Literal["dev", "staging", "prod"]
@@ -221,7 +222,7 @@ class Settings(BaseSettings):
     # paquets de règles. Distincte des deux précédentes : c'est la seule clé que
     # l'extension officielle accepte pour un réglage, et elle ne doit servir à rien
     # d'autre. Absente ⇒ la publication échoue fermée (503), la lecture reste servie.
-    xsom_rules_signing_key: str | None = Field(default=None, max_length=128)
+    xsom_rules_signing_key: str | None = Field(default=None, max_length=128, repr=False)
     # Les opérateurs xSOM : `sub` (UUID) des comptes autorisés à composer et signer,
     # séparés par des virgules. Un rôle de tenant n'y suffit jamais — l'administrateur
     # d'un client est admin de son tenant, pas opérateur xSOM. Vide ⇒ personne.
@@ -283,6 +284,27 @@ class Settings(BaseSettings):
             except json.JSONDecodeError as exc:
                 raise ValueError(f"CORS_ALLOW_ORIGINS is not valid JSON: {exc}") from None
         return [item.strip() for item in raw.split(",") if item.strip()]
+
+    @model_validator(mode="after")
+    def _rules_signing_key(self) -> Settings:
+        """Une clé d'autorité présente mais illisible, ou réutilisée, arrête le démarrage.
+
+        Absente, la publication échoue fermée (503) ; présente et fausse, un opérateur
+        croirait pouvoir signer. Et une graine partagée avec les politiques ou les témoins
+        ferait d'une clé publiée pour un usage une autorité pour un autre.
+        """
+        raw = self.xsom_rules_signing_key
+        if not raw:
+            return self
+        try:
+            seed = base64.b64decode(raw, validate=True)
+        except (ValueError, TypeError):
+            raise ValueError("XSOM_RULES_SIGNING_KEY must be valid base64") from None
+        if len(seed) != 32:
+            raise ValueError("XSOM_RULES_SIGNING_KEY must decode to 32 bytes")
+        if raw in (self.developer_policy_signing_key, self.checkpoint_signing_key):
+            raise ValueError("XSOM_RULES_SIGNING_KEY must not reuse another signing key")
+        return self
 
     @field_validator("xsom_operator_subjects")
     @classmethod

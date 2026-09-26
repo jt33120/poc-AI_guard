@@ -285,6 +285,11 @@ def is_xsom_operator(settings: Settings, user: CurrentUser) -> bool:
     Indépendant du tenant et du rôle portés par le jeton : l'administrateur d'un client
     est admin **de son tenant**, jamais opérateur xSOM. Liste vide : personne.
     """
+    # En fédération (`oidc_groups`), c'est l'IdP du client qui émet le `sub` : il pourrait
+    # frapper celui d'un opérateur. Ce mode sert un déploiement chez le client, où la clé
+    # d'autorité xSOM n'a rien à faire ; on y ferme l'atelier.
+    if settings.issuer_claims == "oidc_groups":
+        return False
     return user.user_id.strip().lower() in settings.xsom_operators
 
 

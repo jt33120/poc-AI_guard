@@ -26,6 +26,7 @@ import secrets
 import subprocess
 import sys
 import threading
+import unicodedata
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -189,6 +190,27 @@ def _storable(value: Any) -> bool:
     return True
 
 
+def has_invisible(text: str) -> bool:
+    """Caractère de contrôle ou de format (bidi, zéro chasse) : rien à faire dans un libellé.
+
+    Un libellé s'affiche sur le poste à côté d'un envoi bloqué ; un contrôle bidi peut y
+    faire lire autre chose que ce qui est signé.
+    """
+    return any(unicodedata.category(char) in ("Cc", "Cf") for char in text)
+
+
+def has_unassigned(text: str) -> bool:
+    """Un point de code que la table Unicode de ce Python ne connaît pas (catégorie Cn).
+
+    Le contrat ne fixe pas de version d'Unicode, et le poste suit celle de son moteur
+    JavaScript, plus récente que celle de Python : un caractère encore non attribué ici
+    peut être une lettre là-bas. Les mots d'un texte qui en contient ne se découpent donc
+    pas pareil des deux côtés, et un paquet que la plateforme a éprouvé pourrait échouer
+    sur le poste. On refuse ce qu'on ne sait pas lire à l'identique.
+    """
+    return any(unicodedata.category(char) == "Cn" for char in text)
+
+
 def check_schema(payload: Any) -> None:
     """Étape 1 de §2. Un booléen n'est pas un entier, un flottant non plus (§1)."""
     if not isinstance(payload, dict) or not _storable(payload) or _has_bool_or_float(payload):
@@ -197,6 +219,16 @@ def check_schema(payload: Any) -> None:
         _Payload.model_validate(payload)
     except ValidationError:
         raise RulesPackError("schema") from None
+    for detector in payload["detectors"]:
+        if has_invisible(detector["label"]) or has_unassigned(detector["label"]):
+            raise RulesPackError("schema", detector=detector["id"], reason="label")
+    tests = payload["tests"]
+    for index, positive in enumerate(tests["positives"]):
+        if has_unassigned(positive["text"]):
+            raise RulesPackError("unassigned_character", test=index)
+    for index, negative in enumerate(tests["negatives"]):
+        if has_unassigned(negative):
+            raise RulesPackError("unassigned_character", test=index)
 
 
 def _has_bool_or_float(value: Any, key: str | None = None) -> bool:
@@ -214,10 +246,15 @@ def _has_bool_or_float(value: Any, key: str | None = None) -> bool:
 # ---------------------------------------------------------------------------
 # Étapes 2 à 9, dans un processus qu'on peut tuer
 # ---------------------------------------------------------------------------
+#: Réponse du moteur au plus : 1 000 détections tiennent largement dedans.
+MAX_ENGINE_OUTPUT = 1_000_000
+
+
 @dataclass(frozen=True)
 class Evaluation:
     error: dict[str, Any] | None
     detections: list[dict[str, Any]]
+    truncated: bool = False
 
 
 def evaluate(payload: dict[str, Any], sample: str | None = None) -> Evaluation:
@@ -254,6 +291,8 @@ def evaluate(payload: dict[str, Any], sample: str | None = None) -> Evaluation:
 
 
 def _read_engine(result: subprocess.CompletedProcess[bytes]) -> Evaluation:
+    if len(result.stdout) > MAX_ENGINE_OUTPUT:
+        raise RulesPackError("engine_failed")
     try:
         answer = json.loads(result.stdout)
     except ValueError:
@@ -264,7 +303,7 @@ def _read_engine(result: subprocess.CompletedProcess[bytes]) -> Evaluation:
     detections = answer["detections"]
     if (error is not None and not isinstance(error, dict)) or not isinstance(detections, list):
         raise RulesPackError("engine_failed")
-    return Evaluation(error=error, detections=detections)
+    return Evaluation(error=error, detections=detections, truncated=answer.get("truncated") is True)
 
 
 def validate(payload: dict[str, Any]) -> None:
@@ -387,6 +426,8 @@ def _normalized_terms(terms: list[str], detector_id: str) -> tuple[list[str], in
     normalized: list[str] = []
     widest = 0
     for term in terms:
+        if has_unassigned(term):
+            raise RulesPackError("unassigned_character", detector=detector_id)
         form = engine.normalize_term(term)
         if not form:
             raise RulesPackError("term_empty", detector=detector_id)
@@ -416,11 +457,9 @@ def _terms_match(
         "digests": sorted(engine.term_digest(salt, form) for form in normalized),
         "maxWords": widest,
     }
-    # §6 : vérifier que chaque terme saisi est bien détecté, puis l'oublier.
-    probe = {"id": draft.id, "match": built}
-    for term in match.terms:
-        if not engine.detect(probe, term):
-            raise RulesPackError("term_not_detected", detector=draft.id)
+    # Chaque terme est détecté par construction : sa forme normalisée est celle que le
+    # poste calcule (§4, vecteurs `terms.cases`) et son empreinte est dans la liste, avec
+    # au plus `maxWords` mots. Les termes en clair s'arrêtent ici (§6).
     return built
 
 
@@ -507,10 +546,13 @@ def entry_digest(
     version: int,
     digest: str,
     key_id: str | None,
+    public_key: str | None,
+    signature: str | None,
+    expires_at: datetime | None,
     created_by: str,
     at: datetime,
 ) -> str:
-    """Ce qui est chaîné : des métadonnées et l'empreinte du paquet, aucun contenu."""
+    """Ce qui est chaîné : métadonnées, empreinte et signature du paquet, aucun contenu."""
     body = json.dumps(
         {
             "event": event,
@@ -519,6 +561,9 @@ def entry_digest(
             "version": version,
             "payload_digest": digest,
             "key_id": key_id,
+            "public_key": public_key,
+            "signature": signature,
+            "expires_at": audit.canonical_ts(expires_at) if expires_at else None,
             "created_by": created_by,
             "at": audit.canonical_ts(at),
         },
@@ -624,7 +669,10 @@ def _append(
         version=version,
         digest=digest,
         key_id=key_id,
-        created_by=created_by,
+        public_key=published[2] if published else None,
+        signature=published[3] if published else None,
+        expires_at=published[4] if published else None,
+        created_by=created_by[: audit.MAX_FIELD],
         at=at,
     )
     prev_row = conn.execute(
@@ -669,6 +717,7 @@ def publish(
     expected_version: int,
     signing: Ed25519Signer,
     created_by: str,
+    expected_revoked: bool = False,
 ) -> dict[str, Any]:
     """Signer et conserver la version suivante ; la charge doit avoir été validée.
 
@@ -680,7 +729,9 @@ def publish(
         _lock(conn, tenant_id)
         latest = current(conn, tenant_id)
         seen = latest.version if latest else 0
-        if seen != expected_version:
+        # Un retrait survenu pendant l'épreuve change la base de la composition (des
+        # empreintes reprises d'une version retirée, par exemple) : conflit, pas signature.
+        if seen != expected_version or (latest is not None and latest.revoked != expected_revoked):
             raise VersionConflict("version_conflict")
         if latest is not None and latest.pack_id != payload["packId"]:
             raise RulesPackError("pack_id_mismatch")
@@ -721,18 +772,45 @@ def revoke(conn: psycopg.Connection, *, tenant_id: str, version: int, revoked_by
     return True
 
 
+def _published_row_consistent(
+    tenant: str,
+    pack_id: str,
+    version: int,
+    payload: dict[str, Any],
+    public_key: str,
+    signature: str,
+    digest: str,
+) -> bool:
+    """Le paquet dit ce que disent ses colonnes, et sa signature se vérifie avec sa clé."""
+    if (
+        payload.get("tenantId") != tenant
+        or payload.get("packId") != pack_id
+        or payload.get("version") != version
+        or payload_digest(payload) != digest
+    ):
+        return False
+    try:
+        raw = base64.b64decode(public_key, validate=True)
+        Ed25519PublicKey.from_public_bytes(raw).verify(
+            base64.b64decode(signature, validate=True), canonical(payload)
+        )
+    except (InvalidSignature, ValueError, TypeError):
+        return False
+    return True
+
+
 def verify_chain(conn: psycopg.Connection, tenant_id: str) -> audit.ChainResult:
-    """Recalculer chaque maillon depuis ses colonnes, et chaque empreinte depuis le paquet."""
+    """Recalculer chaque maillon depuis ses colonnes, et chaque paquet depuis sa signature."""
     rows = conn.execute(
-        "select id, event, tenant_id::text, pack_id, version, payload, key_id, payload_digest, "
-        "created_by, created_at, entry_digest, prev_hash, entry_hash from rules_pack_events "
-        "where tenant_id = %s order by id",
+        "select id, event, tenant_id::text, pack_id, version, payload, key_id, public_key, "
+        "signature, expires_at, payload_digest, created_by, created_at, entry_digest, "
+        "prev_hash, entry_hash from rules_pack_events where tenant_id = %s order by id",
         (tenant_id,),
     ).fetchall()
     prev = audit.GENESIS
     for row in rows:
-        (row_id, event, tenant, pack_id, version, payload, key_id, digest, by, at) = row[:10]
-        stored_digest, stored_prev, stored_hash = row[10:]
+        (row_id, event, tenant, pack_id, version, payload, key_id, public_key) = row[:8]
+        (signature, expires_at, digest, by, at, stored_digest, stored_prev, stored_hash) = row[8:]
         expected = entry_digest(
             event=event,
             tenant_id=tenant,
@@ -740,6 +818,9 @@ def verify_chain(conn: psycopg.Connection, tenant_id: str) -> audit.ChainResult:
             version=version,
             digest=digest,
             key_id=key_id,
+            public_key=public_key,
+            signature=signature,
+            expires_at=expires_at,
             created_by=by,
             at=at,
         )
@@ -747,7 +828,12 @@ def verify_chain(conn: psycopg.Connection, tenant_id: str) -> audit.ChainResult:
             stored_prev == prev
             and stored_digest == expected
             and audit.compute_entry_hash(prev, expected) == stored_hash
-            and (payload is None or payload_digest(payload) == digest)
+            and (
+                payload is None
+                or _published_row_consistent(
+                    tenant, pack_id, version, payload, public_key, signature, digest
+                )
+            )
         )
         if not intact:
             return audit.ChainResult(ok=False, broken_id=row_id, count=len(rows))

@@ -113,11 +113,16 @@ def test_unusable_terms_are_refused_without_echoing_them(term: str, code: str) -
     assert term not in str(refused.value) and term not in repr(refused.value.as_dict())
 
 
-def test_a_catastrophic_pattern_is_refused_within_the_budget(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Valide selon §3, mais ``re`` y passerait des heures : on tue et on refuse."""
-    monkeypatch.setattr(rules_packs, "TIMEOUT_SECONDS", 1.5)
+@pytest.mark.parametrize(
+    "pattern",
+    ["[a-z]{0,60}[a-z]{0,60}[a-z]{0,60}[a-z]{0,60}XYZ", "(?:a|aa)?" * 27 + "XYZ"],
+)
+def test_an_explosive_pattern_is_refused_even_with_harmless_tests(pattern: str) -> None:
+    """Valide selon §3, mais ``re`` y passerait des heures sur un texte ordinaire.
+
+    Les tests de l'opérateur ne le révèlent pas (ils sont courts) : la plateforme borne le
+    nombre de chemins de retour arrière avant de signer.
+    """
     draft = _draft(
         detectors=[
             {
@@ -125,20 +130,49 @@ def test_a_catastrophic_pattern_is_refused_within_the_budget(
                 "label": "Motif lent",
                 "category": "internal_infra",
                 "action": "warn",
-                "match": {
-                    "type": "pattern",
-                    "pattern": "[a-z]{0,60}[a-z]{0,60}[a-z]{0,60}[a-z]{0,60}XYZ",
-                },
+                "match": {"type": "pattern", "pattern": pattern},
             }
         ],
-        tests={"positives": [{"detector": "slow", "text": "abcXYZ"}], "negatives": ["a" * 1500]},
+        tests={"positives": [{"detector": "slow", "text": "abcXYZ"}], "negatives": ["rien"]},
     )
-    payload = _build(draft)
     started = time.monotonic()
     with pytest.raises(rules_packs.RulesPackError) as refused:
-        rules_packs.validate(payload)
+        rules_packs.validate(_build(draft))
+    assert (refused.value.code, refused.value.detector) == ("too_complex", "slow")
+    assert time.monotonic() - started < 5
+
+
+def test_a_pattern_slow_on_the_probe_texts_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(engine, "PROBE_BUDGET_SECONDS", 0.0)
+    detector = {
+        "id": "d",
+        "label": "x",
+        "category": "project",
+        "action": "block",
+        "match": {"type": "pattern", "pattern": "[a-z]{0,60}[a-z]{0,60}XYZ"},
+    }
+    assert (
+        engine.paths(engine.parse_pattern("[a-z]{0,60}[a-z]{0,60}XYZ", has_context=False)) == 3721
+    )
+    with pytest.raises(engine.PackError) as refused:
+        engine.check_platform(
+            {"detectors": [detector], "tests": {"positives": [], "negatives": []}}
+        )
+    assert refused.value.code == "pattern_too_slow"
+
+
+def test_the_isolated_engine_is_killed_past_its_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(rules_packs, "TIMEOUT_SECONDS", 0.01)
+    with pytest.raises(rules_packs.RulesPackError) as refused:
+        rules_packs.validate(_build(_draft()))
     assert refused.value.code == "budget_exceeded"
-    assert time.monotonic() - started < 10
+
+
+def test_detections_returned_to_the_operator_are_bounded() -> None:
+    payload = _build(_draft())
+    evaluation = rules_packs.evaluate(payload, "CLI-12345678 " * 1500)
+    assert evaluation.truncated is True
+    assert len(evaluation.detections) == engine.MAX_DETECTIONS
 
 
 def test_an_unreachable_engine_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -176,3 +210,28 @@ def test_device_state_reads_the_workstation_claim() -> None:
     assert rules_packs.device_state(None, "b" * 64, digest) == "behind"
     rejected = {"posture_reasons": ["rules_pack_rejected"]}
     assert rules_packs.device_state(rejected, digest, digest) == "refused"
+
+
+def test_characters_this_unicode_table_does_not_know_are_refused() -> None:
+    """U+A7CB est une lettre en Unicode 16, inconnue de ce Python : pas de découpage sûr."""
+    unassigned = "\ua7cbabc"
+    assert rules_packs.has_unassigned(unassigned)
+    draft = _draft()
+    draft.detectors[1].match = rules_packs.TermsDraft(type="terms", terms=[unassigned])
+    with pytest.raises(rules_packs.RulesPackError) as refused:
+        _build(draft)
+    assert refused.value.code == "unassigned_character"
+    payload = _build(_draft())
+    payload["tests"]["negatives"].append(f"texte {unassigned}")
+    with pytest.raises(rules_packs.RulesPackError) as refused:
+        rules_packs.check_schema(payload)
+    assert (refused.value.code, refused.value.test) == ("unassigned_character", 1)
+
+
+@pytest.mark.parametrize("label", ["Client\u202eACME", "Client\u200bACME", "Client\x07ACME"])
+def test_a_label_cannot_hide_what_it_says(label: str) -> None:
+    payload = _build(_draft())
+    payload["detectors"][0]["label"] = label
+    with pytest.raises(rules_packs.RulesPackError) as refused:
+        rules_packs.check_schema(payload)
+    assert (refused.value.code, refused.value.reason) == ("schema", "label")

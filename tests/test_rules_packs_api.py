@@ -347,9 +347,40 @@ def test_revocation_is_its_own_record_and_stops_distribution(
     events = db.conn.execute("select event, version from rules_pack_events order by id").fetchall()
     assert events == [("published", 1), ("revoked", 1)]
     assert rules_packs.verify_chain(db.conn, tenant).ok
-    assert _publish(client, operator, tenant, 1).status_code == 200
+    # Une version retirée ne prête pas ses empreintes : il faut ressaisir les termes.
+    reused = _publish(client, operator, tenant, 1)
+    assert reused.status_code == 422
+    assert reused.json()["detail"]["code"] == "terms_required"
+    assert _publish(client, operator, tenant, 1, terms=["Projet Faucon"]).status_code == 200
     served = client.get("/v1/extension/rules-pack", headers=workstation).json()["rulesPack"]
     assert served["payload"]["version"] == 2
+
+
+def test_a_revocation_during_publication_is_a_conflict(
+    db: DBHandle,
+    test_verifier: TokenVerifier,
+    make_token: Callable[..., str],
+    operator_sub: str,
+) -> None:
+    tenant = _tenant(db, "ACME")
+    client = _app(db, test_verifier, operator_sub)
+    operator = _bearer(make_token, sub=operator_sub, tenant_id=tenant, role="admin")
+    assert _publish(client, operator, tenant, 0, terms=["Projet Faucon"]).status_code == 200
+    latest = rules_packs.current(db.conn, tenant)
+    assert latest is not None
+    payload = {**latest.payload, "version": 2}
+    assert rules_packs.revoke(db.conn, tenant_id=tenant, version=1, revoked_by="x")
+    db.conn.commit()
+    with pytest.raises(rules_packs.VersionConflict):
+        rules_packs.publish(
+            db.conn,
+            tenant_id=tenant,
+            payload=payload,
+            expected_version=1,
+            signing=rules_packs.Ed25519Signer(bytes(range(32))),
+            created_by="x",
+            expected_revoked=False,
+        )
 
 
 def _everything_stored(db: DBHandle) -> str:
@@ -404,6 +435,93 @@ def test_clear_terms_and_the_test_text_are_never_stored_or_logged(
     for secret in _SECRETS:
         assert secret not in stored, secret
         assert secret not in logged, secret
+    # La graine de la clé d'autorité non plus : seule la clé publique est dérivée.
+    assert _SEED.lower() not in stored and _SEED.lower() not in logged
+
+
+def test_a_positive_that_would_reveal_a_term_is_refused(
+    db: DBHandle,
+    test_verifier: TokenVerifier,
+    make_token: Callable[..., str],
+    operator_sub: str,
+) -> None:
+    """Un positif est signé en clair : il ne doit jamais contenir un terme confidentiel."""
+    tenant = _tenant(db, "ACME")
+    client = _app(db, test_verifier, operator_sub)
+    operator = _bearer(make_token, sub=operator_sub, tenant_id=tenant, role="admin")
+    for detector, text in (
+        ("acme.codenames", "Réunion Projet Faucon"),
+        ("acme.customer-id", "CLI-12345678 pour le projet faucon"),
+    ):
+        draft = _draft(["Projet Faucon"])
+        draft["tests"]["positives"].append({"detector": detector, "text": text})
+        trial = client.post(
+            f"/v1/xsom/tenants/{tenant}/rules-pack/dry-run", headers=operator, json={"draft": draft}
+        ).json()
+        assert trial["valid"] is False
+        assert trial["error"]["code"] == "test_reveals_term"
+        assert trial["error"]["detector"] == "acme.codenames"
+        published = client.post(
+            f"/v1/xsom/tenants/{tenant}/rules-pack/publish",
+            headers=operator,
+            json={"draft": draft, "expectedVersion": 0},
+        )
+        assert published.status_code == 422
+        assert "faucon" not in published.text.lower()
+    assert "faucon" not in _everything_stored(db)
+
+
+@pytest.mark.parametrize(
+    ("where", "code"),
+    [("negative", "negative_reveals_term"), ("label", "field_reveals_term")],
+)
+def test_a_term_hidden_by_its_context_still_cannot_travel_in_clear(
+    db: DBHandle,
+    test_verifier: TokenVerifier,
+    make_token: Callable[..., str],
+    operator_sub: str,
+    where: str,
+    code: str,
+) -> None:
+    """Sans son mot-clé, le terme ne déclenche rien ; il serait pourtant signé en clair."""
+    tenant = _tenant(db, "ACME")
+    client = _app(db, test_verifier, operator_sub)
+    operator = _bearer(make_token, sub=operator_sub, tenant_id=tenant, role="admin")
+    draft = _draft(["Projet Faucon"])
+    draft["detectors"][2]["context"] = {"keywords": ["code"], "window": 16}
+    if where == "negative":
+        draft["tests"]["negatives"].append("Le projet Faucon avance bien.")
+    else:
+        draft["detectors"][0]["label"] = "Client du projet Faucon"
+    trial = client.post(
+        f"/v1/xsom/tenants/{tenant}/rules-pack/dry-run", headers=operator, json={"draft": draft}
+    ).json()
+    assert trial["valid"] is False
+    assert trial["error"]["code"] == code
+
+
+def test_a_refused_body_is_never_echoed(
+    db: DBHandle,
+    test_verifier: TokenVerifier,
+    make_token: Callable[..., str],
+    operator_sub: str,
+) -> None:
+    """FastAPI renvoie la valeur refusée par défaut ; pas sur les routes de l'atelier."""
+    tenant = _tenant(db, "ACME")
+    client = _app(db, test_verifier, operator_sub)
+    operator = _bearer(make_token, sub=operator_sub, tenant_id=tenant, role="admin")
+    path = f"/v1/xsom/tenants/{tenant}/rules-pack/dry-run"
+    marker = "zx-essai-marqueur"
+    too_long_term = client.post(
+        path, headers=operator, json={"draft": _draft([marker + " " + "x" * 200])}
+    )
+    too_long_sample = client.post(
+        path, headers=operator, json={"draft": _draft(["a"]), "sample": marker * 2000}
+    )
+    for response in (too_long_term, too_long_sample):
+        assert response.status_code == 422
+        assert marker not in response.text
+        assert response.json()["detail"][0]["loc"]
 
 
 def test_dry_run_explains_refusals_and_counts_utf16(
@@ -467,6 +585,14 @@ def test_the_dry_run_is_rate_limited(
     body = {"draft": _draft(["Projet Faucon"])}
     codes = [client.post(path, headers=operator, json=body).status_code for _ in range(3)]
     assert codes == [200, 200, 429]
+    publish = f"/v1/xsom/tenants/{tenant}/rules-pack/publish"
+    published = [
+        client.post(
+            publish, headers=operator, json={**body, "expectedVersion": version}
+        ).status_code
+        for version in range(3)
+    ]
+    assert published == [200, 200, 429]
 
 
 def test_rls_keeps_each_tenant_to_its_own_packs(
@@ -576,6 +702,14 @@ def test_malformed_pack_evidence_is_refused(fields: dict[str, Any]) -> None:
         extension_devices.Event.model_validate(_event("rules_pack_synced", **fields))
 
 
+@pytest.mark.parametrize("field", ["text", "value", "match", "prompt", "terms"])
+def test_pack_evidence_refuses_any_content_field(field: str) -> None:
+    with pytest.raises(ValidationError):
+        extension_devices.Event.model_validate(
+            _event("rules_pack_synced", rules_pack_digest="a" * 64, **{field: "CLI-12345678"})
+        )
+
+
 def test_pack_evidence_carries_no_content() -> None:
     event = extension_devices.Event.model_validate(
         _event(
@@ -596,6 +730,34 @@ def test_pack_evidence_carries_no_content() -> None:
         "custom_findings",
         "custom_detector_ids",
     }
+
+
+def test_a_bad_or_reused_signing_key_refuses_to_boot() -> None:
+    other = base64.b64encode(bytes(range(1, 33))).decode("ascii")
+    for key, extra in (
+        ("not-base64!", {}),
+        (base64.b64encode(b"short").decode("ascii"), {}),
+        (_SEED, {"developer_policy_signing_key": _SEED}),
+        (_SEED, {"checkpoint_signing_key": _SEED}),
+    ):
+        with pytest.raises(ValidationError):
+            Settings(_env_file=None, env="dev", xsom_rules_signing_key=key, **extra)
+    settings = Settings(
+        _env_file=None, env="dev", xsom_rules_signing_key=_SEED, developer_policy_signing_key=other
+    )
+    assert _SEED not in repr(settings)
+
+
+def test_federated_deployments_have_no_xsom_operator(operator_sub: str) -> None:
+    """En `oidc_groups`, l'IdP du client émet les `sub` : il pourrait frapper celui d'xSOM."""
+    from api.security import is_xsom_operator
+    from core.schemas import CurrentUser
+
+    user = CurrentUser(user_id=operator_sub, tenant_id=str(uuid4()))
+    direct = Settings(_env_file=None, env="dev", xsom_operator_subjects=operator_sub)
+    federated = direct.model_copy(update={"issuer_claims": "oidc_groups"})
+    assert is_xsom_operator(direct, user) is True
+    assert is_xsom_operator(federated, user) is False
 
 
 def test_a_malformed_operator_list_refuses_to_boot() -> None:
