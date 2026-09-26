@@ -356,19 +356,6 @@
   font-size: var(--fs-xs);
   color: var(--signal-accent-text);
 }
-.guard-section-heading h2 {
-  font-size: var(--guard-title-size);
-  line-height: var(--guard-line-leading);
-  font-weight: 600;
-}
-.guard-section-heading .guard-kicker {
-  margin-bottom: var(--sp-4);
-}
-.guard-section-heading > p:last-child:not(.guard-kicker) {
-  color: var(--signal-muted);
-  margin-top: var(--sp-4);
-  font-size: var(--fs-lead);
-}
 .guard-link {
   display: inline-flex;
   align-items: center;
@@ -492,18 +479,6 @@
 .guard-problem > .guard-link {
   margin-top: var(--sp-4);
 }
-
-/* Section 3 : l'aiguillage. */
-.guard-who {
-  padding-block: var(--sp-16);
-  border-top: var(--signal-border) solid var(--signal-line);
-}
-.guard-paths {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--sp-6);
-  margin-top: var(--sp-8);
-}
 .guard-path {
   display: flex;
   flex-direction: column;
@@ -562,119 +537,7 @@
   line-height: var(--guard-line-leading);
   font-weight: 600;
 }
-.guard-landing .guard-saas-open {
-  color: var(--signal-accent-text);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  max-width: 62ch;
-}
-.guard-included,
-.guard-gateway,
-.guard-start {
-  padding-block: var(--sp-12);
-  border-top: var(--signal-border) solid var(--signal-line);
-}
-/* `auto-fit` plutôt que trois colonnes fixes : les familles portent désormais une
-   sous-liste, donc une carte est haute. À 1100 px, trois colonnes donneraient des
-   lignes de six mots. La grille retombe d'elle-même à deux, puis à une. */
-.guard-landing .guard-included__list {
-  list-style: none;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
-  gap: var(--sp-8) var(--sp-6);
-  margin-block: var(--sp-8);
-}
-.guard-included__list > li {
-  padding-top: var(--sp-4);
-  border-top: var(--signal-border) solid var(--signal-line-strong);
-}
-.guard-included__list h3 {
-  font-size: var(--fs-body);
-  font-weight: 600;
-}
-.guard-landing .guard-included__list p {
-  margin-top: var(--sp-2);
-  color: var(--signal-muted);
-  font-size: var(--fs-sm);
-}
-.guard-landing .guard-included__list ul {
-  list-style: none;
-  padding: 0;
-  display: grid;
-  gap: var(--sp-2);
-  margin-top: var(--sp-4);
-}
-.guard-included__list ul li {
-  display: flex;
-  gap: var(--sp-3);
-  color: var(--signal-faint);
-  font-size: var(--fs-xs);
-  line-height: var(--signal-leading);
-}
-.guard-included__list ul li > span {
-  color: var(--signal-accent-text);
-}
-.guard-gateway h2 {
-  font-size: var(--fs-h3);
-  font-weight: 600;
-}
-.guard-landing .guard-gateway p {
-  margin-block: var(--sp-4);
-  color: var(--signal-muted);
-  max-width: 70ch;
-}
-.guard-landing .guard-start__steps {
-  list-style: none;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--sp-6);
-  margin-block: var(--sp-8);
-}
-.guard-start__steps li {
-  display: grid;
-  /* `start` et non l'étirement par défaut : la colonne la plus haute distribuerait
-     sinon sa hauteur en trop dans la ligne du numéro, et les quatre titres ne
-     s'aligneraient plus entre eux. */
-  align-content: start;
-  gap: var(--sp-3);
-  padding-top: var(--sp-4);
-  border-top: var(--signal-border) solid var(--signal-line-strong);
-}
-.guard-start__steps h3 {
-  font-size: var(--fs-body);
-  font-weight: 600;
-}
-.guard-landing .guard-start__steps p {
-  margin-top: var(--sp-2);
-  color: var(--signal-muted);
-  font-size: var(--fs-sm);
-}
-.guard-start > .guard-button {
-  margin-top: var(--sp-4);
-}
-.guard-landing .guard-start__note {
-  margin-top: var(--sp-8);
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--sp-3);
-  color: var(--signal-faint);
-  font-size: var(--fs-xs);
-  max-width: 70ch;
-}
 @media (max-width: 900px) {
-  /* `.guard-landing` en préfixe, et ce n'est pas un ornement : les règles de base
-     de ces deux grilles sont elles-mêmes préfixées (0,2,0), et une requête de média
-     ne pèse rien dans le calcul de spécificité. Sans le préfixe, `.guard-start__steps`
-     vaut (0,1,0) et perd — les quatre étapes restaient sur quatre colonnes à 390 px,
-     à un ou deux mots par ligne. */
-  .guard-paths,
-  .guard-landing .guard-included__list,
-  .guard-landing .guard-start__steps {
-    grid-template-columns: minmax(0, 1fr);
-  }
   .guard-threat {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--sp-4);
@@ -1015,71 +878,4 @@ html[data-reduced-motion="true"] .guard-landing *,
 html[data-signal-motion="reduced"] .guard-landing * {
   animation: none !important;
   transition: none !important;
-}
-
-/* --- La page de téléchargement de l'extension ------------------------------- */
-
-/* Le bouton porte le canal qui marche ; le lien Place de marché, quand il existe,
-   se pose à côté sans lui disputer le regard. À 390 px la ligne se casse plutôt
-   que de comprimer la cible tactile. */
-.guard-ext-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--sp-4) var(--sp-6);
-}
-
-/* Trois gestes, pas quatre : la grille à quatre colonnes de `/saas` laisserait une
-   colonne vide. `auto-fit` la remplit avec ce qu'il y a. */
-.guard-landing .guard-ext-steps {
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-}
-
-.guard-landing .guard-ext-hosts {
-  list-style: none;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-3);
-  margin-block: var(--sp-6) 0;
-}
-.guard-ext-hosts li {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-4);
-  border: var(--signal-border) solid var(--signal-line-strong);
-  border-radius: var(--r-md);
-  color: var(--signal-muted);
-  font-size: var(--fs-xs);
-}
-.guard-ext-hosts__logo {
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: 0.45rem;
-  object-fit: cover;
-}
-
-.guard-ext-limits__title {
-  margin-top: var(--sp-8);
-  font-size: var(--fs-body);
-  font-weight: 600;
-}
-.guard-landing .guard-ext-limits {
-  list-style: none;
-  padding: 0;
-  display: grid;
-  gap: var(--sp-3);
-  margin-block: var(--sp-4);
-  max-width: 70ch;
-}
-.guard-ext-limits li {
-  display: flex;
-  gap: var(--sp-3);
-  color: var(--signal-faint);
-  font-size: var(--fs-sm);
-  line-height: var(--signal-leading);
-}
-.guard-ext-limits li > span {
-  color: var(--signal-accent-text);
 }

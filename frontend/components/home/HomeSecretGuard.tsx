@@ -4,18 +4,9 @@ import Image from "next/image";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { useT } from "@/lib/i18n";
-import claudeCode from "@/public/signal-media/hosts/claude-code.png";
-import codex from "@/public/signal-media/hosts/codex.png";
-import githubCopilot from "@/public/signal-media/hosts/github-copilot.png";
+import { HOSTS } from "@/components/secret-guard/hosts";
 import screenshot from "@/public/signal-media/secret-guard-vscode.png";
 import { HOME_COPY } from "./home-copy";
-
-/** Les assistants pris en charge : des noms de produits, identiques dans les deux langues. */
-const HOSTS = [
-  { id: "github-copilot", name: "GitHub Copilot", logo: githubCopilot },
-  { id: "claude-code", name: "Claude Code", logo: claudeCode },
-  { id: "codex", name: "Codex", logo: codex },
-] as const;
 
 /**
  * Secret Guard, présenté comme un produit : la capture réelle de VS Code sous Windows
@@ -35,7 +26,7 @@ export function HomeSecretGuard() {
           </h2>
           <p className="home-sg__lead" data-reveal>{copy.lead}</p>
           <div className="home-sg__action" data-reveal>
-            <Link className="guard-button" href="/extension">{copy.action} <span aria-hidden="true">↗</span></Link>
+            <Link className="guard-button" href="/secret-guard">{copy.action} <span aria-hidden="true">↗</span></Link>
             <div className="home-sg__hosts">
               <span>{copy.hosts}</span>
               <ul>

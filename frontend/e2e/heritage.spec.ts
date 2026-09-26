@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { GUARD_COPY } from "../components/guard-copy";
 import { GUARD_HOME_COPY } from "../components/guard-home-copy";
 import { HOME_COPY } from "../components/home/home-copy";
+import { SECRET_GUARD_COPY } from "../components/secret-guard/secret-guard-copy";
 import { THREAT_GLOSSARY } from "../lib/threat-glossary";
 
 function copyLeaves(value: unknown): string[] {
@@ -16,7 +17,7 @@ test("the entire nested orientation copy stays illustrative, without invented co
   const coverage = /(?<!\p{L})(?:menace|ligne|facette|couvert|couvre|matrice|bloqu|threat|row|facet|cover|block)/iu;
   const number = /\d+|\b(?:dix-sept|dix-huit|dix-neuf|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|quinze|seize|vingt|seventeen|eighteen|nineteen|two|three|four|five|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|twenty)\b/i;
   for (const language of ["fr", "en"] as const) {
-    const phrases = copyLeaves([GUARD_COPY[language], GUARD_HOME_COPY[language], HOME_COPY[language]]);
+    const phrases = copyLeaves([GUARD_COPY[language], GUARD_HOME_COPY[language], HOME_COPY[language], SECRET_GUARD_COPY[language]]);
     expect(phrases.length).toBeGreaterThan(50);
     for (const phrase of phrases) {
       expect(phrase.trim(), `${language}: an empty visible label`).not.toBe("");
@@ -94,7 +95,7 @@ test("the products page opens on its film, then shows each product in a carousel
   const slides = carousel.locator(".xp-slide");
   await expect(slides).toHaveCount(2);
   await expect(slides.nth(0).getByRole("heading", { name: "Secret Guard", exact: true })).toBeAttached();
-  await expect(slides.nth(0).getByRole("link", { name: "Découvrir Secret Guard" })).toHaveAttribute("href", "/extension");
+  await expect(slides.nth(0).getByRole("link", { name: "Découvrir Secret Guard" })).toHaveAttribute("href", "/secret-guard");
   await expect(slides.nth(1).getByRole("heading", { name: "AI Guard", exact: true })).toBeAttached();
   // La plateforme s'ouvre sur la connexion au compte.
   await expect(slides.nth(1).getByRole("link", { name: "Explorer la plateforme" })).toHaveAttribute("href", "/login");
@@ -131,7 +132,7 @@ test("the products page opens on its film, then shows each product in a carousel
 });
 
 test("every public header carries the same orientation menu", async ({ page }) => {
-  for (const chemin of ["/", "/produits", "/extension", "/menaces"]) {
+  for (const chemin of ["/", "/produits", "/secret-guard", "/menaces"]) {
     await page.goto(chemin);
     const navigation = page.getByRole("navigation", { name: "Navigation principale" });
     await expect(navigation.getByRole("link", { name: "Nos Produits", exact: true })).toHaveAttribute("href", "/produits");
@@ -251,60 +252,55 @@ test("the hero respects reduced motion without downloading its video", async ({ 
   expect(videoRequests).toEqual([]);
 });
 
-test("the extension page hands over a file that installs, and names its limits", async ({ page }) => {
+test("the Secret Guard page says what it solves, how, and hands over the file", async ({ page }) => {
+  // L'ancienne adresse mène à la page du produit.
+  await page.goto("/extension");
+  await expect(page).toHaveURL(/\/secret-guard$/);
+
   await page.goto("/produits");
-  await page.locator('#gamme a[href="/extension"]').click();
-  await expect(page).toHaveURL(/\/extension$/);
+  await page.locator('#gamme a[href="/secret-guard"]').click();
+  await expect(page).toHaveURL(/\/secret-guard$/);
 
-  // Le bouton est le produit de cette page. Un lien relatif ou un chemin de
-  // release daté ne tiendrait pas d'une version à l'autre : le nom d'asset est
-  // fixe, et c'est ce qui rend `latest/download` utilisable comme lien permanent.
-  const telecharger = page.getByRole("link", { name: /Télécharger l’extension/ });
-  await expect(telecharger).toHaveAttribute(
-    "href",
-    "https://github.com/jt33120/poc-AI_guard/releases/latest/download/xsom-secret-guard-vscode.vsix",
-  );
-
-  // La bannière porte son média. L'affiche part au chargement : un chemin mort
-  // laisserait un rectangle vide derrière le titre, sans rien casser d'autre.
-  const fond = page.locator(".guard-masthead__video");
+  // Ce qu'on résout, en une phrase, avec les trois assistants.
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Les meilleurs agents de code.");
+  await expect(page.locator(".sg-hero__hosts li")).toHaveText(["GitHub Copilot", "Claude Code", "Codex"]);
+  const fond = page.locator(".sg-hero__video");
   await expect(fond).toHaveAttribute("poster", "/signal-media/ai-guard-extension-v1.png");
   await expect(fond).toHaveAttribute("preload", "none");
 
-  // Trois gestes, et le deuxième dit comment on installe un VSIX. Sans lui, la
-  // page rendrait un fichier sans mode d'emploi.
-  const gestes = page.locator(".guard-start__steps li");
-  await expect(gestes).toHaveCount(3);
-  await expect(gestes.nth(1)).toContainText("VSIX");
-  await expect(gestes.nth(2)).toContainText("/hooks");
-  await expect(page.locator("#individual")).toContainText("Gratuit");
-  await expect(page.locator("#enterprise")).toContainText("MDM");
-  await expect(page.locator("#enterprise")).toContainText("requirements.toml");
-  await expect(page.locator("#enterprise")).toContainText("Codex ne distribue pas les scripts");
-  // L'offre Équipe se lit sur la page des produits, avec ses éditions et ses tarifs.
-  await expect(page.locator("#enterprise a.guard-button")).toHaveAttribute("href", "/produits#offres");
+  // Le schéma : le filtre et ses trois couches, dont le réglage réservé à l'édition Équipe.
+  const couches = page.locator("#fonctionnement .sg-layers li");
+  await expect(couches).toHaveCount(3);
+  await expect(couches.nth(1)).toContainText("Entropie");
+  await expect(couches.nth(2)).toContainText("Équipe");
 
-  // Les trois hôtes réellement configurés sont publiés, sans élargir la promesse.
-  await expect(page.locator(".guard-ext-hosts li")).toHaveCount(3);
-  const claude = page.locator(".guard-ext-hosts li", { hasText: "Claude Code" });
-  await expect(claude.locator('img[src*="claude-ai-icon"]')).toBeVisible();
+  // Le vrai panneau, ses sept boutons légendés ; Expurger est déplié d'office, et
+  // survoler une autre légende la déplie à son tour.
+  const panneau = page.locator("#panneau");
+  await expect(panneau.locator(".sg-tour__spots span")).toHaveCount(7);
+  await expect(panneau.locator(".sg-callout")).toHaveCount(7);
+  await expect(panneau.getByRole("button", { name: /Expurger Recommandé/ })).toHaveAttribute("aria-expanded", "true");
+  await panneau.getByRole("button", { name: /^Bloquer/ }).hover();
+  await expect(panneau.getByRole("button", { name: /^Bloquer/ })).toHaveAttribute("aria-expanded", "true");
+  await expect(panneau.getByRole("button", { name: /Expurger Recommandé/ })).toHaveAttribute("aria-expanded", "false");
+  const capture = panneau.locator(".sg-tour__picture img");
+  await capture.scrollIntoViewIfNeeded();
+  await capture.evaluate((image) => (image as HTMLImageElement).decode());
 
-  // Les quatre bornes. Celle de la version est la plus facile à taire, et c'est
-  // celle qui fait échouer une installation par ailleurs correcte : le premier
-  // lecteur de la page s'est arrêté là, en 1.133, avec le bon fichier et la
-  // bonne commande. Les deux planchers sont donc tenus tous les deux, parce que
-  // ne nommer que 1.137 laissait croire qu'on installe quand même en 1.133 pour
-  // couvrir les trois autres assistants.
-  const bornes = page.locator(".guard-gateway:has(#ext-local) .guard-ext-limits li");
-  await expect(bornes).toHaveCount(4);
-  await expect(bornes.nth(1)).toContainText("1.136");
-  await expect(bornes.nth(1)).toContainText("1.137");
-  await expect(page.getByText("est un indicateur", { exact: false })).toBeVisible();
-
-  // Tant que la fiche n'existe pas, la page ne propose pas de l'ouvrir.
-  await expect(page.getByRole("link", { name: /Installer depuis VS Code/ })).toHaveCount(0);
-  await expect(page.getByText("pas encore distribuée sur la Place de marché", { exact: false })).toBeVisible();
+  // Le fichier, sa version et ses planchers. Le nom d'asset est fixe : c'est ce qui
+  // rend `latest/download` utilisable comme lien permanent.
+  const telechargement = page.locator("#telecharger");
+  await expect(telechargement.getByRole("link", { name: "Télécharger le VSIX" })).toHaveAttribute(
+    "href",
+    "https://github.com/jt33120/poc-AI_guard/releases/latest/download/xsom-secret-guard-vscode.vsix",
+  );
+  await expect(telechargement.locator(".sg-download__version strong")).toHaveText(/^\d+\.\d+\.\d+$/);
+  await expect(telechargement).toContainText("1.133");
+  await expect(telechargement).toContainText("1.137");
+  await expect(telechargement.locator(".sg-download__steps li")).toHaveCount(3);
+  await expect(telechargement.getByRole("link", { name: /Secret Guard Équipe/ })).toHaveAttribute("href", "/produits#offres");
 });
+
 
 for (const width of [390, 768, 1440]) {
   test(`the landing stays contained in French and English at ${width}px`, async ({ page }) => {
@@ -323,16 +319,14 @@ for (const width of [390, 768, 1440]) {
     await expect(page.locator("#campus-detail")).toContainText("Model & data teams");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 
-    await page.goto("/extension");
+    await page.goto("/secret-guard");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 
     if (width === 390) {
-      // Une grille à quatre colonnes tient dans 390 px sans déborder : le contrôle
-      // de débordement ci-dessus la laisse passer, à deux mots par ligne. Ce qu'on
-      // veut, c'est qu'elle soit EMPILÉE, et deux étapes empilées ne partagent pas
-      // la même ordonnée. (C'est ce qui manquait quand la requête de média perdait
-      // en spécificité contre sa propre règle de base.)
-      const etapes = page.locator(".guard-start__steps li");
+      // Trois colonnes tiennent dans 390 px sans déborder, à deux mots par ligne :
+      // le contrôle de débordement les laisserait passer. Les étapes doivent être
+      // EMPILÉES, et deux étapes empilées ne partagent pas la même ordonnée.
+      const etapes = page.locator(".sg-download__steps li");
       const premiere = await etapes.nth(0).boundingBox();
       const seconde = await etapes.nth(1).boundingBox();
       expect(seconde!.y).toBeGreaterThan(premiere!.y);

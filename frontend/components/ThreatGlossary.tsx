@@ -696,7 +696,7 @@ function ThreatDetails({ entry, lang, copy }: { entry: GlossaryEntry; lang: Lang
             : developerGuard.mode === "B"
               ? "A local control is implemented on the published hosts and events."
               : "No Secret Guard control is published for this threat."}</p>
-          {developerGuard.mode === "B" && <Link href="/extension">{lang === "fr" ? "Voir les préconditions et limites de l’extension" : "See extension prerequisites and limits"} <span aria-hidden="true">↗</span></Link>}
+          {developerGuard.mode === "B" && <Link href="/secret-guard">{lang === "fr" ? "Voir les préconditions et limites de l’extension" : "See extension prerequisites and limits"} <span aria-hidden="true">↗</span></Link>}
         </div>
         <dl className="guard-glossary__facets">
           <div>
