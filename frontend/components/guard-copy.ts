@@ -363,6 +363,7 @@ export const GUARD_COPY = {
       "Ressources : fichiers de credentials et racines hors périmètre refusés dans les événements supportés.",
       "Actions : écriture, suppression, publication, déploiement, réseau et MCP reçoivent une décision explicite.",
       "Exceptions : une action sensible attend une approbation courte et liée à son contexte exact.",
+      "Règles sur mesure : xSOM calibre des détecteurs sur vos identifiants et vos projets, les signe ; le poste vérifie la signature hors ligne avant de les appliquer. En pilote, avec une extension compatible.",
       "Preuves : inventaire du poste, politique, décision et statut d’interception restent distincts.",
     ],
     extGuardLimit:
@@ -689,6 +690,7 @@ export const GUARD_COPY = {
       "Resources: credential files and out-of-scope roots are denied for supported events.",
       "Actions: writes, deletion, publishing, deployment, network and MCP receive an explicit decision.",
       "Exceptions: a sensitive action waits for a short-lived approval tied to its exact context.",
+      "Custom rules: xSOM calibrates detectors on your identifiers and projects and signs them; the workstation checks the signature offline before applying them. In pilot, with a compatible extension.",
       "Evidence: workstation inventory, policy, decision and interception status remain distinct.",
     ],
     extGuardLimit:
