@@ -21,6 +21,7 @@ const expectedFiles = [
   "[Content_Types].xml",
   "extension.vsixmanifest",
   "extension/LICENSE.txt",
+  "extension/changelog.md",
   "extension/dist/extension.cjs",
   "extension/dist/hook.cjs",
   "extension/icon.png",
@@ -30,6 +31,7 @@ const expectedFiles = [
 ].sort();
 const localEquivalents = new Map([
   ["extension/LICENSE.txt", "packages/vscode/LICENSE.txt"],
+  ["extension/changelog.md", "packages/vscode/CHANGELOG.md"],
   ["extension/dist/extension.cjs", "packages/vscode/dist/extension.cjs"],
   ["extension/dist/hook.cjs", "packages/vscode/dist/hook.cjs"],
   ["extension/icon.png", "packages/vscode/icon.png"],
