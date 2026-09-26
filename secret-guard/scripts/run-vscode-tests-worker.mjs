@@ -64,6 +64,11 @@ try {
       "--disable-extensions",
       "--skip-welcome",
       "--skip-release-notes",
+      // Secrets stay in memory: on macOS the default store is the login
+      // keychain, and a locked keychain (screen locked, unattended run) blocks
+      // the VS Code main process on an invisible prompt, so every workbench
+      // call (configuration write, clipboard) waited until the timeout.
+      "--use-inmemory-secretstorage",
     ],
   }).then(
     () => ({ status: "exited" }),
