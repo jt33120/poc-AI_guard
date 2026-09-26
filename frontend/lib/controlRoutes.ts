@@ -30,11 +30,23 @@ interface Route {
  * encodé. C'est ce qui interdit `..`, `%2e%2e` et tout ce qui ferait sortir du chemin.
  */
 const SEG = "[A-Za-z0-9_-]{1,64}";
+const POLICY_SEG = "[a-z0-9][a-z0-9._-]{0,127}";
 
 export const CONTROL_ROUTES: readonly Route[] = [
   { pattern: new RegExp("^v1/extensions/devices$"), methods: ["GET"] },
   { pattern: new RegExp("^v1/extensions/events$"), methods: ["GET"] },
   { pattern: new RegExp("^v1/extensions/verify$"), methods: ["GET"] },
+  { pattern: new RegExp("^v1/developer-policies$"), methods: ["GET"] },
+  {
+    pattern: new RegExp(`^v1/developer-policies/${POLICY_SEG}$`),
+    methods: ["PUT"],
+  },
+  {
+    pattern: new RegExp(
+      `^v1/developer-policies/${POLICY_SEG}/assign/${SEG}$`,
+    ),
+    methods: ["POST"],
+  },
   { pattern: new RegExp("^v1/agents$"), methods: ["GET"] },
   { pattern: new RegExp("^v1/approvals$"), methods: ["GET"] },
   { pattern: new RegExp(`^v1/approvals/${SEG}/decision$`), methods: ["POST"] },
@@ -60,13 +72,15 @@ export const CONTROL_ROUTES: readonly Route[] = [
 ];
 
 /**
- * Un segment sûr : rien de vide, aucun point, aucun encodage.
+ * Un segment sûr : ni vide, ni point initial, ni séparateur, ni encodage.
+ * Les expressions de route restent plus étroites : seul un identifiant de politique
+ * peut contenir un point interne.
  *
  * Next décode les segments avant de les remettre ici, donc `%2e%2e` arrive sous la
  * forme `..`. Le test porte donc sur la valeur décodée, la seule qui compte.
  */
 function segmentSain(segment: string): boolean {
-  return /^[A-Za-z0-9_-]+$/.test(segment);
+  return /^[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}$/.test(segment);
 }
 
 /**

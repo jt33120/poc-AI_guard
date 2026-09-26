@@ -79,7 +79,9 @@ test("workstations distinguish client claims and gateway evidence", async ({
   ).toBeVisible();
   await expect(page.getByText("Nettoyé → XXX", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Vérifier le chaînage" }).click();
-  await expect(page.getByRole("status")).toContainText("pas une attestation");
+  await expect(
+    page.getByRole("status").filter({ hasText: "pas une attestation" }),
+  ).toBeVisible();
   await page.getByLabel("Poste", { exact: true }).selectOption("device-1");
   await expect(
     page.getByText("Observé par la passerelle", { exact: true }),

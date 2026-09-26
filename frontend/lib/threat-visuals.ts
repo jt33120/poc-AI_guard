@@ -1,3 +1,6 @@
+import type { Lang } from "@/lib/strings";
+import frenchVisuals from "@/lib/generated/threat-visuals-fr.json";
+
 const THREAT_VISUALS: Record<string, string> = {
   "injection-directe": "promptinjection.webp",
   "injection-de-prompt": "indirectpromptinjection.webp",
@@ -69,7 +72,9 @@ const THREAT_VISUALS: Record<string, string> = {
   "derive-de-modele": "46a52fa3-04d0-4088-9874-f94991b43e08.webp",
 };
 
-export function visualForThreat(id: string) {
+export function visualForThreat(id: string, lang: Lang = "fr") {
+  const french = (frenchVisuals as Record<string, string>)[id];
+  if (lang === "fr" && french) return french;
   const filename = THREAT_VISUALS[id];
-  return filename ? `/threats/${encodeURIComponent(filename)}` : null;
+  return filename ? `/threats/${encodeURIComponent(filename)}` : french ?? null;
 }

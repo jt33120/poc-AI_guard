@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "defaults": {
+    "product": "Secret Guard",
+    "module": "Aucun contrôle Secret Guard déclaré",
+    "status": "out_of_scope",
+    "mode": "X",
+    "hosts": [],
+    "environment": "non_applicable",
+    "preconditions": [],
+    "limit": "Cette menace ne reçoit pas de couverture Secret Guard sur la base d'une promesse générale ou d'un contrôle d'un autre produit.",
+    "scenarios": [],
+    "sources": []
+  },
+  "overrides": [
+    {
+      "ids": ["fuite-de-secrets", "vol-identifiants-cloud", "vol-cle-api-ia"],
+      "module": "Secret Guard local",
+      "status": "implemented_local",
+      "mode": "B",
+      "hosts": [
+        { "assistant": "claude", "events": ["prompt", "read"], "environment": "local" },
+        { "assistant": "codex", "events": ["prompt"], "environment": "local" },
+        { "assistant": "copilot", "events": ["prompt"], "environment": "local", "verified": false }
+      ],
+      "environment": "local",
+      "preconditions": ["Extension installée", "Hook de l'hôte activé et invoqué"],
+      "limit": "Les pièces jointes natives, un terminal hors session et les chemins non interceptés ne sont pas couverts par ce contrôle.",
+      "scenarios": ["secret-guard/tests/core/scan.test.ts", "secret-guard/tests/cli/hook.test.ts"],
+      "sources": ["secret-guard/tests/core/scan.test.ts", "secret-guard/tests/cli/hook.test.ts"]
+    },
+    {
+      "ids": ["traversee-de-chemin", "fuite-de-donnees"],
+      "module": "Runner de ressources",
+      "status": "implemented_local",
+      "mode": "B",
+      "hosts": [
+        { "assistant": "claude", "events": ["read"], "environment": "local" }
+      ],
+      "environment": "local",
+      "preconditions": ["Politique signée présente", "Lecture fournie par un événement Claude Code qualifié"],
+      "limit": "Une vérification de chemin ne protège pas une lecture réalisée par un processus non intercepté ; le profil renforcé Linux apporte la frontière système.",
+      "scenarios": ["secret-guard/tests/runner/hook-input.test.ts", "secret-guard/tests/policy/evaluate.test.ts"],
+      "sources": ["secret-guard/tests/runner/hook-input.test.ts", "secret-guard/tests/policy/evaluate.test.ts"]
+    }
+  ]
+}

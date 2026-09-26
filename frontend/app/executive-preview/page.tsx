@@ -11,7 +11,8 @@ export function generateMetadata() {
   return pageMetadata("exec.title", { descriptionKey: "exec.subtitle" });
 }
 
-const DEMO_MAILTO = "mailto:julian.talou@xsom.fr?subject=xSOM%20AI%20Guard%20%3A%20demo";
+const DEMO_MAILTO =
+  "mailto:julian.talou@xsom.fr?subject=xSOM%20AI%20Guard%20%3A%20demo";
 
 // Les chiffres viennent de l'instantané **relu** du tenant de démonstration, pas
 // d'un échantillon. Ils étaient écrits à la main jusqu'à `L8` — `governed: 8`,
@@ -21,8 +22,8 @@ const DEMO_MAILTO = "mailto:julian.talou@xsom.fr?subject=xSOM%20AI%20Guard%20%3A
 
 // Composant serveur : la page ne fait qu'afficher. `<ExecutiveSummary />` reste un
 // îlot client, parce que la console l'emploie aussi et l'y veut interactif.
-export default function ExecutivePreviewPage() {
-  const { t } = serverT();
+export default async function ExecutivePreviewPage() {
+  const { t } = await serverT();
   return (
     <main className="relative">
       <header className="sticky top-0 z-30 border-b border-white/10 bg-navy/70 backdrop-blur-xl">
@@ -37,7 +38,10 @@ export default function ExecutivePreviewPage() {
           </Link>
           <div className="flex items-center gap-2 sm:gap-3">
             <LanguageToggle />
-            <Link href="/login" className="btn btn-ghost hidden px-4 py-1.5 sm:inline-flex">
+            <Link
+              href="/login"
+              className="btn btn-ghost hidden px-4 py-1.5 sm:inline-flex"
+            >
               {t("land.nav.signin")}
             </Link>
             <a href={DEMO_MAILTO} className="btn btn-primary px-4 py-1.5">
@@ -58,10 +62,15 @@ export default function ExecutivePreviewPage() {
               commit. Sans lui, un lecteur ne peut pas distinguer une lecture d'une
               maquette — et c'est précisément la distinction que ce produit vend. */}
           <p className="muted mt-3 max-w-3xl font-mono text-[11px] leading-relaxed">
-            {t("demo.bandeau", { date: INSTANTANE.genere_le, commit: INSTANTANE.commit })}
+            {t("demo.bandeau", {
+              date: INSTANTANE.genere_le,
+              commit: INSTANTANE.commit,
+            })}
             {INSTANTANE.chainee && ` ✓ ${t("demo.bandeau.chaine")}`}
           </p>
-          <p className="muted mt-3 max-w-2xl text-sm leading-relaxed">{t("demo.lede")}</p>
+          <p className="muted mt-3 max-w-2xl text-sm leading-relaxed">
+            {t("demo.lede")}
+          </p>
         </header>
 
         <ExecutiveSummary

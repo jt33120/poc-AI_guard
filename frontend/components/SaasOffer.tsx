@@ -29,7 +29,7 @@ import Link from "next/link";
 import { Wordmark, XsomMark } from "@/components/brand";
 import { CONTACT_MAILTO, GUARD_COPY } from "@/components/guard-copy";
 import { GuardNav } from "@/components/GuardNav";
-import { SignalPreferences } from "@/design-system/react";
+import { GuardFooter } from "@/components/GuardFooter";
 import { useT } from "@/lib/i18n";
 
 export function SaasOffer() {
@@ -131,22 +131,7 @@ export function SaasOffer() {
         </p>
       </section>
 
-      <footer className="guard-footer">
-        <div className="guard-wrap">
-          <div className="brand">
-            <XsomMark />
-            <Wordmark />
-          </div>
-          <p>{copy.footer}</p>
-          <a href="https://www.xsom.fr" target="_blank" rel="noreferrer">
-            {copy.cabinet} ↗
-          </a>
-          <details>
-            <summary>{lang === "fr" ? "Affichage" : "Display"}</summary>
-            <SignalPreferences lang={lang} />
-          </details>
-        </div>
-      </footer>
+      <GuardFooter />
     </main>
   );
 }

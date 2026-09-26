@@ -1,7 +1,7 @@
 "use client";
 
 import { useT } from "@/lib/i18n";
-import { GuardOffers, GuardPublisher, GuardOfferQuestions } from "@/components/GuardOffers";
+import { GuardOffers, GuardOfferQuestions } from "@/components/GuardOffers";
 import { PILOT_MAILTO } from "@/components/guard-offers-copy";
 import { DeveloperPublicShell } from "./DeveloperPublicShell";
 
@@ -19,7 +19,6 @@ export function DeveloperPricing() {
       <ol>{(lang === "fr" ? ["Qualification : vos postes, vos assistants, vos dépôts et vos objectifs.", "Accord de pilote : jusqu’à 10 postes, périmètre, date de début et conditions écrits.", "Évaluation : contrôles actifs, faux refus, adoption et charge d’exploitation.", "Bilan : poursuivre sur devis ou arrêter, sans souscription automatique."] : ["Qualification: workstations, assistants, repositories and goals.", "Pilot agreement: up to 10 workstations, written scope, start date and terms.", "Evaluation: active controls, false blocks, adoption and operating effort.", "Review: continue on a quote or stop, with no automatic subscription."]).map((step, index) => <li key={step}><span>0{index + 1}</span>{step}</li>)}</ol>
     </div></section>
     <GuardOfferQuestions />
-    <GuardPublisher />
     <section className="developer-section developer-cta guard-wrap"><div><p>{lang === "fr" ? "PARLONS DE VOTRE ÉQUIPE" : "LET’S TALK ABOUT YOUR TEAM"}</p><h2>{lang === "fr" ? "Évaluons votre premier périmètre." : "Let’s assess your first scope."}</h2><p>{lang === "fr" ? "Indiquez le nombre de développeurs, les assistants utilisés et vos systèmes. xSOM vous répond pour cadrer le pilote." : "Share your developer count, assistants and operating systems. xSOM will reply to scope the pilot."}</p></div><a className="guard-button" href={PILOT_MAILTO}>{lang === "fr" ? "Demander mes 90 jours" : "Request my 90 days"} ↗</a></section>
   </main></DeveloperPublicShell>;
 }

@@ -5,9 +5,11 @@ import { ProductsOffer } from "@/components/ProductsOffer";
 import { getLang } from "@/lib/lang";
 import "../guard-landing.css";
 import "../guard-home.css";
+import "../home.css";
+import "../products.css";
 
-export function generateMetadata(): Metadata {
-  const copy = GUARD_HOME_COPY[getLang()];
+export async function generateMetadata(): Promise<Metadata> {
+  const copy = GUARD_HOME_COPY[await getLang()];
   return { title: copy.productsMeta, description: copy.productsDescription };
 }
 

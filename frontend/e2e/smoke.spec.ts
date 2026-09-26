@@ -19,7 +19,8 @@ async function authed(context: BrowserContext) {
 
 test("landing page renders", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "xSOM AI Guard" })).toBeVisible();
+  await expect(page.locator("#home-film video")).toBeVisible();
+  await expect(page.locator(".guard-header .brand__name")).toHaveText("xSOM AI Studio");
   const fonts = await page.evaluate(async () => {
     await document.fonts.ready;
     const root = getComputedStyle(document.documentElement);
@@ -27,7 +28,7 @@ test("landing page renders", async ({ page }) => {
     const display = family("--signal-font-display");
     const body = family("--signal-font-body");
     const loaded = [...document.fonts].filter(face => face.status === "loaded").map(face => face.family.replace(/["']/g, ""));
-    return { display, body, loaded, headingStyle: getComputedStyle(document.querySelector("h1")!).fontFamily, bodyStyle: getComputedStyle(document.body).fontFamily };
+    return { display, body, loaded, headingStyle: getComputedStyle(document.querySelector("h2")!).fontFamily, bodyStyle: getComputedStyle(document.body).fontFamily };
   });
   expect(fonts.display.toLowerCase()).toContain("manrope");
   expect(fonts.body.toLowerCase()).toContain("sourcesans");
@@ -250,10 +251,7 @@ test("un visiteur sans cookie reçoit le français, et le document le déclare",
   // lecteur d'écran lisait de l'anglais avec une voix française. Vérifier l'un sans
   // l'autre laisserait ce désaccord passer.
   await expect(page.locator("html")).toHaveAttribute("lang", "fr");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Vos agents codent.");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "Vos règles restent les vôtres.",
-  );
+  await expect(page.locator("#usages-heading")).toHaveText("Chaque usage de l’IA expose à des risques cyber différents.");
 
   // Le titre et la description existent, et sont français. Sans ce lot il n'y avait
   // ni l'un ni l'autre : une page cliente ne peut pas en exporter.
@@ -270,8 +268,7 @@ test("un visiteur sans cookie reçoit le français, et le document le déclare",
   // l'anglais. (Que la page soit devenue un composant serveur ne se lit pas ici mais
   // dans le poids du bundle : 2,56 ko de JS de page avant, 187 o après.)
   const html = (await reponse?.text()) ?? "";
-  expect(html).toContain("Vos agents codent.");
-  expect(html).toContain("Vos règles restent les vôtres.");
+  expect(html).toContain("Chaque usage de l’IA expose à des risques cyber différents.");
 });
 
 test("basculer en anglais tient au rechargement", async ({ page }) => {
@@ -281,23 +278,13 @@ test("basculer en anglais tient au rechargement", async ({ page }) => {
   // (« Empoisonnement », « Agents », « entraînons »). Le sélecteur était juste tant que
   // la page était courte, ce qui est la définition d'un sélecteur fragile.
   await page.getByRole("button", { name: "EN", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "Your agents code.",
-  );
-  await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "Your rules stay yours.",
-  );
+  await expect(page.locator("#usages-heading")).toHaveText("Every AI use case brings its own cyber risks.");
 
   // Le rechargement est le point : la préférence tient dans un cookie que le serveur
   // relit, elle ne vit pas seulement dans l'état d'un composant.
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "Your agents code.",
-  );
-  await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "Your rules stay yours.",
-  );
+  await expect(page.locator("#usages-heading")).toHaveText("Every AI use case brings its own cyber risks.");
   await expect(page).toHaveTitle(/French governance for AI agents/);
 });
 

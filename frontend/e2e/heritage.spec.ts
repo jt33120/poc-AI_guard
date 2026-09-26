@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { GUARD_COPY } from "../components/guard-copy";
 import { GUARD_HOME_COPY } from "../components/guard-home-copy";
+import { HOME_COPY } from "../components/home/home-copy";
+import { THREAT_GLOSSARY } from "../lib/threat-glossary";
 
 function copyLeaves(value: unknown): string[] {
   if (typeof value === "string") return [value];
@@ -9,10 +11,10 @@ function copyLeaves(value: unknown): string[] {
 }
 
 test("the entire nested orientation copy stays illustrative, without invented coverage counts", () => {
-  const coverage = /menace|ligne|facette|(?<!\p{L})couvert|(?<!\p{L})couvre|matrice|bloqu|threat|row|facet|(?<!\p{L})cover|block/iu;
+  const coverage = /menace|ligne|facette|couvert|couvre|matrice|bloqu|threat|row|facet|cover|block/i;
   const number = /\d+|\b(?:dix-sept|dix-huit|dix-neuf|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|quinze|seize|vingt|seventeen|eighteen|nineteen|two|three|four|five|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|twenty)\b/i;
   for (const language of ["fr", "en"] as const) {
-    const phrases = copyLeaves([GUARD_COPY[language], GUARD_HOME_COPY[language]]);
+    const phrases = copyLeaves([GUARD_COPY[language], GUARD_HOME_COPY[language], HOME_COPY[language]]);
     expect(phrases.length).toBeGreaterThan(50);
     for (const phrase of phrases) {
       expect(phrase.trim(), `${language}: an empty visible label`).not.toBe("");
@@ -34,85 +36,107 @@ test("the landing explains AI uses, introduces the extension and keeps both next
   });
   await page.goto("/");
 
-  // Le parcours présente les usages, puis les produits, puis les deux suites.
-  await expect(page.getByText("Secret Guard gratuit · Developer Guard en pilote accompagné", { exact: true }).first()).toBeVisible();
-  await expect(page.locator(".guard-masthead")).toBeVisible();
-  await expect(page.locator("#usages .guard-campus")).toBeVisible();
-  await expect(page.locator("#menaces-accueil")).toHaveCount(0);
-  expect(await page.locator(".guard-masthead, #usages, #produits, #vous").evaluateAll(
-    (sections) => sections.map((section) => section.classList.contains("guard-masthead") ? "masthead" : section.id),
-  )).toEqual(["masthead", "usages", "vous"]);
+  // Le parcours : le film, les équipes, les trois façons d'avancer, Secret Guard.
+  await expect(page.locator("#home-film video")).toBeVisible();
+  // L'illustration est chargée à l'approche, comme toute image sous la ligne de flottaison.
+  const campus = page.locator(".home-campus__image");
+  await campus.scrollIntoViewIfNeeded();
+  await campus.evaluate(async (image: HTMLImageElement) => {
+    await image.decode();
+    if (!image.naturalWidth) throw new Error("Campus illustration failed to load");
+  });
+  expect(await page.locator("main > section").evaluateAll(
+    (sections) => sections.map((section) => section.id || section.className),
+  )).toEqual(["home-film", "usages", "offres", "secret-guard"]);
 
   // Le menu expose les produits, les besoins cyber et le cabinet, puis la porte de
   // découverte des solutions xSOM.
   const navigation = page.getByRole("navigation", { name: "Navigation principale" });
-  await expect(navigation.getByRole("link")).toHaveCount(6);
-  await expect(navigation.getByRole("link", { name: "Nos produits", exact: true })).toHaveAttribute("href", "/produits");
-  await expect(navigation.getByRole("link", { name: "Vos besoins cybers", exact: true })).toHaveAttribute("href", "/menaces");
-  await expect(navigation.getByRole("link", { name: /Notre cabinet/ })).toHaveAttribute("href", "https://www.xsom.fr");
-  await expect(navigation.getByRole("link", { name: "Commencer gratuitement", exact: true })).toHaveAttribute("href", "/extension");
+  await expect(navigation.getByRole("link")).toHaveCount(3);
+  await expect(navigation.getByRole("link", { name: "Nos Produits", exact: true })).toHaveAttribute("href", "/produits");
+  await expect(navigation.getByRole("link", { name: "Vos besoins", exact: true })).toHaveAttribute("href", "/menaces");
+  await expect(navigation.getByRole("link", { name: /Nos conseils/ })).toHaveAttribute("href", "https://www.xsom.fr");
 
-  // Le masthead mène aux produits sans passer par le menu : c'est la sortie que lit
-  // un visiteur qui ne remonte pas.
-  await expect(page.locator(".guard-masthead__actions").getByRole("link").nth(1)).toHaveAttribute("href", "/developpeurs");
+  // Le film porte ses propres commandes, lecture et son, à la place des contrôles natifs.
+  const film = page.locator("#home-film");
+  expect(await film.locator("video").getAttribute("controls")).toBeNull();
+  await expect(film.getByRole("button", { name: "Activer le son", exact: true })).toBeVisible();
 
-  const chemins = page.locator("#vous .guard-path");
-  await expect(chemins).toHaveCount(2);
-  await expect(chemins.filter({ hasText: "Entreprise" }).getByRole("link")).toHaveAttribute("href", /^mailto:/);
-  await expect(chemins.filter({ hasText: "Secret Guard Local" }).getByRole("link")).toHaveAttribute("href", "/extension");
+  // Secret Guard se montre par une capture réelle dans VS Code.
+  await expect(page.locator("#secret-guard .home-laptop__window img")).toHaveAttribute("src", /secret-guard-vscode/);
+  await expect(page.locator("#secret-guard .home-sg__hosts li")).toHaveText(["GitHub Copilot", "Claude Code", "Codex"]);
 
   expect(apiRequests).toBe(0);
 
-  await page.getByRole("link", { name: "Périmètre & preuves", exact: true }).first().click();
+  await page.getByRole("link", { name: "Périmètre et preuves", exact: true }).first().click();
   await expect(page).toHaveURL(/\/evidence$/);
   await expect(page.locator("#menaces .paysage .menace")).toHaveCount(23);
 });
 
-test("the products page gives both products the same billing, and the menu points at it", async ({ page }) => {
+test("the products page opens on its film, then shows each product in a carousel", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("navigation", { name: "Navigation principale" })
-    .getByRole("link", { name: "Nos produits", exact: true }).click();
+    .getByRole("link", { name: "Nos Produits", exact: true }).click();
   await expect(page).toHaveURL(/\/produits$/);
 
-  // Deux produits, deux blocs de même forme. La plateforme tenait en une ligne posée
-  // sous l'extension, sur une section d'accueil : un seul bloc rendu ici la ferait
-  // revenir au rang de note de bas de page sans que rien ne le signale.
-  const produits = page.locator(".guard-product-feature");
-  await expect(produits).toHaveCount(2);
-  await expect(produits.nth(0).getByRole("heading", { name: "Vos agents. Votre cadre.", exact: true })).toBeVisible();
-  await expect(produits.nth(0).getByRole("link")).toHaveAttribute("href", "/developpeurs");
-  await expect(produits.nth(1).getByRole("heading", { name: "AI Guard, la plateforme", exact: true })).toBeVisible();
-  // La sortie de la plateforme est la porte du compte, pas la page qui la décrit :
-  // celle-ci reste accessible en second, sans être la première chose qu'on clique.
-  await expect(produits.nth(1).getByRole("link", { name: /Explorer la plateforme/ })).toHaveAttribute("href", "/saas");
-  await expect(produits.nth(1).locator('a[href="/saas"]')).toHaveCount(1);
-  await expect(page.locator(".guard-glossary-link a")).toHaveAttribute("href", "/menaces");
+  // Le film de la gamme, avec ses propres commandes, et une invitation à descendre
+  // vers le carrousel. Il ne nomme aucun produit : la gamme va s'agrandir.
+  const film = page.locator("#home-film");
+  await expect(film.locator("video")).toHaveAttribute("src", /xsom-products-v1-fr\.mp4$/);
+  expect(await film.locator("video").getAttribute("controls")).toBeNull();
+  expect(await film.locator("video").getAttribute("aria-label")).not.toMatch(/Secret Guard|AI Guard/);
+  await expect(film.getByRole("link", { name: "Découvrir" })).toHaveAttribute("href", "#gamme");
+
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("du poste à l’infrastructure");
+
+  // Une diapositive par produit, chacune avec sa porte d'entrée.
+  const carousel = page.getByRole("region", { name: "Nos produits" });
+  const slides = carousel.locator(".xp-slide");
+  await expect(slides).toHaveCount(2);
+  await expect(slides.nth(0).getByRole("heading", { name: "Secret Guard", exact: true })).toBeAttached();
+  await expect(slides.nth(0).getByRole("link", { name: "Découvrir Secret Guard" })).toHaveAttribute("href", "/extension");
+  await expect(slides.nth(1).getByRole("heading", { name: "AI Guard", exact: true })).toBeAttached();
+  await expect(slides.nth(1).locator('a[href="/saas"]')).toHaveCount(1);
+  await expect(slides.nth(1).locator('a[href^="mailto:"]')).toHaveCount(1);
+
+  // Les sélecteurs et les flèches suivent la diapositive affichée.
+  const pickers = carousel.getByRole("group", { name: "Nos produits" }).getByRole("button");
+  await expect(pickers.nth(0)).toHaveAttribute("aria-pressed", "true");
+  await expect(carousel.getByRole("button", { name: "Produit précédent" })).toBeDisabled();
+  await pickers.nth(1).click();
+  await expect(pickers.nth(1)).toHaveAttribute("aria-pressed", "true");
+  await expect(carousel.getByRole("button", { name: "Produit suivant" })).toBeDisabled();
+  const decalage = (index: number) => slides.nth(index).evaluate((slide) =>
+    Math.round(slide.getBoundingClientRect().left - slide.parentElement!.getBoundingClientRect().left));
+  await expect.poll(() => decalage(1)).toBe(0);
+  await carousel.getByRole("button", { name: "Produit précédent" }).click();
+  await expect(pickers.nth(0)).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(() => decalage(0)).toBe(0);
 
   // Les deux captures sont de vraies images, et elles se décodent : un chemin mort
   // laisserait une figure vide que `toBeVisible` accepterait sans broncher.
-  const captures = page.locator(".guard-product-shot img");
+  const captures = slides.locator(".xp-slide__shot img");
   await expect(captures).toHaveCount(2);
-  await expect.poll(() =>
-    captures.evaluateAll((images) => images.every((image) => (image as HTMLImageElement).naturalWidth > 0)),
-  ).toBe(true);
   for (const capture of await captures.all()) {
+    await capture.evaluate((image) => (image as HTMLImageElement).decode());
     expect((await capture.getAttribute("alt"))?.length ?? 0).toBeGreaterThan(20);
   }
 
-  // Le titre de la page est un `h1` : sans lui, la page des produits n'aurait pas de
-  // tête et la hiérarchie repartirait à `h2`.
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Du poste de travail à l’entreprise");
+  // Les éditions payantes portent le nom du produit, pas un second nom de gamme.
+  await expect(page.locator("#offres")).toContainText("Secret Guard Équipe");
+  await expect(page.locator("#offres")).toContainText("Secret Guard Renforcé");
+  await expect(page.locator("main")).not.toContainText("Developer Guard");
+  await expect(page.locator('.guard-glossary-link a[href="/menaces"]')).toHaveAttribute("href", "/menaces");
 });
 
 test("every public header carries the same orientation menu", async ({ page }) => {
   for (const chemin of ["/", "/produits", "/saas", "/extension", "/menaces"]) {
     await page.goto(chemin);
     const navigation = page.getByRole("navigation", { name: "Navigation principale" });
-    await expect(navigation.getByRole("link", { name: "Nos produits", exact: true })).toHaveAttribute("href", "/produits");
-    await expect(navigation.getByRole("link", { name: "Vos besoins cybers", exact: true })).toHaveAttribute("href", "/menaces");
-    await expect(navigation.getByRole("link", { name: /Notre cabinet/ })).toHaveAttribute("href", "https://www.xsom.fr");
-    await expect(navigation.getByRole("link", { name: "Commencer gratuitement", exact: true })).toHaveAttribute("href", "/extension");
-    await expect(navigation.getByRole("link")).toHaveCount(6);
+    await expect(navigation.getByRole("link", { name: "Nos Produits", exact: true })).toHaveAttribute("href", "/produits");
+    await expect(navigation.getByRole("link", { name: "Vos besoins", exact: true })).toHaveAttribute("href", "/menaces");
+    await expect(navigation.getByRole("link", { name: /Nos conseils/ })).toHaveAttribute("href", "https://www.xsom.fr");
+    await expect(navigation.getByRole("link")).toHaveCount(3);
   }
 });
 
@@ -145,93 +169,93 @@ test("a page reached by an internal link still reveals what it hides", async ({ 
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/");
   await page.getByRole("navigation", { name: "Navigation principale" })
-    .getByRole("link", { name: "Nos produits", exact: true }).click();
+    .getByRole("link", { name: "Nos Produits", exact: true }).click();
   await expect(page).toHaveURL(/\/produits$/);
 
   // Le layout racine reste monté d'une page à l'autre : sans relevé des cibles à
   // chaque navigation, cette page gardait ses révélations à zéro pour toujours.
+  const cible = page.locator(".guard-glossary-link");
+  await cible.scrollIntoViewIfNeeded();
   await expect.poll(
-    () => page.locator(".guard-home-heading").evaluate((n) => getComputedStyle(n).opacity),
+    () => cible.evaluate((n) => getComputedStyle(n).opacity),
     { timeout: 5_000 },
   ).toBe("1");
 });
 
-test("the campus switches risks and universes with a keyboard, without service calls", async ({ page }) => {
-  let apiRequests = 0;
-  await page.route("**/api/**", async (route) => {
-    apiRequests += 1;
-    await route.fulfill({ status: 503, json: { detail: "Illustrative campus only" } });
-  });
+test("the campus opens each team over the illustration, with a keyboard", async ({ page }) => {
   await page.goto("/");
-  const usages = page.locator("#usages");
-  const toggle = usages.getByRole("switch", { name: "Afficher les risques", exact: true });
-  const universes = usages.getByRole("group", { name: "Choisir un univers IA", exact: true });
+  const tabs = page.locator("#usages").getByRole("group", { name: "Les équipes" });
   const detail = page.locator("#campus-detail");
-  const risks = usages.locator(".guard-campus__risk-label:visible");
-
-  await expect(toggle).toHaveAttribute("aria-checked", "false");
-  await expect(risks).toHaveCount(0);
-  await toggle.focus();
-  await page.keyboard.press("Space");
-  await expect(toggle).toHaveAttribute("aria-checked", "true");
-  await expect(risks).toHaveCount(3);
-
-  const contentByUniverse = new Set<string>();
-  for (const name of ["Développement", "Collaborateurs", "Modèles & données"]) {
-    const choice = universes.getByRole("button", { name, exact: true });
-    await choice.focus();
+  await expect(detail).toBeHidden();
+  for (const name of ["Équipes métier", "Équipes de développement", "Équipes modèles & données"]) {
+    const tab = tabs.getByRole("button", { name: new RegExp(name) });
+    await tab.focus();
     await page.keyboard.press("Enter");
-    await expect(choice).toHaveAttribute("aria-pressed", "true");
-    await expect(universes.locator('[aria-pressed="true"]')).toHaveCount(1);
-    await expect(detail).toContainText(name);
-    await expect(detail.locator(".guard-campus__risks li")).toHaveCount(3);
-    await expect(detail.getByText("Le rôle des contrôles", { exact: true })).toBeVisible();
-    await expect(detail.locator(".guard-campus__safeguards li")).toHaveCount(3);
-    await expect(toggle).toHaveAttribute("aria-checked", "true");
-    contentByUniverse.add((await detail.innerText()).trim());
-  }
-  expect(contentByUniverse.size).toBe(3);
-
-  // Les repères posés sur le bâtiment pilotent la même sélection que la liste.
-  const pins = usages.locator(".guard-campus__annotations");
-  for (const name of ["Collaborateurs", "Modèles & données", "Développement"]) {
-    const pin = pins.getByRole("button", { name, exact: true });
-    await pin.click();
-    await expect(pin).toHaveAttribute("aria-pressed", "true");
-    await expect(pins.locator('[aria-pressed="true"]')).toHaveCount(1);
-    await expect(universes.getByRole("button", { name, exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(tab).toHaveAttribute("aria-pressed", "true");
     await expect(detail.getByRole("heading", { name, exact: true })).toBeVisible();
+    await expect(detail.locator(".home-campus__lists li")).toHaveCount(6);
+    const visuals = detail.getByRole("button", { name: /^Agrandir/ });
+    await expect(visuals).toHaveCount(3);
+    await visuals.first().click();
+    const preview = page.getByRole("dialog");
+    await expect(preview).toBeVisible();
+    await expect(preview.getByText("Comment réduire le risque", { exact: true })).toBeVisible();
+    // Échap ferme l'aperçu seul : le panneau de l'équipe reste ouvert.
+    await page.keyboard.press("Escape");
+    await expect(preview).toBeHidden();
+    await expect(detail).toBeVisible();
+    await tab.click();
+    await expect(detail).toBeHidden();
   }
+});
 
-  await toggle.focus();
-  await page.keyboard.press("Space");
-  await expect(toggle).toHaveAttribute("aria-checked", "false");
-  await expect(risks).toHaveCount(0);
-  expect(apiRequests).toBe(0);
+test("each team opens its own filtered cyber risks", async ({ page }) => {
+  const teams = [
+    { name: "Équipes de développement", use: "development" },
+    { name: "Équipes métier", use: "workplace" },
+    { name: "Équipes modèles & données", use: "models" },
+  ] as const;
+
+  for (const team of teams) {
+    await page.goto("/");
+    await page.locator("#usages").getByRole("group", { name: "Les équipes" })
+      .getByRole("button", { name: new RegExp(team.name) }).click();
+    const link = page.locator("#campus-detail").getByRole("link", {
+      name: `Explorer les risques liés à mon équipe : ${team.name}`,
+    });
+    await expect(link).toHaveAttribute("href", `/menaces?use=${team.use}#definitions`);
+    await link.click();
+    await expect(page).toHaveURL(new RegExp(`/menaces\\?use=${team.use}#definitions$`));
+    await expect(page.getByRole("group", { name: "Filtrer par usage IA" })
+      .getByRole("button", { name: team.name, exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator(".guard-glossary__row")).toHaveCount(
+      THREAT_GLOSSARY.filter((entry) => entry.uses.includes(team.use)).length,
+    );
+  }
 });
 
 test("the hero respects reduced motion without downloading its video", async ({ page }) => {
   const videoRequests: string[] = [];
   await page.emulateMedia({ reducedMotion: "reduce" });
   page.on("request", (request) => {
-    if (/ai-guard-hero-v2\.webm(?:\?|$)/.test(request.url())) videoRequests.push(request.url());
+    if (/xsom-ai-home-v3-(?:fr|en)\.mp4(?:\?|$)/.test(request.url())) videoRequests.push(request.url());
   });
   await page.goto("/");
-  const video = page.locator(".guard-masthead__video");
+  const video = page.locator(".home-film__video");
   await expect(video).toBeVisible();
-  await expect(video).toHaveAttribute("poster", "/signal-media/ai-guard-hero-v2.png");
+  await expect(video).toHaveAttribute("poster", "/signal-media/xsom-ai-home-v3-fr.jpg");
   await expect(video).toHaveAttribute("preload", "none");
   await expect.poll(() => video.evaluate((element) => (element as HTMLVideoElement).paused)).toBe(true);
-  await expect(video).not.toHaveAttribute("src", /\S/);
+  await expect(video).toHaveAttribute("src", "/signal-media/xsom-ai-home-v3-fr.mp4");
   expect(videoRequests).toEqual([]);
 });
 
 test("the self-serve page says what the product does, and where that stops", async ({ page }) => {
   await page.goto("/produits");
-  await page.locator('a[href="/saas"]').click();
+  await page.locator('#gamme a[href="/saas"]').click();
   await expect(page).toHaveURL(/\/saas$/);
 
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Une règle avant chaque action raccordée");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Encadrez vos agents");
 
   // L'inventaire : six familles, et chacune porte des lignes concrètes. Le compte
   // par famille est ce qui distingue cette page de celle d'avant, qui tenait en six
@@ -275,7 +299,7 @@ test("the self-serve page says what the product does, and where that stops", asy
 
 test("the extension page hands over a file that installs, and names its limits", async ({ page }) => {
   await page.goto("/produits");
-  await page.locator('[data-offer="local"] a').click();
+  await page.locator('#gamme a[href="/extension"]').click();
   await expect(page).toHaveURL(/\/extension$/);
 
   // Le bouton est le produit de cette page. Un lien relatif ou un chemin de
@@ -303,9 +327,9 @@ test("the extension page hands over a file that installs, and names its limits",
   await expect(page.locator("#enterprise")).toContainText("MDM");
   await expect(page.locator("#enterprise")).toContainText("requirements.toml");
   await expect(page.locator("#enterprise")).toContainText("Codex ne distribue pas les scripts");
-  await expect(page.locator("#enterprise a.guard-button")).toHaveAttribute("href", "/developpeurs/tarifs");
+  await expect(page.locator("#enterprise a.guard-button")).toHaveAttribute("href", /^mailto:/);
 
-  // Une installation, quatre assistants : c'est l'argument, il doit être vérifiable.
+  // Les trois hôtes réellement configurés sont publiés, sans élargir la promesse.
   await expect(page.locator(".guard-ext-hosts li")).toHaveCount(3);
   const claude = page.locator(".guard-ext-hosts li", { hasText: "Claude Code" });
   await expect(claude.locator('img[src*="claude-ai-icon"]')).toBeVisible();
@@ -316,7 +340,7 @@ test("the extension page hands over a file that installs, and names its limits",
   // bonne commande. Les deux planchers sont donc tenus tous les deux, parce que
   // ne nommer que 1.137 laissait croire qu'on installe quand même en 1.133 pour
   // couvrir les trois autres assistants.
-  const bornes = page.locator(".guard-ext-limits").last().locator("li");
+  const bornes = page.locator(".guard-gateway:has(#ext-local) .guard-ext-limits li");
   await expect(bornes).toHaveCount(4);
   await expect(bornes.nth(1)).toContainText("1.136");
   await expect(bornes.nth(1)).toContainText("1.137");
@@ -324,23 +348,24 @@ test("the extension page hands over a file that installs, and names its limits",
 
   // Tant que la fiche n'existe pas, la page ne propose pas de l'ouvrir.
   await expect(page.getByRole("link", { name: /Installer depuis VS Code/ })).toHaveCount(0);
-  await expect(page.getByText("n’est pas encore distribuée", { exact: false })).toBeVisible();
+  await expect(page.getByText("compte éditeur", { exact: false })).toBeVisible();
 });
 
 for (const width of [390, 768, 1440]) {
   test(`the landing stays contained in French and English at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/");
-    await page.getByRole("group", { name: "Choisir un univers IA", exact: true })
-      .getByRole("button", { name: "Modèles & données", exact: true })
-      .click();
-    await page.getByRole("switch", { name: "Afficher les risques", exact: true }).click();
-    await expect(page.locator(".guard-campus__risk-label:visible")).toHaveCount(3);
-    await expect(page.locator("#campus-detail")).toContainText("Modèles & données");
+    await page.locator("#usages").getByRole("group", { name: "Les équipes" })
+      .getByRole("button", { name: /Équipes modèles & données/ }).click();
+    await expect(page.locator("#campus-detail")).toContainText("Équipes modèles & données");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    // L'en-tête s'efface en descente et revient en haut de page ; sous 900 px, la
+    // langue se choisit dans son menu.
+    await page.evaluate(() => window.scrollTo(0, 0));
+    const menu = page.getByRole("button", { name: "Menu", exact: true });
+    if (await menu.isVisible()) await menu.click();
     await page.getByRole("button", { name: "EN", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Tell us about you.", exact: true })).toBeVisible();
-    await expect(page.locator("#campus-detail")).not.toContainText("Modèles & données");
+    await expect(page.locator("#campus-detail")).toContainText("Model & data teams");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 
     await page.goto("/saas");
@@ -364,12 +389,12 @@ for (const width of [390, 768, 1440]) {
     await page.goto("/produits");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     if (width === 390) {
-      // Deux produits empilés, pas deux colonnes serrées : le contrôle de
-      // débordement ci-dessus laisse passer une grille qui tient à deux mots par
-      // ligne, et c'est exactement ce qu'on ne veut pas ici.
-      const premier = await page.locator(".guard-product-feature").nth(0).boundingBox();
-      const second = await page.locator(".guard-product-feature").nth(1).boundingBox();
-      expect(second!.y).toBeGreaterThan(premier!.y);
+      // Sur mobile, chaque diapositive empile son texte puis sa capture : deux
+      // colonnes serrées tiendraient dans 390 px, à deux mots par ligne.
+      const diapositive = page.locator(".xp-slide").first();
+      const texte = await diapositive.locator("h2").boundingBox();
+      const capture = await diapositive.locator(".xp-slide__shot").boundingBox();
+      expect(capture!.y).toBeGreaterThan(texte!.y);
     }
   });
 }

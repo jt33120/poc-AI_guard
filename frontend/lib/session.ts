@@ -14,11 +14,16 @@ export interface Session {
 
 export async function getSession(): Promise<Session | null> {
   // Hermetic E2E bypass: a marker cookie stands in for a real Supabase session.
-  if (config.e2e && cookies().get("xsom_e2e")) {
-    return { userId: "e2e-user", tenantId: "e2e-tenant", role: "admin", accessToken: "e2e-token" };
+  if (config.e2e && (await cookies()).get("xsom_e2e")) {
+    return {
+      userId: "e2e-user",
+      tenantId: "e2e-tenant",
+      role: "admin",
+      accessToken: "e2e-token",
+    };
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -28,7 +33,10 @@ export async function getSession(): Promise<Session | null> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  const appMeta = (user.app_metadata ?? {}) as { tenant_id?: string; role?: Role };
+  const appMeta = (user.app_metadata ?? {}) as {
+    tenant_id?: string;
+    role?: Role;
+  };
   return {
     userId: user.id,
     tenantId: appMeta.tenant_id ?? null,

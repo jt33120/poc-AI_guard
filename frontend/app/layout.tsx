@@ -50,19 +50,19 @@ const mono = localFont({
 // faux, et un robot, qui n'a pas de cookie, verrait de toute façon le français aux
 // deux adresses. Conséquence assumée et notée : **seul le français est indexable**.
 // Rendre l'anglais indexable demande des routes de langue, pas une balise de plus.
-export function generateMetadata(): Metadata {
-  const lang = getLang();
-  const titre = `xSOM AI Guard · ${translate(lang, "meta.tagline")}`;
+export async function generateMetadata(): Promise<Metadata> {
+  const lang = await getLang();
+  const titre = `xSOM AI Studio · ${translate(lang, "meta.tagline")}`;
   const description = translate(lang, "meta.description");
   return {
-    title: { default: titre, template: "%s · xSOM AI Guard" },
+    title: { default: titre, template: "%s · xSOM AI Studio" },
     description,
     openGraph: {
       title: titre,
       description,
       locale: lang === "fr" ? "fr_FR" : "en_US",
       type: "website",
-      siteName: "xSOM AI Guard",
+      siteName: "xSOM AI Studio",
     },
   };
 }
@@ -75,7 +75,7 @@ const MOTION_BOOTSTRAP =
   "if(!matchMedia('(prefers-reduced-motion: reduce)').matches&&'IntersectionObserver' in window)" +
   "document.documentElement.setAttribute('data-motion','on')";
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -84,7 +84,7 @@ export default function RootLayout({
   // défaut : l'attribut contredisait le texte qu'il qualifiait. Un lecteur d'écran
   // lisait donc de l'anglais avec une voix française. Résolu, il ne peut plus mentir
   // ni dans un sens ni dans l'autre.
-  const lang = getLang();
+  const lang = await getLang();
   return (
     <html
       lang={lang}

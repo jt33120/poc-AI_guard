@@ -35,7 +35,7 @@ import {
 import { GUARD_HOME_COPY } from "@/components/guard-home-copy";
 import { GuardHeroVideo } from "@/components/GuardHeroVideo";
 import { GuardNav } from "@/components/GuardNav";
-import { SignalPreferences } from "@/design-system/react";
+import { GuardFooter } from "@/components/GuardFooter";
 import { useT } from "@/lib/i18n";
 
 
@@ -114,7 +114,7 @@ export function ExtensionOffer() {
             <p className="guard-path__tag">{copy.extEnterpriseLabel}</p>
             <h3>{copy.extEnterpriseTitle}</h3>
             <p>{copy.extEnterpriseBody}</p>
-            <Link className="guard-button" href="/developpeurs/tarifs">{lang === "fr" ? "Voir l’offre Équipe" : "See the Team offer"} ↗</Link>
+            <Link className="guard-button" href="/produits#offres">{lang === "fr" ? "Voir l’offre Équipe" : "See the Team offer"} ↗</Link>
             <p className="guard-path__note">{copy.extEnterpriseNote}</p>
             <a className="guard-link" href="https://learn.chatgpt.com/fr-FR/docs/hooks#hooks-gérés-définis-dans-requirementstoml" target="_blank" rel="noreferrer">{copy.extEnterpriseDocs} ↗</a>
           </article>
@@ -171,7 +171,7 @@ export function ExtensionOffer() {
         </ul>
         <p className="guard-start__note">{copy.extGuardLimit}</p>
         <div className="guard-ext-links">
-          <Link className="guard-link" href="/developpeurs">{lang === "fr" ? "Découvrir l’évolution Developer Guard" : "Discover the Developer Guard evolution"} ↗</Link>
+          <Link className="guard-link" href="/produits">{lang === "fr" ? "Explorer nos produits" : "Explore our products"} ↗</Link>
           <Link className="guard-link" href="/menaces">{lang === "fr" ? "Voir les menaces et leur couverture publiée" : "See threats and published coverage"} ↗</Link>
         </div>
       </section>
@@ -199,22 +199,7 @@ export function ExtensionOffer() {
         </p>
       </section>
 
-      <footer className="guard-footer">
-        <div className="guard-wrap">
-          <div className="brand">
-            <XsomMark />
-            <Wordmark />
-          </div>
-          <p>{copy.footer}</p>
-          <a href="https://www.xsom.fr" target="_blank" rel="noreferrer">
-            {copy.cabinet} ↗
-          </a>
-          <details>
-            <summary>{lang === "fr" ? "Affichage" : "Display"}</summary>
-            <SignalPreferences lang={lang} />
-          </details>
-        </div>
-      </footer>
+      <GuardFooter />
     </main>
   );
 }

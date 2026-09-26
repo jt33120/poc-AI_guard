@@ -6,15 +6,20 @@ import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { Wordmark, XsomMark } from "@/components/brand";
 import { Diagramme, DiagrammeDefs } from "@/components/Diagramme";
 import { GuardNav } from "@/components/GuardNav";
-import { SignalPreferences } from "@/design-system/react";
+import { GuardFooter } from "@/components/GuardFooter";
 import { figureDeFiche } from "@/lib/glossary-figures";
 import { visualForThreat } from "@/lib/threat-visuals";
 import { useT } from "@/lib/i18n";
 import type { Lang } from "@/lib/strings";
 import {
+  DEVELOPER_GUARD_COVERAGE,
+  developerGuardFor,
+} from "@/lib/product-coverage";
+import {
   GLOSSARY_CATEGORIES,
   GLOSSARY_COPY,
   GLOSSARY_COVERAGES,
+  developerGuardCoverage,
   GLOSSARY_IMPACTS,
   GLOSSARY_STATUSES,
   GLOSSARY_SURFACES,
@@ -40,6 +45,10 @@ type Filters = {
   surface: GlossarySurface | "all";
   impact: GlossaryImpact | "all";
   status: GlossaryStatus | "all";
+  product: "developer-guard" | "all";
+  module: string;
+  assistant: string;
+  environment: string;
 };
 type Facet = keyof Filters;
 
@@ -50,7 +59,15 @@ const NO_FILTERS: Filters = {
   surface: "all",
   impact: "all",
   status: "all",
+  product: "all",
+  module: "all",
+  assistant: "all",
+  environment: "all",
 };
+
+const DEVELOPER_MODULES = [...new Set(DEVELOPER_GUARD_COVERAGE.threats.map((entry) => entry.module))].sort();
+const DEVELOPER_ASSISTANTS = [...new Set(DEVELOPER_GUARD_COVERAGE.threats.flatMap((entry) => entry.hosts.map((host) => host.assistant)))].sort();
+const DEVELOPER_ENVIRONMENTS = [...new Set(DEVELOPER_GUARD_COVERAGE.threats.flatMap((entry) => [entry.environment, ...entry.hosts.map((host) => host.environment)]))].sort();
 
 const SORTS = ["category", "risk", "coverage", "name"] as const;
 type Sort = (typeof SORTS)[number];
@@ -68,13 +85,18 @@ function toolLabel(tool: GlossaryTool, lang: Lang) {
 }
 
 function matchesFacets(entry: GlossaryEntry, filters: Filters) {
+  const developer = developerGuardFor(entry.id);
   return (
     (filters.use === "all" || entry.uses.includes(filters.use)) &&
     (filters.coverage === "all" || entry.coverage === filters.coverage) &&
     (filters.category === "all" || entry.category === filters.category) &&
     (filters.surface === "all" || entry.surface === filters.surface) &&
     (filters.impact === "all" || entry.impact === filters.impact) &&
-    (filters.status === "all" || entry.status === filters.status)
+    (filters.status === "all" || entry.status === filters.status) &&
+    (filters.product === "all" || developer.mode !== "X") &&
+    (filters.module === "all" || developer.module === filters.module) &&
+    (filters.assistant === "all" || developer.hosts.some((host) => host.assistant === filters.assistant)) &&
+    (filters.environment === "all" || developer.environment === filters.environment || developer.hosts.some((host) => host.environment === filters.environment))
   );
 }
 
@@ -119,13 +141,38 @@ export function ThreatGlossary() {
   const [semanticIds, setSemanticIds] = useState<string[] | null>(null);
   const [searchState, setSearchState] = useState<SearchState>("idle");
   const [preview, setPreview] = useState<VisualPreview | null>(null);
+  const [urlReady, setUrlReady] = useState(false);
 
   // Un lien profond `/menaces#<id>` ouvre la ligne qu'il vise : le navigateur y
   // défile déjà, il reste à montrer son détail.
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const next = { ...NO_FILTERS };
+    const usage = GLOSSARY_USES.find((id) => id === params.get("use"));
+    if (usage) next.use = usage;
+    if (params.get("product") === "developer-guard") next.product = "developer-guard";
+    const coverageModule = params.get("module");
+    const assistant = params.get("assistant");
+    const environment = params.get("environment");
+    if (coverageModule && DEVELOPER_MODULES.includes(coverageModule)) next.module = coverageModule;
+    if (assistant && DEVELOPER_ASSISTANTS.includes(assistant)) next.assistant = assistant;
+    if (environment && DEVELOPER_ENVIRONMENTS.includes(environment)) next.environment = environment;
+    setFilters(next);
+    setUrlReady(true);
     const id = decodeURIComponent(window.location.hash.slice(1));
     if (THREAT_GLOSSARY.some((entry) => entry.id === id)) setOpen(new Set([id]));
   }, []);
+
+  useEffect(() => {
+    if (!urlReady) return;
+    const url = new URL(window.location.href);
+    for (const key of ["use", "product", "module", "assistant", "environment"] as const) {
+      const value = filters[key];
+      if (value === "all") url.searchParams.delete(key);
+      else url.searchParams.set(key, value);
+    }
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  }, [filters, urlReady]);
 
   const words = normalise(query).trim().split(/\s+/).filter(Boolean);
   const lexicalMatches = THREAT_GLOSSARY.filter((entry) => {
@@ -224,7 +271,7 @@ export function ThreatGlossary() {
       <a className="guard-glossary__skip" href="#definitions">{copy.skip}</a>
       <header className="guard-header">
         <div className="guard-wrap guard-header__inner">
-          <Link href="/" className="brand" aria-label={`xSOM · ${copy.home}`}>
+          <Link href="/" className="brand" aria-label={`xSOM AI Studio · ${copy.home}`}>
             <XsomMark />
             <Wordmark />
           </Link>
@@ -301,6 +348,22 @@ export function ThreatGlossary() {
               <FacetSelect id="threat-surface" label={copy.surface} all={copy.surfaceAll} options={GLOSSARY_SURFACES} labels={copy.surfaces} value={filters.surface} count={(value) => countWith("surface", value)} onChange={(value) => setFacet("surface", value)} />
               <FacetSelect id="threat-impact" label={copy.impact} all={copy.impactAll} options={GLOSSARY_IMPACTS} labels={copy.impacts} value={filters.impact} count={(value) => countWith("impact", value)} onChange={(value) => setFacet("impact", value)} />
               <FacetSelect id="threat-status" label={copy.status} all={copy.statusAll} options={GLOSSARY_STATUSES} labels={copy.statuses} value={filters.status} count={(value) => countWith("status", value)} onChange={(value) => setFacet("status", value)} />
+            </div>
+
+            <div className="guard-glossary__developer-filters">
+              <div>
+                <p className="guard-glossary__facet-label">{copy.developerFilters}</p>
+                <p>{copy.developerFiltersNote}</p>
+              </div>
+              <div className="guard-glossary__selects">
+                <SelectField id="threat-product" label={copy.product} value={filters.product} onChange={(value) => setFacet("product", value)}>
+                  <option value="all">{copy.productAll} ({countWith("product", "all")})</option>
+                  <option value="developer-guard">Secret Guard ({countWith("product", "developer-guard")})</option>
+                </SelectField>
+                <StringFacetSelect id="threat-module" label={copy.module} all={copy.moduleAll} options={DEVELOPER_MODULES} value={filters.module} count={(value) => countWith("module", value)} onChange={(value) => setFacet("module", value)} />
+                <StringFacetSelect id="threat-assistant" label={copy.assistant} all={copy.assistantAll} options={DEVELOPER_ASSISTANTS} value={filters.assistant} count={(value) => countWith("assistant", value)} onChange={(value) => setFacet("assistant", value)} />
+                <StringFacetSelect id="threat-environment" label={copy.environment} all={copy.environmentAll} options={DEVELOPER_ENVIRONMENTS} value={filters.environment} count={(value) => countWith("environment", value)} onChange={(value) => setFacet("environment", value)} />
+              </div>
             </div>
           </div>
 
@@ -379,17 +442,7 @@ export function ThreatGlossary() {
         </div>
       )}
 
-      <footer className="guard-footer">
-        <div className="guard-wrap">
-          <Link href="/" className="brand" aria-label={`xSOM · ${copy.home}`}><XsomMark /><Wordmark /></Link>
-          <p>{copy.footer}</p>
-          <a href="https://www.xsom.fr" target="_blank" rel="noreferrer">{copy.cabinet} ↗</a>
-          <details>
-            <summary>{copy.display}</summary>
-            <SignalPreferences lang={lang} />
-          </details>
-        </div>
-      </footer>
+      <GuardFooter />
     </div>
   );
 }
@@ -474,6 +527,18 @@ function FacetSelect<T extends string>({
   );
 }
 
+function StringFacetSelect({ id, label, all, options, value, count, onChange }: { id: string; label: string; all: string; options: readonly string[]; value: string; count: (value: string) => number; onChange: (value: string) => void }) {
+  return (
+    <SelectField id={id} label={label} value={value} onChange={onChange}>
+      <option value="all">{all} ({count("all")})</option>
+      {options.map((option) => {
+        const n = count(option);
+        return <option key={option} value={option} disabled={n === 0 && option !== value}>{option} ({n})</option>;
+      })}
+    </SelectField>
+  );
+}
+
 /**
  * La répartition de la couverture sur les lignes que les autres filtres laissent.
  *
@@ -534,7 +599,7 @@ function ThreatRows({
 }) {
   const text = entry.copy[lang];
   const detailsId = `${entry.id}-details`;
-  const visual = visualForThreat(entry.id);
+  const visual = visualForThreat(entry.id, lang);
   return (
     <Fragment>
       <tr id={entry.id} className="guard-glossary__row" data-open={open ? "" : undefined}>
@@ -549,7 +614,7 @@ function ThreatRows({
         <td data-cell="visual" data-label={copy.columns.visual}>
           {visual ? (
             <button className="guard-glossary__visual" type="button" onClick={() => onPreview({ src: visual, title: text.title })} aria-label={`${copy.columns.visual} : ${text.title}`}>
-              <img src={visual} alt="" width="960" height="960" />
+              <img src={visual} alt="" width="960" height="960" loading="lazy" decoding="async" />
               <span>{copy.columns.visual}</span>
             </button>
           ) : <span aria-label={lang === "fr" ? "Aperçu non disponible" : "Preview unavailable"}>—</span>}
@@ -592,6 +657,7 @@ function OfferIcon({ offer }: { offer: "saas" | "consulting" }) {
 
 function ThreatDetails({ entry, lang, copy }: { entry: GlossaryEntry; lang: Lang; copy: Copy }) {
   const text = entry.copy[lang];
+  const developerGuard = developerGuardCoverage(entry);
   const explainer = entry.explainer?.[lang];
   const figure = figureDeFiche(entry.id);
   const owasp = entry.owasp ? OWASP[entry.owasp] : undefined;
@@ -621,6 +687,17 @@ function ThreatDetails({ entry, lang, copy }: { entry: GlossaryEntry; lang: Lang
           </h3>
           <p>{text.guard}</p>
           {entry.releve && <Link href="/evidence#menaces">{copy.proof} · {entry.releve} <span aria-hidden="true">↗</span></Link>}
+        </div>
+        <div className="guard-glossary__guard" data-coverage={developerGuard.mode === "B" ? "yes" : "no"} data-developer-guard-mode={developerGuard.mode}>
+          <h3>Secret Guard · {developerGuard.mode}</h3>
+          <p>{lang === "fr"
+            ? developerGuard.mode === "B"
+              ? "Contrôle local implémenté sur les hôtes et événements publiés."
+              : "Aucun contrôle Secret Guard publié pour cette menace."
+            : developerGuard.mode === "B"
+              ? "A local control is implemented on the published hosts and events."
+              : "No Secret Guard control is published for this threat."}</p>
+          {developerGuard.mode === "B" && <Link href="/extension">{lang === "fr" ? "Voir les préconditions et limites de l’extension" : "See extension prerequisites and limits"} <span aria-hidden="true">↗</span></Link>}
         </div>
         <dl className="guard-glossary__facets">
           <div>

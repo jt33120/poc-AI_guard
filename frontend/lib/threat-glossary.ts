@@ -1,4 +1,5 @@
 import type { Lang } from "@/lib/strings";
+import { DEVELOPER_GUARD_BY_THREAT, type DeveloperGuardCoverage } from "@/lib/product-coverage";
 
 /**
  * Le glossaire opérationnel des menaces cyber de l'IA (`/menaces`).
@@ -120,6 +121,13 @@ export type GlossaryEntry = {
   copy: Record<Lang, GlossaryText>;
   explainer?: Record<Lang, GlossaryExplainer>;
 };
+
+/** Couverture Developer Guard générée depuis les contrôles et leurs scénarios. */
+export function developerGuardCoverage(entry: Pick<GlossaryEntry, "id">): DeveloperGuardCoverage {
+  const coverage = DEVELOPER_GUARD_BY_THREAT.get(entry.id);
+  if (coverage === undefined) throw new Error(`Missing Developer Guard coverage for ${entry.id}`);
+  return coverage;
+}
 
 const CONTAINERS: Localised = { fr: "Conteneurs", en: "Containers" };
 const NO_MODEL_SCANNER: Localised = {
@@ -2214,7 +2222,7 @@ export const GLOSSARY_COPY = {
     sorts: { category: "Catégorie", risk: "Non résolu d’abord", coverage: "Couverture AI Guard", name: "Nom (A → Z)" },
     filter: "Filtrer par usage IA",
     all: "Tous les usages",
-    uses: { development: "Développeurs", workplace: "Collaborateurs", agents: "Agents", models: "AI scientist" },
+    uses: { development: "Équipes de développement", workplace: "Équipes métier", agents: "Agents", models: "Équipes modèles & données" },
     coverageFilter: "Filtrer par couverture AI Guard",
     coverageAll: "Toutes",
     coverage: { yes: "Couvert", partial: "Partiel", no: "Non couvert" },
@@ -2260,6 +2268,12 @@ export const GLOSSARY_COPY = {
     status: "État de l’art",
     statusAll: "Tous les états",
     statuses: { unsolved: "Non résolu", mitigated: "Atténué", mixed: "Selon le contexte", solved: "Maîtrisé" },
+    developerFilters: "Couverture par produit développeur",
+    developerFiltersNote: "Filtres issus du registre Secret Guard généré. Ils ne sont pas influencés par la recherche sémantique.",
+    product: "Produit", productAll: "Tous les produits",
+    module: "Module", moduleAll: "Tous les modules",
+    assistant: "Assistant", assistantAll: "Tous les assistants",
+    environment: "Environnement", environmentAll: "Tous les environnements",
     columns: {
       threat: "Menace",
       visual: "Aperçu",
@@ -2289,7 +2303,7 @@ export const GLOSSARY_COPY = {
     nextTitle: "Passer des risques à vos usages.",
     nextText: "Découvrez les solutions AI Guard et choisissez votre point de départ.",
     nextLink: "Découvrir nos produits",
-    footer: "xSOM AI Guard · Monitoring et cybersécurité des usages IA",
+    footer: "xSOM AI Studio · Monitoring et cybersécurité des usages IA",
     cabinet: "Le cabinet xSOM",
     display: "Affichage",
     skip: "Aller au tableau des menaces",
@@ -2306,7 +2320,7 @@ export const GLOSSARY_COPY = {
     sorts: { category: "Category", risk: "Unsolved first", coverage: "AI Guard coverage", name: "Name (A → Z)" },
     filter: "Filter by AI use",
     all: "All uses",
-    uses: { development: "Developers", workplace: "Employees", agents: "Agents", models: "Data & weights" },
+    uses: { development: "Development teams", workplace: "Business teams", agents: "Agents", models: "Model & data teams" },
     coverageFilter: "Filter by AI Guard coverage",
     coverageAll: "All",
     coverage: { yes: "Covered", partial: "Partial", no: "Not covered" },
@@ -2352,6 +2366,12 @@ export const GLOSSARY_COPY = {
     status: "State of the art",
     statusAll: "All states",
     statuses: { unsolved: "Unsolved", mitigated: "Mitigated", mixed: "Context-dependent", solved: "Controlled" },
+    developerFilters: "Developer product coverage",
+    developerFiltersNote: "Filters come from the generated Secret Guard record. Semantic search never changes them.",
+    product: "Product", productAll: "All products",
+    module: "Module", moduleAll: "All modules",
+    assistant: "Assistant", assistantAll: "All assistants",
+    environment: "Environment", environmentAll: "All environments",
     columns: {
       threat: "Threat",
       visual: "Preview",
@@ -2381,7 +2401,7 @@ export const GLOSSARY_COPY = {
     nextTitle: "Connect the risks to your AI use.",
     nextText: "Explore AI Guard solutions and choose where to start.",
     nextLink: "Discover our products",
-    footer: "xSOM AI Guard · AI monitoring and cybersecurity",
+    footer: "xSOM AI Studio · AI monitoring and cybersecurity",
     cabinet: "About xSOM",
     display: "Display",
     skip: "Skip to the threat table",

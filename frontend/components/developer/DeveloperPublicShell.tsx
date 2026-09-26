@@ -29,7 +29,7 @@ export function DeveloperPublicShell({
     <div className="guard-landing developer-site">
       <header className="guard-header">
         <div className="guard-wrap guard-header__inner">
-          <Link href="/" className="brand" aria-label="xSOM AI Guard">
+          <Link href="/" className="brand" aria-label="xSOM AI Studio">
             <XsomMark />
             <Wordmark />
           </Link>
@@ -49,7 +49,7 @@ export function DeveloperPublicShell({
       {children}
       <footer className="guard-footer">
         <div className="guard-wrap">
-          <Link href="/" className="brand" aria-label="xSOM AI Guard">
+          <Link href="/" className="brand" aria-label="xSOM AI Studio">
             <XsomMark />
             <Wordmark />
           </Link>

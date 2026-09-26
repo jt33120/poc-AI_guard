@@ -3,7 +3,7 @@
 import Link from "next/link";
 
 import { useT } from "@/lib/i18n";
-import { GuardOffers, GuardPublisher } from "@/components/GuardOffers";
+import { GuardOffers } from "@/components/GuardOffers";
 import { DeveloperPublicShell } from "./DeveloperPublicShell";
 import { DeveloperScenario } from "./DeveloperScenario";
 import { DEVELOPER_COPY } from "./developer-copy";
@@ -37,7 +37,6 @@ export function DeveloperLanding() {
         </section>
 
         <GuardOffers />
-        <GuardPublisher />
         <section className="developer-section guard-wrap" aria-labelledby="levels-heading">
           <header className="developer-section__heading"><p>01 / CONTROL LEVELS</p><h2 id="levels-heading">{copy.controlsTitle}</h2><p>{copy.controlsIntro}</p></header>
           <div className="developer-levels">

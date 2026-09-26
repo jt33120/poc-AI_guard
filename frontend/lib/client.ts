@@ -8,7 +8,11 @@ export async function apiGet<T>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
-export async function apiSend<T>(path: string, method: string, body?: unknown): Promise<T> {
+export async function apiSend<T>(
+  path: string,
+  method: string,
+  body?: unknown,
+): Promise<T> {
   const res = await fetch(`/api/control/${path}`, {
     method,
     headers: { "Content-Type": "application/json" },
@@ -28,7 +32,11 @@ export async function apiDelete(path: string): Promise<void> {
 }
 
 // Like apiSend but for endpoints that return no body (e.g. 204).
-export async function apiSendVoid(path: string, method: string, body?: unknown): Promise<void> {
+export async function apiSendVoid(
+  path: string,
+  method: string,
+  body?: unknown,
+): Promise<void> {
   const res = await fetch(`/api/control/${path}`, {
     method,
     headers: { "Content-Type": "application/json" },

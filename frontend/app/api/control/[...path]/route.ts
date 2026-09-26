@@ -5,11 +5,14 @@ import { routeAllowed } from "@/lib/controlRoutes";
 import { getSession } from "@/lib/session";
 
 interface RouteContext {
-  params: { path: string[] };
+  params: Promise<{ path: string[] }>;
 }
 
 // Server-side proxy: the browser never sees the bearer token (CLAUDE.md §4.5).
-async function forward(request: NextRequest, path: string[]): Promise<NextResponse> {
+async function forward(
+  request: NextRequest,
+  path: string[],
+): Promise<NextResponse> {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
@@ -44,22 +47,25 @@ async function forward(request: NextRequest, path: string[]): Promise<NextRespon
   const body = await upstream.arrayBuffer();
   return new NextResponse(body, {
     status: upstream.status,
-    headers: { "content-type": upstream.headers.get("content-type") ?? "application/json" },
+    headers: {
+      "content-type":
+        upstream.headers.get("content-type") ?? "application/json",
+    },
   });
 }
 
-export function GET(request: NextRequest, ctx: RouteContext) {
-  return forward(request, ctx.params.path);
+export async function GET(request: NextRequest, ctx: RouteContext) {
+  return forward(request, (await ctx.params).path);
 }
-export function POST(request: NextRequest, ctx: RouteContext) {
-  return forward(request, ctx.params.path);
+export async function POST(request: NextRequest, ctx: RouteContext) {
+  return forward(request, (await ctx.params).path);
 }
-export function PUT(request: NextRequest, ctx: RouteContext) {
-  return forward(request, ctx.params.path);
+export async function PUT(request: NextRequest, ctx: RouteContext) {
+  return forward(request, (await ctx.params).path);
 }
-export function PATCH(request: NextRequest, ctx: RouteContext) {
-  return forward(request, ctx.params.path);
+export async function PATCH(request: NextRequest, ctx: RouteContext) {
+  return forward(request, (await ctx.params).path);
 }
-export function DELETE(request: NextRequest, ctx: RouteContext) {
-  return forward(request, ctx.params.path);
+export async function DELETE(request: NextRequest, ctx: RouteContext) {
+  return forward(request, (await ctx.params).path);
 }

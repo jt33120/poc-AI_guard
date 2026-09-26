@@ -469,16 +469,16 @@ export const STR = {
     fr: "La gouvernance française des agents IA",
   },
   "meta.description": {
-    en: "Developer Guard by xSOM Consulting, a French cybersecurity publisher. Free local secret detection, team policies and 90 days of qualified team discovery.",
-    fr: "Developer Guard, édité en France par xSOM Consulting. Détection locale gratuite, règles d’équipe et 90 jours de découverte sur un périmètre qualifié.",
+    en: "Secret Guard by xSOM Consulting, a French cybersecurity publisher. Free local secret detection, team policies and 90 days of qualified team discovery.",
+    fr: "Secret Guard, édité en France par xSOM Consulting. Détection locale gratuite, règles d’équipe et 90 jours de découverte sur un périmètre qualifié.",
   },
   "land.hero.title": {
     en: "Ship AI agents to production. Without losing control.",
     fr: "Déployez vos agents IA en production. Sans perdre le contrôle.",
   },
   "land.hero.sub": {
-    en: "xSOM AI Guard sits between your agent and its tools. Every action is checked against your policy, paused for human approval when it's irreversible, and written to a tamper-proof audit trail.",
-    fr: "xSOM AI Guard s'intercale entre votre agent et ses outils. Chaque action est vérifiée selon votre politique, suspendue pour validation humaine si elle est irréversible, et inscrite dans un journal inviolable.",
+    en: "AI Guard sits between your agent and its tools. Every action is checked against your policy, paused for human approval when it's irreversible, and written to a tamper-proof audit trail.",
+    fr: "AI Guard s'intercale entre votre agent et ses outils. Chaque action est vérifiée selon votre politique, suspendue pour validation humaine si elle est irréversible, et inscrite dans un journal inviolable.",
   },
   "land.hero.cta": { en: "Get started", fr: "Commencer" },
   "land.hero.cta2": { en: "Request an engagement", fr: "Demander une prestation" },
@@ -508,7 +508,7 @@ export const STR = {
     en: "Assistant, copilot, or autonomous workflow",
     fr: "Assistant, copilote ou workflow autonome",
   },
-  "land.how.guard": { en: "xSOM AI Guard", fr: "xSOM AI Guard" },
+  "land.how.guard": { en: "AI Guard", fr: "AI Guard" },
   "land.how.guard.sub": {
     en: "Policy · Human-in-the-loop · Audit",
     fr: "Politique · Validation humaine · Audit",
@@ -759,7 +759,7 @@ export const STR = {
 
   // ── In-app Home / onboarding (post-login) ────────────────────────────
   "nav.home": { en: "Home", fr: "Accueil" },
-  "home.title": { en: "Welcome to xSOM AI Guard", fr: "Bienvenue sur xSOM AI Guard" },
+  "home.title": { en: "Welcome to xSOM AI Studio", fr: "Bienvenue sur xSOM AI Studio" },
   "home.subtitle": {
     en: "Your control center for everything your AI agents do.",
     fr: "Votre centre de contrôle pour tout ce que font vos agents IA.",

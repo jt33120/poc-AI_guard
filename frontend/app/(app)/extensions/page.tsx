@@ -9,6 +9,9 @@ import {
   EmptyState,
 } from "@/components/ConsoleUI";
 import { apiGet } from "@/lib/client";
+import { DeviceCoverage } from "@/components/developer/DeviceCoverage";
+import { ExceptionList } from "@/components/developer/ExceptionList";
+import { PolicyAssignments } from "@/components/developer/PolicyAssignments";
 
 interface Device {
   id: string;
@@ -20,6 +23,20 @@ interface Device {
   last_seen_at: string;
   revoked_at: string | null;
   gateway_events: number;
+  assigned_policy_id?: string | null;
+  assigned_policy_version?: number | null;
+  assigned_policy_expires_at?: string | null;
+  minimum_runner_version?: string | null;
+  posture_received_at?: string | null;
+  posture?: {
+    outcome?: string;
+    posture_reasons?: string[];
+    policy_id?: string;
+    policy_version?: number;
+    runner_version?: string;
+    queue_pending?: number;
+    dropped?: number;
+  } | null;
 }
 interface AuditEvent {
   id: number;
@@ -51,6 +68,7 @@ const OUTCOMES: Record<string, string> = {
   passed: "Passé",
   failed: "Échec",
   configured: "Configuré",
+  unverified: "Non vérifié",
   upstream_accepted: "Accepté par le fournisseur",
   upstream_rejected: "Refusé par le fournisseur",
 };
@@ -212,14 +230,17 @@ export default function ExtensionsPage() {
               assistants. Inventaire limité aux 500 postes les plus récemment
               vus.
             </p>
+            <DeviceCoverage devices={devices} />
           </section>
+          <PolicyAssignments devices={devices} />
+          <ExceptionList />
           <section className="console-panel">
             <div className="console-panel-heading">
               <h2>Journal des protections</h2>
               <label>
                 Poste{" "}
-              <select
-                aria-label="Poste"
+                <select
+                  aria-label="Poste"
                   value={selected}
                   onChange={(event) => setSelected(event.target.value)}
                 >

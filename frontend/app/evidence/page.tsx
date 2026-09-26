@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GuardFooter } from "@/components/GuardFooter";
 import type { Metadata } from "next";
 import { XsomMark, Wordmark } from "@/components/brand";
 import { Fonctionnement } from "@/components/Fonctionnement";
@@ -7,8 +8,8 @@ import { ThreatLedger } from "@/components/ThreatLedger";
 import { LanguageToggle } from "@/lib/i18n";
 import { serverT } from "@/lib/lang";
 
-export function generateMetadata(): Metadata {
-  const { lang } = serverT();
+export async function generateMetadata(): Promise<Metadata> {
+  const { lang } = await serverT();
   const fr = lang === "fr";
   return {
     title: fr ? "Périmètre et preuves du POC" : "POC scope and evidence",
@@ -19,8 +20,8 @@ export function generateMetadata(): Metadata {
 }
 
 /** The original evidence remains public, separate from the POC's first view. */
-export default function EvidencePage() {
-  const { lang } = serverT();
+export default async function EvidencePage() {
+  const { lang } = await serverT();
   const fr = lang === "fr";
   return (
     <main className="relative">
@@ -59,6 +60,7 @@ export default function EvidencePage() {
       <ProfilProvider>
         <ThreatLedger />
       </ProfilProvider>
+      <GuardFooter />
     </main>
   );
 }
