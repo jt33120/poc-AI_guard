@@ -231,13 +231,22 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--sp-3);
-  align-items: end;
+  align-items: start;
+}
+.rules-test > .btn {
+  align-self: end;
 }
 .rules-test[data-with-detector] {
   grid-template-columns: minmax(0, 14rem) minmax(0, 1fr) auto;
 }
+/* Vide, la région d'annonce reste dans l'arbre d'accessibilité sans occuper de place. */
 .rules-status:empty {
+  position: absolute;
+  width: 1px;
+  height: 1px;
   min-height: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 .rules-status {
   min-height: var(--sp-6);
