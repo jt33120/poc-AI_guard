@@ -9,3 +9,4 @@ export * from "./policy-store.js";
 export * from "./session.js";
 export * from "./quality-gates.js";
 export * from "./resource-reader.js";
+export * from "./rules-pack.js";
