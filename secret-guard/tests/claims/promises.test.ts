@@ -63,9 +63,10 @@ describe("promises of the product copy", () => {
     const commands = manifest.contributes.commands.map(
       (command) => command.command,
     );
-    expect(commands).toContain("secretGuard.requestRulesPack");
+    // Asking xSOM for a tuning, or importing a file xSOM signed (offline
+    // workstations): nothing that composes or edits a rule.
     expect(
       commands.filter((command) => /rule|pack|regle|réglage/iu.test(command)),
-    ).toEqual(["secretGuard.requestRulesPack"]);
+    ).toEqual(["secretGuard.requestRulesPack", "secretGuard.importRulesPack"]);
   });
 });

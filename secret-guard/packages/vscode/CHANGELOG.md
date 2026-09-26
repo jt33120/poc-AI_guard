@@ -8,6 +8,8 @@
   hors ligne par la clé d’autorité xSOM compilée dans l’extension, liaison à
   l’organisation du poste, refus des versions plus anciennes ; un réglage expiré
   reste appliqué et signalé.
+- Import hors ligne d’un réglage signé pour les postes sans accès à la plateforme,
+  avec les mêmes vérifications que la synchronisation.
 - Analyse bornée : préfiltre littéral et budget de travail par analyse ; au-delà,
   l’envoi est bloqué comme analyse incomplète, jamais laissé passer.
 - Expurger masque aussi les détections sur mesure, sous le nom de la règle.

@@ -22,6 +22,7 @@ import { dashboardHtml } from "../../packages/vscode/src/dashboard.js";
 import {
   fetchRulesPack,
   forgetEnrollment,
+  importRulesPack,
   readRulesPackSnapshot,
   syncRulesPack,
 } from "../../packages/vscode/src/rules-pack-sync.js";
@@ -303,6 +304,60 @@ describe("rules pack synchronisation", () => {
       state: "none",
       offerRequest: true,
     });
+  });
+});
+
+describe("offline import", () => {
+  it("applies the same checks as a synchronisation and pins the tenant", async () => {
+    const directory = await freshStorage();
+    const raw = JSON.stringify(envelope({ ...reference, version: 4 }));
+    expect(
+      await importRulesPack(directory, raw, { keys, now: NOW }),
+    ).toMatchObject({ outcome: "applied" });
+    expect(await readRulesPackState(directory)).toMatchObject({
+      tenantId: TENANT,
+      tenantSource: "import",
+      highest: { "acme-main": { version: 4 } },
+    });
+    expect(
+      await importRulesPack(
+        directory,
+        JSON.stringify(
+          envelope({ ...reference, tenantId: "tenant-b", version: 9 }),
+        ),
+        { keys, now: NOW },
+      ),
+    ).toEqual({ outcome: "rejected", reason: "tenant_mismatch" });
+    expect(
+      await importRulesPack(directory, JSON.stringify(envelope(reference)), {
+        keys,
+        now: NOW,
+      }),
+    ).toEqual({ outcome: "rejected", reason: "version_downgrade" });
+    expect(
+      await importRulesPack(directory, "{not json", { keys, now: NOW }),
+    ).toEqual({ outcome: "rejected", reason: "malformed_envelope" });
+    expect(
+      await importRulesPack(directory, " ".repeat(4 * 1024 * 1024 + 1), {
+        keys,
+        now: NOW,
+      }),
+    ).toEqual({ outcome: "rejected", reason: "too_large" });
+    // The verified pack stays applied through every refusal.
+    expect(await view(directory)).toMatchObject({
+      state: "active",
+      version: 4,
+    });
+  });
+
+  it("refuses everything in a build without authority key", async () => {
+    const directory = await freshStorage();
+    expect(
+      await importRulesPack(directory, JSON.stringify(envelope(reference)), {
+        keys: [],
+        now: NOW,
+      }),
+    ).toEqual({ outcome: "rejected", reason: "no_authority_key" });
   });
 });
 

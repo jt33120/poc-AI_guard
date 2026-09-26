@@ -27,8 +27,12 @@ import { ActivityMonitor } from "./hook-activity.js";
 import { HookManager, type HookHealth } from "./hook-manager.js";
 import { GatewayIntegration } from "./gateway-integration.js";
 import { customFindingFields } from "./gateway-client.js";
-import { readRulesPackSnapshot } from "./rules-pack-sync.js";
-import { rulesPackView, type RulesPackView } from "./rules-pack-view.js";
+import { importRulesPack, readRulesPackSnapshot } from "./rules-pack-sync.js";
+import {
+  refusalLabel,
+  rulesPackView,
+  type RulesPackView,
+} from "./rules-pack-view.js";
 import { activationStrategy, supportsVsCodePromptHooks } from "./onboarding.js";
 import { defaultHostDefinitions } from "./host-config.js";
 import { markdownReport, modalReport } from "./presentation.js";
@@ -879,6 +883,43 @@ export async function activate(
         await vscode.env.openExternal(vscode.Uri.parse(RULES_PACK_REQUEST_URL));
       },
     ),
+    // Offline import for air-gapped workstations. The file is always chosen
+    // by the developer in a dialog: arguments from other extensions are
+    // ignored. Same verification as a synchronisation.
+    vscode.commands.registerCommand("secretGuard.importRulesPack", async () => {
+      closeStatusControls();
+      const [target] =
+        (await vscode.window.showOpenDialog({
+          title: "Secret Guard · Importer un réglage xSOM",
+          openLabel: "Vérifier et importer",
+          canSelectMany: false,
+          filters: { "Réglage xSOM": ["json"] },
+        })) ?? [];
+      if (target === undefined) return;
+      let raw: string;
+      try {
+        const bytes = await vscode.workspace.fs.readFile(target);
+        raw = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      } catch {
+        await vscode.window.showErrorMessage(
+          "Fichier illisible : aucun réglage importé. Les règles intégrées restent actives.",
+        );
+        return;
+      }
+      const result = await importRulesPack(storage, raw).catch(
+        () => ({ outcome: "error" }) as const,
+      );
+      await reloadRulesPack(storage);
+      await refreshUi();
+      if (result.outcome === "applied")
+        await vscode.window.showInformationMessage(
+          `${rulesView.line}. Réglage vérifié hors ligne et appliqué sur ce poste.`,
+        );
+      else
+        await vscode.window.showErrorMessage(
+          `Réglage refusé : ${result.outcome === "rejected" ? refusalLabel(result.reason) : "import impossible"}. Les règles intégrées restent actives.`,
+        );
+    }),
     // Read-only state of the xSOM tuning (no rule content, no detected
     // value), after re-verifying the stored pack. Used by the protection
     // centre refresh and the extension-host contract.

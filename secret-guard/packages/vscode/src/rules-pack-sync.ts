@@ -72,7 +72,7 @@ export async function fetchRulesPack(
 
 export interface EnrolledTenant {
   readonly id: string;
-  readonly source: Exclude<TenantSource, "first_pack">;
+  readonly source: "register" | "policy";
 }
 
 export interface RulesPackSyncOptions {
@@ -151,14 +151,37 @@ export async function syncRulesPack(
     });
     return { outcome: "none" };
   }
+  return applyEnvelope(storage, envelope, state, known, "first_pack", {
+    keys,
+    now,
+  });
+}
+
+/**
+ * Verify an envelope and store it when accepted. Shared by the online
+ * synchronisation and the offline import: the same checks, the same files.
+ */
+async function applyEnvelope(
+  storage: string,
+  envelope: unknown,
+  state: RulesPackState,
+  known: { id: string; source: TenantSource } | undefined,
+  firstSource: "first_pack" | "import",
+  { keys, now }: { keys: readonly AuthorityKey[]; now: Date },
+): Promise<RulesPackSyncOutcome> {
+  const pinned =
+    known === undefined
+      ? {}
+      : { tenantId: known.id, tenantSource: known.source };
   let tenant = known;
   if (tenant === undefined) {
-    // First pack of this enrollment: it came over the channel authenticated
-    // as this workstation, so its signed tenant becomes the enrolled tenant.
+    // First pack of this enrollment: its signed tenant becomes the enrolled
+    // tenant (online: it came over the channel authenticated as this
+    // workstation; offline: an administrator chose to import it).
     const verified = verifyRulesPackEnvelope(envelope, keys);
     const signedTenant = verified.ok ? verified.payload.tenantId : undefined;
     if (typeof signedTenant === "string" && signedTenant !== "")
-      tenant = { id: signedTenant, source: "first_pack" };
+      tenant = { id: signedTenant, source: firstSource };
   }
   const accepted = acceptRulesPack(envelope, {
     keys,
@@ -184,7 +207,7 @@ export async function syncRulesPack(
   await writeRulesPackState(storage, {
     schemaVersion: 1,
     tenantId: accepted.pack.tenantId,
-    tenantSource: tenant?.source ?? "first_pack",
+    tenantSource: tenant?.source ?? firstSource,
     highest: {
       ...mergeHighest(state.highest, fresh.highest),
       [accepted.pack.packId]: {
@@ -196,6 +219,45 @@ export async function syncRulesPack(
     lastSync: record(now, "applied"),
   });
   return { outcome: "applied", digest: accepted.digest };
+}
+
+/**
+ * Offline import for air-gapped workstations (Renforcé): a pack file handed
+ * over by xSOM goes through exactly the checks of a synchronisation. The
+ * first import fixes the tenant; later ones must match it.
+ */
+export async function importRulesPack(
+  storage: string,
+  raw: string,
+  options: Pick<RulesPackSyncOptions, "keys" | "now"> = {},
+): Promise<RulesPackSyncOutcome> {
+  const now = options.now ?? new Date();
+  const keys = options.keys ?? builtInAuthorityKeys();
+  const state = await readRulesPackState(storage);
+  if (Buffer.byteLength(raw, "utf8") > MAX_RULES_PACK_BYTES) {
+    await writeRulesPackState(storage, {
+      ...state,
+      lastSync: record(now, "rejected", "too_large"),
+    });
+    return { outcome: "rejected", reason: "too_large" };
+  }
+  let envelope: unknown;
+  try {
+    envelope = JSON.parse(raw);
+  } catch {
+    envelope = undefined;
+  }
+  return applyEnvelope(
+    storage,
+    envelope,
+    state,
+    tenantFor(state, undefined),
+    "import",
+    {
+      keys,
+      now,
+    },
+  );
 }
 
 function mergeHighest(

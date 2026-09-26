@@ -244,7 +244,7 @@ export function acceptRulesPack(
 // ---------------------------------------------------------------------------
 // Local files: the verified envelope and the state the hook runner re-reads.
 
-export type TenantSource = "register" | "policy" | "first_pack";
+export type TenantSource = "register" | "policy" | "first_pack" | "import";
 
 export interface RulesPackSyncRecord {
   readonly at: string;
@@ -340,7 +340,8 @@ export async function readRulesPackState(
         : {}),
       ...(tenantSource === "register" ||
       tenantSource === "policy" ||
-      tenantSource === "first_pack"
+      tenantSource === "first_pack" ||
+      tenantSource === "import"
         ? { tenantSource }
         : {}),
       ...(typeof value.selfTestedDigest === "string"

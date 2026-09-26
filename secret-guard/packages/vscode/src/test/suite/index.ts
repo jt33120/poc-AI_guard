@@ -36,6 +36,7 @@ function registerTests(mocha: Mocha): void {
         "secretGuard.disableHook",
         "secretGuard.copyRedacted",
         "secretGuard.requestRulesPack",
+        "secretGuard.importRulesPack",
         "secretGuard.rulesPackStatus",
       ]) {
         assert.ok(commands.has(command), `${command} is registered`);

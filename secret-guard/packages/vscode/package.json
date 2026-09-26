@@ -46,7 +46,8 @@
     "onCommand:secretGuard.finishCodexSetup",
     "onCommand:secretGuard.disableHook",
     "onCommand:secretGuard.copyRedacted",
-    "onCommand:secretGuard.requestRulesPack"
+    "onCommand:secretGuard.requestRulesPack",
+    "onCommand:secretGuard.importRulesPack"
   ],
   "contributes": {
     "icons": {
@@ -167,6 +168,10 @@
       {
         "command": "secretGuard.requestRulesPack",
         "title": "Secret Guard: Demander un réglage sur mesure xSOM"
+      },
+      {
+        "command": "secretGuard.importRulesPack",
+        "title": "Secret Guard: Importer un réglage xSOM (poste hors ligne)"
       }
     ],
     "menus": {

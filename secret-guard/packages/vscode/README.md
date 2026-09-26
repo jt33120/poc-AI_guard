@@ -24,6 +24,10 @@ option à cocher : le réglage se fait avec xSOM, puis arrive sur le poste racco
 - Expurger masque aussi ces détections, sous le nom de la règle, par exemple
   `<REDACTED_Identifiant_client_ACME>`. La valeur n’est jamais affichée ni journalisée.
 
+Poste sans accès à la plateforme (édition Renforcé) : **Secret Guard: Importer un
+réglage xSOM (poste hors ligne)** vérifie et applique un fichier de réglage remis par
+xSOM, avec exactement les mêmes contrôles.
+
 L’infobulle et le centre de protection indiquent l’état en quelques mots :
 « Réglage xSOM · v3 · 12 règles · jusqu’au 01/09/2027 », « Réglage refusé :
 signature invalide », ou « Aucun réglage sur mesure » avec un lien pour en
