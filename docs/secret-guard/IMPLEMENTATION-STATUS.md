@@ -1,6 +1,6 @@
 # État d’implémentation Developer Guard
 
-État vérifié localement le 23 septembre 2026. « Implémenté » décrit le code et ses tests dans ce dépôt. « À qualifier » demande un hôte, un OS administré ou une infrastructure externe et ne doit pas être présenté comme livré en production.
+État vérifié localement le 23 septembre 2026, complété le 27 septembre 2026 pour les réglages sur mesure (extension 0.7.0, branche `feat/secret-guard-regles-xsom`, non publiée). « Implémenté » décrit le code et ses tests dans ce dépôt. « À qualifier » demande un hôte, un OS administré ou une infrastructure externe et ne doit pas être présenté comme livré en production.
 
 | Lot | État local | Preuve dans le dépôt | Qualification restante |
 |---|---|---|---|
@@ -22,6 +22,10 @@
 | A01 | implémenté et validé localement | routes `/developpeurs`, `/developpeurs/securite`, `/developpeurs/tarifs`, navigation publique et liens depuis accueil/produits/extension | URL/SHA de publication après autorisation |
 | A02 | implémenté et validé localement | scénario synthétique secret/action destructive/réseau, profils Local/Équipe/Renforcé, aucun appel externe | confrontation aux hôtes et postes réels du pilote |
 | A03 | implémenté et validé localement | registre produit généré, modes B/D/O/A/X, préconditions/limites, filtres partageables produit/module/assistant/environnement | enrichir uniquement depuis de nouvelles preuves exécutées |
+| R01 | implémenté et validé localement (extension 0.7.0) | contrat figé `secret-guard/contracts/RULES-PACK.md` et ses vecteurs (tous passent en TypeScript) ; cœur : motifs sûrs compilés et interprétés avec budget, termes en empreintes salées, validité et auto-tests ; runner : clés d’autorité compilées, tenant enrôlé, anti-retour, expiration signalée ; extension : synchronisation, revérification par le hook, posture §7, infobulle et centre de protection ; cérémonie de clé, porte de latence avec le plus grand réglage, `CLAIMS.md` | cérémonie de clé par le propriétaire et variable `XSOM_RULES_AUTHORITY_KEYS` ; route `GET /v1/extension/rules-pack` et champs d’événement §7 déployés par la plateforme ; `tenant_id` renvoyé à l’enregistrement (sinon premier réglage épinglé) ; premier réglage réel en pilote |
+| R02 | corrigé | pont d’approbation : socket court et privé sur macOS (le chemin dépassait 104 octets, `listen EINVAL`) ; suite Extension Host isolée du trousseau macOS | — |
 | A04 | validé localement | FR/EN, clavier, focus, reduced motion, 390/768/1440, 0 débordement, 0 erreur console sur les neuf captures, 80/80 Playwright | lecteur d’écran matériel et publication distante à qualifier |
+
+Les promesses visibles et leurs preuves sont tenues dans [`CLAIMS.md`](CLAIMS.md), avec les corrections de texte recommandées pour le site.
 
 Les protections locales de secrets restent actives sans droit commercial. Une expiration de licence ne doit ni désactiver le scanner ni ouvrir une permission. L’extension conserve l’identifiant Marketplace existant ; aucune publication distante n’a été effectuée par cette implémentation.

@@ -16,6 +16,22 @@ Le modèle ajoute comme actifs les politiques signées, l’identité de poste, 
 
 Les attaques traitées localement comprennent signature ou clé inattendue, rejeu et downgrade de politique, politique future/expirée, runner trop ancien, traversée et lien symbolique, contenu binaire ou trop grand, commande composée/ambiguë, outil MCP ou schéma modifié, approbation rejouée ou liée à un autre poste, dérive du hook et saturation de file. Les hôtes réels, l’administrateur local, les contournements hors session renforcée, Remote/WSL/Container et la sémantique exhaustive des données restent hors de cette preuve locale. La matrice exhaustive est [DEVELOPER-THREAT-MAPPING.md](./DEVELOPER-THREAT-MAPPING.md).
 
+## Réglages sur mesure xSOM (0.7.0)
+
+Actif ajouté : le réglage d’une organisation (motifs, empreintes salées de termes confidentiels) et la clé d’autorité xSOM qui le signe. La graine privée ne quitte pas la plateforme ; seules les clés publiques sont compilées dans l’extension.
+
+| Menace | Contrôle | Preuve |
+|---|---|---|
+| Réglage contrefait, clé injectée dans l’enveloppe ou sur le poste | vérification par `keyId` contre les seules clés compilées ; aucune clé lue à l’exécution | `tests/runner/rules-pack.test.ts` |
+| Réglage d’une autre organisation, rejoué ou plus ancien | tenant enrôlé, anti-retour par `packId` (version et empreinte), historique conservé à la déconnexion | `tests/runner/rules-pack.test.ts`, `tests/vscode/rules-pack.test.ts` |
+| Fichier modifié sur le poste après vérification | le hook revérifie signature, tenant et version à chaque appel | `tests/vscode/rules-pack-hook.test.ts` |
+| Build officielle faisant confiance à la clé de TEST publique | refus à la construction hors build de test, inspection du VSIX | `scripts/rules-authority.mjs`, `scripts/inspect-vsix.mjs` |
+| Déni de service par un motif valide mais pathologique ou un texte adversarial | préfiltre littéral, interpréteur compté, budget par analyse → BLOCK « analyse incomplète » | `tests/core/rules-scan.test.ts`, porte `benchmark:check` |
+| Fuite d’un terme confidentiel par le réglage | empreintes salées seulement, aucun positif requis pour les termes | contrat §2 et §4 |
+| Fuite d’une valeur détectée | ni valeur ni extrait dans `ScanResult`, les messages, la posture ou l’audit ; l’étiquette signée du détecteur suffit | `tests/core/rules-scan.test.ts`, `tests/vscode/rules-pack-hook.test.ts` |
+
+Limites acceptées : le réglage s’applique au texte original, pas aux vues décodées ; un utilisateur administrateur de son poste peut supprimer le fichier du réglage (la posture le signale) ; sans `tenant_id` fourni par la plateforme à l’enregistrement, le premier réglage reçu sur le canal authentifié du poste fixe le tenant.
+
 ## 1. Objectif de sécurité
 
 Le core Secret Guard analyse localement une chaîne et rend un verdict sans inclure

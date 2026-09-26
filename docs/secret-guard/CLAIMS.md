@@ -1,0 +1,60 @@
+# Secret Guard — promesses et preuves
+
+État au 27 septembre 2026, extension **0.7.0** (branche `feat/secret-guard-regles-xsom`, non publiée). Chaque promesse visible par un utilisateur est reliée au test ou à la porte CI qui la prouve. Une promesse sans preuve automatisée n’est pas « prouvée » : elle est partielle ou à corriger. La porte de référence est `npm --prefix secret-guard run verify` (format, lint, types, tests unitaires avec couverture, contrats CLI/hooks, Extension Host VS Code 1.137, contenu du VSIX, évaluation synthétique, fuzz, dogfood, latence, audit npm).
+
+Sources relevées :
+
+- **Ext** — extension : `package.json` (description Marketplace), `README.md` (page Marketplace), infobulle (`status-tooltip.ts`, `tooltip-art.ts`), centre de protection (`dashboard.ts`), messages des hooks (`cli/src/hook.ts`, `report.ts`).
+- **Site** — page publique `/secret-guard` (`frontend/components/secret-guard/secret-guard-copy.ts`), accueil (`home/home-copy.ts`) et gamme (`products/products-copy.ts`), lus sur la branche `feat/frontend-refonte` en lecture seule.
+
+Légende : ✅ prouvé par un test ou une porte ; ⚠️ partiel (vrai sur un périmètre plus étroit que la phrase) ; ❌ à corriger (voir la section suivante).
+
+## Tableau
+
+| # | Promesse | Où | Preuve | État |
+|---|---|---|---|---|
+| 1 | « Sans LLM · sans réseau » ; « aucun appel réseau du détecteur » | Site (flow), Ext (centre de protection) | `tests/claims/offline-detection.test.ts` : le graphe d’imports réel du cœur, du chargement d’un réglage et de la décision de hook n’importe aucun module réseau, processus ou LLM et n’appelle aucune API réseau ; le cœur n’a aucune dépendance | ✅ |
+| 2 | « Avant l’envoi » | Site (flow) | Contrats de hooks : `scripts/test-cli.mjs`, `tests/cli/hook.test.ts`, `tests/vscode/rules-pack-hook.test.ts` (sortie 2 = refus, avant réponse) | ⚠️ le runner refuse avant l’envoi ; l’invocation effective par chaque hôte reste à qualifier (`HOST-CAPABILITIES.md`) |
+| 3 | « Filtrage déterministe » | Site (accueil, gamme) | `tests/claims/promises.test.ts` (même texte → même verdict, avec ou sans réglage), `tests/core/security.test.ts` « handles dense overlapping candidates deterministically », fuzz déterministe 100 000 cas | ✅ |
+| 4 | « Règles déterministes : clés, jetons, mots de passe » | Site (flow) | `scripts/evaluate.mjs --check` : 1 150 positifs, 20/20 familles, 0 faux BLOCK sur 50 000 négatifs synthétiques | ✅ (corpus synthétique, pas une précision terrain) |
+| 5 | « Entropie : les chaînes trop aléatoires » | Site (flow) | `tests/core/security.test.ts` « keeps unanchored high entropy at WARN » et exclusions Base64/chemins | ✅ l’entropie seule avertit (WARN), elle ne bloque que dans le mode Bloquer |
+| 6 | « Réglage sur mesure : vos données clients » (Équipe) ; « notre équipe conseil calibre les règles » | Site (flow, accueil), Ext (README, infobulle, centre de protection) | `tests/core/rules-pack-contract.test.ts` (tous les vecteurs du contrat), `tests/core/rules-scan.test.ts`, `tests/runner/rules-pack.test.ts`, `tests/vscode/rules-pack.test.ts`, `tests/vscode/rules-pack-hook.test.ts` (hook réel), contrat Extension Host | ⚠️ livré dans 0.7.0 ; effectif seulement après la cérémonie de clé et le déploiement de `GET /v1/extension/rules-pack` par la plateforme |
+| 7 | Réglage « non contrefaisable », « vérifié hors ligne » | Ext (README) | `tests/runner/rules-pack.test.ts` (clé de l’enveloppe ignorée, keyId inconnu, signature falsifiée, vecteur altéré, autre tenant, retour arrière), `scripts/inspect-vsix.mjs` (clé de TEST jamais livrée, clé de release présente dans les deux bundles), `tests/runner/rules-authority-key.test.ts` | ✅ sous réserve que la graine xSOM reste secrète |
+| 8 | « Réglage fait avec xSOM, pas une option à cocher » | Brief produit, Ext (centre de protection) | `tests/claims/promises.test.ts` : aucun réglage VS Code ni commande ne crée ou modifie une règle ; seule une demande à xSOM existe | ✅ |
+| 9 | Le réglage « n’ajoute que des détections », règles intégrées intactes | Ext (README) | `tests/core/rules-scan.test.ts` « still detects a built-in secret with a pack loaded », « keeps the stricter verdict » ; `rules-pack-hook.test.ts` (build sans clé : règles intégrées actives) | ✅ |
+| 10 | Analyse bornée ; au-delà, « analyse incomplète », envoi bloqué | Ext (README, messages) | `tests/core/rules-scan.test.ts` (budget dépassé → BLOCK `custom_rules_incomplete`, entrée adversariale de 1 Mio), porte `benchmark:check` (1 Mio adversarial ≈ 1 s, porte 5 s) | ✅ |
+| 11 | « Usage inchangé, pas de latence perceptible » / « sans latence perceptible » | Site (accueil, gamme) | `benchmark:check` : 16 Kio p95 1,35 ms (porte 15 ms), 1 Mio p95 80 ms (porte 250 ms), démarrage CLI p95 124 ms (porte 350 ms) ; avec le réglage maximal 16 Kio p95 16 ms, 256 Kio 254 ms, 1 Mio 1 004 ms | ⚠️ vrai pour un prompt courant ; un prompt de 1 Mio avec le plus grand réglage prend environ 1 s |
+| 12 | « Vos secrets restent sur le poste » ; « aucune IA ni appel réseau ne voit passer le secret » | Site (hero, accueil) | Mode Bloquer : hooks (`tests/cli/hook.test.ts`) ; mais relais Claude : « le contenu original transite par votre passerelle » (centre de protection, `tests/vscode/gateway.test.ts`) ; mode Avertir : transmis tel quel (`tests/vscode/dispatch.test.ts`) | ❌ |
+| 13 | « Les meilleurs agents de code. Sans risque. » | Site (hero) | Aucune preuve possible d’une absence de risque (pièces jointes natives non couvertes, hooks retirables, secrets inconnus des règles) | ❌ |
+| 14 | Bloquer « arrête tout message qui contient un secret » | Site (panneau) ; Ext corrigée en 0.7.0 (« où un secret est détecté ») | `tests/cli/hook.test.ts`, `tests/vscode/dispatch.test.ts` : message arrêté quand un secret est **détecté** | ⚠️ site : « détecté » manque |
+| 15 | Expurger : « masqué dans @secretguard et Claude raccordé ; ailleurs, l’envoi s’arrête et un clic expurge le presse-papiers » | Site (panneau), Ext (infobulle, README) | `tests/vscode/dispatch.test.ts` « redacts strong findings before sending in automatic redact mode », `tests/cli/hook.test.ts` « blocks in redact mode when the host cannot replace the original », `tests/vscode/gateway.test.ts` « the actual hook delegates redact only », `tests/vscode/clipboard-purge.test.ts`, contrat Extension Host « purges the clipboard in place » | ✅ |
+| 16 | Expurger masque aussi le réglage sur mesure, sous le nom de la règle | Ext (README) | `tests/core/rules-scan.test.ts` « masks custom findings with the detector label », contrat Extension Host (presse-papiers → `<REDACTED_Identifiant_client_ACME>`) | ✅ |
+| 17 | Avertir : « une heure, puis retour à Expurger » | Site (panneau), Ext | `tests/vscode/observe-window.test.ts` | ✅ |
+| 18 | Presse-papiers : « rien ne change si le nettoyage est incomplet » | Site (panneau), Ext | `tests/vscode/clipboard-purge.test.ts` « never offers a replacement when the scan is incomplete » | ✅ |
+| 19 | Barre d’état : « toujours visible. Un clic expurge le presse-papiers » | Site (panneau) | `tests/vscode/status-tooltip.test.ts` : le clic expurge en Expurger, **vérifie** dans les autres niveaux | ⚠️ |
+| 20 | « VS Code 1.133 ou plus récent · 1.137 pour GitHub Copilot » | Site (téléchargement), Ext (README) | `tests/claims/promises.test.ts` (manifeste `^1.133.0`), `tests/vscode/onboarding.test.ts` (hook Copilot seulement à partir de 1.137), Extension Host exécuté sur 1.137.0 | ⚠️ aucune exécution Extension Host sur 1.133 |
+| 21 | « Claude Code, Codex et GitHub Copilot » | Ext (description Marketplace), Site | `tests/vscode/host-config.test.ts` (configuration des trois hôtes), canaris locaux | ⚠️ configuration et canaris prouvés, pas l’interception par chaque hôte (`HOST-CAPABILITIES.md`) |
+| 22 | « Mode prudent par défaut » | Ext (README) | `tests/claims/promises.test.ts` (défaut `block`, hooks automatiques) | ✅ |
+| 23 | « Les valeurs détectées ne sont pas affichées » ; aucune valeur dans l’audit | Ext (messages, README) | `tests/core/rules-scan.test.ts`, `tests/vscode/rules-pack-hook.test.ts` (sortie du hook sans la valeur), `tests/vscode/rules-pack.test.ts` (événements : identifiants de règles seulement), invariant SG-INV-04 | ✅ |
+| 24 | Centre de protection : « ne charge aucune ressource distante et n’exécute aucun JavaScript » | Ext (README) | `tests/vscode/dashboard.test.ts` (CSP `default-src 'none'`, liens de commandes en liste blanche), `enableScripts: false` | ✅ |
+| 25 | « Audit sans contenu » : poste, date, résultat, nombre de détections | Ext (infobulle, centre de protection) | Type `AuditEvent` sans champ libre, `tests/vscode/gateway.test.ts`, `customFindingFields` (identifiants seulement) ; côté plateforme, modèle Pydantic `extra="forbid"` | ✅ |
+| 26 | Pièces jointes « PNG, PDF et Markdown analysées dans les sessions Claude raccordées » | Ext (centre de protection, README) | Tests Python du relais (hors de ce paquet) | ⚠️ prouvé côté plateforme, pas par la vérification de l’extension |
+| 27 | « Éditions Local, Équipe et Renforcé » | Site (gamme) | Local : ce dépôt ; Équipe : politiques signées, réglage sur mesure ; Renforcé : pilote Linux seulement (`MANAGED-DEPLOYMENT.md`) | ⚠️ Renforcé non qualifié hors Linux |
+
+## À corriger
+
+Modifications de texte recommandées pour le site ; le texte du site n’est pas modifié par cette branche.
+
+1. **Hero `/secret-guard`** (`secret-guard-copy.ts`, `hero.title`) : « Les meilleurs agents de code. Sans risque. » → **« Les meilleurs agents de code. Sans exposer vos secrets. »** (EN : « The best coding agents. Without exposing your secrets. »).
+2. **Hero `/secret-guard`** (`hero.lead`) : « vos secrets restent sur le poste » → **« les secrets détectés ne partent pas vers l’assistant »** (EN : « detected secrets are not sent to the assistant »). Raison : avec le relais Claude, le texte original transite par la passerelle xSOM pour y être nettoyé ; en mode Avertir, il part tel quel.
+3. **Accueil** (`home-copy.ts`, `secretGuard.features[0]`) : « aucune IA ni appel réseau ne voit passer le secret » → **« la détection se fait sur le poste, sans IA ni appel réseau »**.
+4. **Accueil et gamme** (`home-copy.ts` `features[1]`, `products-copy.ts` `features[1]`) : « pas de latence perceptible » / « sans latence perceptible » → **« analyse locale en quelques millisecondes pour un prompt courant »** (gamme : **« Analyse locale en quelques millisecondes »**). Raison : un texte de 1 Mio avec le plus grand réglage prend environ une seconde.
+5. **Panneau, bouton Bloquer** (`tour.controls.block`) : « Arrête tout message qui contient un secret, une ambiguïté ou un scan incomplet. » → **« Arrête tout message où un secret est détecté, ambigu ou mal analysé. »** L’extension 0.7.0 est déjà corrigée (carte Bloquer : « Arrête tout message où un secret est détecté. ») ; ce texte n’apparaît qu’au survol de la tuile dans l’image du site, dont la mise en page ne change pas.
+6. **Panneau, barre d’état** (`tour.controls.statusbar`) : « Toujours visible. Un clic expurge le presse-papiers. » → **« Toujours visible. Un clic expurge le presse-papiers en niveau Expurger, le vérifie sinon. »**
+7. **Flow, couche « Réglage sur mesure »** : ajouter la condition **« Édition Équipe, réglage signé par xSOM »** au badge existant, et ne l’annoncer comme disponible qu’après la première release 0.7.x construite avec la clé d’autorité et le déploiement de la route plateforme.
+
+## Frontières
+
+- Les chiffres de performance viennent d’un Mac Apple Silicon (Node 26) ; la porte CI tourne sur `ubuntu-latest` avec des seuils plus larges.
+- Le réglage sur mesure s’applique au texte original (pas aux vues décodées Base64/percent/JSON que le scanner intégré examine) : c’est la sémantique du contrat, calibrée par xSOM telle quelle.
+- L’invocation réelle des hooks par Claude Code, Codex et Copilot reste qualifiée hôte par hôte (`HOST-CAPABILITIES.md`, `EVIDENCE-PROTOCOL.md`).

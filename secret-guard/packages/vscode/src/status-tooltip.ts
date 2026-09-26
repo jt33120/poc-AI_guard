@@ -130,7 +130,7 @@ const TIERS: readonly ModeTier[] = [
     tone: "ok",
     exposure: "Minimale",
     exposed: 1,
-    description: "Arrête tout message contenant un secret.",
+    description: "Arrête tout message où un secret est détecté.",
     effects: [
       ["Envoi", "Arrêté : secret, ambiguïté, scan incomplet"],
       ["Corriger", "Retirez ou expurgez la valeur"],
