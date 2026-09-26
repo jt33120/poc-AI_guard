@@ -12,7 +12,10 @@
   avec les mêmes vérifications que la synchronisation.
 - Analyse bornée : préfiltre littéral et budget de travail par analyse ; au-delà,
   l’envoi est bloqué comme analyse incomplète, jamais laissé passer.
-- Expurger masque aussi les détections sur mesure, sous le nom de la règle.
+- Expurger masque aussi les détections sur mesure, sous le nom de la règle ; le relais
+  Claude ne reçoit jamais un message concerné par le réglage.
+- Le réglage voit à travers les caractères invisibles (trait d’union conditionnel,
+  espace sans chasse) collés depuis un traitement de texte.
 - Infobulle et centre de protection : état du réglage en une ligne ; demande de
   réglage pour les postes Local.
 - Posture et audit sans contenu : identité du réglage, nombre de détections sur

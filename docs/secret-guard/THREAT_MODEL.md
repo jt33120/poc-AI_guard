@@ -30,7 +30,17 @@ Actif ajouté : le réglage d’une organisation (motifs, empreintes salées de 
 | Fuite d’un terme confidentiel par le réglage | empreintes salées seulement, aucun positif requis pour les termes | contrat §2 et §4 |
 | Fuite d’une valeur détectée | ni valeur ni extrait dans `ScanResult`, les messages, la posture ou l’audit ; l’étiquette signée du détecteur suffit | `tests/core/rules-scan.test.ts`, `tests/vscode/rules-pack-hook.test.ts` |
 
-Limites acceptées : le réglage s’applique au texte original, pas aux vues décodées ; un utilisateur administrateur de son poste peut supprimer le fichier du réglage (la posture le signale) ; sans `tenant_id` fourni par la plateforme à l’enregistrement, le premier réglage reçu sur le canal authentifié du poste fixe le tenant.
+| Budget épuisé par un gros texte, beaucoup de fichiers mentionnés ou de nombreux sels | un seul budget par décision de hook, auto-tests plafonnés au total, BLOCK « analyse incomplète » ; relais Claude jamais utilisé dans ce cas | `tests/cli/hook-rules-budget.test.ts`, `tests/vscode/rules-pack-hook.test.ts` |
+| Étiquette signée utilisée comme canal d’injection vers l’assistant | caractères de contrôle, de format et de ligne retirés ; texte brut dans le Markdown du participant | `tests/core/rules-scan.test.ts`, `tests/vscode/presentation.test.ts` |
+| Caractères invisibles cachant une valeur | seconde passe sur le texte visible, plages rapportées au texte original | `tests/core/rules-scan.test.ts` |
+
+Limites acceptées :
+
+- le réglage s’applique au texte original et à ses caractères visibles, pas aux vues décodées (Base64, percent, JSON) du scanner intégré ;
+- un utilisateur maître de son poste peut supprimer ou modifier le fichier du réglage ou son état (tenant, historique, empreinte auto-testée) : la signature empêche toute contrefaçon, pas la suppression ; le hook peut alors charger un réglage signé sans rejouer ses auto-tests ;
+- sans `tenant_id` fourni par la plateforme à l’enregistrement ni politique signée portant un tenant, le premier réglage reçu sur le canal authentifié du poste (ou le premier import hors ligne) fixe le tenant ;
+- `{"rulesPack": null}` retire le réglage sans signature ; les empreintes salées résistent à la lecture, pas à une attaque par dictionnaire ;
+- en mode Avertir, un texte dont l’analyse est incomplète est transmis, comme un texte avec secret.
 
 ## 1. Objectif de sécurité
 
