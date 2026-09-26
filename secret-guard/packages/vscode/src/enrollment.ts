@@ -39,7 +39,6 @@ export interface ManagedPolicySummary {
   readonly version: number;
   readonly expiresAt: string;
   readonly minRunnerVersion?: string;
-  readonly tenantId?: string;
 }
 
 export async function readManagedPolicySummary(
@@ -52,7 +51,6 @@ export async function readManagedPolicySummary(
         version?: unknown;
         expiresAt?: unknown;
         minRunnerVersion?: unknown;
-        tenantId?: unknown;
       };
     };
     const policy = parsed.policy;
@@ -71,9 +69,6 @@ export async function readManagedPolicySummary(
       ...(policy.minRunnerVersion === undefined
         ? {}
         : { minRunnerVersion: policy.minRunnerVersion }),
-      ...(typeof policy.tenantId === "string" && policy.tenantId !== ""
-        ? { tenantId: policy.tenantId }
-        : {}),
     };
   } catch {
     return undefined;
@@ -85,6 +80,28 @@ export async function storedPolicyKey(
 ): Promise<string | undefined> {
   try {
     return (await readFile(policyKeyPath(storage), "utf8")).trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The tenant stated by the stored managed policy, only once its signature is
+ * verified again with the pinned policy key. Anything else gives undefined.
+ */
+export async function verifiedPolicyTenant(
+  storage: string,
+): Promise<string | undefined> {
+  try {
+    const pinned = await storedPolicyKey(storage);
+    const policy = validateSignedPolicyDocument(
+      JSON.parse(await readFile(policyPath(storage), "utf8")),
+      pinned,
+      "999.999.999",
+    );
+    return typeof policy.tenantId === "string" && policy.tenantId !== ""
+      ? policy.tenantId
+      : undefined;
   } catch {
     return undefined;
   }

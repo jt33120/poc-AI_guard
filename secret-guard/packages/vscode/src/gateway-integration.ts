@@ -14,7 +14,11 @@ import {
 import { startGatewayBridge, type GatewayBridge } from "./gateway-bridge.js";
 import { startApprovalBridge, type ApprovalBridge } from "./approval-bridge.js";
 import { canDelegate, routeFile } from "./gateway-delegation.js";
-import { readManagedPolicySummary, syncManagedPolicy } from "./enrollment.js";
+import {
+  readManagedPolicySummary,
+  syncManagedPolicy,
+  verifiedPolicyTenant,
+} from "./enrollment.js";
 import { readLastHookAt } from "./hook-activity.js";
 import type { HookHealth } from "./hook-manager.js";
 import {
@@ -101,6 +105,7 @@ export class GatewayIntegration implements vscode.Disposable {
   private rulesTimer: ReturnType<typeof setInterval> | undefined;
   // Set once the platform has answered the rules-pack route (contract §7).
   private platformServesRulesPack = false;
+  private pendingRulesSync: Promise<void> = Promise.resolve();
   private retry: ReturnType<typeof setTimeout> | undefined;
   public status = "Non connecté";
   public constructor(
@@ -198,21 +203,30 @@ export class GatewayIntegration implements vscode.Disposable {
     }
   }
   /** Fetch and verify the xSOM tuning, then let the interface re-read it. */
-  private async syncRules(
+  private syncRules(
     connection: Connection,
     enrolledTenant: EnrolledTenant | undefined,
   ): Promise<RulesPackSyncOutcome> {
-    const outcome = await syncRulesPack(
-      connection.endpoint,
-      connection.token,
-      this.context.globalStorageUri.fsPath,
-      enrolledTenant === undefined ? {} : { enrolledTenant },
-    ).catch((): RulesPackSyncOutcome => ({ outcome: "error" }));
-    // Any answer of the route, even "no tuning", shows the platform speaks
-    // contract §7; a network error leaves what was known.
-    if (outcome.outcome !== "error") this.platformServesRulesPack = true;
-    await this.rules?.changed();
-    return outcome;
+    // One synchronisation at a time; a disconnection waits for it before
+    // forgetting the enrollment, so a late sync cannot re-apply a pack.
+    const run = this.pendingRulesSync.then(async () => {
+      const outcome = await syncRulesPack(
+        connection.endpoint,
+        connection.token,
+        this.context.globalStorageUri.fsPath,
+        enrolledTenant === undefined ? {} : { enrolledTenant },
+      ).catch((): RulesPackSyncOutcome => ({ outcome: "error" }));
+      // Any answer of the route, even "no tuning", shows the platform speaks
+      // contract §7; a network error leaves what was known.
+      if (outcome.outcome !== "error") this.platformServesRulesPack = true;
+      await this.rules?.changed().catch(() => undefined);
+      return outcome;
+    });
+    this.pendingRulesSync = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
   }
   private async start(connection: Connection): Promise<void> {
     const registration = (await gatewayJson(
@@ -246,14 +260,14 @@ export class GatewayIntegration implements vscode.Disposable {
     );
     // The enrolled tenant, as stated by the platform: at registration when it
     // says so, else in the signed policy; otherwise the first pack pins it.
-    const signedPolicy = await readManagedPolicySummary(
+    const policyTenant = await verifiedPolicyTenant(
       this.context.globalStorageUri.fsPath,
     );
     const enrolledTenant =
       registeredTenant(registration.tenant_id) ??
-      (signedPolicy?.tenantId === undefined
+      (policyTenant === undefined
         ? undefined
-        : { id: signedPolicy.tenantId, source: "policy" as const });
+        : { id: policyTenant, source: "policy" as const });
     const rulesOutcome = await this.syncRules(connection, enrolledTenant);
     const config = vscode.workspace.getConfiguration("claudeCode");
     if (!vscode.extensions.getExtension("anthropic.claude-code"))
@@ -420,10 +434,12 @@ export class GatewayIntegration implements vscode.Disposable {
       void this.queue?.flush();
     }, 30000);
     this.rulesTimer = setInterval(() => {
-      void this.syncRules(connection, enrolledTenant).then((outcome) => {
-        if (this.rules !== undefined)
-          this.record(rulesPackEvent(outcome, this.rules.view()));
-      });
+      void this.syncRules(connection, enrolledTenant)
+        .then((outcome) => {
+          if (this.rules !== undefined)
+            this.record(rulesPackEvent(outcome, this.rules.view()));
+        })
+        .catch(() => undefined);
     }, RULES_PACK_SYNC_MS);
     void this.queue.flush();
     this.status =
@@ -469,10 +485,11 @@ export class GatewayIntegration implements vscode.Disposable {
     await this.stopBridge();
     this.queue = undefined;
     // Leaving xSOM ends the tuning of this workstation: built-in rules only.
+    await this.pendingRulesSync;
     await forgetEnrollment(this.context.globalStorageUri.fsPath).catch(
       () => undefined,
     );
-    await this.rules?.changed();
+    await this.rules?.changed().catch(() => undefined);
     await this.context.secrets.delete(CONNECTION_STORAGE_KEY);
     await this.context.globalState.update("xsom.claudeBase", undefined);
     this.status = "Déconnecté";

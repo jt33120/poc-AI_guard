@@ -9,6 +9,7 @@ import {
   policyKeyPath,
   policyPath,
   syncManagedPolicy,
+  verifiedPolicyTenant,
 } from "../../packages/vscode/src/enrollment.js";
 
 const PUBLIC_KEY_A = "MCowBQYDK2VwAyEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
@@ -155,5 +156,23 @@ describe("managed policy enrollment", () => {
       await rm(storage, { recursive: true, force: true });
       storage = await mkdtemp(join(tmpdir(), "developer-guard-enrollment-"));
     }
+  });
+
+  it("states the enrolled tenant only from a re-verified signed policy", async () => {
+    storage = await mkdtemp(join(tmpdir(), "developer-guard-enrollment-"));
+    expect(await verifiedPolicyTenant(storage)).toBeUndefined();
+    const envelope = signedEnvelope(validPolicy(1));
+    await writeFile(policyKeyPath(storage), `${envelope.publicKey}\n`);
+    await writeFile(policyPath(storage), JSON.stringify(envelope));
+    expect(await verifiedPolicyTenant(storage)).toBe("tenant-a");
+    // Editing the stored tenant breaks the signature: no tenant at all.
+    await writeFile(
+      policyPath(storage),
+      JSON.stringify({
+        ...envelope,
+        policy: { ...envelope.policy, tenantId: "tenant-b" },
+      }),
+    );
+    expect(await verifiedPolicyTenant(storage)).toBeUndefined();
   });
 });
