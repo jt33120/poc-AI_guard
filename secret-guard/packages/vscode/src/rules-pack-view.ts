@@ -42,6 +42,7 @@ const REFUSALS: Record<RulesPackRefusal | "sync_failed", string> = {
   version_downgrade: "version plus ancienne",
   version_conflict: "version en conflit",
   too_large: "taille excessive",
+  unreadable: "fichier illisible",
   sync_failed: "synchronisation impossible",
 };
 
@@ -111,6 +112,10 @@ export function rulesPackView(snapshot: RulesPackSnapshot): RulesPackView {
   if (snapshot.authorityKeys === 0)
     return {
       state: "no_authority_key",
+      // A pack was served or stored, and this build could not accept it.
+      ...(applied.status === "rejected" || lastSync?.outcome === "rejected"
+        ? { reason: "rules_pack_rejected" as const }
+        : {}),
       tone: "warn",
       line: "Réglage indisponible : version non officielle",
       title: "Réglage sur mesure indisponible",

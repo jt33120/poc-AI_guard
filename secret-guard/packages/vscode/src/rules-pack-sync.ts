@@ -13,6 +13,8 @@ import {
   verifyRulesPackEnvelope,
   writePrivateFile,
   writeRulesPackState,
+  historyKey,
+  ownEntry,
   type AcceptedVersion,
   type AppliedRulesPack,
   type AuthorityKey,
@@ -112,6 +114,22 @@ function tenantFor(
 }
 
 /**
+ * Write the state from the freshest copy on disk: several VS Code windows
+ * may synchronise at once, and none may lose another's version history.
+ */
+async function updateState(
+  storage: string,
+  change: (fresh: RulesPackState) => RulesPackState,
+): Promise<void> {
+  const fresh = await readRulesPackState(storage);
+  const next = change(fresh);
+  await writeRulesPackState(storage, {
+    ...next,
+    highest: mergeHighest(fresh.highest, next.highest),
+  });
+}
+
+/**
  * Fetch, verify and store the pack. A refused or unreachable pack leaves the
  * previously verified pack (if any) and the built-in rules untouched; the
  * outcome is recorded for the status and the posture.
@@ -124,37 +142,41 @@ export async function syncRulesPack(
 ): Promise<RulesPackSyncOutcome> {
   const now = options.now ?? new Date();
   const keys = options.keys ?? builtInAuthorityKeys();
-  const state = await readRulesPackState(storage);
   let envelope: unknown;
   try {
     envelope = await (options.fetchPack ?? fetchRulesPack)(endpoint, token);
   } catch {
-    await writeRulesPackState(storage, {
-      ...state,
+    await updateState(storage, (fresh) => ({
+      ...fresh,
       lastSync: record(now, "error", "sync_failed"),
-    });
+    }));
     return { outcome: "error" };
   }
+  const state = await readRulesPackState(storage);
   const known = tenantFor(state, options.enrolledTenant);
-  const pinned =
-    known === undefined
-      ? {}
-      : { tenantId: known.id, tenantSource: known.source };
   if (envelope === null) {
     // The tenant has no tuning (any more): back to the built-in rules only.
     // The version history stays, so an older pack cannot come back later.
     await rm(rulesPackPath(storage), { force: true });
-    await writeRulesPackState(storage, {
-      ...state,
-      ...pinned,
+    await updateState(storage, (fresh) => ({
+      ...fresh,
+      ...pinnedTenant(known),
       lastSync: record(now, "none"),
-    });
+    }));
     return { outcome: "none" };
   }
   return applyEnvelope(storage, envelope, state, known, "first_pack", {
     keys,
     now,
   });
+}
+
+function pinnedTenant(
+  known: { id: string; source: TenantSource } | undefined,
+): Partial<Pick<RulesPackState, "tenantId" | "tenantSource">> {
+  return known === undefined
+    ? {}
+    : { tenantId: known.id, tenantSource: known.source };
 }
 
 /**
@@ -169,10 +191,20 @@ async function applyEnvelope(
   firstSource: "first_pack" | "import",
   { keys, now }: { keys: readonly AuthorityKey[]; now: Date },
 ): Promise<RulesPackSyncOutcome> {
-  const pinned =
-    known === undefined
-      ? {}
-      : { tenantId: known.id, tenantSource: known.source };
+  const refuse = async (
+    reason: RulesPackRefusal,
+  ): Promise<RulesPackSyncOutcome> => {
+    await updateState(storage, (fresh) => ({
+      ...fresh,
+      ...pinnedTenant(known),
+      lastSync: record(now, "rejected", reason),
+    }));
+    return { outcome: "rejected", reason };
+  };
+  const serialized = JSON.stringify(envelope ?? null);
+  // What is stored must load again: the hook refuses a larger file.
+  if (Buffer.byteLength(serialized, "utf8") > MAX_RULES_PACK_BYTES)
+    return refuse("too_large");
   let tenant = known;
   if (tenant === undefined) {
     // First pack of this enrollment: its signed tenant becomes the enrolled
@@ -188,37 +220,50 @@ async function applyEnvelope(
     enrolledTenant: tenant?.id,
     highest: state.highest,
     now,
+    // An unchanged pack was self-tested in full by this extension already.
+    ...(state.selfTestedDigest === undefined
+      ? {}
+      : { selfTestedDigest: state.selfTestedDigest }),
   });
-  if (!accepted.ok) {
-    await writeRulesPackState(storage, {
-      ...state,
-      ...pinned,
-      lastSync: record(now, "rejected", accepted.reason),
-    });
-    return { outcome: "rejected", reason: accepted.reason };
-  }
-  // Several VS Code windows may synchronise at once: re-read the state and
-  // never replace a newer pack another window has already applied.
-  const fresh = await readRulesPackState(storage);
-  const newer = fresh.highest[accepted.pack.packId];
+  if (!accepted.ok) return refuse(accepted.reason);
+  const key = historyKey(accepted.pack.tenantId, accepted.pack.packId);
+  // Never replace a newer pack another window has applied meanwhile.
+  const newer = ownEntry((await readRulesPackState(storage)).highest, key);
   if (newer !== undefined && newer.version > accepted.pack.version)
     return { outcome: "applied", digest: newer.digest };
-  await writePrivateFile(rulesPackPath(storage), JSON.stringify(envelope));
-  await writeRulesPackState(storage, {
+  await writePrivateFile(rulesPackPath(storage), serialized);
+  await updateState(storage, (fresh) => ({
     schemaVersion: 1,
     tenantId: accepted.pack.tenantId,
     tenantSource: tenant?.source ?? firstSource,
     highest: {
       ...mergeHighest(state.highest, fresh.highest),
-      [accepted.pack.packId]: {
-        version: accepted.pack.version,
-        digest: accepted.digest,
-      },
+      [key]: { version: accepted.pack.version, digest: accepted.digest },
     },
     selfTestedDigest: accepted.digest,
     lastSync: record(now, "applied"),
-  });
+  }));
   return { outcome: "applied", digest: accepted.digest };
+}
+
+function mergeHighest(
+  left: RulesPackState["highest"],
+  right: RulesPackState["highest"],
+): Record<string, AcceptedVersion> {
+  const merged: Record<string, AcceptedVersion> = Object.fromEntries(
+    Object.entries(left),
+  );
+  for (const [key, entry] of Object.entries(right)) {
+    const current = ownEntry(merged, key);
+    if (current === undefined || entry.version > current.version)
+      Object.defineProperty(merged, key, {
+        value: entry,
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+  }
+  return merged;
 }
 
 /**
@@ -235,10 +280,10 @@ export async function importRulesPack(
   const keys = options.keys ?? builtInAuthorityKeys();
   const state = await readRulesPackState(storage);
   if (Buffer.byteLength(raw, "utf8") > MAX_RULES_PACK_BYTES) {
-    await writeRulesPackState(storage, {
-      ...state,
+    await updateState(storage, (fresh) => ({
+      ...fresh,
       lastSync: record(now, "rejected", "too_large"),
-    });
+    }));
     return { outcome: "rejected", reason: "too_large" };
   }
   let envelope: unknown;
@@ -258,19 +303,6 @@ export async function importRulesPack(
       now,
     },
   );
-}
-
-function mergeHighest(
-  left: RulesPackState["highest"],
-  right: RulesPackState["highest"],
-): Record<string, AcceptedVersion> {
-  const merged: Record<string, AcceptedVersion> = { ...left };
-  for (const [packId, entry] of Object.entries(right)) {
-    const current = merged[packId];
-    if (current === undefined || entry.version > current.version)
-      merged[packId] = entry;
-  }
-  return merged;
 }
 
 /** Forget the tenant learned from this enrollment (on disconnection). */

@@ -27,6 +27,7 @@ import { ActivityMonitor } from "./hook-activity.js";
 import { HookManager, type HookHealth } from "./hook-manager.js";
 import { GatewayIntegration } from "./gateway-integration.js";
 import { customFindingFields } from "./gateway-client.js";
+import { builtInAuthorityKeys } from "@xsom/developer-guard-runner";
 import { importRulesPack, readRulesPackSnapshot } from "./rules-pack-sync.js";
 import {
   refusalLabel,
@@ -99,11 +100,13 @@ async function reloadRulesPack(storage: string): Promise<void> {
       snapshot.applied.status === "applied" ? snapshot.applied.pack : undefined;
     rulesView = rulesPackView(snapshot);
   } catch {
+    // Never "no tuning" by default: an unexpected failure is shown and
+    // reported as a refused tuning, with the built-in rules still active.
     rulesPack = undefined;
     rulesView = rulesPackView({
-      applied: { status: "none" },
-      enrolled: false,
-      authorityKeys: 1,
+      applied: { status: "rejected", reason: "unreadable" },
+      enrolled: true,
+      authorityKeys: builtInAuthorityKeys().length,
     });
   }
 }

@@ -5,10 +5,11 @@
 import {
   createHash,
   createPublicKey,
+  randomUUID,
   verify,
   type KeyObject,
 } from "node:crypto";
-import { open, rename, rm, writeFile } from "node:fs/promises";
+import { open, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 import {
   compileRulesPack,
@@ -42,7 +43,29 @@ export type RulesPackRefusal =
   | "tenant_unknown"
   | "version_downgrade"
   | "version_conflict"
-  | "too_large";
+  | "too_large"
+  | "unreadable";
+
+/**
+ * Version history key: the platform numbers versions per (tenant, packId),
+ * and a workstation re-enrolled in another organisation starts a new history.
+ */
+export function historyKey(tenantId: string, packId: string): string {
+  return `${packId}@${tenantId}`;
+}
+
+/** An own entry of a record: never a property inherited from Object. */
+export function ownEntry<T>(
+  record: Readonly<Record<string, T>>,
+  key: string,
+): T | undefined {
+  return Object.hasOwn(record, key) ? record[key] : undefined;
+}
+
+/** `YYYY-MM-DDTHH:MM:SSZ`, the form of the signed timestamps (§2). */
+export function contractTimestamp(date: Date): string {
+  return `${date.toISOString().slice(0, 19)}Z`;
+}
 
 /** The raw build constant, or "" when this build carries no authority key. */
 export function builtInAuthorityKeySource(): string {
@@ -132,7 +155,13 @@ export function verifyRulesPackEnvelope(
     return { ok: false, reason: "malformed_envelope" };
   const authority = keys.find((key) => key.keyId === value.keyId);
   if (authority === undefined) return { ok: false, reason: "unknown_key" };
-  const canonical = Buffer.from(canonicalRulesPack(value.payload), "utf8");
+  let canonical: Buffer;
+  try {
+    canonical = Buffer.from(canonicalRulesPack(value.payload), "utf8");
+  } catch {
+    // Pathological nesting: refused, never an exception for the caller.
+    return { ok: false, reason: "malformed_envelope" };
+  }
   let valid: boolean;
   try {
     valid = verify(
@@ -162,7 +191,7 @@ export interface AcceptanceContext {
   readonly keys: readonly AuthorityKey[];
   /** Tenant this workstation is enrolled in; undefined refuses every pack. */
   readonly enrolledTenant: string | undefined;
-  /** Highest version accepted so far, per packId (anti-downgrade). */
+  /** Highest version accepted so far, by historyKey (anti-downgrade). */
   readonly highest: Readonly<Record<string, AcceptedVersion>>;
   readonly now: Date;
   /**
@@ -216,7 +245,10 @@ export function acceptRulesPack(
     return { ok: false, reason: "tenant_unknown" };
   if (payload.tenantId !== context.enrolledTenant)
     return { ok: false, reason: "tenant_mismatch" };
-  const previous = context.highest[payload.packId];
+  const previous = ownEntry(
+    context.highest,
+    historyKey(payload.tenantId, payload.packId),
+  );
   if (previous !== undefined) {
     if (payload.version < previous.version)
       return { ok: false, reason: "version_downgrade" };
@@ -231,13 +263,14 @@ export function acceptRulesPack(
   });
   if (!compiled.ok)
     return { ok: false, reason: "invalid_pack", detail: compiled.error };
-  const expires = Date.parse(payload.expiresAt);
   return {
     ok: true,
     pack: compiled.pack,
     digest: verified.digest,
     keyId: verified.keyId,
-    expired: !(expires > context.now.getTime()),
+    // Compared as strings, like the validity window (§2): a timestamp that
+    // is not a real date cannot turn into NaN here.
+    expired: !(payload.expiresAt > contractTimestamp(context.now)),
   };
 }
 
@@ -277,12 +310,15 @@ export function rulesPackStatePath(storage: string): string {
 /** Read at most `MAX_RULES_PACK_BYTES`; larger files are refused, not truncated. */
 export async function readBoundedFile(
   path: string,
-): Promise<string | "absent" | "too_large"> {
+): Promise<string | "absent" | "too_large" | "unreadable"> {
   let handle;
   try {
     handle = await open(path, "r");
-  } catch {
-    return "absent";
+  } catch (error) {
+    // Only a missing file means "no pack"; any other failure is reported.
+    return (error as NodeJS.ErrnoException).code === "ENOENT"
+      ? "absent"
+      : "unreadable";
   }
   try {
     const buffer = Buffer.alloc(MAX_RULES_PACK_BYTES + 1);
@@ -299,6 +335,8 @@ export async function readBoundedFile(
     }
     if (size > MAX_RULES_PACK_BYTES) return "too_large";
     return buffer.subarray(0, size).toString("utf8");
+  } catch {
+    return "unreadable";
   } finally {
     await handle.close();
   }
@@ -313,12 +351,45 @@ function isAcceptedVersion(value: unknown): value is AcceptedVersion {
   );
 }
 
+const SYNC_OUTCOMES: readonly string[] = [
+  "applied",
+  "none",
+  "rejected",
+  "error",
+];
+const SYNC_REASONS: readonly string[] = [
+  "no_authority_key",
+  "malformed_envelope",
+  "unknown_key",
+  "invalid_signature",
+  "invalid_pack",
+  "tenant_mismatch",
+  "tenant_unknown",
+  "version_downgrade",
+  "version_conflict",
+  "too_large",
+  "unreadable",
+  "sync_failed",
+];
+
+function isSyncRecord(value: unknown): value is RulesPackSyncRecord {
+  return (
+    isObject(value) &&
+    typeof value.at === "string" &&
+    typeof value.outcome === "string" &&
+    SYNC_OUTCOMES.includes(value.outcome) &&
+    (value.reason === undefined ||
+      (typeof value.reason === "string" && SYNC_REASONS.includes(value.reason)))
+  );
+}
+
 /** The persisted state; unreadable or malformed state reads as empty. */
 export async function readRulesPackState(
   storage: string,
 ): Promise<RulesPackState> {
   const raw = await readBoundedFile(rulesPackStatePath(storage));
-  if (raw === "absent" || raw === "too_large") return EMPTY_RULES_PACK_STATE;
+  if (raw === "absent" || raw === "too_large" || raw === "unreadable")
+    return EMPTY_RULES_PACK_STATE;
   try {
     const value: unknown = JSON.parse(raw);
     if (
@@ -327,9 +398,12 @@ export async function readRulesPackState(
       !isObject(value.highest)
     )
       return EMPTY_RULES_PACK_STATE;
-    const highest: Record<string, AcceptedVersion> = {};
-    for (const [packId, entry] of Object.entries(value.highest))
-      if (isAcceptedVersion(entry)) highest[packId] = entry;
+    // fromEntries defines own properties, even for a key like "__proto__".
+    const highest: Record<string, AcceptedVersion> = Object.fromEntries(
+      Object.entries(value.highest).filter(([, entry]) =>
+        isAcceptedVersion(entry),
+      ),
+    ) as Record<string, AcceptedVersion>;
     const tenantSource = value.tenantSource;
     const lastSync = value.lastSync;
     return {
@@ -347,25 +421,31 @@ export async function readRulesPackState(
       ...(typeof value.selfTestedDigest === "string"
         ? { selfTestedDigest: value.selfTestedDigest }
         : {}),
-      ...(isObject(lastSync) &&
-      typeof lastSync.at === "string" &&
-      typeof lastSync.outcome === "string"
-        ? { lastSync: lastSync as unknown as RulesPackSyncRecord }
-        : {}),
+      ...(isSyncRecord(lastSync) ? { lastSync } : {}),
     };
   } catch {
     return EMPTY_RULES_PACK_STATE;
   }
 }
 
-/** Write a file readable by this user only, atomically (temporary + rename). */
+/**
+ * Write a file readable by this user only, atomically: a unique temporary
+ * file, flushed to disk, then renamed over the target. A crash leaves the
+ * old or the new content, never an empty file.
+ */
 export async function writePrivateFile(
   path: string,
   content: string,
 ): Promise<void> {
-  const temporary = `${path}.${String(process.pid)}.tmp`;
+  const temporary = `${path}.${String(process.pid)}.${randomUUID()}.tmp`;
   try {
-    await writeFile(temporary, content, { mode: 0o600 });
+    const handle = await open(temporary, "wx", 0o600);
+    try {
+      await handle.writeFile(content, "utf8");
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
     await rename(temporary, path);
   } catch (error) {
     await rm(temporary, { force: true });
@@ -401,7 +481,8 @@ export async function loadAppliedRulesPack(
 ): Promise<AppliedRulesPack> {
   const raw = await readBoundedFile(rulesPackPath(storage));
   if (raw === "absent") return { status: "none" };
-  if (raw === "too_large") return { status: "rejected", reason: "too_large" };
+  if (raw === "too_large" || raw === "unreadable")
+    return { status: "rejected", reason: raw };
   let envelope: unknown;
   try {
     envelope = JSON.parse(raw);

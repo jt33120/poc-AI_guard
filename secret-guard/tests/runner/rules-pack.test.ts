@@ -6,7 +6,7 @@ import {
   type KeyObject,
 } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -16,6 +16,7 @@ import {
   builtInAuthorityKeys,
   canonicalRulesPack,
   EMPTY_RULES_PACK_STATE,
+  historyKey,
   loadAppliedRulesPack,
   MAX_RULES_PACK_BYTES,
   parseAuthorityKeys,
@@ -54,6 +55,7 @@ const vectors = JSON.parse(
 };
 const vector = vectors.signature;
 const TENANT = "00000000-0000-4000-8000-000000000001";
+const HISTORY = historyKey(TENANT, "acme-main");
 // The public TEST authority of the contract vectors; never a production key.
 const testKeys = parseAuthorityKeys(vector.publicKeyBase64);
 
@@ -220,28 +222,30 @@ describe("hostile envelopes", () => {
     expect(
       acceptRulesPack(
         vector.envelope,
-        context({ highest: { "acme-main": { version: 4, digest } } }),
+        context({ highest: { [HISTORY]: { version: 4, digest } } }),
       ),
     ).toEqual({ ok: false, reason: "version_downgrade" });
     expect(
       acceptRulesPack(
         vector.envelope,
         context({
-          highest: { "acme-main": { version: 3, digest: "0".repeat(64) } },
+          highest: { [HISTORY]: { version: 3, digest: "0".repeat(64) } },
         }),
       ),
     ).toEqual({ ok: false, reason: "version_conflict" });
     expect(
       acceptRulesPack(
         vector.envelope,
-        context({ highest: { "acme-main": { version: 3, digest } } }),
+        context({ highest: { [HISTORY]: { version: 3, digest } } }),
       ),
     ).toMatchObject({ ok: true });
     // Another packId is unrelated to this history.
     expect(
       acceptRulesPack(
         vector.envelope,
-        context({ highest: { other: { version: 99, digest } } }),
+        context({
+          highest: { [historyKey(TENANT, "other")]: { version: 99, digest } },
+        }),
       ),
     ).toMatchObject({ ok: true });
   });
@@ -401,5 +405,73 @@ describe("rules pack on disk", () => {
       tenantSource: "register",
       highest: { good: { version: 2, digest: "a".repeat(64) } },
     });
+  });
+
+  it("reports an unreadable pack instead of treating it as absent", async () => {
+    if (process.platform === "win32" || process.getuid?.() === 0) return;
+    const directory = await freshStorage();
+    await writeFile(rulesPackPath(directory), JSON.stringify(vector.envelope));
+    await chmod(rulesPackPath(directory), 0o000);
+    expect(await loadAppliedRulesPack(directory, testKeys)).toEqual({
+      status: "rejected",
+      reason: "unreadable",
+    });
+  });
+
+  it("drops an unknown sync record and inherited keys", async () => {
+    const directory = await freshStorage();
+    await writeFile(
+      join(directory, "rules-pack-state.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        highest: {},
+        lastSync: { at: "x", outcome: "rejected", reason: "made_up" },
+      }),
+    );
+    expect((await readRulesPackState(directory)).lastSync).toBeUndefined();
+    // A packId named like an Object property has no inherited history.
+    const constructorPack = signed({ ...reference, packId: "constructor" });
+    expect(acceptRulesPack(constructorPack, context())).toMatchObject({
+      ok: true,
+    });
+  });
+});
+
+describe("rules pack edge cases", () => {
+  it("compares expiry as signed timestamps, never as NaN", () => {
+    const odd = signed({ ...reference, expiresAt: "2027-13-01T00:00:00Z" });
+    // Month 13 is not a date, but it sorts after the current time.
+    expect(acceptRulesPack(odd, context())).toMatchObject({
+      ok: true,
+      expired: false,
+    });
+  });
+
+  it("refuses a pathologically nested payload without throwing", () => {
+    let nested: unknown = 0;
+    for (let depth = 0; depth < 100_000; depth += 1) nested = [nested];
+    expect(
+      verifyRulesPackEnvelope(
+        {
+          payload: { deep: nested },
+          keyId: vector.keyId,
+          signature: vector.envelope.signature,
+        },
+        testKeys,
+      ),
+    ).toEqual({ ok: false, reason: "malformed_envelope" });
+  });
+
+  it("starts a new history for another organisation after re-enrollment", () => {
+    const other = signed({ ...reference, tenantId: "tenant-b", version: 1 });
+    expect(
+      acceptRulesPack(
+        other,
+        context({
+          enrolledTenant: "tenant-b",
+          highest: { [HISTORY]: { version: 9, digest: "0".repeat(64) } },
+        }),
+      ),
+    ).toMatchObject({ ok: true });
   });
 });

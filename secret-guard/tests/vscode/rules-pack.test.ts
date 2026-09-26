@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   authorityKeyId,
   canonicalRulesPack,
+  historyKey,
   parseAuthorityKeys,
   readRulesPackState,
   rulesPackPath,
@@ -52,6 +53,7 @@ const vectors = JSON.parse(
   };
 };
 const TENANT = "00000000-0000-4000-8000-000000000001";
+const HISTORY = historyKey(TENANT, "acme-main");
 const keys = parseAuthorityKeys(vectors.signature.publicKeyBase64);
 const privateKey: KeyObject = createPrivateKey({
   key: Buffer.concat([
@@ -122,7 +124,7 @@ describe("rules pack synchronisation", () => {
     expect(state).toMatchObject({
       tenantId: TENANT,
       tenantSource: "first_pack",
-      highest: { "acme-main": { version: 3 } },
+      highest: { [HISTORY]: { version: 3 } },
       lastSync: { outcome: "applied" },
     });
     expect(state.selfTestedDigest).toBe(
@@ -226,7 +228,7 @@ describe("rules pack synchronisation", () => {
       version: 4,
     });
     expect(
-      (await readRulesPackState(directory)).highest["acme-main"]?.version,
+      (await readRulesPackState(directory)).highest[HISTORY]?.version,
     ).toBe(4);
   });
 
@@ -252,7 +254,7 @@ describe("rules pack synchronisation", () => {
     });
     // History survives: the old version cannot come back.
     expect(
-      (await readRulesPackState(directory)).highest["acme-main"]?.version,
+      (await readRulesPackState(directory)).highest[HISTORY]?.version,
     ).toBe(3);
   });
 
@@ -300,7 +302,7 @@ describe("rules pack synchronisation", () => {
     });
     await forgetEnrollment(directory);
     expect(await readRulesPackState(directory)).toMatchObject({
-      highest: { "acme-main": { version: 3 } },
+      highest: { [HISTORY]: { version: 3 } },
     });
     expect((await readRulesPackState(directory)).tenantId).toBeUndefined();
     expect(await view(directory)).toMatchObject({
@@ -320,7 +322,7 @@ describe("offline import", () => {
     expect(await readRulesPackState(directory)).toMatchObject({
       tenantId: TENANT,
       tenantSource: "import",
-      highest: { "acme-main": { version: 4 } },
+      highest: { [HISTORY]: { version: 4 } },
     });
     expect(
       await importRulesPack(
