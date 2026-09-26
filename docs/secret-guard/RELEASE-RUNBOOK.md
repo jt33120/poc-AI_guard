@@ -41,4 +41,4 @@ En cas de compromission de la graine : retirer immédiatement l’ancienne clé 
 
 ### Builds de développement et de test
 
-Sans `XSOM_RULES_AUTHORITY_KEYS`, `packages/vscode/build.mjs` annonce « no key — this build refuses every rules pack » et l’extension affiche « Réglage indisponible : build sans clé xSOM ». Les tests utilisent la clé de TEST publique des vecteurs du contrat, uniquement avec `XSOM_RULES_TEST_BUILD=1` ; la suite Extension Host reconstruit l’extension sans elle à la fin.
+Sans `XSOM_RULES_AUTHORITY_KEYS`, `packages/vscode/build.mjs` annonce « no key — this build refuses every rules pack » et l’extension affiche « Réglage indisponible : version non officielle ». Les tests utilisent la clé de TEST publique des vecteurs du contrat, uniquement avec `XSOM_RULES_TEST_BUILD=1` ; la suite Extension Host reconstruit l’extension sans elle à la fin.

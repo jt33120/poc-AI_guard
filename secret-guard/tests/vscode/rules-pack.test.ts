@@ -173,7 +173,7 @@ describe("rules pack synchronisation", () => {
       state: "active",
       tone: "warn",
       version: 4,
-      line: "Réglage xSOM · v4 · 3 règles · jusqu’au 01/09/2027 · mise à jour : signature invalide",
+      line: "Réglage xSOM · v4 · 3 règles · mise à jour refusée",
       reason: "rules_pack_rejected",
     });
     expect(
@@ -193,7 +193,7 @@ describe("rules pack synchronisation", () => {
     expect(await view(directory)).toMatchObject({
       state: "active",
       version: 4,
-      line: "Réglage xSOM · v4 · 3 règles · jusqu’au 01/09/2027 · mise à jour : synchronisation impossible",
+      line: "Réglage xSOM · v4 · 3 règles · hors ligne",
     });
   });
 
@@ -283,7 +283,7 @@ describe("rules pack synchronisation", () => {
       rulesPackView(await readRulesPackSnapshot(directory, [], NOW)),
     ).toMatchObject({
       state: "no_authority_key",
-      line: "Réglage indisponible : build sans clé xSOM",
+      line: "Réglage indisponible : version non officielle",
     });
   });
 

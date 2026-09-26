@@ -32,7 +32,7 @@ export interface RulesPackView {
 }
 
 const REFUSALS: Record<RulesPackRefusal | "sync_failed", string> = {
-  no_authority_key: "build sans clé xSOM",
+  no_authority_key: "version non officielle",
   malformed_envelope: "format invalide",
   unknown_key: "signataire inconnu",
   invalid_signature: "signature invalide",
@@ -86,14 +86,18 @@ export function rulesPackView(snapshot: RulesPackSnapshot): RulesPackView {
         reason: "rules_pack_expired",
         ...identity,
       };
-    const stale =
+    // One short line: the validity date, or what went wrong with the last
+    // update (the protection centre gives the reason).
+    const status =
       lastRefusal === undefined
-        ? ""
-        : ` · mise à jour : ${REFUSALS[lastRefusal]}`;
+        ? `jusqu’au ${date}`
+        : lastRefusal === "sync_failed"
+          ? "hors ligne"
+          : "mise à jour refusée";
     return {
       state: "active",
       tone: lastRefusal === undefined ? "ok" : "warn",
-      line: `${head} · jusqu’au ${date}${stale}`,
+      line: `${head} · ${status}`,
       title: "Réglage sur mesure xSOM",
       detail: `${rules(pack.detectorCount)} calibrées et signées par xSOM pour votre organisation, appliquées sur ce poste en plus des règles intégrées. Valable jusqu’au ${date}.${lastRefusal === undefined ? "" : ` Dernière mise à jour non appliquée : ${REFUSALS[lastRefusal]} ; la version vérifiée reste active.`}`,
       offerRequest: false,
@@ -108,10 +112,10 @@ export function rulesPackView(snapshot: RulesPackSnapshot): RulesPackView {
     return {
       state: "no_authority_key",
       tone: "warn",
-      line: "Réglage indisponible : build sans clé xSOM",
+      line: "Réglage indisponible : version non officielle",
       title: "Réglage sur mesure indisponible",
       detail:
-        "Cette version de l’extension ne contient pas la clé d’autorité xSOM : aucun réglage ne peut être vérifié, donc aucun n’est appliqué. Installez la version officielle.",
+        "Cette version de l’extension ne contient pas la clé d’autorité xSOM : aucun réglage ne peut être vérifié, donc aucun n’est appliqué. Les règles intégrées protègent ce poste. Installez la version officielle.",
       offerRequest: false,
     };
 
