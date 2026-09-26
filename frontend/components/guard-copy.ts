@@ -34,12 +34,12 @@ export const HOME_HERO_MEDIA = {
   fr: {
     mp4: "/signal-media/xsom-ai-home-v3-fr.mp4",
     poster: "/signal-media/xsom-ai-home-v3-fr.jpg",
-    label: "xSOM AI Studio — Vos équipes adoptent l’IA. Secrets, données, actions d’agents : exposés. Détecter les secrets, bloquer les actions à risque, tracer chaque décision. La couche cybersécurité de vos usages IA. Logiciels et conseil.",
+    label: "xSOM AI Studio : vos équipes adoptent l’IA. Secrets, données, actions d’agents : exposés. Détecter les secrets, bloquer les actions à risque, tracer chaque décision. La couche cybersécurité de vos usages IA. Logiciels et conseil.",
   },
   en: {
     mp4: "/signal-media/xsom-ai-home-v3-en.mp4",
     poster: "/signal-media/xsom-ai-home-v3-en.jpg",
-    label: "xSOM AI Studio — Your teams embrace AI. Secrets, data, agent actions: exposed. Detect secrets, block risky actions, trace every decision. The cybersecurity layer for every AI use case. Software and consulting.",
+    label: "xSOM AI Studio: your teams embrace AI. Secrets, data, agent actions: exposed. Detect secrets, block risky actions, trace every decision. The cybersecurity layer for every AI use case. Software and consulting.",
   },
 };
 

@@ -20,7 +20,7 @@ test("the entire nested orientation copy stays illustrative, without invented co
     expect(phrases.length).toBeGreaterThan(50);
     for (const phrase of phrases) {
       expect(phrase.trim(), `${language}: an empty visible label`).not.toBe("");
-      // Per-row proof belongs on /evidence, not in an illustrative route selector.
+      // Per-row proof never belongs in an illustrative route selector.
       expect(phrase, `${language}: an unbound evidence claim`).not.toMatch(/\bM-\d{2}\b|100\s*%/i);
       if (coverage.test(phrase)) expect(phrase, `${language}: hardcoded coverage count`).not.toMatch(number);
     }
@@ -71,9 +71,6 @@ test("the landing explains AI uses, introduces the extension and keeps both next
 
   expect(apiRequests).toBe(0);
 
-  await page.getByRole("link", { name: "Périmètre et preuves", exact: true }).first().click();
-  await expect(page).toHaveURL(/\/evidence$/);
-  await expect(page.locator("#menaces .paysage .menace")).toHaveCount(23);
 });
 
 test("the products page opens on its film, then shows each product in a carousel", async ({ page }) => {
@@ -99,7 +96,8 @@ test("the products page opens on its film, then shows each product in a carousel
   await expect(slides.nth(0).getByRole("heading", { name: "Secret Guard", exact: true })).toBeAttached();
   await expect(slides.nth(0).getByRole("link", { name: "Découvrir Secret Guard" })).toHaveAttribute("href", "/extension");
   await expect(slides.nth(1).getByRole("heading", { name: "AI Guard", exact: true })).toBeAttached();
-  await expect(slides.nth(1).locator('a[href="/saas"]')).toHaveCount(1);
+  // La plateforme s'ouvre sur la connexion au compte.
+  await expect(slides.nth(1).getByRole("link", { name: "Explorer la plateforme" })).toHaveAttribute("href", "/login");
   await expect(slides.nth(1).locator('a[href^="mailto:"]')).toHaveCount(1);
 
   // Les sélecteurs et les flèches suivent la diapositive affichée.
@@ -133,7 +131,7 @@ test("the products page opens on its film, then shows each product in a carousel
 });
 
 test("every public header carries the same orientation menu", async ({ page }) => {
-  for (const chemin of ["/", "/produits", "/saas", "/extension", "/menaces"]) {
+  for (const chemin of ["/", "/produits", "/extension", "/menaces"]) {
     await page.goto(chemin);
     const navigation = page.getByRole("navigation", { name: "Navigation principale" });
     await expect(navigation.getByRole("link", { name: "Nos Produits", exact: true })).toHaveAttribute("href", "/produits");
@@ -253,53 +251,6 @@ test("the hero respects reduced motion without downloading its video", async ({ 
   expect(videoRequests).toEqual([]);
 });
 
-test("the self-serve page says what the product does, and where that stops", async ({ page }) => {
-  await page.goto("/produits");
-  await page.locator('#gamme a[href="/saas"]').click();
-  await expect(page).toHaveURL(/\/saas$/);
-
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Une règle avant chaque action raccordée");
-
-  // L'inventaire : six familles, et chacune porte des lignes concrètes. Le compte
-  // par famille est ce qui distingue cette page de celle d'avant, qui tenait en six
-  // phrases vagues — sans lui, six titres vides passeraient le test.
-  const familles = page.locator(".guard-included__list > li");
-  await expect(familles).toHaveCount(6);
-  for (let i = 0; i < 6; i++) {
-    await expect(familles.nth(i).locator("ul > li").count()).resolves.toBeGreaterThanOrEqual(4);
-  }
-  await expect(familles.first()).toContainText("Juge LLM sur les seuls cas ambigus");
-
-  // La nuance que l'inventaire ne porte pas vit sur la page qui la prouve.
-  await expect(page.locator(".guard-included").getByRole("link")).toHaveAttribute("href", "/evidence");
-
-  // La borne, et c'est la raison d'être de cette section : la passerelle
-  // contraignante ne s'obtient pas en s'inscrivant. La page le dit, et elle donne
-  // la porte — un courriel, comme le chemin du conseil.
-  const passerelle = page.locator(".guard-gateway");
-  await expect(passerelle).toContainText("accès direct à la base");
-  await expect(passerelle.getByRole("link")).toHaveAttribute("href", /^mailto:/);
-
-  // Le geste « Brancher » décrit les deux voies qu'un inscrit obtient vraiment.
-  // Promettre la passerelle ici apprendrait à faire ce qui ne marchera pas.
-  const brancher = page.locator(".guard-start__steps li").nth(2);
-  await expect(brancher).toContainText("adresse de base");
-  await expect(brancher).not.toContainText("passerelle");
-
-  await expect(page.locator(".guard-start__steps li")).toHaveCount(4);
-  await expect(page.locator(".guard-start__steps li").first()).toContainText("Créer le compte");
-
-  // Le périmètre est dit sur la page qui vend, pas seulement sur celle qui prouve.
-  await expect(page.getByText("n’est pas contrôlé", { exact: false })).toBeVisible();
-
-  // La sortie mène à la création de compte, pas à un formulaire de contact : c'est
-  // toute la différence entre ce chemin et celui du conseil. Le sélecteur exclut
-  // l'en-tête, dont la porte du compte porte les mêmes mots pour une autre page.
-  await expect(
-    page.locator(".guard-saas-hero").getByRole("link", { name: "Créer un compte", exact: true }),
-  ).toHaveAttribute("href", "/signup");
-});
-
 test("the extension page hands over a file that installs, and names its limits", async ({ page }) => {
   await page.goto("/produits");
   await page.locator('#gamme a[href="/extension"]').click();
@@ -372,7 +323,7 @@ for (const width of [390, 768, 1440]) {
     await expect(page.locator("#campus-detail")).toContainText("Model & data teams");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 
-    await page.goto("/saas");
+    await page.goto("/extension");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 
     if (width === 390) {
@@ -386,9 +337,6 @@ for (const width of [390, 768, 1440]) {
       const seconde = await etapes.nth(1).boundingBox();
       expect(seconde!.y).toBeGreaterThan(premiere!.y);
     }
-
-    await page.goto("/extension");
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 
     await page.goto("/produits");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

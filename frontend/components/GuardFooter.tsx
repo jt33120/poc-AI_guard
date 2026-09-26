@@ -22,7 +22,6 @@ export function GuardFooter() {
           <Link href="/produits">{fr ? "Nos Produits" : "Our products"}</Link>
           <a href="https://www.xsom.fr" target="_blank" rel="noreferrer">{fr ? "Nos conseils" : "Our consulting"} ↗</a>
           <Link href="/menaces">{fr ? "Vos besoins" : "Your needs"}</Link>
-          <Link href="/evidence">{fr ? "Périmètre et preuves" : "Scope and evidence"}</Link>
         </nav>
         <nav aria-label={fr ? "Informations légales" : "Legal information"}>
           <h2>{fr ? "Informations légales" : "Legal information"}</h2>

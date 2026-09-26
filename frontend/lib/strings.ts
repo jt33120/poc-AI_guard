@@ -41,15 +41,6 @@ export const STR = {
   },
 
   // Public profile diagnostic (QO-7)
-  "triage.title": {
-    en: "Start with your AI use cases.",
-    fr: "Partons de vos usages de l’IA.",
-  },
-  "triage.lede": {
-    en: "Select your team's uses. The diagnostic compares them with the POC’s published scope. It does not certify your deployment or connect a service.",
-    fr: "Sélectionnez les usages de votre équipe. Le diagnostic les compare au périmètre publié du POC. Il ne certifie pas votre déploiement et ne connecte aucun service.",
-  },
-  "triage.profiles": { en: "How do you use AI?", fr: "Comment utilisez-vous l'IA ?" },
   "triage.p1a": { en: "Our developers integrate an AI model", fr: "Nos développeurs intègrent un modèle IA" },
   "triage.p1a.hint": {
     en: "OpenAI, Claude or another hosted model, called from our application.",
@@ -80,38 +71,9 @@ export const STR = {
     en: "Our own training or fine-tuning pipelines.",
     fr: "Nos propres chaînes d'entraînement ou d'affinage.",
   },
-  "triage.email": { en: "Professional e-mail", fr: "E-mail professionnel" },
-  "triage.submit": { en: "See my diagnostic", fr: "Voir mon diagnostic" },
-  "triage.busy": { en: "Computing…", fr: "Calcul en cours…" },
-  "triage.needprofile": {
-    en: "Tick at least one: the diagnostic is the crossing of your usage with what we prove.",
-    fr: "Cochez-en au moins un : le diagnostic est le croisement de votre usage avec ce que nous prouvons.",
-  },
-  "triage.failed": { en: "The diagnostic could not be computed.", fr: "Le diagnostic n'a pas pu être calculé." },
-  "triage.result.lines": { en: "threat lines", fr: "lignes de menace" },
 
-  // --- L'offre libre-service (page /saas) --------------------------------------
-  // Seules les métadonnées vivent ici : le corps de la page est dans `guard-copy.ts`
-  // avec le reste de la copie d'accueil, pour qu'un seul fichier porte la voix des
-  // pages publiques.
-  "saas.meta.title": {
-    en: "Self-serve offer",
-    fr: "L'offre libre-service",
-  },
-  "saas.meta.lede": {
-    en: "What the self-serve offer includes, and the four steps to connect your first agent.",
-    fr: "Ce que l'offre libre-service inclut, et les quatre gestes pour brancher votre premier agent.",
-  },
-  "triage.result.applicable": { en: "concern you", fr: "vous concernent" },
-  "triage.result.ours": { en: "are ours to hold", fr: "sont sur notre terrain" },
-  "triage.result.blocked": { en: "we block today", fr: "nous bloquons aujourd'hui" },
-  "triage.result.again": { en: "Change my answers", fr: "Modifier mes réponses" },
   // The purpose statement is rendered from the API response, never hardcoded here:
   // the text that governs a collection must travel with the collection.
-  "triage.privacy.before": {
-    en: "Your address is used to get back to you about this diagnostic. It is neither sold nor passed to a third party, and you may ask for its deletion at any time.",
-    fr: "Votre adresse sert à vous recontacter au sujet de ce diagnostic. Elle n'est ni revendue ni transmise à un tiers, et vous pouvez demander sa suppression à tout moment.",
-  },
 
   // Welcome / landing
   "welcome.badge": {

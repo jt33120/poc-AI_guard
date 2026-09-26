@@ -37,7 +37,8 @@ from core.triage import diagnose
 _RACINE = Path(__file__).resolve().parent.parent
 _GATE = _RACINE / "scripts" / "gen_marketing.py"
 _COPIE = _RACINE / "frontend" / "lib" / "strings.ts"
-_PAGE = _RACINE / "frontend" / "app" / "evidence" / "page.tsx"
+#: Une page réelle du front, que les tests modifient puis restaurent.
+_PAGE = _RACINE / "frontend" / "components" / "ProductsOffer.tsx"
 _FAITS = _RACINE / "frontend" / "lib" / "generated" / "marketing-facts.json"
 _CARTE = _RACINE / "coverage" / "map.json"
 
@@ -167,8 +168,8 @@ def test_a_number_written_into_the_markup_is_refused() -> None:
     try:
         _PAGE.write_text(
             original.replace(
-                '<main className="relative">',
-                '<main className="relative">\n      <p>16 lignes de menace, 8 bloquées</p>',
+                '<main>',
+                '<main>\n      <p>16 lignes de menace, 8 bloquées</p>',
                 1,
             ),
             encoding="utf-8",
@@ -272,7 +273,7 @@ def test_a_number_in_a_comment_is_not_read_as_markup(page_restauree: Path) -> No
     """Un commentaire n'est pas de la copie : le visiteur ne le lit jamais."""
     _inserer(
         page_restauree,
-        '<main className="relative">',
+        '<main>',
         "{/* Seize lignes de menace : le relevé les publie via <ThreatLedger />. */}\n      ",
     )
     rendu = _gate()
@@ -289,7 +290,7 @@ def test_a_number_in_markup_beside_a_comment_is_still_refused(page_restauree: Pa
     """
     _inserer(
         page_restauree,
-        '<main className="relative">',
+        '<main>',
         "{/* Un commentaire qui cite <ThreatLedger /> et parle de menaces. */}\n"
         "      <p>16 lignes de menace, 8 bloquées</p>\n      ",
     )
@@ -306,7 +307,7 @@ def test_a_double_slash_inside_a_string_opens_no_comment(page_restauree: Path) -
     """
     _inserer(
         page_restauree,
-        '<main className="relative">',
+        '<main>',
         '<a href="https://exemple.test/a">16 lignes de menace</a>\n      ',
     )
     rendu = _gate()
@@ -324,7 +325,7 @@ def test_a_regex_literal_does_not_swallow_the_rest_of_its_line(page_restauree: P
     """
     _inserer(
         page_restauree,
-        '<main className="relative">',
+        '<main>',
         '<span>{"x".replace(/^https?:\\/\\//, "")}</span><p>16 lignes de menace</p>\n      ',
     )
     rendu = _gate()
@@ -347,7 +348,7 @@ def test_a_file_opening_on_a_jsdoc_block_is_still_scanned(page_restauree: Path) 
     """
     _inserer(
         page_restauree,
-        '<main className="relative">',
+        '<main>',
         "{/**\n       * Un en-tête qui cite <ThreatLedger /> et parle de menaces.\n       */}\n"
         "      <p>16 lignes de menace</p>\n      ",
     )

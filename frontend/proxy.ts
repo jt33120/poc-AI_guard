@@ -19,7 +19,7 @@ const PROTECTED = [
 ];
 
 export async function proxy(request: NextRequest) {
-  // Segment-aware match so e.g. /executive-preview (public) is NOT caught by /executive.
+  // Segment-aware match, so a public path that merely starts like a console path is not caught.
   const path = request.nextUrl.pathname;
   const isProtected = PROTECTED.some(
     (p) => path === p || path.startsWith(`${p}/`),

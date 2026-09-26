@@ -212,11 +212,6 @@ test("the glossary table combines search, facets and sorting, expands rows and t
     exact: true,
   });
   await indirect.click();
-  await expect(
-    page
-      .locator("#injection-de-prompt-details")
-      .getByRole("link", { name: /Relevé de couverture · M-02/ }),
-  ).toHaveAttribute("href", "/evidence#menaces");
   // Les marqueurs de flèche sont posés UNE fois pour le document, quel que soit le
   // nombre de figures ouvertes.
   await page
@@ -246,10 +241,6 @@ test("the glossary table combines search, facets and sorting, expands rows and t
   await expect(
     headers.filter({ hasText: "Tool poisoning and rug pull" }),
   ).toHaveCount(0);
-  await expect(page.locator(".guard-glossary__scope a")).toHaveAttribute(
-    "href",
-    "/evidence",
-  );
   expect(definitionApiRequests).toBe(0);
 });
 

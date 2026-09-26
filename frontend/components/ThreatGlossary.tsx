@@ -419,7 +419,7 @@ export function ThreatGlossary() {
             )}
           </div>
 
-          <p className="guard-glossary__scope">{copy.scope} <Link href="/evidence">{copy.deeper} ↗</Link></p>
+          <p className="guard-glossary__scope">{copy.scope}</p>
           <aside className="guard-glossary__next" aria-labelledby="glossary-next-heading">
             <div>
               <h2 id="glossary-next-heading">{copy.nextTitle}</h2>
@@ -686,7 +686,6 @@ function ThreatDetails({ entry, lang, copy }: { entry: GlossaryEntry; lang: Lang
             {copy.guardHeading} · {copy.coverage[entry.coverage]}
           </h3>
           <p>{text.guard}</p>
-          {entry.releve && <Link href="/evidence#menaces">{copy.proof} · {entry.releve} <span aria-hidden="true">↗</span></Link>}
         </div>
         <div className="guard-glossary__guard" data-coverage={developerGuard.mode === "B" ? "yes" : "no"} data-developer-guard-mode={developerGuard.mode}>
           <h3>Secret Guard · {developerGuard.mode}</h3>

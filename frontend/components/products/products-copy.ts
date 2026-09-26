@@ -6,12 +6,12 @@ export const PRODUCTS_HERO_MEDIA: FilmMedia = {
   fr: {
     mp4: "/signal-media/xsom-products-v1-fr.mp4",
     poster: "/signal-media/xsom-products-v1-fr.jpg",
-    label: "Nos produits — Sur le poste, protéger ce que vos équipes envoient aux IA. Dans votre infrastructure, contrôler chaque action de vos agents. Du poste au serveur : nos produits de cybersécurité IA.",
+    label: "Nos produits : sur le poste, protéger ce que vos équipes envoient aux IA. Dans votre infrastructure, contrôler chaque action de vos agents. Du poste au serveur : nos produits de cybersécurité IA.",
   },
   en: {
     mp4: "/signal-media/xsom-products-v1-en.mp4",
     poster: "/signal-media/xsom-products-v1-en.jpg",
-    label: "Our products — On the workstation, protect what your teams send to AI. In your infrastructure, control every action your agents take. From laptop to server: our AI cybersecurity products.",
+    label: "Our products: on the workstation, protect what your teams send to AI. In your infrastructure, control every action your agents take. From laptop to server: our AI cybersecurity products.",
   },
 };
 
@@ -44,7 +44,7 @@ export const PRODUCTS_COPY = {
         lead: "Tracez et monitorez les actions de vos agents, dans votre infrastructure.",
         body: "La passerelle se place entre vos agents et leurs outils. Chaque action rencontre une règle : automatique, soumise à une validation humaine, ou refusée. Le journal garde la décision, et il s’exporte.",
         features: ["Règles d’action et validation humaine", "Journal d’audit immuable et exportable", "Déployée dans votre infrastructure"],
-        primary: { label: "Explorer la plateforme", href: "/saas" },
+        primary: { label: "Explorer la plateforme", href: "/login" },
         secondary: { label: "Chiffrer un déploiement", href: CONTACT_MAILTO },
         note: "Console de découverte gratuite. Passerelle et intégration sur devis, distinctes des tarifs Secret Guard. Seuls les outils raccordés sont contrôlés.",
         imageAlt: "La console AI Guard : registre des outils, règle effective pour l’outil choisi, et le récit d’un appel jusqu’à sa trace.",
@@ -78,7 +78,7 @@ export const PRODUCTS_COPY = {
         lead: "Trace and monitor what your agents do, inside your infrastructure.",
         body: "The gateway sits between your agents and their tools. Every action meets a rule: automatic, held for human approval, or refused. The log keeps the decision, and it exports.",
         features: ["Action rules and human approval", "Immutable, exportable audit log", "Deployed in your infrastructure"],
-        primary: { label: "Explore the platform", href: "/saas" },
+        primary: { label: "Explore the platform", href: "/login" },
         secondary: { label: "Request a deployment quote", href: CONTACT_MAILTO },
         note: "Free discovery console. Gateway and integration quoted separately from Secret Guard pricing. Only connected tools are controlled.",
         imageAlt: "The AI Guard console: the tool registry, the effective rule for the selected tool, and one call told through to its trace.",
