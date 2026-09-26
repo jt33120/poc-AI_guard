@@ -10,6 +10,8 @@ import {
   sliceMappedView,
   type MappedView,
 } from "./mapping.js";
+import type { CompiledRulesPack } from "./custom/pack.js";
+import { WorkBudgetExceeded, WorkMeter } from "./custom/work.js";
 import { boundedScore, decisionForLevel, levelForScore } from "./risk.js";
 import {
   type InternalFinding,
@@ -21,6 +23,7 @@ import {
 import {
   MAX_INPUT_BYTES,
   RULESET_VERSION,
+  type CustomRuleRef,
   type Finding,
   type ScanInput,
   type ScanResult,
@@ -29,6 +32,14 @@ import {
 } from "./types.js";
 
 const MAX_FINDINGS = 2_048;
+/**
+ * Work allowed to the xSOM custom rules for one scan (see WorkMeter). Sized
+ * so that the worst valid pack stays around one second on the reference
+ * machine; beyond it the scan is incomplete and blocks.
+ */
+export const CUSTOM_RULES_WORK_BUDGET = 120_000_000;
+const CUSTOM_BLOCK_SCORE = 90;
+const CUSTOM_WARN_SCORE = 40;
 const BASE64_CANDIDATE = /[A-Za-z0-9+/_-]{20,16384}={0,2}/g;
 const TOKEN_PREFIXES = [
   "github_pat_",
@@ -325,35 +336,48 @@ function utf8Length(
   return bytes;
 }
 
-function limitFinding(
-  type: "scan_limit" | "scan_error",
-  reason: string,
-): Finding {
+type FailureKind = "scan_limit" | "scan_error" | "custom_budget";
+
+const FAILURES: Record<
+  FailureKind,
+  { ruleId: string; secretType: "scan_limit" | "scan_error"; reason: string }
+> = {
+  scan_limit: {
+    ruleId: "input_too_large",
+    secretType: "scan_limit",
+    reason: "maximum_input_size_exceeded",
+  },
+  scan_error: {
+    ruleId: "scanner_failure",
+    secretType: "scan_error",
+    reason: "scanner_failed_closed",
+  },
+  custom_budget: {
+    ruleId: "custom_rules_incomplete",
+    secretType: "scan_limit",
+    reason: "custom_rules_budget_exceeded",
+  },
+};
+
+function limitFinding(kind: FailureKind): Finding {
   const score = 100;
   const origin = { offset: 0, line: 1, column: 1 } as const;
+  const failure = FAILURES[kind];
   return {
-    ruleId: type === "scan_limit" ? "input_too_large" : "scanner_failure",
-    secretType: type,
+    ruleId: failure.ruleId,
+    secretType: failure.secretType,
     // A global scanner failure has no trustworthy source range. A zero-width
     // origin avoids allocating line metadata for a potentially huge input.
     span: { start: origin, end: origin },
     score,
     level: levelForScore(score),
-    reasons: [reason],
+    reasons: [failure.reason],
     encoding: "plain",
   };
 }
 
-function failedResult(
-  inputBytes: number,
-  type: "scan_limit" | "scan_error",
-): ScanResult {
-  const finding = limitFinding(
-    type,
-    type === "scan_limit"
-      ? "maximum_input_size_exceeded"
-      : "scanner_failed_closed",
-  );
+function failedResult(inputBytes: number, kind: FailureKind): ScanResult {
+  const finding = limitFinding(kind);
   return {
     decision: "BLOCK",
     level: "CRITICAL",
@@ -637,13 +661,75 @@ function collectFindings(
   return dedupeOverlaps(findings);
 }
 
+interface CustomInternalFinding {
+  readonly start: number;
+  readonly end: number;
+  readonly rule: CustomRuleRef;
+}
+
+/**
+ * Detections of the xSOM rules pack on the original text, or null when the
+ * work budget ran out (the scan is then incomplete and must block).
+ */
+function collectCustomFindings(
+  content: string,
+  rules: CompiledRulesPack,
+): CustomInternalFinding[] | null {
+  let perDetector;
+  try {
+    perDetector = rules.detect(
+      content,
+      new WorkMeter(CUSTOM_RULES_WORK_BUDGET),
+    );
+  } catch (error) {
+    if (error instanceof WorkBudgetExceeded) return null;
+    throw error;
+  }
+  const findings: CustomInternalFinding[] = [];
+  perDetector.forEach((matches, index) => {
+    const detector = rules.detectors[index];
+    if (detector === undefined) return;
+    const { spec } = detector;
+    const rule: CustomRuleRef = {
+      packId: rules.packId,
+      packVersion: rules.version,
+      detectorId: spec.id,
+      label: spec.label,
+      category: spec.category,
+      action: spec.action,
+    };
+    for (const match of matches)
+      findings.push({ start: match.start, end: match.end, rule });
+  });
+  return findings;
+}
+
+function customFinding(
+  finding: CustomInternalFinding,
+  spanFor: ReturnType<typeof createSpanFactory>,
+): Finding {
+  const score =
+    finding.rule.action === "block" ? CUSTOM_BLOCK_SCORE : CUSTOM_WARN_SCORE;
+  return {
+    ruleId: `xsom_${finding.rule.detectorId}`,
+    secretType: "custom_rule",
+    span: spanFor(finding.start, finding.end),
+    score,
+    level: levelForScore(score),
+    reasons: ["xsom_custom_rule", `category_${finding.rule.category}`],
+    encoding: "plain",
+    custom: finding.rule,
+  };
+}
+
 function successfulResult(
   content: string,
   inputBytes: number,
   internal: InternalFinding[],
+  custom: readonly CustomInternalFinding[] = [],
 ): ScanResult {
   const spanFor = createSpanFactory(content);
-  const findings = internal.map((finding) => {
+  const builtIn = internal.map((finding) => {
     const score = boundedScore(finding.score);
     return {
       ruleId: finding.ruleId,
@@ -655,6 +741,15 @@ function successfulResult(
       encoding: finding.encoding,
     } satisfies Finding;
   });
+  // Custom findings add to the built-in ones; the verdict is the stricter.
+  const findings = [
+    ...builtIn,
+    ...custom.map((finding) => customFinding(finding, spanFor)),
+  ].sort(
+    (left, right) =>
+      left.span.start.offset - right.span.start.offset ||
+      left.span.end.offset - right.span.end.offset,
+  );
   const score = findings.reduce(
     (maximum, finding) => Math.max(maximum, finding.score),
     0,
@@ -690,7 +785,13 @@ export function scan(input: ScanInput): ScanResult {
 
     const findings = collectFindings(content, input.languageId);
     if (findings === null) return failedResult(inputBytes, "scan_error");
-    return successfulResult(content, inputBytes, findings);
+    if (input.rules === undefined)
+      return successfulResult(content, inputBytes, findings);
+    const custom = collectCustomFindings(content, input.rules);
+    if (custom === null) return failedResult(inputBytes, "custom_budget");
+    if (findings.length + custom.length > MAX_FINDINGS)
+      return failedResult(inputBytes, "scan_error");
+    return successfulResult(content, inputBytes, findings, custom);
   } catch {
     return failedResult(inputBytes, "scan_error");
   }
@@ -721,7 +822,7 @@ export function redact(content: string, findings: readonly Finding[]): string {
         left.span.end.offset - right.span.end.offset ||
         right.score - left.score,
     );
-  const merged: Array<{ start: number; end: number; ruleId: string }> = [];
+  const merged: Array<{ start: number; end: number; name: string }> = [];
   for (const finding of valid) {
     const start = finding.span.start.offset;
     const end = finding.span.end.offset;
@@ -730,16 +831,33 @@ export function redact(content: string, findings: readonly Finding[]): string {
       previous.end = Math.max(previous.end, end);
       continue;
     }
-    merged.push({ start, end, ruleId: finding.ruleId });
+    merged.push({ start, end, name: placeholderName(finding) });
   }
 
   let redacted = content;
   for (const replacement of merged.reverse()) {
     const { start, end } = replacement;
-    const safeRuleId = replacement.ruleId.replace(/[^A-Za-z0-9_]/g, "_");
-    redacted = `${redacted.slice(0, start)}<REDACTED_${safeRuleId}>${redacted.slice(end)}`;
+    redacted = `${redacted.slice(0, start)}<REDACTED_${replacement.name}>${redacted.slice(end)}`;
   }
   return redacted;
+}
+
+/**
+ * Built-in findings are named by their rule id; xSOM findings by the label of
+ * their signed detector (« Identifiant client ACME » → Identifiant_client_ACME),
+ * reduced to ASCII letters, digits and underscores.
+ */
+function placeholderName(finding: Finding): string {
+  if (finding.custom === undefined)
+    return finding.ruleId.replace(/[^A-Za-z0-9_]/g, "_");
+  const name = finding.custom.label
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .replace(/[^A-Za-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 48)
+    .replace(/_+$/g, "");
+  return name === "" ? "custom_rule" : name;
 }
 
 /** Redact every finding and authoritatively rescan the exact resulting content. */

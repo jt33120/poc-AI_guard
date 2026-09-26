@@ -13,12 +13,20 @@ const TYPES: Record<SecretType, string> = {
   api_key: "Clé API",
   generic_secret: "Secret potentiel",
   high_entropy: "Valeur à vérifier",
+  custom_rule: "Règle sur mesure xSOM",
   scan_limit: "Limite d’analyse",
   scan_error: "Analyse indisponible",
 };
 
+/** What was found: the signed label of an xSOM detector, else the secret type. */
+export function findingName(finding: Finding): string {
+  return finding.custom === undefined
+    ? TYPES[finding.secretType]
+    : `${finding.custom.label} (réglage xSOM)`;
+}
+
 export function findingSummary(finding: Finding): string {
-  return `${TYPES[finding.secretType]} · ligne ${finding.span.start.line}, colonne ${finding.span.start.column}`;
+  return `${findingName(finding)} · ligne ${finding.span.start.line}, colonne ${finding.span.start.column}`;
 }
 
 export function markdownReport(result: ScanResult): string {

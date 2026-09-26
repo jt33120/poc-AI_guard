@@ -1,3 +1,6 @@
+import type { CompiledRulesPack } from "./custom/pack.js";
+import type { RulesAction, RulesCategory } from "./custom/schema.js";
+
 export const MAX_INPUT_BYTES = 1_048_576;
 export const RULESET_VERSION = "2026-09-11.v0";
 
@@ -24,6 +27,7 @@ export type SecretType =
   | "api_key"
   | "generic_secret"
   | "high_entropy"
+  | "custom_rule"
   | "scan_limit"
   | "scan_error";
 
@@ -31,6 +35,21 @@ export interface ScanInput {
   readonly content: string;
   readonly sourceKind?: SourceKind;
   readonly languageId?: string;
+  /**
+   * A verified xSOM rules pack. Its detections add to the built-in ones; it
+   * never disables or weakens a built-in rule.
+   */
+  readonly rules?: CompiledRulesPack;
+}
+
+/** The signed detector behind a custom finding: identity only, never input text. */
+export interface CustomRuleRef {
+  readonly packId: string;
+  readonly packVersion: number;
+  readonly detectorId: string;
+  readonly label: string;
+  readonly category: RulesCategory;
+  readonly action: RulesAction;
 }
 
 /** Offsets and columns use JavaScript/VS Code UTF-16 code units. Lines and columns are 1-based. */
@@ -58,6 +77,8 @@ export interface Finding {
   readonly level: RiskLevel;
   readonly reasons: readonly string[];
   readonly encoding: FindingEncoding;
+  /** Present only on findings of an xSOM rules pack. */
+  readonly custom?: CustomRuleRef;
 }
 
 export interface ScanResult {
