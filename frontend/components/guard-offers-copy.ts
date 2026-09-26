@@ -50,7 +50,7 @@ export const GUARD_OFFER_FAMILIES_COPY = {
     title: "Trois façons d’avancer avec xSOM AI Studio.",
     intro: "En solo, en équipe ou à l’échelle de votre organisation : choisissez l’accompagnement adapté à vos usages.",
     offers: [
-      { id: "open-source", badge: "01 · En solo", name: "Produits open source", body: "Des outils ouverts pour protéger vos usages individuels de l’IA et garder la main sur votre environnement.", features: ["Pour un usage individuel", "Code ouvert et consultable", "Installation en autonomie"], href: "/extension", action: "Découvrir les outils" },
+      { id: "open-source", badge: "01 · En solo", name: "Produits gratuits", body: "Des outils gratuits pour protéger vos usages individuels de l’IA, directement sur votre poste.", features: ["Pour un usage individuel", "Détection locale, sans envoi au cloud", "Installation en autonomie"], href: "/extension", action: "Découvrir les outils" },
       { id: "software", badge: "02 · En équipe", name: "Offre logiciel", body: "Nos produits sous licence ou en SaaS pour équiper vos équipes et organiser la protection de vos usages de l’IA.", features: ["Licences et abonnements payants", "Des produits adaptés à vos usages", "Une offre selon votre périmètre"], href: "/produits", action: "Explorer nos logiciels" },
       { id: "consulting", badge: "03 · Sur mesure", name: "Offre conseil", body: "Un accompagnement dédié aux grands comptes et aux besoins personnalisés, avec le cabinet xSOM.", features: ["Cadrage de vos enjeux", "Accompagnement de vos équipes", "Réponse adaptée à votre organisation"], href: "https://www.xsom.fr", action: "Rencontrer xSOM" },
     ],
@@ -60,7 +60,7 @@ export const GUARD_OFFER_FAMILIES_COPY = {
     title: "Three ways forward with xSOM AI Studio.",
     intro: "On your own, as a team or across your organisation: choose the support that fits your needs.",
     offers: [
-      { id: "open-source", badge: "01 · Solo", name: "Open source products", body: "Open tools to protect your individual AI usage and stay in control of your environment.", features: ["For individual use", "Open, inspectable code", "Self-service installation"], href: "/extension", action: "Discover the tools" },
+      { id: "open-source", badge: "01 · Solo", name: "Free products", body: "Free tools to protect your individual AI usage, right on your workstation.", features: ["For individual use", "Local detection, no cloud upload", "Self-service installation"], href: "/extension", action: "Discover the tools" },
       { id: "software", badge: "02 · Teams", name: "Software", body: "Our licensed and SaaS products to equip your teams and organise protection across your AI workflows.", features: ["Paid licences and subscriptions", "Products suited to your workflows", "An offer tailored to your scope"], href: "/produits", action: "Explore our software" },
       { id: "consulting", badge: "03 · Tailored", name: "Consulting", body: "Dedicated support for large organisations and custom requirements, with xSOM consulting.", features: ["Define your priorities", "Support your teams", "An approach tailored to your organisation"], href: "https://www.xsom.fr", action: "Meet xSOM" },
     ],

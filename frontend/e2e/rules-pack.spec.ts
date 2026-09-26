@@ -216,6 +216,13 @@ test.describe("client : lecture seule", () => {
   });
 });
 
+test("le réglage et l'atelier exigent une session console", async ({ page }) => {
+  await page.goto("/extensions/reglage");
+  await expect(page).toHaveURL(/\/login/);
+  await page.goto("/xsom/regles");
+  await expect(page).toHaveURL(/\/login/);
+});
+
 test.describe("opérateur xSOM : composer, éprouver, signer", () => {
   test("un compte qui n'est pas opérateur xSOM voit la frontière", async ({ page, context }) => {
     await authenticate(context);
