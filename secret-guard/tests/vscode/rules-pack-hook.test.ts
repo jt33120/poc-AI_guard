@@ -1,4 +1,7 @@
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
+import { createServer } from "node:http";
+import { once } from "node:events";
+import type { AddressInfo } from "node:net";
 import { readFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -10,6 +13,8 @@ import {
   rulesPackPath,
   writeRulesPackState,
 } from "../../packages/runner/src/index.js";
+import { startGatewayBridge } from "../../packages/vscode/src/gateway-bridge.js";
+import { routeFile } from "../../packages/vscode/src/gateway-delegation.js";
 
 // The real hook runner, bundled like the release (esbuild `define`), run as
 // the subprocess an assistant starts. It must verify the stored pack itself.
@@ -77,24 +82,38 @@ afterAll(async () => {
 async function runHook(
   hook: Uint8Array,
   prompt: string,
+  mode = "block",
+  environment: Record<string, string> = {},
 ): Promise<{ status: number | null; stdout: string; stderr: string }> {
   const path = join(storage, "hook.cjs");
   await writeFile(path, hook);
-  const result = spawnSync(
-    process.execPath,
-    [path, "--host=claude", "--mode=block"],
-    {
-      input: JSON.stringify({ hook_event_name: "UserPromptSubmit", prompt }),
-      encoding: "utf8",
-      timeout: 20_000,
-      env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
-    },
-  );
-  return {
-    status: result.status,
-    stdout: result.stdout,
-    stderr: result.stderr,
-  };
+  // Asynchronous: a relay served by this test process must keep answering.
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      process.execPath,
+      [path, "--host=claude", `--mode=${mode}`],
+      {
+        env: { ...process.env, ...environment, ELECTRON_RUN_AS_NODE: "1" },
+        timeout: 20_000,
+        windowsHide: true,
+      },
+    );
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
+    child.on("error", reject);
+    child.on("close", (status) => {
+      resolve({ status, stdout, stderr });
+    });
+    child.stdin.end(
+      JSON.stringify({ hook_event_name: "UserPromptSubmit", prompt }),
+    );
+  });
 }
 
 describe("hook runner with an xSOM rules pack", () => {
@@ -134,6 +153,49 @@ describe("hook runner with an xSOM rules pack", () => {
         rulesPackPath(storage),
         JSON.stringify(vectors.signature.envelope),
       );
+    }
+  });
+
+  it("never delegates a custom detection to the relay, which cannot clean it", async () => {
+    // A live local relay in Expurger: built-in secrets are delegated to it
+    // (it cleans them), a customer id of the xSOM tuning stays blocked.
+    const upstream = createServer((_request, response) => {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end("{}");
+    });
+    upstream.listen(0, "127.0.0.1");
+    await once(upstream, "listening");
+    const relay = await startGatewayBridge(
+      `http://127.0.0.1:${String((upstream.address() as AddressInfo).port)}`,
+      "synthetic-gateway-token",
+    );
+    try {
+      await writeFile(
+        routeFile(storage, relay.baseUrl),
+        JSON.stringify({ baseUrl: relay.baseUrl }),
+      );
+      const environment = { ANTHROPIC_BASE_URL: relay.baseUrl };
+      const builtIn = await runHook(
+        withKey,
+        `deploy ${GITHUB_TOKEN}`,
+        "redact",
+        environment,
+      );
+      expect(builtIn.status).toBe(0);
+      const custom = await runHook(
+        withKey,
+        `Le client ${CUSTOMER_ID} a appelé.`,
+        "redact",
+        environment,
+      );
+      expect(custom.status).toBe(2);
+      expect(custom.stderr).toContain("« Identifiant client ACME »");
+      expect(custom.stderr).not.toContain("nouvelle session");
+      expect(custom.stderr).not.toContain(CUSTOMER_ID);
+    } finally {
+      await relay.close();
+      upstream.closeAllConnections();
+      upstream.close();
     }
   });
 });

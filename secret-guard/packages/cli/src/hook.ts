@@ -91,17 +91,23 @@ function readSafely(readFile: FileReader, path: string): FileText {
   }
 }
 
+/** Sees every scan result of one hook decision (metadata only). */
+export type ScanObserver = (result: ScanResult) => void;
+
 function fileVerdict(
   file: FileText,
   rules?: CompiledRulesPack,
+  observe?: ScanObserver,
 ): ScanResult | undefined {
   if (file.status !== "text") return undefined;
   try {
-    return scan({
+    const result = scan({
       content: file.content,
       sourceKind: "document",
       ...(rules === undefined ? {} : { rules }),
     });
+    observe?.(result);
+    return result;
   } catch {
     return undefined;
   }
@@ -128,10 +134,11 @@ export function fileResponse(
   mode: ProtectionMode,
   readFile: FileReader = readLocalFile,
   rules?: CompiledRulesPack,
+  observe?: ScanObserver,
 ): HookResponse {
   const file = readSafely(readFile, path);
   if (file.status === "absent") return { continue: true };
-  const result = fileVerdict(file, rules);
+  const result = fileVerdict(file, rules, observe);
   if (result?.decision === "ALLOW" && result.complete)
     return { continue: true };
   const detail = fileDetail(basename(path), result);
@@ -166,11 +173,12 @@ function mentionedFilesResponse(
   mode: ProtectionMode,
   readFile: FileReader,
   rules?: CompiledRulesPack,
+  observe?: ScanObserver,
 ): HookResponse {
   const paths = mentionedPaths(prompt, cwd);
   const checked = paths
     .slice(0, MAX_MENTIONED_FILES)
-    .map((path) => fileResponse(path, mode, readFile, rules));
+    .map((path) => fileResponse(path, mode, readFile, rules, observe));
   if (paths.length > MAX_MENTIONED_FILES && mode !== "observe")
     checked.push(
       block(
@@ -211,6 +219,7 @@ export function runHook(
   mode: ProtectionMode = "block",
   readFile: FileReader = readLocalFile,
   rules?: CompiledRulesPack,
+  observe?: ScanObserver,
 ): HookResponse {
   let input: HookInput;
   try {
@@ -229,7 +238,7 @@ export function runHook(
   if (subject === null)
     return block("Secret Guard blocked an unexpected or invalid hook event.");
   if (subject.kind === "read")
-    return fileResponse(subject.path, mode, readFile, rules);
+    return fileResponse(subject.path, mode, readFile, rules, observe);
 
   try {
     const result = scan({
@@ -237,6 +246,7 @@ export function runHook(
       sourceKind: "prompt",
       ...(rules === undefined ? {} : { rules }),
     });
+    observe?.(result);
     return combine([
       responseForResult(result, mode),
       mentionedFilesResponse(
@@ -245,6 +255,7 @@ export function runHook(
         mode,
         readFile,
         rules,
+        observe,
       ),
     ]);
   } catch {
