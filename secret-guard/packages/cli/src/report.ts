@@ -2,9 +2,19 @@ import type { Finding, ScanResult } from "@xsom/secret-guard-core";
 
 const MAX_REPORTED_FINDINGS = 8;
 
+/**
+ * What was found, never the value: the secret type, or the signed label of
+ * an xSOM custom detector.
+ */
+export function findingName(finding: Finding): string {
+  return finding.custom === undefined
+    ? finding.secretType
+    : `« ${finding.custom.label} » (réglage xSOM)`;
+}
+
 export function describeFinding(finding: Finding): string {
   const { line, column } = finding.span.start;
-  return `${finding.secretType} (${finding.level}, ${finding.score}/100) at line ${line}, column ${column}`;
+  return `${findingName(finding)} (${finding.level}, ${finding.score}/100) at line ${line}, column ${column}`;
 }
 
 export function humanReport(result: ScanResult): string {
@@ -29,6 +39,10 @@ export function humanReport(result: ScanResult): string {
 /** One line saying what was found and where, never the value. */
 export function findingSummary(result: ScanResult): string {
   const first = result.findings[0];
+  if (!result.complete)
+    return first?.reasons.includes("custom_rules_budget_exceeded") === true
+      ? "Secret Guard n’a pas pu terminer l’analyse du réglage xSOM (texte trop long ou trop complexe) : analyse incomplète, envoi bloqué."
+      : "Secret Guard n’a pas pu analyser le texte en entier : analyse incomplète, envoi bloqué.";
   if (first === undefined) {
     return result.complete
       ? "Secret Guard could not establish a safe verdict."
@@ -37,7 +51,7 @@ export function findingSummary(result: ScanResult): string {
   const { line, column } = first.span.start;
   const extra =
     result.findings.length > 1 ? ` and ${result.findings.length - 1} more` : "";
-  return `Secret Guard detected ${first.secretType} at line ${line}, column ${column}${extra}.`;
+  return `Secret Guard detected ${findingName(first)} at line ${line}, column ${column}${extra}.`;
 }
 
 export function hookMessage(result: ScanResult): string {

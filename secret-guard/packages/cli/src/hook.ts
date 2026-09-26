@@ -1,7 +1,11 @@
 import { basename, resolve } from "node:path";
 import process from "node:process";
 
-import { scan, type ScanResult } from "@xsom/secret-guard-core";
+import {
+  scan,
+  type CompiledRulesPack,
+  type ScanResult,
+} from "@xsom/secret-guard-core";
 
 import {
   MAX_MENTIONED_FILES,
@@ -10,7 +14,7 @@ import {
   type FileReader,
   type FileText,
 } from "./file-guard.js";
-import { findingSummary, hookMessage } from "./report.js";
+import { findingName, findingSummary, hookMessage } from "./report.js";
 
 export type ProtectionMode = "block" | "redact" | "observe";
 // Hook arguments written before 0.6 could also say "allow" (ambiguous
@@ -87,10 +91,17 @@ function readSafely(readFile: FileReader, path: string): FileText {
   }
 }
 
-function fileVerdict(file: FileText): ScanResult | undefined {
+function fileVerdict(
+  file: FileText,
+  rules?: CompiledRulesPack,
+): ScanResult | undefined {
   if (file.status !== "text") return undefined;
   try {
-    return scan({ content: file.content, sourceKind: "document" });
+    return scan({
+      content: file.content,
+      sourceKind: "document",
+      ...(rules === undefined ? {} : { rules }),
+    });
   } catch {
     return undefined;
   }
@@ -99,12 +110,12 @@ function fileVerdict(file: FileText): ScanResult | undefined {
 function fileDetail(name: string, result: ScanResult | undefined): string {
   const first = result?.findings[0];
   if (result === undefined || !result.complete || first === undefined)
-    return `Secret Guard n’a pas pu analyser « ${name} » en entier : fichier binaire, de plus de 1 Mio ou inaccessible.`;
+    return `Secret Guard n’a pas pu analyser « ${name} » en entier : fichier binaire, de plus de 1 Mio, inaccessible ou analyse trop longue.`;
   const extra =
     result.findings.length > 1
       ? ` et ${String(result.findings.length - 1)} autre(s) détection(s)`
       : "";
-  return `« ${name} » contient ${first.secretType} ligne ${String(first.span.start.line)}${extra}. La valeur n’est pas affichée.`;
+  return `« ${name} » contient ${findingName(first)} ligne ${String(first.span.start.line)}${extra}. La valeur n’est pas affichée.`;
 }
 
 /**
@@ -116,10 +127,11 @@ export function fileResponse(
   path: string,
   mode: ProtectionMode,
   readFile: FileReader = readLocalFile,
+  rules?: CompiledRulesPack,
 ): HookResponse {
   const file = readSafely(readFile, path);
   if (file.status === "absent") return { continue: true };
-  const result = fileVerdict(file);
+  const result = fileVerdict(file, rules);
   if (result?.decision === "ALLOW" && result.complete)
     return { continue: true };
   const detail = fileDetail(basename(path), result);
@@ -153,11 +165,12 @@ function mentionedFilesResponse(
   cwd: string,
   mode: ProtectionMode,
   readFile: FileReader,
+  rules?: CompiledRulesPack,
 ): HookResponse {
   const paths = mentionedPaths(prompt, cwd);
   const checked = paths
     .slice(0, MAX_MENTIONED_FILES)
-    .map((path) => fileResponse(path, mode, readFile));
+    .map((path) => fileResponse(path, mode, readFile, rules));
   if (paths.length > MAX_MENTIONED_FILES && mode !== "observe")
     checked.push(
       block(
@@ -188,10 +201,16 @@ export function responseForResult(
   return block(message);
 }
 
+/**
+ * Decide on one hook event. `rules` is an xSOM rules pack the caller has
+ * already verified (signature, tenant, version); its detections add to the
+ * built-in ones.
+ */
 export function runHook(
   rawInput: string,
   mode: ProtectionMode = "block",
   readFile: FileReader = readLocalFile,
+  rules?: CompiledRulesPack,
 ): HookResponse {
   let input: HookInput;
   try {
@@ -210,13 +229,23 @@ export function runHook(
   if (subject === null)
     return block("Secret Guard blocked an unexpected or invalid hook event.");
   if (subject.kind === "read")
-    return fileResponse(subject.path, mode, readFile);
+    return fileResponse(subject.path, mode, readFile, rules);
 
   try {
-    const result = scan({ content: subject.prompt, sourceKind: "prompt" });
+    const result = scan({
+      content: subject.prompt,
+      sourceKind: "prompt",
+      ...(rules === undefined ? {} : { rules }),
+    });
     return combine([
       responseForResult(result, mode),
-      mentionedFilesResponse(subject.prompt, subject.cwd, mode, readFile),
+      mentionedFilesResponse(
+        subject.prompt,
+        subject.cwd,
+        mode,
+        readFile,
+        rules,
+      ),
     ]);
   } catch {
     if (mode === "observe") {
