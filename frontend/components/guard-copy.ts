@@ -6,8 +6,9 @@
  * diverger de la première sans que personne ne le remarque, puisque rien ne teste une
  * chaîne de caractères recopiée.
  */
-export const CONTACT_MAILTO =
-  "mailto:julian.talou@xsom.fr?subject=xSOM%20AI%20Guard%20%3A%20cas%20d%E2%80%99usage";
+export const XSOM_CONTACT_EMAIL = "julian.talou@xsom.fr";
+
+export const CONTACT_MAILTO = `mailto:${XSOM_CONTACT_EMAIL}?subject=xSOM%20AI%20Guard%20%3A%20cas%20d%E2%80%99usage`;
 
 /**
  * Le canal de distribution de l'extension, et l'état réel de sa publication.
