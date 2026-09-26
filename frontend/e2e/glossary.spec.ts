@@ -150,11 +150,28 @@ test("the glossary table combines search, facets and sorting, expands rows and t
   await expect(rows).toHaveCount(covered.length);
   for (const row of await rows.all())
     await expect(row.locator(".guard-glossary__offer")).toHaveText(/SaaS/);
+  // Les facettes secondaires sont repliées : le premier regard ne voit que l'usage
+  // et la couverture. Chaque filtre actif se retire d'un clic, sans tout réinitialiser.
+  const more = page.locator(".guard-glossary__more");
+  await expect(
+    page.getByRole("combobox", { name: "Catégorie", exact: true }),
+  ).toBeHidden();
+  await expect(
+    coverage.getByRole("button", { name: "Couvert", exact: true }),
+  ).toHaveAccessibleDescription(/bloque ou retient/);
+  await more.locator("summary").click();
   await page
     .getByRole("combobox", { name: "Catégorie", exact: true })
     .selectOption("agents");
   await expect(rows).toHaveCount(
     covered.filter((entry) => entry.category === "agents").length,
+  );
+  await expect(more.locator(".guard-glossary__badge")).toHaveText("1");
+  await page
+    .getByRole("button", { name: "Retirer le filtre : Couvert", exact: true })
+    .click();
+  await expect(rows).toHaveCount(
+    THREAT_GLOSSARY.filter((entry) => entry.category === "agents").length,
   );
   await page
     .getByRole("button", { name: "Réinitialiser les filtres", exact: true })
