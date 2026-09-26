@@ -1,4 +1,12 @@
-import { mkdir, mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  stat,
+  symlink,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -172,6 +180,22 @@ describe("approval socket location", () => {
     expect((await stat(location.directory)).mode & 0o777).toBe(0o700);
     await rm(location.directory, { recursive: true, force: true });
   });
+
+  posixOnly(
+    "refuses a planted symlink without touching its target",
+    async () => {
+      const storage = await mkdtemp(join("/tmp", "xsg-link-"));
+      const target = await mkdtemp(join("/tmp", "xsg-target-"));
+      await chmod(target, 0o755);
+      await symlink(target, join(storage, "ipc"));
+      await expect(
+        approvalSocketLocation(storage, [], "darwin"),
+      ).rejects.toThrow("approval_socket_directory_not_private");
+      expect((await stat(target)).mode & 0o777).toBe(0o755);
+      await rm(storage, { recursive: true, force: true });
+      await rm(target, { recursive: true, force: true });
+    },
+  );
 
   posixOnly("fails closed when no location fits", async () => {
     const storage = await longStorage();

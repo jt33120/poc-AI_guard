@@ -81,6 +81,18 @@ describe("rules authority key ceremony", () => {
     expect(result.stderr).toContain("inside the repository");
   });
 
+  it.skipIf(process.platform !== "darwin")(
+    "refuses the repository under another letter case on macOS",
+    () => {
+      const result = run(
+        "--out",
+        resolve("contracts/authority.seed").toUpperCase(),
+      );
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("inside the repository");
+    },
+  );
+
   it("validates build keys and keeps the test key out of real builds", () => {
     const [testKey] = TEST_AUTHORITY_PUBLIC_KEYS;
     expect(() =>

@@ -57,15 +57,18 @@ export interface SocketLocation {
 // Only this user may traverse the directory: other local accounts can neither
 // reach the socket nor replace it, whatever the socket file's own mode.
 async function assertPrivateDirectory(directory: string): Promise<void> {
-  await chmod(directory, 0o700);
-  const status = await lstat(directory);
+  // Inspect before changing anything: chmod follows a planted symlink.
   const owner = process.getuid?.();
+  const before = await lstat(directory);
   if (
-    !status.isDirectory() ||
-    status.isSymbolicLink() ||
-    (status.mode & 0o077) !== 0 ||
-    (owner !== undefined && status.uid !== owner)
+    !before.isDirectory() ||
+    before.isSymbolicLink() ||
+    (owner !== undefined && before.uid !== owner)
   )
+    throw new Error("approval_socket_directory_not_private");
+  await chmod(directory, 0o700);
+  const after = await lstat(directory);
+  if (!after.isDirectory() || (after.mode & 0o077) !== 0)
     throw new Error("approval_socket_directory_not_private");
 }
 
@@ -135,6 +138,9 @@ export async function startApprovalBridge(
   gatewayToken: string,
 ): Promise<ApprovalBridge> {
   await mkdir(storage, { recursive: true });
+  // Socket of 0.6.x, next to the storage: never reused, removed once.
+  if (process.platform !== "win32")
+    await rm(join(storage, "developer-guard-approval.sock"), { force: true });
   const location = await socketLocation(storage);
   const { socket } = location;
   if (process.platform !== "win32") await rm(socket, { force: true });
@@ -223,11 +229,22 @@ export async function startApprovalBridge(
       await rm(location.directory, { recursive: true, force: true });
     throw error;
   }
-  await writeFile(
-    join(storage, "developer-guard-approval.json"),
-    JSON.stringify({ socket, nonce }),
-    { mode: 0o600 },
-  );
+  try {
+    await writeFile(
+      join(storage, "developer-guard-approval.json"),
+      JSON.stringify({ socket, nonce }),
+      { mode: 0o600 },
+    );
+  } catch (error) {
+    await new Promise<void>((resolve) =>
+      server.close(() => {
+        resolve();
+      }),
+    );
+    if (location.temporary)
+      await rm(location.directory, { recursive: true, force: true });
+    throw error;
+  }
   return {
     async close(): Promise<void> {
       await new Promise<void>((resolve) =>

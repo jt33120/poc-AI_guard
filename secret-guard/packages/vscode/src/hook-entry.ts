@@ -48,18 +48,18 @@ async function check(storage: string): Promise<void> {
     readObserveDeadline(storage),
     Date.now(),
   );
-  let customFindings = 0;
-  const response = runHook(
-    rawInput,
-    mode,
-    undefined,
-    await verifiedRulesPack(storage),
-    (result) => {
-      customFindings += result.findings.filter(
-        (finding) => finding.custom !== undefined,
-      ).length;
-    },
-  );
+  // The relay cleans with the platform's rules only. With an xSOM tuning
+  // loaded, a custom detection, or a scan that could not finish (budget,
+  // too many findings: the tuning may not have run), must stay here.
+  const rulesPack = await verifiedRulesPack(storage);
+  let tuningNeedsLocalBlock = false;
+  const response = runHook(rawInput, mode, undefined, rulesPack, (result) => {
+    if (
+      result.findings.some((finding) => finding.custom !== undefined) ||
+      (rulesPack !== undefined && !result.complete)
+    )
+      tuningNeedsLocalBlock = true;
+  });
   const adapter = adapterFor(process.argv.slice(2));
   const policyResponse = await policyResponseFor(rawInput, adapter, storage);
   if (policyResponse !== undefined && !policyResponse.continue) {
@@ -81,13 +81,11 @@ async function check(storage: string): Promise<void> {
   } catch {
     /* Invalid envelopes must remain blocked. */
   }
-  // The relay cleans with the platform's rules, not with this workstation's
-  // xSOM tuning: a custom detection is never delegated, it stays blocked.
   if (
     !response.continue &&
     relayedEvent &&
     mode === "redact" &&
-    customFindings === 0 &&
+    !tuningNeedsLocalBlock &&
     (await canDelegate(storage, process.env.ANTHROPIC_BASE_URL))
   ) {
     // The original travels only to the registered, mandatory-redaction route.
@@ -100,7 +98,7 @@ async function check(storage: string): Promise<void> {
     const staleClaudeSession =
       relayedEvent &&
       mode === "redact" &&
-      customFindings === 0 &&
+      !tuningNeedsLocalBlock &&
       process.env.CLAUDE_PROJECT_DIR !== undefined &&
       (await relayConnected(storage));
     process.stderr.write(

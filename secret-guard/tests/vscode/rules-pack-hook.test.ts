@@ -192,6 +192,15 @@ describe("hook runner with an xSOM rules pack", () => {
       expect(custom.stderr).toContain("« Identifiant client ACME »");
       expect(custom.stderr).not.toContain("nouvelle session");
       expect(custom.stderr).not.toContain(CUSTOMER_ID);
+      // Too many customer ids for the scanner to keep: incomplete, and an
+      // incomplete scan with a tuning loaded is never delegated either.
+      const dump = Array.from(
+        { length: 2_100 },
+        (_, index) => `CLI-${String(10_000_000 + index)}`,
+      ).join(" ");
+      const incomplete = await runHook(withKey, dump, "redact", environment);
+      expect(incomplete.status).toBe(2);
+      expect(incomplete.stderr).toContain("analyse incomplète");
     } finally {
       await relay.close();
       upstream.closeAllConnections();

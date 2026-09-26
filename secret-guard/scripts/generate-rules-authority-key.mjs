@@ -22,9 +22,15 @@ import { fileURLToPath } from "node:url";
 
 import { authorityKeyId } from "./rules-authority.mjs";
 
-const repository = realpathSync(
+const repository = realpathSync.native(
   fileURLToPath(new URL("../../", import.meta.url)),
 );
+// macOS and Windows file systems are case-insensitive by default.
+const caseless = process.platform === "darwin" || process.platform === "win32";
+
+function comparable(path) {
+  return caseless ? path.toLowerCase() : path;
+}
 
 function fail(message) {
   process.stderr.write(`${message}\n`);
@@ -53,7 +59,7 @@ function insideRepository(path) {
   // Resolve the deepest existing parent: the file itself does not exist yet.
   for (;;) {
     try {
-      directory = realpathSync(directory);
+      directory = realpathSync.native(directory);
       break;
     } catch {
       const parent = dirname(directory);
@@ -61,9 +67,9 @@ function insideRepository(path) {
       directory = parent;
     }
   }
-  return (
-    directory === repository || directory.startsWith(`${repository}${sep}`)
-  );
+  const inside = comparable(directory);
+  const root = comparable(repository);
+  return inside === root || inside.startsWith(`${root}${sep}`);
 }
 
 const { privateKey, publicKey } = generateKeyPairSync("ed25519");
