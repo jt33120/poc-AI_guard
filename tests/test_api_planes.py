@@ -172,7 +172,11 @@ def test_a_hot_plane_serves_only_its_declared_prefixes(chaud: Plane) -> None:
 #: +2 sur le plan LLM : la demande et la consommation d'une approbation Developer
 #: Guard doivent rester disponibles pendant qu'un hook retient l'action. Elles sont
 #: authentifiées par le jeton du poste et ne servent ni contenu ni fonction console.
-_BUDGET_CHAUD: dict[Plane, int] = {Plane.DECISION: 6, Plane.LLM: 17}
+#:
+#: +1 sur le plan LLM : `GET /v1/extension/rules-pack` (RULES-PACK.md §7) sert au poste
+#: son réglage sur mesure signé, avec la même authentification que
+#: `/v1/extension/policy`, qui vit déjà ici. En lecture seule, sans contenu client.
+_BUDGET_CHAUD: dict[Plane, int] = {Plane.DECISION: 6, Plane.LLM: 18}
 
 
 @pytest.mark.parametrize("chaud", [Plane.DECISION, Plane.LLM])
