@@ -219,3 +219,26 @@ def test_workstation_approval_is_bound_to_device_policy_action_and_single_use(
         },
     )
     assert replay.status_code == 200 and replay.json()["status"] == "approved"
+
+
+def test_publishing_a_policy_without_a_signing_key_fails_closed(
+    db: DBHandle,
+    test_verifier: TokenVerifier,
+    make_token: Callable[..., str],
+) -> None:
+    """Route comprise : sans graine, 503 et aucune ligne, jamais une politique non signée."""
+    tenant = str(uuid4())
+    db.conn.execute("insert into tenants (id,name) values (%s,'Sans clé')", (tenant,))
+    db.conn.commit()
+    app = create_app(Settings(_env_file=None, env="dev", database_url=db.url))
+    app.state.verifier = test_verifier
+    client = TestClient(app)
+    admin = {"Authorization": f"Bearer {make_token(tenant_id=tenant, role='admin')}"}
+    refused = client.put(
+        "/v1/developer-policies/sans-cle", headers=admin, json=_payload("sans-cle")
+    )
+    assert refused.status_code == 503
+    rows = db.conn.execute(
+        "select count(*) from developer_policies where tenant_id=%s", (tenant,)
+    ).fetchone()
+    assert rows == (0,)

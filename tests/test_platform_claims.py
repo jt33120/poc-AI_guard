@@ -41,7 +41,7 @@ def test_every_proven_claim_cites_a_test() -> None:
     unproven = [
         row.split("|")[1].strip()
         for row in _rows()
-        if "| Prouvé" in row and not _REFERENCE.search(row)
+        if ("| Prouvé" in row or "| Partiel" in row) and not _REFERENCE.search(row)
     ]
     assert unproven == []
 
