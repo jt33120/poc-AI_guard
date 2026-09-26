@@ -38,14 +38,31 @@ const ATOMS = [
   "[ab]",
   "[a-c0-1]",
   "\\.",
+  // Escapes inside classes, a range across the letter cases, punctuation.
+  "[\\]\\^\\-\\\\a]",
+  "[Z-a]",
+  "[!-/]",
+  "[\\d\\s]",
+  "\\[",
+  "\\^",
 ];
-const QUANTIFIERS = ["", "", "", "?", "{2}", "{0,3}", "{1,2}"];
+const QUANTIFIERS = [
+  "",
+  "",
+  "",
+  "?",
+  "{2}",
+  "{0,3}",
+  "{1,2}",
+  "{0,64}",
+  "{64}",
+];
 
 function randomSequence(next: () => number, depth: number): string {
   const length = 1 + Math.floor(next() * 4);
   let sequence = "";
   for (let index = 0; index < length; index += 1) {
-    if (depth < 2 && next() < 0.25) {
+    if (depth < 3 && next() < 0.25) {
       const branches = 1 + Math.floor(next() * 3);
       const inner = Array.from({ length: branches }, () =>
         randomSequence(next, depth + 1),
@@ -73,6 +90,15 @@ function randomText(next: () => number): string {
     " ",
     "_",
     "😀",
+    "[",
+    "\\",
+    "]",
+    "^",
+    "`",
+    "Z",
+    "z",
+    "/",
+    "!",
   ];
   const length = Math.floor(next() * 40);
   return Array.from({ length }, () => pick(next, alphabet)).join("");

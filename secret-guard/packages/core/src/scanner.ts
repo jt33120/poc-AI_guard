@@ -11,7 +11,11 @@ import {
   type MappedView,
 } from "./mapping.js";
 import type { CompiledRulesPack } from "./custom/pack.js";
-import { WorkBudgetExceeded, WorkMeter } from "./custom/work.js";
+import {
+  TooManyMatches,
+  WorkBudgetExceeded,
+  WorkMeter,
+} from "./custom/work.js";
 import { boundedScore, decisionForLevel, levelForScore } from "./risk.js";
 import {
   type InternalFinding,
@@ -336,7 +340,8 @@ function utf8Length(
   return bytes;
 }
 
-type FailureKind = "scan_limit" | "scan_error" | "custom_budget";
+type FailureKind =
+  "scan_limit" | "scan_error" | "custom_budget" | "custom_too_many";
 
 const FAILURES: Record<
   FailureKind,
@@ -356,6 +361,11 @@ const FAILURES: Record<
     ruleId: "custom_rules_incomplete",
     secretType: "scan_limit",
     reason: "custom_rules_budget_exceeded",
+  },
+  custom_too_many: {
+    ruleId: "custom_rules_too_many_findings",
+    secretType: "scan_limit",
+    reason: "custom_findings_limit_exceeded",
   },
 };
 
@@ -667,41 +677,107 @@ interface CustomInternalFinding {
   readonly rule: CustomRuleRef;
 }
 
+const DEFAULT_IGNORABLE = /\p{Default_Ignorable_Code_Point}/u;
+// Signed labels still reach messages an assistant reads: no control,
+// format (bidi, zero-width) or line-separator character survives.
+const UNSAFE_LABEL_CHARACTERS = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]+/gu;
+
+/** A detector label safe to show in any message, never empty. */
+export function displayLabel(label: string): string {
+  const safe = label
+    .replace(UNSAFE_LABEL_CHARACTERS, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
+  return safe === "" ? "Règle xSOM" : safe;
+}
+
 /**
- * Detections of the xSOM rules pack on the original text, or null when the
- * work budget ran out (the scan is then incomplete and must block).
+ * The text without invisible formatting characters (soft hyphen, zero-width
+ * space…), with the original offset of every kept code unit. Pasted text
+ * often carries them; they must not hide a customer id from the tuning.
+ */
+function visibleText(content: string): { text: string; origin: number[] } {
+  const origin: number[] = [];
+  let text = "";
+  let index = 0;
+  for (const character of content) {
+    if (!DEFAULT_IGNORABLE.test(character)) {
+      text += character;
+      for (let unit = 0; unit < character.length; unit += 1)
+        origin.push(index + unit);
+    }
+    index += character.length;
+  }
+  return { text, origin };
+}
+
+type CustomCollection =
+  | { readonly status: "ok"; readonly findings: CustomInternalFinding[] }
+  | { readonly status: "budget" | "too_many" };
+
+/**
+ * Detections of the xSOM rules pack on the original text — and on its
+ * visible characters when it holds invisible formatting ones — or the
+ * reason the custom analysis could not finish (the scan then blocks).
  */
 function collectCustomFindings(
   content: string,
   rules: CompiledRulesPack,
-): CustomInternalFinding[] | null {
-  let perDetector;
+  maxMatches: number,
+  shared?: WorkMeter,
+): CustomCollection {
+  const meter = new WorkMeter(CUSTOM_RULES_WORK_BUDGET, shared);
+  const passes: {
+    perDetector: ReturnType<CompiledRulesPack["detect"]>;
+    origin?: number[];
+  }[] = [];
   try {
-    perDetector = rules.detect(
-      content,
-      new WorkMeter(CUSTOM_RULES_WORK_BUDGET),
-    );
+    passes.push({
+      perDetector: rules.detect(content, meter, undefined, maxMatches),
+    });
+    if (DEFAULT_IGNORABLE.test(content)) {
+      const visible = visibleText(content);
+      meter.spend(Math.ceil(content.length / 16));
+      passes.push({
+        perDetector: rules.detect(visible.text, meter, undefined, maxMatches),
+        origin: visible.origin,
+      });
+    }
   } catch (error) {
-    if (error instanceof WorkBudgetExceeded) return null;
+    if (error instanceof WorkBudgetExceeded) return { status: "budget" };
+    if (error instanceof TooManyMatches) return { status: "too_many" };
     throw error;
   }
   const findings: CustomInternalFinding[] = [];
-  perDetector.forEach((matches, index) => {
-    const detector = rules.detectors[index];
-    if (detector === undefined) return;
-    const { spec } = detector;
-    const rule: CustomRuleRef = {
-      packId: rules.packId,
-      packVersion: rules.version,
-      detectorId: spec.id,
-      label: spec.label,
-      category: spec.category,
-      action: spec.action,
-    };
-    for (const match of matches)
-      findings.push({ start: match.start, end: match.end, rule });
-  });
-  return findings;
+  const seen = new Set<string>();
+  for (const { perDetector, origin } of passes)
+    perDetector.forEach((matches, index) => {
+      const detector = rules.detectors[index];
+      if (detector === undefined) return;
+      const { spec } = detector;
+      const rule: CustomRuleRef = {
+        packId: rules.packId,
+        packVersion: rules.version,
+        detectorId: spec.id,
+        label: displayLabel(spec.label),
+        category: spec.category,
+        action: spec.action,
+      };
+      for (const match of matches) {
+        const start =
+          origin === undefined ? match.start : (origin[match.start] ?? 0);
+        const end =
+          origin === undefined
+            ? match.end
+            : (origin[match.end - 1] ?? content.length - 1) + 1;
+        const key = `${String(index)}:${String(start)}:${String(end)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        findings.push({ start, end, rule });
+      }
+    });
+  if (findings.length > maxMatches) return { status: "too_many" };
+  return { status: "ok", findings };
 }
 
 function customFinding(
@@ -787,11 +863,18 @@ export function scan(input: ScanInput): ScanResult {
     if (findings === null) return failedResult(inputBytes, "scan_error");
     if (input.rules === undefined)
       return successfulResult(content, inputBytes, findings);
-    const custom = collectCustomFindings(content, input.rules);
-    if (custom === null) return failedResult(inputBytes, "custom_budget");
-    if (findings.length + custom.length > MAX_FINDINGS)
-      return failedResult(inputBytes, "scan_error");
-    return successfulResult(content, inputBytes, findings, custom);
+    const custom = collectCustomFindings(
+      content,
+      input.rules,
+      MAX_FINDINGS - findings.length,
+      input.workMeter,
+    );
+    if (custom.status !== "ok")
+      return failedResult(
+        inputBytes,
+        custom.status === "budget" ? "custom_budget" : "custom_too_many",
+      );
+    return successfulResult(content, inputBytes, findings, custom.findings);
   } catch {
     return failedResult(inputBytes, "scan_error");
   }
@@ -808,8 +891,17 @@ function validSpan(content: string, finding: Finding): boolean {
   );
 }
 
+export interface RedactOptions {
+  /** Name every xSOM finding `custom_rule` instead of its label. */
+  readonly neutralCustomNames?: boolean;
+}
+
 /** Replace original source spans with non-sensitive, deterministic placeholders. */
-export function redact(content: string, findings: readonly Finding[]): string {
+export function redact(
+  content: string,
+  findings: readonly Finding[],
+  options: RedactOptions = {},
+): string {
   const valid = findings
     .filter(
       (finding) =>
@@ -831,7 +923,14 @@ export function redact(content: string, findings: readonly Finding[]): string {
       previous.end = Math.max(previous.end, end);
       continue;
     }
-    merged.push({ start, end, name: placeholderName(finding) });
+    merged.push({
+      start,
+      end,
+      name:
+        options.neutralCustomNames === true && finding.custom !== undefined
+          ? "custom_rule"
+          : placeholderName(finding),
+    });
   }
 
   let redacted = content;
@@ -870,8 +969,17 @@ export function redactAndRescan(input: ScanInput): SanitizeResult {
       ? input.content
       : "";
   if (!initial.complete) return { initial, content: "", final: initial };
-  const content = redact(original, initial.findings);
-  const final = scan({ ...input, content });
+  let content = redact(original, initial.findings);
+  let final = scan({ ...input, content });
+  if (
+    !(final.complete && final.decision === "ALLOW") &&
+    initial.findings.some((finding) => finding.custom !== undefined)
+  ) {
+    // A label can contain a word the tuning detects: name the placeholders
+    // neutrally and rescan once more.
+    content = redact(original, initial.findings, { neutralCustomNames: true });
+    final = scan({ ...input, content });
+  }
   return {
     initial,
     content: final.complete && final.decision === "ALLOW" ? content : "",

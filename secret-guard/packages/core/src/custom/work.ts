@@ -14,11 +14,34 @@ export class WorkBudgetExceeded extends Error {
 export class WorkMeter {
   public used = 0;
 
-  public constructor(public readonly limit: number) {}
+  /**
+   * `parent` shares a larger budget across several meters, e.g. one hook
+   * event that scans a prompt and the files it mentions.
+   */
+  public constructor(
+    public readonly limit: number,
+    private readonly parent?: WorkMeter,
+  ) {}
 
   public spend(units: number): void {
     this.used += units;
+    this.parent?.spend(units);
     if (this.used > this.limit) throw new WorkBudgetExceeded();
+  }
+
+  /** Units still available here and in every parent. */
+  public remaining(): number {
+    const own = this.limit - this.used;
+    return this.parent === undefined
+      ? own
+      : Math.min(own, this.parent.remaining());
+  }
+}
+
+/** Raised when the custom rules find more matches than a scan may report. */
+export class TooManyMatches extends Error {
+  public constructor() {
+    super("custom_findings_limit_exceeded");
   }
 }
 

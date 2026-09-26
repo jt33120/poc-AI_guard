@@ -17,7 +17,7 @@ import {
   type DetectorSpec,
   type RulesPackPayload,
 } from "./schema.js";
-import { WorkBudgetExceeded, WorkMeter } from "./work.js";
+import { TooManyMatches, WorkBudgetExceeded, WorkMeter } from "./work.js";
 
 export type RulesPackError =
   | "schema"
@@ -36,6 +36,11 @@ export type RulesPackError =
 const MAX_TOTAL_DIGESTS = 20_000;
 /** Work allowed for one self-test text (at most 2 000 characters). */
 export const SELF_TEST_WORK_BUDGET = 2_000_000;
+/**
+ * Work allowed for all the self-tests of one pack together (the largest
+ * pack the contract allows needs about 37 M units).
+ */
+export const SELF_TESTS_TOTAL_BUDGET = 150_000_000;
 
 /** A valid pack, compiled for the scanner. Immutable and reusable across scans. */
 export class CompiledRulesPack {
@@ -70,16 +75,20 @@ export class CompiledRulesPack {
     return this.detectors.length;
   }
 
-  /** Detections per detector; throws WorkBudgetExceeded past the meter. */
+  /**
+   * Detections per detector. Throws WorkBudgetExceeded past the meter and
+   * TooManyMatches past `maxMatches` kept detections.
+   */
   public detect(
     text: string,
     meter: WorkMeter,
     only?: ReadonlySet<number>,
+    maxMatches?: number,
   ): CustomMatch[][] {
     return detectAll(
       this.detectors,
       this.groups,
-      new TextView(text, meter),
+      new TextView(text, meter, maxMatches),
       meter,
       only,
     );
@@ -125,12 +134,14 @@ export function compileDetector(
 function selfTest(
   pack: CompiledRulesPack,
   text: string,
+  total: WorkMeter,
   only?: ReadonlySet<number>,
 ): CustomMatch[][] | undefined {
   try {
-    return pack.detect(text, new WorkMeter(SELF_TEST_WORK_BUDGET), only);
+    return pack.detect(text, new WorkMeter(SELF_TEST_WORK_BUDGET, total), only);
   } catch (error) {
-    if (error instanceof WorkBudgetExceeded) return undefined;
+    if (error instanceof WorkBudgetExceeded || error instanceof TooManyMatches)
+      return undefined;
     throw error;
   }
 }
@@ -188,15 +199,16 @@ export function compileRulesPack(
 
   const pack = new CompiledRulesPack(payload, detectors);
   if (options.selfTests === false) return { ok: true, pack };
+  const total = new WorkMeter(SELF_TESTS_TOTAL_BUDGET);
   for (const positive of positives) {
     const index = indexOf.get(positive.detector) as number;
-    const results = selfTest(pack, positive.text, new Set([index]));
+    const results = selfTest(pack, positive.text, total, new Set([index]));
     if (results === undefined) return fail("self_test_incomplete");
     if ((results[index] ?? []).length === 0)
       return fail("positive_not_detected");
   }
   for (const negative of negatives) {
-    const results = selfTest(pack, negative);
+    const results = selfTest(pack, negative, total);
     if (results === undefined) return fail("self_test_incomplete");
     if (results.some((matches) => matches.length > 0))
       return fail("negative_detected");

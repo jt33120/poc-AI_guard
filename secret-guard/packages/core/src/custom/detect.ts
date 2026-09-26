@@ -10,7 +10,12 @@ import {
   textWords,
   type Word,
 } from "./terms.js";
-import type { WorkMeter } from "./work.js";
+import { TooManyMatches, type WorkMeter } from "./work.js";
+
+/** Native RegExp allowed below this static bound on one attempt. */
+const NATIVE_ATTEMPT_LIMIT = 4_096;
+/** Interpreter steps worth one native backtracking step (measured ≥ 8). */
+const NATIVE_STEP_RATIO = 8;
 
 export interface CompiledContext {
   /** ASCII-lowercased keywords. */
@@ -91,11 +96,21 @@ export function termGroups(
 export class TextView {
   private loweredText: string | undefined;
   private wordList: Word[] | undefined;
+  private matches = 0;
+  /** Whole-text native matches, shared by detectors with the same pattern. */
+  public readonly nativeCache = new Map<string, CustomMatch[]>();
 
   public constructor(
     public readonly text: string,
     private readonly meter: WorkMeter,
+    private readonly maxMatches = Number.POSITIVE_INFINITY,
   ) {}
+
+  /** Count kept detections; past the limit the scan stops (fail closed). */
+  public keep(count: number): void {
+    this.matches += count;
+    if (this.matches > this.maxMatches) throw new TooManyMatches();
+  }
 
   /** ASCII-lowercased copy; same UTF-16 length as the text. */
   public get lowered(): string {
@@ -178,8 +193,41 @@ export function shannonEntropy(value: string): number {
   return entropy;
 }
 
-function anyKeyword(view: TextView, context: CompiledContext): boolean {
-  return context.keywords.some((keyword) => view.lowered.includes(keyword));
+function anyKeyword(
+  view: TextView,
+  context: CompiledContext,
+  meter: WorkMeter,
+): boolean {
+  return context.keywords.some((keyword) => {
+    meter.spend(Math.ceil(view.text.length / 64));
+    return view.lowered.includes(keyword);
+  });
+}
+
+/**
+ * Whole-text matches of a context-only pattern. When the static bound on
+ * one attempt is small, V8's RegExp runs the exact same leftmost-first
+ * search (the differential test holds them equal) and its bounded worst
+ * case is charged to the meter up front; otherwise the interpreter scans.
+ */
+function wholeTextMatches(
+  view: TextView,
+  detector: PatternDetector,
+  meter: WorkMeter,
+): CustomMatch[] | undefined {
+  const { pattern } = detector;
+  if (pattern.attemptBound > NATIVE_ATTEMPT_LIMIT) return undefined;
+  const key = `${pattern.flags}/${pattern.source}`;
+  const cached = view.nativeCache.get(key);
+  if (cached !== undefined) return cached;
+  const charge = Math.ceil(
+    (view.text.length * pattern.attemptBound) / NATIVE_STEP_RATIO,
+  );
+  if (charge > meter.remaining()) return undefined;
+  meter.spend(charge);
+  const matches = pattern.nativeMatches(view.text);
+  view.nativeCache.set(key, matches);
+  return matches;
 }
 
 interface Interval {
@@ -229,9 +277,14 @@ function patternMatches(
   let intervals: Interval[];
   if (pattern.anchor !== undefined)
     intervals = anchorIntervals(view, detector, meter);
-  else if (detector.context !== undefined && anyKeyword(view, detector.context))
+  else if (
+    detector.context !== undefined &&
+    anyKeyword(view, detector.context, meter)
+  ) {
+    const native = wholeTextMatches(view, detector, meter);
+    if (native !== undefined) return native;
     intervals = [{ start: 0, end: view.text.length - 1 }];
-  else return [];
+  } else return [];
 
   const matches: CustomMatch[] = [];
   let position = 0;
@@ -298,9 +351,11 @@ export function detectAll(
   const results: CustomMatch[][] = detectors.map(() => []);
   detectors.forEach((detector, index) => {
     if (detector.kind !== "pattern" || (only && !only.has(index))) return;
-    results[index] = patternMatches(view, detector, meter).filter((match) =>
+    const kept = patternMatches(view, detector, meter).filter((match) =>
       keepPatternMatch(view, detector, match, meter),
     );
+    view.keep(kept.length);
+    results[index] = kept;
   });
 
   const wanted = groups.filter(
@@ -328,7 +383,9 @@ export function detectAll(
           (detector.context === undefined ||
             contextHolds(view, hit, detector.context, meter)),
       );
-      results[index] = resolveTermCandidates(candidates);
+      const kept = resolveTermCandidates(candidates);
+      view.keep(kept.length);
+      results[index] = kept;
     }
   }
   return results;

@@ -1,4 +1,5 @@
 import type { CompiledRulesPack } from "./custom/pack.js";
+import type { WorkMeter } from "./custom/work.js";
 import type { RulesAction, RulesCategory } from "./custom/schema.js";
 
 export const MAX_INPUT_BYTES = 1_048_576;
@@ -40,6 +41,11 @@ export interface ScanInput {
    * never disables or weakens a built-in rule.
    */
   readonly rules?: CompiledRulesPack;
+  /**
+   * Shared work budget for several scans of one decision (a prompt and the
+   * files it mentions): the custom rules of every scan draw from it.
+   */
+  readonly workMeter?: WorkMeter;
 }
 
 /** The signed detector behind a custom finding: identity only, never input text. */

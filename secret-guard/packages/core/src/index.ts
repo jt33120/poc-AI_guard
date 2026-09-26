@@ -1,4 +1,11 @@
-export { redact, redactAndRescan, scan } from "./scanner.js";
+export {
+  CUSTOM_RULES_WORK_BUDGET,
+  displayLabel,
+  redact,
+  redactAndRescan,
+  scan,
+  type RedactOptions,
+} from "./scanner.js";
 export { decisionForLevel, levelForScore } from "./risk.js";
 export {
   FIXED_RULE_IDS,
@@ -23,7 +30,11 @@ export {
   type SafePattern,
 } from "./custom/pattern.js";
 export { normalizeTerm, termDigest } from "./custom/terms.js";
-export { WorkBudgetExceeded, WorkMeter } from "./custom/work.js";
+export {
+  TooManyMatches,
+  WorkBudgetExceeded,
+  WorkMeter,
+} from "./custom/work.js";
 export type {
   ContextSpec,
   DetectorSpec,

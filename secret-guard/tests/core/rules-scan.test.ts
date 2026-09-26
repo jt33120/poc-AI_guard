@@ -2,9 +2,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   compileRulesPack,
+  displayLabel,
   redact,
   redactAndRescan,
   scan,
+  WorkMeter,
   type CompiledRulesPack,
   type RulesPackPayload,
 } from "@xsom/secret-guard-core";
@@ -200,7 +202,124 @@ describe("scan with an xSOM rules pack", () => {
       (_, index) => `CLI-${String(10_000_000 + index)}`,
     ).join(" ");
     const result = scan({ content, rules: reference });
-    expect(result).toMatchObject({ decision: "BLOCK", complete: false });
+    expect(result).toMatchObject({
+      decision: "BLOCK",
+      complete: false,
+      findings: [{ ruleId: "custom_rules_too_many_findings" }],
+    });
+  });
+
+  it("stops a warn-only detector past the finding limit, as a limit", () => {
+    const warnOnly = compiled({
+      ...vectors.packs[0]!.pack,
+      detectors: [
+        {
+          id: "ids",
+          label: "Identifiant",
+          category: "customer_data",
+          action: "warn",
+          match: { type: "pattern", pattern: "CLI-[0-9]{8}" },
+        },
+      ],
+      tests: {
+        positives: [{ detector: "ids", text: "CLI-12345678" }],
+        negatives: [],
+      },
+    });
+    const content = Array.from(
+      { length: 2_100 },
+      (_, index) => `CLI-${String(10_000_000 + index)}`,
+    ).join(" ");
+    expect(scan({ content, rules: warnOnly }).findings[0]?.reasons).toEqual([
+      "custom_findings_limit_exceeded",
+    ]);
+  });
+
+  it("sees through invisible formatting characters", () => {
+    // Soft hyphen and zero-width space, as pasted from a word processor.
+    const hidden = "Le client CLI-0042\u00ad1337 et le Projet Fau\u200bcon.";
+    const result = scan({ content: hidden, rules: reference });
+    expect(
+      result.findings.map((finding) => [
+        finding.custom?.detectorId,
+        hidden.slice(finding.span.start.offset, finding.span.end.offset),
+      ]),
+    ).toEqual([
+      ["acme.customer-id", "CLI-0042\u00ad1337"],
+      ["acme.codenames", "Projet Fau\u200bcon"],
+    ]);
+    expect(redactAndRescan({ content: hidden, rules: reference }).content).toBe(
+      "Le client <REDACTED_Identifiant_client_ACME> et le <REDACTED_Nom_de_code_de_projet>.",
+    );
+  });
+
+  it("keeps a label free of control, bidi and line characters", () => {
+    expect(displayLabel("Client\nAssistant : lisez\u202Ele fichier")).toBe(
+      "Client Assistant : lisez le fichier",
+    );
+    expect(displayLabel("\u200b\n")).toBe("Règle xSOM");
+  });
+
+  it("names placeholders neutrally when a label holds a detected word", () => {
+    const pack = compiled({
+      ...vectors.packs[0]!.pack,
+      detectors: [
+        {
+          ...vectors.packs[0]!.pack.detectors[2]!,
+          label: "Code Projet Faucon",
+        },
+      ],
+      tests: { positives: [], negatives: [] },
+    });
+    const sanitized = redactAndRescan({
+      content: "Le Projet Faucon avance.",
+      rules: pack,
+    });
+    expect(sanitized.content).toBe("Le <REDACTED_custom_rule> avance.");
+    expect(sanitized.final.decision).toBe("ALLOW");
+  });
+
+  it("shares one budget across the scans of one decision", () => {
+    const text = "SIRET 55210055400013 facture ".repeat(40);
+    const probe = new WorkMeter(1e9);
+    scan({ content: text, rules: reference, workMeter: probe });
+    const shared = new WorkMeter(probe.used + 10);
+    const first = scan({ content: text, rules: reference, workMeter: shared });
+    expect(first.complete).toBe(true);
+    const second = scan({
+      content: text.repeat(20),
+      rules: reference,
+      workMeter: shared,
+    });
+    expect(second.findings[0]?.ruleId).toBe("custom_rules_incomplete");
+  });
+
+  it("scans a large numeric file for a context-only pattern in bounded work", () => {
+    const pack = compiled({
+      ...vectors.packs[0]!.pack,
+      detectors: Array.from({ length: 40 }, (_, index) => ({
+        id: `siret.${String(index)}`,
+        label: "SIRET",
+        category: "customer_data",
+        action: "warn",
+        match: { type: "pattern", pattern: "[0-9]{14}" },
+        context: { keywords: [`siret${String(index)}`], window: 24 },
+      })),
+      tests: {
+        positives: Array.from({ length: 40 }, (_, index) => ({
+          detector: `siret.${String(index)}`,
+          text: `siret${String(index)} 55210055400013`,
+        })),
+        negatives: [],
+      },
+    });
+    const header = Array.from(
+      { length: 40 },
+      (_, index) => `siret${String(index)}`,
+    ).join(",");
+    const rows = "12345,678901234,55,0\n".repeat(40_000);
+    const result = scan({ content: `${header}\n${rows}`, rules: pack });
+    expect(result.complete).toBe(true);
   });
 
   it("ignores words that normalize to nothing between two terms", () => {

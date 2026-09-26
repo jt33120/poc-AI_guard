@@ -509,6 +509,40 @@ export function validatePattern(
   };
 }
 
+const PATH_CAP = 1e12;
+
+/** Upper bound on the backtracking paths of one attempt. */
+function pathCount(alternatives: readonly (readonly Term[])[]): number {
+  let total = 0;
+  for (const terms of alternatives) {
+    let paths = 1;
+    for (const term of terms) {
+      const choices =
+        term.atom.kind === "char" || term.max > 1
+          ? term.max - term.min + 1
+          : pathCount(term.atom.alternatives) + (term.min === 0 ? 1 : 0);
+      paths = Math.min(PATH_CAP, paths * choices);
+    }
+    total = Math.min(PATH_CAP, total + paths);
+  }
+  return total;
+}
+
+function termCount(alternatives: readonly (readonly Term[])[]): number {
+  return alternatives.reduce(
+    (total, terms) =>
+      total +
+      terms.reduce(
+        (sum, term) =>
+          sum +
+          1 +
+          (term.atom.kind === "group" ? termCount(term.atom.alternatives) : 0),
+        0,
+      ),
+    0,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Matcher
 
@@ -643,6 +677,13 @@ type Continuation = (position: number) => number;
 export class SafePattern {
   private readonly program: BranchNode;
   public readonly first: CharSet;
+  /**
+   * Static upper bound on the backtracking steps of one attempt: paths ×
+   * (longest match + terms). Small bounds allow the native RegExp, whose
+   * total work over a text is then bounded without being interruptible.
+   */
+  public readonly attemptBound: number;
+  private nativeExpression: RegExp | undefined;
 
   public constructor(
     private readonly alternatives: readonly (readonly Term[])[],
@@ -660,6 +701,20 @@ export class SafePattern {
     };
     this.first = new Uint8Array(128);
     firstSet(alternatives, caseInsensitive, this.first);
+    this.attemptBound = Math.min(
+      PATH_CAP,
+      pathCount(alternatives) * (maxLength + termCount(alternatives) + 1),
+    );
+  }
+
+  /** Every match over the whole text with the compiled RegExp (matchAll). */
+  public nativeMatches(text: string): { start: number; end: number }[] {
+    this.nativeExpression ??= new RegExp(this.source, this.flags);
+    const expression = new RegExp(this.nativeExpression);
+    return [...text.matchAll(expression)].map((match) => ({
+      start: match.index,
+      end: match.index + match[0].length,
+    }));
   }
 
   /** ECMAScript source equivalent to this pattern (without the `u` flag). */
