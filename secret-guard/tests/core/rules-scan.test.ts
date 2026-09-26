@@ -156,13 +156,43 @@ describe("scan with an xSOM rules pack", () => {
     },
   );
 
-  it("bounds a 1 MiB adversarial input on a pathological valid pattern", () => {
-    const unit = `ACME${"a".repeat(160)} `;
-    const content = unit.repeat(Math.floor(1_048_000 / unit.length));
-    const result = scan({ content, rules: pathologicalPack() });
-    expect(result.decision).toBe("BLOCK");
-    expect(result.complete).toBe(false);
-  }, 60_000);
+  it(
+    "bounds a 1 MiB adversarial input on a pathological valid pattern",
+    {
+      timeout: 60_000,
+    },
+    () => {
+      // One repeated letter: the built-in rules pass it, so only the custom
+      // rules' budget can stop the scan.
+      const content = "a".repeat(1_048_000);
+      expect(scan({ content }).decision).toBe("ALLOW");
+      const pack = compiled({
+        ...vectors.packs[0]!.pack,
+        detectors: [
+          {
+            id: "slow",
+            label: "Motif lent",
+            category: "project",
+            action: "warn",
+            match: {
+              type: "pattern",
+              pattern: `aaa${"[a-z]{0,8}".repeat(20)}z`,
+            },
+          },
+        ],
+        tests: {
+          positives: [{ detector: "slow", text: "aaabcz" }],
+          negatives: [],
+        },
+      });
+      const result = scan({ content, rules: pack });
+      expect(result).toMatchObject({
+        decision: "BLOCK",
+        complete: false,
+        findings: [{ ruleId: "custom_rules_incomplete" }],
+      });
+    },
+  );
 
   it("fails closed when a pack yields more findings than the scanner keeps", () => {
     const content = Array.from(
