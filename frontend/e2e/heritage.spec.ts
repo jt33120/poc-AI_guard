@@ -11,7 +11,9 @@ function copyLeaves(value: unknown): string[] {
 }
 
 test("the entire nested orientation copy stays illustrative, without invented coverage counts", () => {
-  const coverage = /menace|ligne|facette|couvert|couvre|matrice|bloqu|threat|row|facet|cover|block/i;
+  // En début de mot (lettres accentuées comprises) : « découverte » et « discovery »
+  // ne parlent pas de couverture.
+  const coverage = /(?<!\p{L})(?:menace|ligne|facette|couvert|couvre|matrice|bloqu|threat|row|facet|cover|block)/iu;
   const number = /\d+|\b(?:dix-sept|dix-huit|dix-neuf|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|quinze|seize|vingt|seventeen|eighteen|nineteen|two|three|four|five|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|twenty)\b/i;
   for (const language of ["fr", "en"] as const) {
     const phrases = copyLeaves([GUARD_COPY[language], GUARD_HOME_COPY[language], HOME_COPY[language]]);
@@ -26,6 +28,7 @@ test("the entire nested orientation copy stays illustrative, without invented co
   expect(coverage.test("Huit menaces bloquées")).toBe(true);
   expect(number.test("Huit menaces bloquées")).toBe(true);
   expect(number.test("Une liste de menaces")).toBe(false);
+  expect(coverage.test("90 jours de découverte offerts")).toBe(false);
 });
 
 test("the landing explains AI uses, introduces the extension and keeps both next steps", async ({ page }) => {
@@ -255,7 +258,7 @@ test("the self-serve page says what the product does, and where that stops", asy
   await page.locator('#gamme a[href="/saas"]').click();
   await expect(page).toHaveURL(/\/saas$/);
 
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Encadrez vos agents");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Une règle avant chaque action raccordée");
 
   // L'inventaire : six familles, et chacune porte des lignes concrètes. Le compte
   // par famille est ce qui distingue cette page de celle d'avant, qui tenait en six
@@ -327,7 +330,8 @@ test("the extension page hands over a file that installs, and names its limits",
   await expect(page.locator("#enterprise")).toContainText("MDM");
   await expect(page.locator("#enterprise")).toContainText("requirements.toml");
   await expect(page.locator("#enterprise")).toContainText("Codex ne distribue pas les scripts");
-  await expect(page.locator("#enterprise a.guard-button")).toHaveAttribute("href", /^mailto:/);
+  // L'offre Équipe se lit sur la page des produits, avec ses éditions et ses tarifs.
+  await expect(page.locator("#enterprise a.guard-button")).toHaveAttribute("href", "/produits#offres");
 
   // Les trois hôtes réellement configurés sont publiés, sans élargir la promesse.
   await expect(page.locator(".guard-ext-hosts li")).toHaveCount(3);
@@ -348,7 +352,7 @@ test("the extension page hands over a file that installs, and names its limits",
 
   // Tant que la fiche n'existe pas, la page ne propose pas de l'ouvrir.
   await expect(page.getByRole("link", { name: /Installer depuis VS Code/ })).toHaveCount(0);
-  await expect(page.getByText("compte éditeur", { exact: false })).toBeVisible();
+  await expect(page.getByText("pas encore distribuée sur la Place de marché", { exact: false })).toBeVisible();
 });
 
 for (const width of [390, 768, 1440]) {
