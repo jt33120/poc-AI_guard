@@ -1,10 +1,22 @@
 import process from "node:process";
-import { dirname } from "node:path";
+import { readFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { canDelegate, relayConnected } from "./gateway-delegation.js";
 import { beginActivity } from "./hook-activity.js";
 import { effectiveMode, readObserveDeadline } from "./observe-window.js";
 
 import { parseHookMode, runHook } from "@xsom/secret-guard-cli/hook";
+import {
+  claudeAdapter,
+  codexAdapter,
+  copilotAdapter,
+  type HostAdapter,
+} from "@xsom/developer-guard-adapters";
+import {
+  evaluateHookInput,
+  loadPolicy,
+  resolveApproval,
+} from "@xsom/developer-guard-runner";
 
 const MAX_HOOK_INPUT_BYTES = 1_200_000;
 const STALE_SESSION_MESSAGE =
@@ -35,6 +47,15 @@ async function check(storage: string): Promise<void> {
     Date.now(),
   );
   const response = runHook(rawInput, mode);
+  const adapter = adapterFor(process.argv.slice(2));
+  const policyResponse = await policyResponseFor(rawInput, adapter, storage);
+  if (policyResponse !== undefined && !policyResponse.continue) {
+    process.stderr.write(
+      `${policyResponse.stderr ?? "xSOM Secret Guard refused this action."}\n`,
+    );
+    process.exitCode = 2;
+    return;
+  }
   // Prompts, their @-mentioned files and Read tool results all reach the
   // provider inside the request the relay cleans; nothing else is delegated.
   let relayedEvent = false;
@@ -72,6 +93,83 @@ async function check(storage: string): Promise<void> {
     return;
   }
   process.stdout.write(`${JSON.stringify(response)}\n`);
+}
+
+function adapterFor(args: readonly string[]): HostAdapter {
+  const host = args
+    .find((arg) => arg.startsWith("--host="))
+    ?.slice("--host=".length);
+  if (host === "claude") return claudeAdapter;
+  if (host === "codex") return codexAdapter;
+  return copilotAdapter;
+}
+
+function managedRoots(): readonly string[] {
+  const raw = process.env.XSOM_DEVELOPER_GUARD_ROOTS;
+  return raw === undefined || raw === ""
+    ? []
+    : raw.split(process.platform === "win32" ? ";" : ":").filter(Boolean);
+}
+
+async function policyResponseFor(
+  rawInput: string,
+  adapter: HostAdapter,
+  storage: string,
+) {
+  const policyPath = join(storage, "developer-policy.json");
+  const publicKeyPath = join(storage, "developer-policy.pub");
+  let publicKey: string;
+  try {
+    publicKey = (await readFile(publicKeyPath, "utf8")).trim();
+  } catch {
+    return undefined;
+  }
+  if (publicKey === "") return undefined;
+  try {
+    const input = JSON.parse(rawInput) as Record<string, unknown>;
+    const result = evaluateHookInput(
+      adapter,
+      input,
+      await loadPolicy(policyPath, publicKey),
+      managedRoots(),
+    );
+    if (result.decision?.effect === "require_approval") {
+      const adapted = adapter.adapt(input);
+      const approval =
+        adapted === null
+          ? "unavailable"
+          : await resolveApproval(
+              storage,
+              rawInput,
+              adapted.request,
+              result.decision,
+            );
+      if (approval === "approved")
+        return adapter.respond({
+          ...result.decision,
+          effect: "allow",
+          reason: "approval_consumed",
+        });
+      return adapter.respond({
+        ...result.decision,
+        effect: "deny",
+        reason:
+          approval === "pending"
+            ? "approval_pending"
+            : "approval_bridge_unavailable",
+      });
+    }
+    return result.decision === undefined
+      ? undefined
+      : adapter.respond(result.decision);
+  } catch {
+    // A managed path must never turn a broken policy or envelope into permission.
+    return adapter.respond({
+      effect: "deny",
+      reason: "managed_policy_unavailable",
+      matchedRuleIds: [],
+    });
+  }
 }
 
 async function main(): Promise<void> {

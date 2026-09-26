@@ -1,0 +1,15 @@
+{
+  "analyzer": "eslint",
+  "analyzerVersion": "10.10.0",
+  "commitSha": "0123456789abcdef0123456789abcdef01234567",
+  "verdict": "fail",
+  "sarif": {
+    "version": "2.1.0",
+    "runs": [
+      {
+        "tool": { "driver": { "name": "eslint", "version": "10.10.0" } },
+        "results": [{ "level": "error" }]
+      }
+    ]
+  }
+}

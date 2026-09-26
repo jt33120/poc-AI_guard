@@ -2,8 +2,7 @@ src/**
 build.mjs
 tsconfig.json
 node_modules/**
+dist/**
 !dist/extension.cjs
 !dist/hook.cjs
-dist/test/**
-dist/*.vsix
 **/*.map

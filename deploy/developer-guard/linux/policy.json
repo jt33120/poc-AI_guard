@@ -1,0 +1,10 @@
+{
+  "AllowedExtensions": {
+    "xsom.xsom-secret-guard-vscode": ["0.6.0"],
+    "*": false
+  },
+  "ExtensionsAutoUpdate": false,
+  "ChatHooks": true,
+  "ChatAgentAllowedNetworkDomains": [],
+  "ChatAgentDeniedNetworkDomains": ["*"]
+}

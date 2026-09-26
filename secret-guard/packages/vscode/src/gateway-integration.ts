@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import process from "node:process";
 import * as vscode from "vscode";
+import { evaluatePosture } from "@xsom/developer-guard-runner";
 import {
   AuditQueue,
   gatewayJson,
@@ -10,7 +11,11 @@ import {
   type QueueState,
 } from "./gateway-client.js";
 import { startGatewayBridge, type GatewayBridge } from "./gateway-bridge.js";
+import { startApprovalBridge, type ApprovalBridge } from "./approval-bridge.js";
 import { canDelegate, routeFile } from "./gateway-delegation.js";
+import { readManagedPolicySummary, syncManagedPolicy } from "./enrollment.js";
+import { readLastHookAt } from "./hook-activity.js";
+import type { HookHealth } from "./hook-manager.js";
 
 export type GatewayState = "online" | "retrying" | "offline";
 
@@ -39,11 +44,19 @@ const CONNECTION_ERRORS: Record<string, string> = {
 
 export class GatewayIntegration implements vscode.Disposable {
   private bridge: GatewayBridge | undefined;
+  private approvalBridge: ApprovalBridge | undefined;
   private queue: AuditQueue | undefined;
   private timer: ReturnType<typeof setInterval> | undefined;
   private retry: ReturnType<typeof setTimeout> | undefined;
   public status = "Non connecté";
-  public constructor(private readonly context: vscode.ExtensionContext) {}
+  public constructor(
+    private readonly context: vscode.ExtensionContext,
+    private readonly readHookHealth: () => Promise<HookHealth>,
+  ) {}
+  public get summary(): string {
+    const audit = this.audit;
+    return `${this.status}${audit === undefined ? "" : ` · ${audit}`}`;
+  }
   public get audit(): string | undefined {
     return this.queue
       ? `Audit : ${this.queue.pending} en attente, ${this.queue.dropped} perdu(s) · ${this.queue.lastSync}`
@@ -142,6 +155,13 @@ export class GatewayIntegration implements vscode.Disposable {
       registration.protocol !== "anthropic-messages-v1"
     )
       throw new Error("unsupported_gateway");
+    const runnerVersion = this.context.extension.packageJSON.version as string;
+    const policyState = await syncManagedPolicy(
+      connection.endpoint,
+      connection.token,
+      this.context.globalStorageUri.fsPath,
+      runnerVersion,
+    );
     const config = vscode.workspace.getConfiguration("claudeCode");
     if (!vscode.extensions.getExtension("anthropic.claude-code"))
       throw new Error("claude_extension_missing");
@@ -187,6 +207,16 @@ export class GatewayIntegration implements vscode.Disposable {
       await this.stopBridge();
       throw error;
     }
+    try {
+      this.approvalBridge = await startApprovalBridge(
+        this.context.globalStorageUri.fsPath,
+        connection.endpoint,
+        connection.token,
+      );
+    } catch (error) {
+      await this.stopBridge();
+      throw error;
+    }
     const queueKey = `xsom.audit.${connection.installation}.${connection.endpoint}`;
     this.queue = new AuditQueue(
       this.context.globalState.get<QueueState>(queueKey) ?? {
@@ -218,7 +248,56 @@ export class GatewayIntegration implements vscode.Disposable {
       outcome: "configured",
       findings: 0,
     });
+    this.record({
+      kind: "policy_synced",
+      assistant: "secretguard",
+      mode: "redact",
+      outcome: policyState === "assigned" ? "configured" : "unverified",
+      findings: 0,
+    });
+    const emitPosture = async (): Promise<void> => {
+      const [hookHealth, policy] = await Promise.all([
+        this.readHookHealth(),
+        readManagedPolicySummary(this.context.globalStorageUri.fsPath),
+      ]);
+      const lastHookAt = readLastHookAt(this.context.globalStorageUri.fsPath);
+      const result = evaluatePosture({
+        policyPresent: policyState === "assigned" && policy !== undefined,
+        ...(policy === undefined ? {} : { policyExpiresAt: policy.expiresAt }),
+        hookInstalled:
+          hookHealth.state === "active" || hookHealth.state === "partial",
+        ...(lastHookAt === undefined
+          ? {}
+          : { lastHookInvocationAt: new Date(lastHookAt).toISOString() }),
+        queuePending: this.queue?.pending ?? 0,
+        queueDropped: this.queue?.dropped ?? 0,
+      });
+      const specificReason =
+        hookHealth.reason === "config_invalid" ||
+        hookHealth.reason === "hook_modified" ||
+        hookHealth.reason === "canary_failed"
+          ? hookHealth.reason
+          : undefined;
+      this.record({
+        kind: "posture",
+        assistant: "secretguard",
+        mode: "redact",
+        outcome: result.state === "healthy" ? "configured" : "unverified",
+        findings: 0,
+        posture_reasons:
+          specificReason === undefined
+            ? result.reasons
+            : [...new Set([...result.reasons, specificReason])],
+        ...(policy === undefined
+          ? {}
+          : { policy_id: policy.policyId, policy_version: policy.version }),
+        runner_version: runnerVersion,
+        queue_pending: this.queue?.pending ?? 0,
+      });
+    };
+    await emitPosture();
     this.timer = setInterval(() => {
+      void emitPosture();
       this.record({
         kind: "heartbeat",
         assistant: "claude",
@@ -261,6 +340,11 @@ export class GatewayIntegration implements vscode.Disposable {
         entries.filter((entry) => entry.name !== "ANTHROPIC_BASE_URL"),
         vscode.ConfigurationTarget.Global,
       );
+    }
+    if (this.approvalBridge) {
+      const old = this.approvalBridge;
+      this.approvalBridge = undefined;
+      await old.close();
     }
     await this.stopBridge();
     this.queue = undefined;

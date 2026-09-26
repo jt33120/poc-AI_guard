@@ -129,6 +129,43 @@ def test_provider_only_receives_cleaned_body_with_subscription_headers(
         assert devices.verify(conn, tenant)
 
 
+def test_content_free_posture_is_visible_in_inventory(
+    db: DBHandle, test_verifier: TokenVerifier, make_token: Callable[..., str]
+) -> None:
+    tenant, _, client, headers, registration = enrollment(db, test_verifier)
+    event = {
+        "event_id": str(uuid4()),
+        "at": "2026-09-23T00:00:00Z",
+        "kind": "posture",
+        "assistant": "secretguard",
+        "mode": "redact",
+        "outcome": "unverified",
+        "findings": 0,
+        "dropped": 2,
+        "posture_reasons": ["hook_modified", "audit_events_dropped"],
+        "policy_id": "team-default",
+        "policy_version": 3,
+        "runner_version": "0.6.0",
+        "queue_pending": 17,
+    }
+    response = client.post("/v1/extension/events", headers=headers, json={"events": [event]})
+    assert response.status_code == 200, response.text
+    own = {"Authorization": f"Bearer {make_token(tenant_id=tenant, role='admin')}"}
+    inventory = client.get("/v1/extensions/devices", headers=own).json()
+    assert inventory[0]["id"] == registration["installation_id"]
+    assert inventory[0]["posture"]["posture_reasons"] == [
+        "hook_modified",
+        "audit_events_dropped",
+    ]
+    assert inventory[0]["posture"]["queue_pending"] == 17
+
+    invalid = {**event, "event_id": str(uuid4()), "posture_reasons": ["raw_prompt"]}
+    assert (
+        client.post("/v1/extension/events", headers=headers, json={"events": [invalid]}).status_code
+        == 422
+    )
+
+
 def test_bad_prompt_audited_without_forwarding(
     db: DBHandle, test_verifier: TokenVerifier, monkeypatch: pytest.MonkeyPatch
 ) -> None:

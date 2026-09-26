@@ -492,7 +492,7 @@ export async function activate(
     (host) => host.id !== "vscode" || supportsVsCodePromptHooks(vscode.version),
   );
   const manager = new HookManager(context, { hosts });
-  gateway = new GatewayIntegration(context);
+  gateway = new GatewayIntegration(context, () => manager.getHealth());
   context.subscriptions.push(gateway);
   const status = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Right,

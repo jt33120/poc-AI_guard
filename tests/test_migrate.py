@@ -154,7 +154,7 @@ def test_adopt_baseline_stops_at_the_first_gap(bare_db: DBHandle) -> None:
 
     assert migrate.adopt_baseline(conn) == prefix
     # The rest was never executed, so it stays pending and is applied for real.
-    remaining = [*_BASELINE_FILES[9:], *_POST_BASELINE]
+    remaining = [name for name in _ALL_FILES if name not in prefix]
     assert [p.name for p in migrate.pending(conn)] == remaining
     assert migrate.apply_all(conn) == remaining
     assert conn.execute("select to_regclass('public.dlp_config')").fetchone() == ("dlp_config",)

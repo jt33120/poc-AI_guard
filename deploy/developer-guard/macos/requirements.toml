@@ -1,0 +1,7 @@
+allowed_approval_policies = ["on-request"]
+allowed_sandbox_modes = ["read-only", "workspace-write"]
+
+[rules]
+prefix_rules = [
+  { pattern = [{ any_of = ["bash", "sh", "zsh"] }], decision = "prompt", justification = "Explicit approval for shell entry points" },
+]

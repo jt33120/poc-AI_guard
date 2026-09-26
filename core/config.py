@@ -192,6 +192,11 @@ class Settings(BaseSettings):
     # tenue pour partager l'hôte de la base.
     checkpoint_key_custody: CheckpointCustody | None = None
 
+    # Separate Ed25519 seed for workstation policy envelopes. Reusing the audit
+    # checkpoint key would turn a public verification key for one purpose into a
+    # signing authority for another. The seed is never stored in PostgreSQL.
+    developer_policy_signing_key: str | None = Field(default=None, max_length=128)
+
     # --- Point de scrutation opérationnel (/v1/ops/metrics) ---------------
     # Jeton porteur que le scrutateur présente. Absent ⇒ la route répond 404 : un
     # relevé de trafic derrière rien du tout dit à un anonyme quel déploiement vaut

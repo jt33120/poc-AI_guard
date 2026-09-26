@@ -1,14 +1,20 @@
 # Secret Guard — Threat model
 
-**Statut :** modèle de menace de l’implémentation V0.2 livrée, avec gaps de release explicites
+**Statut :** modèle historique V0.2 et extension Developer Guard validée localement, avec gaps de qualification explicites
 
 **Référence :** SG-TM-001
 
-**Date :** 11 septembre 2026
+**Date :** 23 septembre 2026
 
 **Dépendance :** [ARCHITECTURE.md](./ARCHITECTURE.md)
 
 **Runtime validé :** Node.js 22.13 ou plus récent
+
+## Extension Developer Guard
+
+Le modèle ajoute comme actifs les politiques signées, l’identité de poste, les approbations à usage unique, les empreintes d’outils MCP, les reçus SARIF et les événements de posture. Les nouvelles frontières de confiance sont la clé de signature serveur, le jeton de poste conservé dans SecretStorage, le runner local et, pour le profil renforcé, l’isolation système.
+
+Les attaques traitées localement comprennent signature ou clé inattendue, rejeu et downgrade de politique, politique future/expirée, runner trop ancien, traversée et lien symbolique, contenu binaire ou trop grand, commande composée/ambiguë, outil MCP ou schéma modifié, approbation rejouée ou liée à un autre poste, dérive du hook et saturation de file. Les hôtes réels, l’administrateur local, les contournements hors session renforcée, Remote/WSL/Container et la sémantique exhaustive des données restent hors de cette preuve locale. La matrice exhaustive est [DEVELOPER-THREAT-MAPPING.md](./DEVELOPER-THREAT-MAPPING.md).
 
 ## 1. Objectif de sécurité
 

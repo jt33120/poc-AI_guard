@@ -1,10 +1,10 @@
 # Secret Guard — Architecture de référence
 
-**Statut :** photographie de l’implémentation V0.2 livrée et trajectoire future
+**Statut :** architecture historique Secret Guard V0.2, complétée par le socle Developer Guard validé localement
 
 **Référence :** SG-ADR-001
 
-**Date de vérification des API :** 11 septembre 2026
+**Date de vérification des API :** 23 septembre 2026
 
 **Cible V0.2 :** VS Code 1.136 ou plus récent ; Node.js 22.13 ou plus récent pour le workspace et le CLI autonome
 
@@ -12,6 +12,12 @@ Les paragraphes marqués **Futur** décrivent une direction et non une capacité
 livrée. Les intégrations utilisateur sont testées au niveau de leur contrat de
 processus ; elles ne constituent pas une attestation d’exécution hôte ni un
 déploiement administrateur non contournable.
+
+## Mise à jour Developer Guard
+
+Le périmètre approuvé est défini par [DEVELOPER-GUARD-PLAN.md](./DEVELOPER-GUARD-PLAN.md). Le dépôt contient désormais des contrats JSON stricts, un évaluateur déterministe TypeScript/Python, des adaptateurs d’hôtes, un runner de ressources/commandes/MCP, des politiques Ed25519 liées au tenant, des approbations liées à l’action et au poste, une posture sans contenu et une console d’administration. Ces briques sont validées localement ; elles ne constituent pas une preuve d’interception réelle par Claude Code ou Codex.
+
+Les invariants V0 restent applicables : aucune valeur détectée dans l’audit, aucune permission déduite d’une simple configuration, aucune garantie universelle de l’extension sur le système. Le profil renforcé Linux ajoute une frontière système distincte ; les profils macOS et Windows de ce dépôt sont des profils administrés, pas des sandboxes qualifiées.
 
 ## 1. Décision
 

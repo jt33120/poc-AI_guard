@@ -219,6 +219,8 @@
     "vscode:prepublish": "npm run build"
   },
   "dependencies": {
+    "@xsom/developer-guard-adapters": "0.1.0",
+    "@xsom/developer-guard-runner": "0.1.0",
     "@xsom/secret-guard-cli": "0.1.0",
     "@xsom/secret-guard-core": "0.1.0"
   }

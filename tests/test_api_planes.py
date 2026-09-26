@@ -168,7 +168,11 @@ def test_a_hot_plane_serves_only_its_declared_prefixes(chaud: Plane) -> None:
 #: relevé monté sur la seule console ne dirait rien des deux chemins chauds — ceux
 #: dont on veut précisément voir le volume et la latence. La route ne lit aucune base
 #: et exige son propre jeton (`OPS_METRICS_TOKEN`) ; sans lui elle répond 404.
-_BUDGET_CHAUD: dict[Plane, int] = {Plane.DECISION: 6, Plane.LLM: 14}
+#:
+#: +2 sur le plan LLM : la demande et la consommation d'une approbation Developer
+#: Guard doivent rester disponibles pendant qu'un hook retient l'action. Elles sont
+#: authentifiées par le jeton du poste et ne servent ni contenu ni fonction console.
+_BUDGET_CHAUD: dict[Plane, int] = {Plane.DECISION: 6, Plane.LLM: 17}
 
 
 @pytest.mark.parametrize("chaud", [Plane.DECISION, Plane.LLM])

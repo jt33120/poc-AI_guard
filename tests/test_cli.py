@@ -54,7 +54,8 @@ def _migrated(db: DBHandle, capsys: pytest.CaptureFixture[str]) -> Settings:
     """Bring the hand-migrated fixture database under the ledger, at head."""
     settings = _settings(db)
     assert _run(["migrate", "--adopt-baseline"], settings, capsys)[0] == 0
-    assert _run(["migrate"], settings, capsys)[0] == 0
+    code, output = _run(["migrate"], settings, capsys)
+    assert code == 0, output
     return settings
 
 
@@ -87,7 +88,7 @@ def test_migrate_dry_run_reports_the_plan_and_changes_nothing(
     db: DBHandle, capsys: pytest.CaptureFixture[str]
 ) -> None:
     code, out = _run(["migrate", "--dry-run"], _settings(db), capsys)
-    assert code == 0
+    assert code == 0, out
     assert "would be applied" in out
     assert "0001_init_tenancy.sql" in out
     # A dry run records nothing: the ledger is still empty afterwards.
@@ -114,7 +115,7 @@ def test_adopt_baseline_then_migrate_brings_a_pre_ledger_database_to_head(
     assert "0001_init_tenancy.sql" in out
 
     code, out = _run(["migrate"], settings, capsys)
-    assert code == 0
+    assert code == 0, out
     assert migrate.LEDGER_MIGRATION in out
     assert _run(["migrate"], settings, capsys) == (0, "migrate: schema already up to date\n")
 

@@ -12,9 +12,9 @@ Nom commercial : le produit poste s'appelle **Secret Guard**, en trois éditions
 
 ## 2. Scope MVP — et non-objectifs
 
-**DANS** : auth multi-tenant (Supabase + RLS + RBAC) ; gateway MCP (proxy de serveurs d'outils en aval) ; moteur de policy déterministe + classification d'action ; HITL (dry-run, approbation, timeout) ; audit immuable hash-chaîné + exports AI Act/RGPD ; LLM juge mince (cas ambigus + génération des narratifs de conformité) ; frontend (inspecteur, file d'approbation, explorateur d'audit, éditeur de policy) ; Secret Guard V0 local (`docs/secret-guard/`) ; tests + CI.
+**DANS** : auth multi-tenant (Supabase + RLS + RBAC) ; gateway MCP (proxy de serveurs d'outils en aval) ; moteur de policy déterministe + classification d'action ; HITL (dry-run, approbation, timeout) ; audit immuable hash-chaîné + exports AI Act/RGPD ; LLM juge mince (cas ambigus + génération des narratifs de conformité) ; frontend (inspecteur, file d'approbation, explorateur d'audit, éditeur de policy) ; Secret Guard local et Developer Guard selon le périmètre approuvé dans `docs/secret-guard/DEVELOPER-GUARD-PLAN.md` ; tests + CI.
 
-**HORS (points d'extension seulement, ne pas implémenter)** : guard prompt injection, scan automatique des pièces jointes/repositories, PII stripping dans Secret Guard, OCR/PDF, médiation RAG, fleet/GitOps multi-instances, hébergement souverain OVH/Keycloak, anomaly detection ML.
+**HORS** : analyse sémantique universelle de prompt injection, indexation automatique et permanente des dépôts, scan natif non intercepté des pièces jointes, OCR/PDF, médiation RAG universelle, fleet/GitOps multi-instances, hébergement souverain OVH/Keycloak et anomaly detection ML. Developer Guard peut refuser des actions ou ressources déterministes sur les chemins d'hôte prouvés ; cela ne vaut pas détection générale de prompt injection.
 
 ## 3. Stack imposée
 
@@ -44,6 +44,7 @@ Pas de composant ni de dépendance hors liste sans justification dans le PR.
 9. Validation Pydantic stricte (longueurs bornées) ; rate limit sur les endpoints coûteux (LLM juge).
 10. Ne jamais logger le **contenu** des arguments d'outils sensibles ni de PII → métadonnées + hash uniquement.
 11. Secret Guard ne retourne ni ne journalise la valeur détectée ; scan incomplet, erreur ou entrée > 1 Mio = blocage explicite, jamais de suffixe non scanné transmis.
+12. Une politique Developer Guard est signée, liée au tenant, monotone et bornée dans le temps. Une capacité hôte inconnue, une signature invalide, une politique expirée ou un runner trop ancien ne deviennent jamais une autorisation.
 
 ## 5. Conventions de code
 

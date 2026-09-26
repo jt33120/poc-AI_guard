@@ -11,6 +11,15 @@ export default defineConfig({
       "@xsom/secret-guard-core": fileURLToPath(
         new URL("./packages/core/src/index.ts", import.meta.url),
       ),
+      "@xsom/developer-guard-policy": fileURLToPath(
+        new URL("./packages/policy/src/index.ts", import.meta.url),
+      ),
+      "@xsom/developer-guard-adapters": fileURLToPath(
+        new URL("./packages/adapters/src/index.ts", import.meta.url),
+      ),
+      "@xsom/developer-guard-runner": fileURLToPath(
+        new URL("./packages/runner/src/index.ts", import.meta.url),
+      ),
     },
   },
   test: {

@@ -127,3 +127,7 @@ jobs:
         run: npm ci
       - name: Static checks, unit coverage, hook contracts, VSIX and latency
         run: xvfb-run -a npm run verify
+      - name: Server-side Developer Guard quality receipt
+        run: |
+          node scripts/create-quality-receipt.mjs --commit "$GITHUB_SHA" --out quality-receipt.json
+          node scripts/verify-quality-receipt.mjs quality-receipt.json "$GITHUB_SHA"

@@ -354,7 +354,7 @@ describe("multi-host hook configuration", () => {
     expect(parsed.hooks.UserPromptSubmit).toHaveLength(2);
     expect(upgraded).toContain("foreign-command");
     expect(parsed.hooks.UserPromptSubmit[1].hooks[0].commandWindows).toBe(
-      renderPowerShellCommand(executable, hookPath, "block"),
+      renderPowerShellCommand(executable, hookPath, "block", "codex"),
     );
     expect(configureHost(upgraded, host, executable, hookPath, "block")).toBe(
       upgraded,

@@ -159,11 +159,11 @@ def create(
 
 
 def expire_if_needed(conn: psycopg.Connection, record: ApprovalRecord) -> ApprovalRecord:
-    """Lazily move a pending-but-past-deadline approval to 'expired' (= deny)."""
-    if record.status == "pending" and record.expires_at <= datetime.now(UTC):
+    """Lazily expire an unconsumed decision once its authorization window closes."""
+    if record.status in {"pending", "approved"} and record.expires_at <= datetime.now(UTC):
         conn.execute(
             "update approvals set status = 'expired', decided_at = now() "
-            "where id = %s and status = 'pending'",
+            "where id = %s and status in ('pending','approved') and consumed_at is null",
             (record.id,),
         )
         row = conn.execute(

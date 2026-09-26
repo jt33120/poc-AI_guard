@@ -1,10 +1,20 @@
 import { randomUUID } from "node:crypto";
+import type { PostureReason } from "@xsom/developer-guard-runner";
+
+export type AuditPostureReason =
+  PostureReason | "config_invalid" | "hook_modified" | "canary_failed";
 
 export type AuditEvent = {
   event_id: string;
   at: string;
   kind:
-    "scan" | "mode_changed" | "local_test" | "gateway_configured" | "heartbeat";
+    | "scan"
+    | "mode_changed"
+    | "local_test"
+    | "gateway_configured"
+    | "policy_synced"
+    | "posture"
+    | "heartbeat";
   assistant: "manual" | "secretguard" | "claude" | "codex" | "copilot";
   mode: "block" | "redact" | "observe";
   outcome:
@@ -14,9 +24,15 @@ export type AuditEvent = {
     | "warned"
     | "passed"
     | "failed"
-    | "configured";
+    | "configured"
+    | "unverified";
   findings: number;
   dropped: number;
+  posture_reasons?: readonly AuditPostureReason[];
+  policy_id?: string;
+  policy_version?: number;
+  runner_version?: string;
+  queue_pending?: number;
 };
 
 export function gatewayUrl(value: string): string {
@@ -68,6 +84,24 @@ export async function gatewayJson(
     reader.releaseLock();
   }
   return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
+}
+
+export async function gatewayGetJson(
+  base: string,
+  token: string,
+  path: string,
+): Promise<unknown> {
+  const response = await fetch(`${gatewayUrl(base)}${path}`, {
+    method: "GET",
+    redirect: "error",
+    signal: AbortSignal.timeout(10000),
+    headers: { "X-Gateway-Token": token },
+  });
+  if (response.status === 404) return undefined;
+  if (!response.ok) throw new Error(`gateway_http_${response.status}`);
+  const content = await response.text();
+  if (content.length > 64000) throw new Error("gateway_response_too_large");
+  return JSON.parse(content) as unknown;
 }
 
 export interface QueueState {

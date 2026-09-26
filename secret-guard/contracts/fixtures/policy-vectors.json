@@ -1,0 +1,73 @@
+{
+  "policy": {
+    "schemaVersion": 1,
+    "policyId": "fixture-policy",
+    "version": 4,
+    "issuedAt": "2026-01-01T00:00:00Z",
+    "expiresAt": "2030-01-01T00:00:00Z",
+    "defaults": { "unknownAction": "deny" },
+    "rules": [
+      {
+        "id": "allow-source-read",
+        "effect": "allow",
+        "match": { "events": ["read"], "resourcePrefixes": ["/repo/src/"] }
+      },
+      {
+        "id": "approve-publish",
+        "effect": "require_approval",
+        "match": { "actionClasses": ["publish"] }
+      },
+      {
+        "id": "deny-private",
+        "effect": "deny",
+        "match": { "resourcePrefixes": ["/repo/src/private/"] }
+      }
+    ]
+  },
+  "vectors": [
+    {
+      "name": "allowed source read",
+      "request": {
+        "assistant": "claude",
+        "event": "read",
+        "actionClass": "read",
+        "resource": "/repo/src/index.ts",
+        "capabilityVerified": true
+      },
+      "effect": "allow"
+    },
+    {
+      "name": "strictest match wins",
+      "request": {
+        "assistant": "claude",
+        "event": "read",
+        "actionClass": "read",
+        "resource": "/repo/src/private/key.ts",
+        "capabilityVerified": true
+      },
+      "effect": "deny"
+    },
+    {
+      "name": "publish requires approval",
+      "request": {
+        "assistant": "claude",
+        "event": "command",
+        "actionClass": "publish",
+        "tool": "Bash",
+        "capabilityVerified": true
+      },
+      "effect": "require_approval"
+    },
+    {
+      "name": "unverified capability cannot be granted",
+      "request": {
+        "assistant": "copilot",
+        "event": "command",
+        "actionClass": "publish",
+        "tool": "terminal",
+        "capabilityVerified": false
+      },
+      "effect": "deny"
+    }
+  ]
+}

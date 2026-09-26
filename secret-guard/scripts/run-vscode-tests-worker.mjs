@@ -51,6 +51,10 @@ try {
     extensionTestsPath,
     extensionTestsEnv: {
       ...process.env,
+      // The extension process itself uses this variable to run bundled Node
+      // hooks. Passing it to the VS Code executable turns the Electron app
+      // into a Node process, which makes every VS Code launch argument fail.
+      ELECTRON_RUN_AS_NODE: undefined,
       HOME: isolatedHome,
       USERPROFILE: isolatedHome,
     },

@@ -26,12 +26,46 @@ class Event(BaseModel):
     model_config = ConfigDict(extra="forbid")
     event_id: UUID
     at: AwareDatetime
-    kind: Literal["scan", "mode_changed", "local_test", "gateway_configured", "heartbeat"]
+    kind: Literal[
+        "scan",
+        "mode_changed",
+        "local_test",
+        "gateway_configured",
+        "policy_synced",
+        "posture",
+        "heartbeat",
+    ]
     assistant: Literal["manual", "secretguard", "claude", "codex", "copilot", "windsurf"]
     mode: Literal["block", "redact", "observe"]
-    outcome: Literal["clean", "blocked", "redacted", "warned", "passed", "failed", "configured"]
+    outcome: Literal[
+        "clean",
+        "blocked",
+        "redacted",
+        "warned",
+        "passed",
+        "failed",
+        "configured",
+        "unverified",
+    ]
     findings: int = Field(default=0, ge=0, le=10000)
     dropped: int = Field(default=0, ge=0, le=1000000000)
+    posture_reasons: list[
+        Literal[
+            "policy_missing",
+            "policy_expired_or_unknown",
+            "hook_missing",
+            "hook_evidence_stale",
+            "audit_events_dropped",
+            "audit_queue_saturated",
+            "config_invalid",
+            "hook_modified",
+            "canary_failed",
+        ]
+    ] = Field(default_factory=list, max_length=9)
+    policy_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+    policy_version: int | None = Field(default=None, ge=1)
+    runner_version: str | None = Field(default=None, pattern=r"^\d{1,3}\.\d{1,3}\.\d{1,3}$")
+    queue_pending: int = Field(default=0, ge=0, le=1000)
 
 
 class Batch(BaseModel):

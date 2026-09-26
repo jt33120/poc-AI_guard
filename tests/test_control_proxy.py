@@ -88,12 +88,17 @@ def _regles() -> list[tuple[re.Pattern[str], set[str]]]:
     texte = _TABLE.read_text(encoding="utf-8")
     seg = re.search(r'const SEG = "([^"]+)"', texte)
     assert seg, "SEG n'est plus déclaré : la table a changé de forme"
+    policy_seg = re.search(r'const POLICY_SEG = "([^"]+)"', texte)
+    assert policy_seg, "POLICY_SEG n'est plus déclaré : la table a changé de forme"
 
     regles: list[tuple[re.Pattern[str], set[str]]] = []
     for motif, verbes in re.findall(
-        r'pattern:\s*new RegExp\([`"]([^`"]+)[`"]\),\s*methods:\s*\[([^\]]*)\]', texte
+        r'pattern:\s*new RegExp\(\s*[`"]([^`"]+)[`"]\s*,?\s*\),\s*methods:\s*\[([^\]]*)\]',
+        texte,
     ):
-        concret = motif.replace("${SEG}", seg.group(1))
+        concret = motif.replace("${SEG}", seg.group(1)).replace(
+            "${POLICY_SEG}", policy_seg.group(1)
+        )
         regles.append((re.compile(concret), set(re.findall(r'"([A-Z]+)"', verbes))))
     assert regles, "aucune règle relue — le format de la table a changé"
     return regles

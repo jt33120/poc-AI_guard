@@ -29,6 +29,8 @@ from api.clients import router as clients_router
 from api.compliance import router as compliance_router
 from api.corpora import router as corpora_router
 from api.credentials import router as credentials_router
+from api.developer_policies import console_router as developer_policies_router
+from api.developer_policies import router as developer_policy_ingest_router
 from api.dlp import router as dlp_router
 from api.entitlement_guard import requires
 from api.errors import register_exception_handlers
@@ -113,10 +115,11 @@ _SOCLE: tuple[APIRouter, ...] = (health_router, ops_router)
 #: un module d'`api/` expose un `router` absent d'ici.
 _PLANS: dict[Plane, tuple[APIRouter, ...]] = {
     Plane.DECISION: (authorize_router,),
-    Plane.LLM: (llm_proxy_router, extension_ingest_router),
+    Plane.LLM: (llm_proxy_router, extension_ingest_router, developer_policy_ingest_router),
     Plane.CONSOLE: (
         servers_router,
         policy_router,
+        developer_policies_router,
         approvals_router,
         audit_router,
         extension_devices_router,
@@ -167,6 +170,8 @@ _CAPACITE_PAR_ROUTEUR: tuple[tuple[APIRouter, Capability | None], ...] = (
     (extension_devices_router, None),  # device evidence uses the same tenant boundary
     (extension_ingest_router, None),  # gateway-token authentication on ingestion
     (policy_router, None),  # sans policy éditable, le produit ne fait rien
+    (developer_policies_router, None),  # policy posture is a security baseline
+    (developer_policy_ingest_router, None),  # gateway-token authentication on workstation fetch
     (trust_router, None),  # lecture du capital de confiance, adossée à l'audit
     # --- Ceux qui n'authentifient PAS par JWT, et que ce garde ne peut pas tenir ----
     #
