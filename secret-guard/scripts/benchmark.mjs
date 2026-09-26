@@ -170,6 +170,74 @@ for (const [name, bytes, iterations, limit] of [
   );
 }
 
+// Non-repeating corpora (numbers, code, prose): the repeated prompt above
+// lets the term memo hit almost always, real text does not.
+let seed = 7;
+const random = () => (seed = (seed * 48271) % 2147483647) / 2147483647;
+const vocabulary = Array.from(
+  { length: 20_000 },
+  (_, index) => `w${index.toString(36)}x`,
+);
+const zipf = () =>
+  vocabulary[
+    Math.min(
+      vocabulary.length - 1,
+      Math.floor(random() ** 3 * vocabulary.length),
+    )
+  ];
+function fill(generate, bytes) {
+  let text = "";
+  while (text.length < bytes) text += generate();
+  return text.slice(0, bytes);
+}
+const corpora = {
+  "numeric CSV": (bytes) =>
+    `siret0,siret2,client\n${fill(() => `${String(Math.floor(random() * 1e9))},${String(Math.floor(random() * 1e6))},${String(Math.floor(random() * 100))}\n`, bytes)}`,
+  code: (bytes) =>
+    fill(
+      () =>
+        `const ${zipf()} = ${zipf()}(${zipf()}, ${String(Math.floor(random() * 1000))});\n`,
+      bytes,
+    ),
+  prose: (bytes) => fill(() => zipf() + (random() < 0.1 ? ".\n" : " "), bytes),
+};
+const sharedSalt = compileRulesPack(largestRulesPack({ sharedSalt: true }));
+if (!sharedSalt.ok) throw new Error("shared-salt pack refused");
+for (const [name, generate] of Object.entries(corpora)) {
+  const medium = generate(256 * 1024);
+  report(
+    `256 KiB ${name} + largest pack (4 salts)`,
+    timed(3, () => {
+      const result = scan({ content: medium, rules: compiled.pack });
+      if (!result.complete)
+        throw new Error(`256 KiB ${name} exceeded the custom rules budget`);
+    }),
+    2_500,
+  );
+  const large = generate(1000 * 1024);
+  let incomplete = 0;
+  report(
+    `1000 KiB ${name} + largest pack (4 salts)`,
+    timed(3, () => {
+      if (!scan({ content: large, rules: compiled.pack }).complete)
+        incomplete += 1;
+    }),
+    5_000,
+  );
+  process.stdout.write(
+    `  → ${incomplete === 0 ? "complete" : "BLOCK, analyse incomplète (budget)"}\n`,
+  );
+  report(
+    `1000 KiB ${name} + largest pack (1 shared salt)`,
+    timed(3, () => {
+      const result = scan({ content: large, rules: sharedSalt.pack });
+      if (!result.complete)
+        throw new Error(`1000 KiB ${name} with one salt exceeded the budget`);
+    }),
+    5_000,
+  );
+}
+
 const pathological = compileRulesPack({
   ...largest,
   detectors: [

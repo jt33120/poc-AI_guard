@@ -78,8 +78,8 @@ function patternDetector(index) {
   }
 }
 
-function termsDetector(index) {
-  const encodedSalt = salt(index);
+function termsDetector(index, sharedSalt) {
+  const encodedSalt = salt(sharedSalt ? 0 : index);
   const saltBytes = Uint8Array.from(Buffer.from(encodedSalt, "base64"));
   const digests = Array.from({ length: DIGESTS_PER_TERMS }, (_, term) =>
     termDigest(saltBytes, normalizeTerm(`nomcode${index}x${term}`)),
@@ -93,8 +93,12 @@ function termsDetector(index) {
   };
 }
 
-/** A valid, unsigned payload of the maximum size. */
-export function largestRulesPack() {
+/**
+ * A valid, unsigned payload of the maximum size. `sharedSalt` gives the four
+ * terms detectors one salt, as the platform is advised to do: one hashing
+ * pass instead of four.
+ */
+export function largestRulesPack({ sharedSalt = false } = {}) {
   const detectors = [];
   const positives = [];
   for (let index = 0; index < PATTERN_DETECTORS; index += 1) {
@@ -103,7 +107,7 @@ export function largestRulesPack() {
     positives.push({ detector: detector.id, text: positive });
   }
   for (let index = 0; index < TERMS_DETECTORS; index += 1)
-    detectors.push(termsDetector(index));
+    detectors.push(termsDetector(index, sharedSalt));
   const negative = NEGATIVE_LINE.repeat(
     Math.ceil(2_000 / NEGATIVE_LINE.length),
   ).slice(0, 2_000);
