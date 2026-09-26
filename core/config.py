@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from functools import lru_cache
 from typing import Annotated, Literal
+from uuid import UUID
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -44,6 +45,24 @@ IssuerClaims = Literal["supabase_gotrue", "oidc_groups"]
 #: Non déclarée, la garde est **inconnue**, et l'inconnu se lit comme `same_host`
 #: côté attestation : c'est la seule direction qui ne surpromet pas.
 CheckpointCustody = Literal["same_host", "separate_host", "kms"]
+
+
+def operator_subjects(raw: str | None) -> frozenset[str]:
+    """``XSOM_OPERATOR_SUBJECTS`` lu en ensemble de `sub` (UUID en minuscules).
+
+    Fail-closed dans les deux sens : vide ne désigne personne, et une entrée qui n'est
+    pas un UUID lève plutôt que d'être ignorée.
+    """
+    subjects: set[str] = set()
+    for item in (raw or "").split(","):
+        entry = item.strip()
+        if not entry:
+            continue
+        try:
+            subjects.add(str(UUID(entry)))
+        except ValueError:
+            raise ValueError("XSOM_OPERATOR_SUBJECTS must list user UUIDs (JWT sub)") from None
+    return frozenset(subjects)
 
 
 class Settings(BaseSettings):
@@ -197,6 +216,19 @@ class Settings(BaseSettings):
     # signing authority for another. The seed is never stored in PostgreSQL.
     developer_policy_signing_key: str | None = Field(default=None, max_length=128)
 
+    # --- Règles sur mesure xSOM (secret-guard/contracts/RULES-PACK.md) ------
+    # Graine Ed25519 (base64, 32 octets) de la clé d'AUTORITÉ xSOM qui signe les
+    # paquets de règles. Distincte des deux précédentes : c'est la seule clé que
+    # l'extension officielle accepte pour un réglage, et elle ne doit servir à rien
+    # d'autre. Absente ⇒ la publication échoue fermée (503), la lecture reste servie.
+    xsom_rules_signing_key: str | None = Field(default=None, max_length=128)
+    # Les opérateurs xSOM : `sub` (UUID) des comptes autorisés à composer et signer,
+    # séparés par des virgules. Un rôle de tenant n'y suffit jamais — l'administrateur
+    # d'un client est admin de son tenant, pas opérateur xSOM. Vide ⇒ personne.
+    xsom_operator_subjects: str | None = Field(default=None, max_length=4000)
+    # Essai et publication exécutent des motifs dans un processus isolé : bornés.
+    rules_pack_rate_limit: str = Field(default="30/minute", max_length=40)
+
     # --- Point de scrutation opérationnel (/v1/ops/metrics) ---------------
     # Jeton porteur que le scrutateur présente. Absent ⇒ la route répond 404 : un
     # relevé de trafic derrière rien du tout dit à un anonyme quel déploiement vaut
@@ -252,6 +284,17 @@ class Settings(BaseSettings):
                 raise ValueError(f"CORS_ALLOW_ORIGINS is not valid JSON: {exc}") from None
         return [item.strip() for item in raw.split(",") if item.strip()]
 
+    @field_validator("xsom_operator_subjects")
+    @classmethod
+    def _operator_subjects(cls, value: str | None) -> str | None:
+        """Une liste d'opérateurs illisible arrête le démarrage.
+
+        Un e-mail glissé à la place d'un `sub` ne désignerait personne en silence ;
+        pire, une adresse se choisit à l'inscription quand un `sub` ne se choisit pas.
+        """
+        operator_subjects(value)
+        return value
+
     @field_validator("cors_allow_origins")
     @classmethod
     def _reject_wildcard(cls, value: list[str]) -> list[str]:
@@ -259,6 +302,11 @@ class Settings(BaseSettings):
         if "*" in value:
             raise ValueError("CORS_ALLOW_ORIGINS must be explicit; wildcard '*' is forbidden")
         return value
+
+    @property
+    def xsom_operators(self) -> frozenset[str]:
+        """Les `sub` des opérateurs xSOM, normalisés. Vide : personne ne compose."""
+        return operator_subjects(self.xsom_operator_subjects)
 
     @property
     def is_prod(self) -> bool:
