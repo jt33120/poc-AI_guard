@@ -5,9 +5,37 @@ import { join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import { TEST_AUTHORITY_PUBLIC_KEYS } from "./rules-authority.mjs";
+
 const worker = fileURLToPath(
   new URL("./run-vscode-tests-worker.mjs", import.meta.url),
 );
+const extensionDirectory = fileURLToPath(
+  new URL("../packages/vscode/", import.meta.url),
+);
+
+// The extension-host contract exercises the xSOM tuning end to end, so the
+// extension under test trusts the public TEST authority of the contract
+// vectors. The bundles are rebuilt without it afterwards, whatever happens;
+// the VSIX inspection also refuses that key.
+function buildExtension(testAuthority) {
+  const environment = { ...process.env };
+  delete environment.XSOM_RULES_AUTHORITY_KEYS;
+  delete environment.XSOM_RULES_TEST_BUILD;
+  if (testAuthority) {
+    environment.XSOM_RULES_AUTHORITY_KEYS =
+      TEST_AUTHORITY_PUBLIC_KEYS.join(",");
+    environment.XSOM_RULES_TEST_BUILD = "1";
+  }
+  const build = spawnSync(process.execPath, ["build.mjs"], {
+    cwd: extensionDirectory,
+    env: environment,
+    stdio: ["ignore", "ignore", "inherit"],
+  });
+  if (build.status !== 0) throw new Error("extension build failed");
+}
+
+buildExtension(true);
 const TIMEOUT_MS = 120_000;
 const SUCCESS_MESSAGE = "xsom-secret-guard-vscode-tests-passed";
 
@@ -77,6 +105,7 @@ const result = await new Promise((resolve) => {
 });
 clearTimeout(timer);
 await rm(isolatedHome, { recursive: true, force: true });
+buildExtension(false);
 
 if (timedOut) {
   process.stderr.write("VS Code extension-host tests exceeded 120 seconds.\n");

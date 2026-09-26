@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import process from "node:process";
 
 import Mocha from "mocha";
@@ -34,6 +35,8 @@ function registerTests(mocha: Mocha): void {
         "secretGuard.finishCodexSetup",
         "secretGuard.disableHook",
         "secretGuard.copyRedacted",
+        "secretGuard.requestRulesPack",
+        "secretGuard.rulesPackStatus",
       ]) {
         assert.ok(commands.has(command), `${command} is registered`);
       }
@@ -91,6 +94,98 @@ function registerTests(mocha: Mocha): void {
           await vscode.env.clipboard.readText(),
           `deploy with ${canary}`,
         );
+      },
+    ),
+  );
+
+  extensionSuite.addTest(
+    new Mocha.Test(
+      "applies a verified xSOM tuning to its own scans and shows it",
+      async () => {
+        const extension = vscode.extensions.getExtension(
+          "xsom.xsom-secret-guard-vscode",
+        );
+        assert.ok(extension);
+        const home = process.env.XSOM_VSCODE_TEST_HOME;
+        assert.ok(home, "isolated test home is configured");
+        const storage = join(
+          home,
+          "user",
+          "User",
+          "globalStorage",
+          "xsom.xsom-secret-guard-vscode",
+        );
+        type Status = { state: string; line: string; packId?: string };
+        const status = async (): Promise<Status> =>
+          (await vscode.commands.executeCommand(
+            "secretGuard.rulesPackStatus",
+          )) as Status;
+
+        assert.deepEqual(await status(), {
+          state: "none",
+          line: "Aucun réglage sur mesure",
+        });
+
+        // The contract's signed reference pack, trusted by this TEST build
+        // only, stored as a synchronisation would store it.
+        const vectors = JSON.parse(
+          await readFile(
+            join(
+              extension.extensionPath,
+              "..",
+              "..",
+              "contracts",
+              "fixtures",
+              "rules-pack-vectors.json",
+            ),
+            "utf8",
+          ),
+        ) as { signature: { envelope: unknown } };
+        await mkdir(storage, { recursive: true });
+        await writeFile(
+          join(storage, "rules-pack.json"),
+          JSON.stringify(vectors.signature.envelope),
+        );
+        await writeFile(
+          join(storage, "rules-pack-state.json"),
+          JSON.stringify({
+            schemaVersion: 1,
+            tenantId: "00000000-0000-4000-8000-000000000001",
+            tenantSource: "register",
+            highest: {},
+          }),
+        );
+        try {
+          const active = await status();
+          assert.equal(active.state, "active");
+          assert.equal(active.packId, "acme-main");
+          assert.match(active.line, /^Réglage xSOM · v3 · 3 règles · /u);
+
+          // Expurger masks the custom finding with the detector label.
+          const customer = ["CLI", "00421337"].join("-");
+          await vscode.env.clipboard.writeText(`Le client ${customer}.`);
+          await vscode.commands.executeCommand("secretGuard.purgeClipboard");
+          assert.equal(
+            await vscode.env.clipboard.readText(),
+            "Le client <REDACTED_Identifiant_client_ACME>.",
+          );
+
+          // A pack edited on disk is refused; built-in rules stay.
+          await writeFile(
+            join(storage, "rules-pack.json"),
+            JSON.stringify({
+              ...(vectors.signature.envelope as object),
+              signature: "A".repeat(86) + "==",
+            }),
+          );
+          const refused = await status();
+          assert.equal(refused.state, "rejected");
+          assert.equal(refused.line, "Réglage refusé : signature invalide");
+        } finally {
+          await rm(join(storage, "rules-pack.json"), { force: true });
+          await rm(join(storage, "rules-pack-state.json"), { force: true });
+        }
+        assert.equal((await status()).state, "none");
       },
     ),
   );
