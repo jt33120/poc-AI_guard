@@ -2,7 +2,12 @@ import { randomUUID } from "node:crypto";
 import type { PostureReason } from "@xsom/developer-guard-runner";
 
 export type AuditPostureReason =
-  PostureReason | "config_invalid" | "hook_modified" | "canary_failed";
+  | PostureReason
+  | "config_invalid"
+  | "hook_modified"
+  | "canary_failed"
+  | "rules_pack_rejected"
+  | "rules_pack_expired";
 
 export type AuditEvent = {
   event_id: string;
@@ -14,7 +19,8 @@ export type AuditEvent = {
     | "gateway_configured"
     | "policy_synced"
     | "posture"
-    | "heartbeat";
+    | "heartbeat"
+    | "rules_pack_synced";
   assistant: "manual" | "secretguard" | "claude" | "codex" | "copilot";
   mode: "block" | "redact" | "observe";
   outcome:
@@ -33,7 +39,27 @@ export type AuditEvent = {
   policy_version?: number;
   runner_version?: string;
   queue_pending?: number;
+  // xSOM custom tuning (contract RULES-PACK.md §7): identity and counts only.
+  rules_pack_id?: string;
+  rules_pack_version?: number;
+  rules_pack_digest?: string;
+  custom_findings?: number;
+  custom_detector_ids?: readonly string[];
 };
+
+/** Custom-finding fields of a scan event: at most 20 unique detector ids. */
+export function customFindingFields(
+  findings: readonly { readonly custom?: { readonly detectorId: string } }[],
+): Pick<AuditEvent, "custom_findings" | "custom_detector_ids"> {
+  const custom = findings.flatMap((finding) =>
+    finding.custom === undefined ? [] : [finding.custom.detectorId],
+  );
+  if (custom.length === 0) return {};
+  return {
+    custom_findings: Math.min(custom.length, 10_000),
+    custom_detector_ids: [...new Set(custom)].slice(0, 20),
+  };
+}
 
 export function gatewayUrl(value: string): string {
   const url = new URL(value);

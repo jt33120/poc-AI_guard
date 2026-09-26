@@ -36,12 +36,15 @@ export function statusBarClickCommand(mode: ProtectionMode): string {
 // Every click target is one image from tooltip-art; HTML carries only the
 // dynamic lines. Image rows and 19px text lines stack with no other spacing.
 
+export const REQUEST_RULES_PACK_COMMAND = "secretGuard.requestRulesPack";
+
 export const STATUS_TOOLTIP_COMMANDS = [
   "secretGuard.setMode",
   "secretGuard.enableHook",
   PURGE_CLIPBOARD_COMMAND,
   CHECK_CLIPBOARD_COMMAND,
   "secretGuard.showDashboard",
+  REQUEST_RULES_PACK_COMMAND,
 ] as const;
 
 type TooltipCommand = (typeof STATUS_TOOLTIP_COMMANDS)[number];
@@ -55,6 +58,14 @@ export interface LastScan {
   readonly time: string;
 }
 
+/** The xSOM custom tuning line (see rules-pack-view.ts). */
+export interface RulesPackLine {
+  readonly line: string;
+  readonly tone: Tone;
+  /** Local users: a discreet link to ask xSOM for a tuning. */
+  readonly offerRequest: boolean;
+}
+
 export interface StatusTooltipInput {
   readonly appearance: Appearance;
   readonly health: HookHealth;
@@ -63,6 +74,7 @@ export interface StatusTooltipInput {
   readonly observeUntil?: string;
   readonly modeApplicationFailed?: boolean;
   readonly lastScan?: LastScan;
+  readonly rulesPack?: RulesPackLine;
 }
 
 const COLOR = {
@@ -246,9 +258,21 @@ function readiness(input: StatusTooltipInput): Readiness {
   };
 }
 
+// The tuning sits under the readiness line: it says which rules the
+// detector applies. A text line keeps the image controls in place.
+function rulesPackLine(rules: RulesPackLine): string {
+  const request = rules.offerRequest
+    ? ` · ${link("Demander à xSOM", { command: REQUEST_RULES_PACK_COMMAND }, "Réglage sur mesure de l’édition Équipe : xSOM calibre et signe des règles pour vos propres données.")}`
+    : "";
+  return textLine(
+    `<small>${span("◆", TONE_COLORS[rules.tone])}&nbsp;${span(escapeHtml(rules.line), COLOR.dim)}${request}</small>`,
+  );
+}
+
 function headerBlocks(
   appearance: Appearance,
   state: Readiness,
+  rules: RulesPackLine | undefined,
 ): readonly string[] {
   return [
     imageRow(
@@ -261,6 +285,7 @@ function headerBlocks(
     textLine(
       `${span("●", TONE_COLORS[state.tone])}&nbsp;&nbsp;${span(state.summary, COLOR.dim)}`,
     ),
+    ...(rules === undefined ? [] : [rulesPackLine(rules)]),
   ];
 }
 
@@ -393,7 +418,7 @@ export function statusTooltipMarkdown(input: StatusTooltipInput): string {
   const { appearance } = input;
   const state = readiness(input);
   return [
-    ...headerBlocks(appearance, state),
+    ...headerBlocks(appearance, state, input.rulesPack),
     ...levelBlocks(appearance, input, state),
     ...clipboardBlocks(appearance, input.mode),
     ...(input.lastScan === undefined ? [] : [scanLine(input.lastScan)]),

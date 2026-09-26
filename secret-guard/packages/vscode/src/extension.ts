@@ -7,6 +7,7 @@ import {
   redactAndRescan,
   scan,
   MAX_INPUT_BYTES,
+  type CompiledRulesPack,
   type ScanInput,
 } from "@xsom/secret-guard-core";
 
@@ -25,6 +26,9 @@ import {
 import { ActivityMonitor } from "./hook-activity.js";
 import { HookManager, type HookHealth } from "./hook-manager.js";
 import { GatewayIntegration } from "./gateway-integration.js";
+import { customFindingFields } from "./gateway-client.js";
+import { readRulesPackSnapshot } from "./rules-pack-sync.js";
+import { rulesPackView, type RulesPackView } from "./rules-pack-view.js";
 import { activationStrategy, supportsVsCodePromptHooks } from "./onboarding.js";
 import { defaultHostDefinitions } from "./host-config.js";
 import { markdownReport, modalReport } from "./presentation.js";
@@ -73,6 +77,36 @@ let gateway: GatewayIntegration | undefined;
 let lastScan: LastScan | undefined;
 // End of the running Avertir window, mirrored from the file the hook reads.
 let observeDeadline: number | undefined;
+// The xSOM tuning applied to the scans run by the extension itself; the
+// hook runner verifies and loads the same file on its own.
+let rulesPack: CompiledRulesPack | undefined;
+let rulesView: RulesPackView = rulesPackView({
+  applied: { status: "none" },
+  enrolled: false,
+  authorityKeys: 0,
+});
+const RULES_PACK_REQUEST_URL = `mailto:julian.talou@xsom.fr?subject=${encodeURIComponent("Secret Guard Équipe — réglage sur mesure")}`;
+
+/** Re-read and re-verify the stored pack; never trusts the file as is. */
+async function reloadRulesPack(storage: string): Promise<void> {
+  try {
+    const snapshot = await readRulesPackSnapshot(storage);
+    rulesPack =
+      snapshot.applied.status === "applied" ? snapshot.applied.pack : undefined;
+    rulesView = rulesPackView(snapshot);
+  } catch {
+    rulesPack = undefined;
+    rulesView = rulesPackView({
+      applied: { status: "none" },
+      enrolled: false,
+      authorityKeys: 1,
+    });
+  }
+}
+
+function withRules<T extends ScanInput>(input: T): T {
+  return rulesPack === undefined ? input : { ...input, rules: rulesPack };
+}
 
 function clockTime(epoch: number): string {
   return new Date(epoch).toLocaleTimeString("fr-FR", {
@@ -136,7 +170,8 @@ async function presentScan(
   input: ScanInput & { sourceKind: LastScan["source"] },
   onScanned: () => Promise<void>,
 ): Promise<void> {
-  const result = scan(input);
+  const guarded = withRules(input);
+  const result = scan(guarded);
   lastScan = {
     source: input.sourceKind,
     decision: result.decision,
@@ -151,13 +186,14 @@ async function presentScan(
     mode: configuredMode(),
     outcome: result.decision === "ALLOW" ? "clean" : "warned",
     findings: result.findings.length,
+    ...customFindingFields(result.findings),
   });
   if (result.decision === "ALLOW") {
     await vscode.window.showInformationMessage(modalReport(result));
     return;
   }
 
-  const sanitized = result.complete ? redactAndRescan(input) : undefined;
+  const sanitized = result.complete ? redactAndRescan(guarded) : undefined;
   const redactedContent =
     sanitized?.final.complete === true &&
     sanitized.final.decision === "ALLOW" &&
@@ -286,6 +322,7 @@ async function handleChat(
   try {
     outcome = await dispatchGuarded(content, {
       mode,
+      ...(rulesPack === undefined ? {} : { rules: rulesPack }),
       notifyWarning: () => {
         stream.markdown(
           "👁️ **Mode Avertir** · Le texte original est transmis sans nettoyage malgré une détection ou une analyse incomplète.\n\n",
@@ -318,11 +355,12 @@ async function handleChat(
         ? "redacted"
         : "passed",
     findings: outcome.initial.findings.length,
+    ...customFindingFields(outcome.initial.findings),
   });
   if (!outcome.sent || response === undefined) {
     stream.markdown(markdownReport(outcome.final));
     const sanitized = outcome.initial.complete
-      ? redactAndRescan({ content, sourceKind: "prompt" })
+      ? redactAndRescan(withRules({ content, sourceKind: "prompt" as const }))
       : undefined;
     if (
       sanitized?.final.complete &&
@@ -371,6 +409,7 @@ async function clipboardShortcut(
 ): Promise<PurgeFeedback> {
   const outcome: PurgeOutcome = purgeClipboardText(
     await vscode.env.clipboard.readText(),
+    rulesPack,
   );
   const purged = action === "purge" && outcome.status === "purged";
   if (purged) await vscode.env.clipboard.writeText(outcome.content);
@@ -392,6 +431,9 @@ async function clipboardShortcut(
       mode: configuredMode(),
       outcome: CLIPBOARD_AUDIT_OUTCOMES[action][outcome.status],
       findings,
+      ...(outcome.status === "clean"
+        ? {}
+        : customFindingFields(outcome.detected)),
     });
   }
   return action === "purge" ? purgeFeedback(outcome) : checkFeedback(outcome);
@@ -472,6 +514,11 @@ async function updateStatus(
       ...(until === undefined ? {} : { observeUntil: until }),
       modeApplicationFailed,
       ...(lastScan === undefined ? {} : { lastScan }),
+      rulesPack: {
+        line: rulesView.line,
+        tone: rulesView.tone,
+        offerRequest: rulesView.offerRequest,
+      },
     }),
     true,
   );
@@ -492,7 +539,17 @@ export async function activate(
     (host) => host.id !== "vscode" || supportsVsCodePromptHooks(vscode.version),
   );
   const manager = new HookManager(context, { hosts });
-  gateway = new GatewayIntegration(context, () => manager.getHealth());
+  const storage = context.globalStorageUri.fsPath;
+  // Set once the interface exists; the gateway may sync before that.
+  let refreshAfterRules: () => Promise<void> = () => Promise.resolve();
+  await reloadRulesPack(storage);
+  gateway = new GatewayIntegration(context, () => manager.getHealth(), {
+    changed: async () => {
+      await reloadRulesPack(storage);
+      await refreshAfterRules();
+    },
+    view: () => rulesView,
+  });
   context.subscriptions.push(gateway);
   const status = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Right,
@@ -545,7 +602,6 @@ export async function activate(
     status.show();
   };
 
-  const storage = context.globalStorageUri.fsPath;
   let observeTimer: ReturnType<typeof setTimeout> | undefined;
   const expireObserveWindow = async (): Promise<void> => {
     if (configuredMode() !== "observe") return;
@@ -612,9 +668,11 @@ export async function activate(
               status: gateway.status,
               ...(gateway.audit === undefined ? {} : { audit: gateway.audit }),
             },
+        rulesView,
       );
     }
   };
+  refreshAfterRules = refreshUi;
   context.subscriptions.push(
     vscode.commands.registerCommand("secretGuard.connectGateway", async () => {
       closeStatusControls();
@@ -814,6 +872,30 @@ export async function activate(
       );
     }),
     vscode.commands.registerCommand("secretGuard.copyRedacted", copyRedacted),
+    vscode.commands.registerCommand(
+      "secretGuard.requestRulesPack",
+      async () => {
+        closeStatusControls();
+        await vscode.env.openExternal(vscode.Uri.parse(RULES_PACK_REQUEST_URL));
+      },
+    ),
+    // Read-only state of the xSOM tuning (no rule content, no detected
+    // value), after re-verifying the stored pack. Used by the protection
+    // centre refresh and the extension-host contract.
+    vscode.commands.registerCommand("secretGuard.rulesPackStatus", async () => {
+      await reloadRulesPack(storage);
+      await refreshUi();
+      return {
+        state: rulesView.state,
+        line: rulesView.line,
+        ...(rulesView.packId === undefined ? {} : { packId: rulesView.packId }),
+        ...(rulesView.version === undefined
+          ? {}
+          : { version: rulesView.version }),
+        ...(rulesView.digest === undefined ? {} : { digest: rulesView.digest }),
+        ...(rulesView.reason === undefined ? {} : { reason: rulesView.reason }),
+      };
+    }),
     vscode.commands.registerCommand(
       "secretGuard.finishCodexSetup",
       openCodexHookReview,

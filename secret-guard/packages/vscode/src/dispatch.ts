@@ -2,6 +2,7 @@ import {
   redact,
   RULESET_VERSION,
   scan,
+  type CompiledRulesPack,
   type ScanInput,
   type ScanResult,
 } from "@xsom/secret-guard-core";
@@ -22,6 +23,8 @@ export interface DispatchDependencies {
   readonly chooseForWarning: (result: ScanResult) => Promise<WarnChoice>;
   readonly transport: (content: string) => Promise<void>;
   readonly scanner?: (input: ScanInput) => ScanResult;
+  /** Verified xSOM rules pack, applied to the scan and to the rescan. */
+  readonly rules?: CompiledRulesPack;
 }
 
 function scannerFailure(content: string): ScanResult {
@@ -52,9 +55,11 @@ export async function dispatchGuarded(
   dependencies: DispatchDependencies,
 ): Promise<DispatchOutcome> {
   const scanner = dependencies.scanner ?? scan;
+  const rules =
+    dependencies.rules === undefined ? {} : { rules: dependencies.rules };
   let initial: ScanResult;
   try {
-    initial = scanner({ content, sourceKind: "prompt" });
+    initial = scanner({ content, sourceKind: "prompt", ...rules });
   } catch {
     initial = scannerFailure(content);
   }
@@ -96,7 +101,7 @@ export async function dispatchGuarded(
   const sanitized = redact(content, initial.findings);
   let final: ScanResult;
   try {
-    final = scanner({ content: sanitized, sourceKind: "prompt" });
+    final = scanner({ content: sanitized, sourceKind: "prompt", ...rules });
   } catch {
     final = scannerFailure(sanitized);
   }

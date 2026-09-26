@@ -39,6 +39,7 @@ export interface ManagedPolicySummary {
   readonly version: number;
   readonly expiresAt: string;
   readonly minRunnerVersion?: string;
+  readonly tenantId?: string;
 }
 
 export async function readManagedPolicySummary(
@@ -51,6 +52,7 @@ export async function readManagedPolicySummary(
         version?: unknown;
         expiresAt?: unknown;
         minRunnerVersion?: unknown;
+        tenantId?: unknown;
       };
     };
     const policy = parsed.policy;
@@ -69,6 +71,9 @@ export async function readManagedPolicySummary(
       ...(policy.minRunnerVersion === undefined
         ? {}
         : { minRunnerVersion: policy.minRunnerVersion }),
+      ...(typeof policy.tenantId === "string" && policy.tenantId !== ""
+        ? { tenantId: policy.tenantId }
+        : {}),
     };
   } catch {
     return undefined;
