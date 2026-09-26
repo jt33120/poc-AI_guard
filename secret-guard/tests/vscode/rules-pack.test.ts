@@ -17,7 +17,10 @@ import {
   rulesPackPath,
   rulesPackStatePath,
 } from "../../packages/runner/src/index.js";
-import { customFindingFields } from "../../packages/vscode/src/gateway-client.js";
+import {
+  customFindingFields,
+  platformCompatibleEvent,
+} from "../../packages/vscode/src/gateway-client.js";
 import { dashboardHtml } from "../../packages/vscode/src/dashboard.js";
 import {
   fetchRulesPack,
@@ -443,6 +446,61 @@ describe("rules pack presentation", () => {
     expect(fields.custom_findings).toBe(30);
     expect(fields.custom_detector_ids).toHaveLength(20);
     expect(new Set(fields.custom_detector_ids).size).toBe(20);
+  });
+
+  it("keeps audit batches ingestible by a platform without contract §7", () => {
+    const posture = {
+      kind: "posture",
+      assistant: "secretguard",
+      mode: "redact",
+      outcome: "unverified",
+      findings: 0,
+      posture_reasons: ["hook_evidence_stale", "rules_pack_expired"],
+      rules_pack_id: "acme-main",
+      rules_pack_version: 3,
+      rules_pack_digest: "a".repeat(64),
+    } as const;
+    expect(platformCompatibleEvent(posture, true)).toBe(posture);
+    expect(platformCompatibleEvent(posture, false)).toEqual({
+      kind: "posture",
+      assistant: "secretguard",
+      mode: "redact",
+      outcome: "unverified",
+      findings: 0,
+      posture_reasons: ["hook_evidence_stale"],
+    });
+    expect(
+      platformCompatibleEvent(
+        {
+          kind: "scan",
+          assistant: "manual",
+          mode: "block",
+          outcome: "warned",
+          findings: 2,
+          custom_findings: 1,
+          custom_detector_ids: ["acme.customer-id"],
+        },
+        false,
+      ),
+    ).toEqual({
+      kind: "scan",
+      assistant: "manual",
+      mode: "block",
+      outcome: "warned",
+      findings: 2,
+    });
+    expect(
+      platformCompatibleEvent(
+        {
+          kind: "rules_pack_synced",
+          assistant: "secretguard",
+          mode: "redact",
+          outcome: "configured",
+          findings: 0,
+        },
+        false,
+      ),
+    ).toBeUndefined();
   });
 
   it("shows the tuning in the protection centre, escaped", () => {

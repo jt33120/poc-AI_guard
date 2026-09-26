@@ -66,46 +66,56 @@ function terminateTree(child) {
   }
 }
 
-const isolatedHome = await mkdtemp(join(tmpdir(), "sg-vsc-"));
-const child = spawn(process.execPath, [worker], {
-  detached: process.platform !== "win32",
-  env: {
-    ...process.env,
-    XSOM_VSCODE_TEST_HOME: isolatedHome,
-    XSOM_VSCODE_TEST_RESULT_PATH: join(isolatedHome, "tests-passed"),
-  },
-  stdio: ["ignore", "inherit", "inherit", "ipc"],
-  windowsHide: true,
-});
-
+let result;
 let timedOut = false;
 let extensionTestsPassed = false;
-const timer = setTimeout(() => {
-  timedOut = true;
-  terminateTree(child);
-}, TIMEOUT_MS);
+try {
+  result = await runSuite();
+} finally {
+  // The TEST authority never outlives the suite, whatever happens.
+  buildExtension(false);
+}
 
-child.on("message", (message) => {
-  if (
-    typeof message === "object" &&
-    message !== null &&
-    message.type === SUCCESS_MESSAGE
-  ) {
-    extensionTestsPassed = true;
-    // VS Code 1.137 can leave its Agent Host alive after the extension-test
-    // host has reported success. The marker comes from the completed Mocha
-    // suite, so terminate the isolated process group instead of hanging CI.
+async function runSuite() {
+  const isolatedHome = await mkdtemp(join(tmpdir(), "sg-vsc-"));
+  const child = spawn(process.execPath, [worker], {
+    detached: process.platform !== "win32",
+    env: {
+      ...process.env,
+      XSOM_VSCODE_TEST_HOME: isolatedHome,
+      XSOM_VSCODE_TEST_RESULT_PATH: join(isolatedHome, "tests-passed"),
+    },
+    stdio: ["ignore", "inherit", "inherit", "ipc"],
+    windowsHide: true,
+  });
+
+  const timer = setTimeout(() => {
+    timedOut = true;
     terminateTree(child);
-  }
-});
+  }, TIMEOUT_MS);
 
-const result = await new Promise((resolve) => {
-  child.once("error", (error) => resolve({ code: null, error }));
-  child.once("close", (code, signal) => resolve({ code, signal }));
-});
-clearTimeout(timer);
-await rm(isolatedHome, { recursive: true, force: true });
-buildExtension(false);
+  child.on("message", (message) => {
+    if (
+      typeof message === "object" &&
+      message !== null &&
+      message.type === SUCCESS_MESSAGE
+    ) {
+      extensionTestsPassed = true;
+      // VS Code 1.137 can leave its Agent Host alive after the extension-test
+      // host has reported success. The marker comes from the completed Mocha
+      // suite, so terminate the isolated process group instead of hanging CI.
+      terminateTree(child);
+    }
+  });
+
+  const outcome = await new Promise((resolve) => {
+    child.once("error", (error) => resolve({ code: null, error }));
+    child.once("close", (code, signal) => resolve({ code, signal }));
+  });
+  clearTimeout(timer);
+  await rm(isolatedHome, { recursive: true, force: true });
+  return outcome;
+}
 
 if (timedOut) {
   process.stderr.write("VS Code extension-host tests exceeded 120 seconds.\n");

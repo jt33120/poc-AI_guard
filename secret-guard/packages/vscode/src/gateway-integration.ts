@@ -7,6 +7,7 @@ import {
   AuditQueue,
   gatewayJson,
   gatewayUrl,
+  platformCompatibleEvent,
   type AuditEvent,
   type QueueState,
 } from "./gateway-client.js";
@@ -98,6 +99,8 @@ export class GatewayIntegration implements vscode.Disposable {
   private queue: AuditQueue | undefined;
   private timer: ReturnType<typeof setInterval> | undefined;
   private rulesTimer: ReturnType<typeof setInterval> | undefined;
+  // Set once the platform has answered the rules-pack route (contract §7).
+  private platformServesRulesPack = false;
   private retry: ReturnType<typeof setTimeout> | undefined;
   public status = "Non connecté";
   public constructor(
@@ -119,7 +122,12 @@ export class GatewayIntegration implements vscode.Disposable {
     return this.retry ? "retrying" : "offline";
   }
   public record(event: Omit<AuditEvent, "event_id" | "at" | "dropped">): void {
-    if (this.queue) void this.queue.enqueue(event);
+    if (!this.queue) return;
+    const compatible = platformCompatibleEvent(
+      event,
+      this.platformServesRulesPack,
+    );
+    if (compatible !== undefined) void this.queue.enqueue(compatible);
   }
   public async restore(): Promise<void> {
     if (vscode.env.remoteName) return;
@@ -200,6 +208,9 @@ export class GatewayIntegration implements vscode.Disposable {
       this.context.globalStorageUri.fsPath,
       enrolledTenant === undefined ? {} : { enrolledTenant },
     ).catch((): RulesPackSyncOutcome => ({ outcome: "error" }));
+    // Any answer of the route, even "no tuning", shows the platform speaks
+    // contract §7; a network error leaves what was known.
+    if (outcome.outcome !== "error") this.platformServesRulesPack = true;
     await this.rules?.changed();
     return outcome;
   }

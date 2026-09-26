@@ -47,6 +47,36 @@ export type AuditEvent = {
   custom_detector_ids?: readonly string[];
 };
 
+type PendingEvent = Omit<AuditEvent, "event_id" | "at" | "dropped">;
+
+/**
+ * The event as this platform can ingest it. Its model forbids unknown
+ * fields: until the platform has shown it serves the xSOM tuning (contract
+ * §7), the tuning fields are left out and `rules_pack_synced` is not sent,
+ * so that one new field never makes a whole audit batch refused.
+ */
+export function platformCompatibleEvent(
+  event: PendingEvent,
+  platformServesRulesPack: boolean,
+): PendingEvent | undefined {
+  if (platformServesRulesPack) return event;
+  if (event.kind === "rules_pack_synced") return undefined;
+  const legacy: PendingEvent = { ...event };
+  delete legacy.rules_pack_id;
+  delete legacy.rules_pack_version;
+  delete legacy.rules_pack_digest;
+  delete legacy.custom_findings;
+  delete legacy.custom_detector_ids;
+  if (legacy.posture_reasons === undefined) return legacy;
+  return {
+    ...legacy,
+    posture_reasons: legacy.posture_reasons.filter(
+      (reason) =>
+        reason !== "rules_pack_rejected" && reason !== "rules_pack_expired",
+    ),
+  };
+}
+
 /** Custom-finding fields of a scan event: at most 20 unique detector ids. */
 export function customFindingFields(
   findings: readonly { readonly custom?: { readonly detectorId: string } }[],
