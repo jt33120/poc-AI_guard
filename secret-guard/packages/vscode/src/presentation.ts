@@ -18,6 +18,11 @@ const TYPES: Record<SecretType, string> = {
   scan_error: "Analyse indisponible",
 };
 
+/** Plain text in chat markdown: a signed label still never becomes a link. */
+function escapeMarkdown(value: string): string {
+  return value.replace(/[\\`*_{}[\]()#+\-.!<>|~]/gu, "\\$&");
+}
+
 /** What was found: the signed label of an xSOM detector, else the secret type. */
 export function findingName(finding: Finding): string {
   return finding.custom === undefined
@@ -40,7 +45,7 @@ export function markdownReport(result: ScanResult): string {
       : "🔎 **Secret Guard · Vérification nécessaire**";
   const lines = result.findings
     .slice(0, MAX_FINDINGS)
-    .map((finding) => `- ${findingSummary(finding)}`);
+    .map((finding) => `- ${escapeMarkdown(findingSummary(finding))}`);
   const omitted = result.findings.length - lines.length;
   if (omitted > 0)
     lines.push(`- ${omitted} autre(s) détection(s) non affichée(s).`);
