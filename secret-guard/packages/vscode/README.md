@@ -21,8 +21,10 @@ option à cocher : le réglage se fait avec xSOM, puis arrive sur le poste racco
   panne compris. Un réglage expiré reste appliqué et l’état le signale.
 - L’analyse reste locale, déterministe, sans LLM ni réseau, et bornée : si un
   texte dépasse le budget d’analyse, l’envoi est bloqué (« analyse incomplète »).
-- Expurger masque aussi ces détections, sous le nom de la règle, par exemple
-  `<REDACTED_Identifiant_client_ACME>`. La valeur n’est jamais affichée ni journalisée.
+- Expurger masque aussi ces détections dans `@secretguard` et le presse-papiers,
+  sous le nom de la règle, par exemple `<REDACTED_Identifiant_client_ACME>`. Le relais
+  Claude ne connaît pas ce réglage : un message concerné est alors arrêté, pas
+  délégué. La valeur n’est jamais affichée ni journalisée.
 
 Poste sans accès à la plateforme (édition Renforcé) : **Secret Guard: Importer un
 réglage xSOM (poste hors ligne)** vérifie et applique un fichier de réglage remis par
