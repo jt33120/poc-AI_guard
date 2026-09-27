@@ -19,18 +19,7 @@ export const CONTACT_MAILTO = `mailto:${XSOM_CONTACT_EMAIL}?subject=xSOM%20AI%20
 export const EXTENSION_VSIX_URL =
   "https://github.com/jt33120/poc-AI_guard/releases/latest/download/xsom-secret-guard-vscode.vsix";
 
-export const EXTENSION_MARKETPLACE_URL =
-  "https://marketplace.visualstudio.com/items?itemName=xsom.xsom-secret-guard-vscode";
-
-/**
- * Les deux bannières vidéo, et l'état réel de leur média.
- *
- * `GuardHeroVideo` ne demande son fichier qu'au moment de le jouer, mais l'affiche
- * du poster, elle, part au chargement : une paire annoncée sans fichier laisserait
- * un 404 dans le journal du navigateur et un rectangle vide à l'écran. Tant que la
- * bannière de `/extension` n'a pas son média, la constante vaut `null` et la page
- * rend son fond uni. Le jour où le fichier arrive, c'est elle qui bascule.
- */
+/** Le film d'ouverture de l'accueil, un par langue (`scripts/render-home-film.mjs`). */
 export const HOME_HERO_MEDIA = {
   fr: {
     mp4: "/signal-media/xsom-ai-home-v3-fr.mp4",
@@ -44,17 +33,11 @@ export const HOME_HERO_MEDIA = {
   },
 };
 
-export const EXTENSION_HERO_MEDIA: { webm: string; poster: string } | null = {
+/** La vidéo d'ambiance de la page Secret Guard ; son affiche tient lieu d'image fixe. */
+export const EXTENSION_HERO_MEDIA = {
   webm: "/signal-media/ai-guard-extension-v1.webm",
   poster: "/signal-media/ai-guard-extension-v1.png",
 };
-
-/**
- * Vrai seulement une fois la fiche réellement en ligne. Le type est élargi à
- * `boolean` pour que la bascule soit une valeur à changer, et non une réécriture des
- * deux endroits où la page teste la constante.
- */
-export const EXTENSION_ON_MARKETPLACE: boolean = false;
 
 /** Concrete orientation copy; none of these illustrative paths claims live coverage. */
 export const GUARD_COPY = {
@@ -315,72 +298,6 @@ export const GUARD_COPY = {
     saasCta: "Créer un compte",
     saasNote:
       "Le périmètre dépend de ce que vous branchez : ce qui ne passe pas par nous n’est pas contrôlé.",
-    extKicker: "SECRET GUARD LOCAL · GRATUIT · ÉDITEUR FRANÇAIS",
-    extTitle: "Vos secrets restent sur votre poste.",
-    extIntro:
-      "Détectez les clés, jetons et mots de passe avant l’envoi dans les prompts pris en charge. Analyse locale, sans compte obligatoire, sans carte et sans quota de scans. Édité par xSOM Consulting en France.",
-    extPlansTitle: "Sur votre poste ou dans votre entreprise",
-    extFreeTitle: "Secret Guard Local",
-    extFreeLabel: "Gratuit",
-    extFreeBody: "Extension et installation locale, sans compte. Vous activez la protection puis approuvez explicitement sa définition dans /hooks, dans Codex CLI.",
-    extFreeNote: "Un hook utilisateur reste désactivable. Toute modification de sa définition demande une nouvelle approbation dans Codex.",
-    extEnterpriseTitle: "Secret Guard Équipe",
-    extEnterpriseLabel: "90 jours de découverte offerts",
-    extEnterpriseBody: "Votre administrateur distribue les scripts via MDM, l’outil de gestion des postes, et impose les hooks Codex dans requirements.toml. La politique d’entreprise les déclare fiables ; ils ne peuvent pas être désactivés depuis l’interface de gestion des hooks.",
-    extEnterpriseNote: "Codex ne distribue pas les scripts. Leur installation et leurs mises à jour restent à la charge de l’éditeur ou de l’entreprise. Ce parcours doit être préparé et validé sur votre parc.",
-    extEnterpriseAction: "Préparer le déploiement",
-    extEnterpriseDocs: "Documentation OpenAI : hooks gérés",
-    extInstallVsix: "Télécharger l’extension",
-    extInstallMarket: "Installer depuis VS Code",
-    extMarketSoon:
-      "Installez la version publiée au format VSIX. L’extension n’est pas encore distribuée sur la Place de marché VS Code.",
-    extStepsTitle: "Trois gestes",
-    extSteps: [
-      {
-        title: "Télécharger",
-        body: "Un fichier, attaché à la dernière version publiée. Aucun compte, aucun dépôt à cloner, aucune compilation.",
-      },
-      {
-        title: "Installer",
-        body: "Palette de commandes, puis « Extensions : Installer à partir d’un VSIX », et désignez le fichier. Ouvrir le fichier ne l’installe pas : VS Code affiche une archive, pas une extension.",
-      },
-      {
-        title: "Activer, une fois",
-        body: "Palette de commandes, puis « Secret Guard: Activer la protection automatique ». Dans Codex CLI, ouvrez /hooks, sélectionnez UserPromptSubmit puis Secret Guard et approuvez sa définition. Redémarrez les assistants déjà ouverts, puis testez le blocage.",
-      },
-    ],
-    extHostsTitle: "Des intégrations à vérifier dans chaque assistant",
-    extHostsBody:
-      "L’activation configure les chemins actuellement testés. Une capacité inconnue reste non vérifiée ; elle ne devient jamais une promesse commerciale par la seule présence d’un hook.",
-    extHosts: [
-      "VS Code et Copilot",
-      "Claude Code",
-      "Codex",
-    ],
-    extGuardTitle: "Évoluer vers Secret Guard Équipe",
-    extGuardItems: [
-      "Secrets : détection locale avant les prompts et lectures de fichiers prises en charge.",
-      "Ressources : fichiers de credentials et racines hors périmètre refusés dans les événements supportés.",
-      "Actions : écriture, suppression, publication, déploiement, réseau et MCP reçoivent une décision explicite.",
-      "Exceptions : une action sensible attend une approbation courte et liée à son contexte exact.",
-      "Règles sur mesure : xSOM calibre des détecteurs sur vos identifiants et vos projets, les signe ; le poste vérifie la signature hors ligne avant de les appliquer. En pilote : la prise en charge par l’extension arrive dans une prochaine version.",
-      "Preuves : inventaire du poste, politique, décision et statut d’interception restent distincts.",
-    ],
-    extGuardLimit:
-      "Un hook utilisateur ne contrôle ni un terminal lancé hors session ni un autre binaire. Le profil renforcé impose en plus l’environnement système et les sorties réseau.",
-    extCheckTitle: "Vérifier que ça tient",
-    extCheckBody:
-      "Composez un faux jeton : les lettres « ghp_ » suivies de trente-six caractères alphanumériques quelconques. Collez-le dans la conversation de l’un des assistants pris en charge. L’envoi doit être refusé avant d’atteindre le modèle.",
-    extLocalTitle: "Rien ne sort pour décider",
-    extLocalBody:
-      "La détection est locale et déterministe. Aucun candidat n’est vérifié en ligne, aucune télémétrie n’est émise, et un résultat porte la règle et sa raison, jamais la valeur détectée.",
-    extLimitsTitle: "Ce que le cadenas ne dit pas",
-    extLimits: [
-      "Le cadenas de la barre d’état est un indicateur. Le verrou, lui, est le hook natif, dans le cycle d’envoi de l’assistant.",
-      "Deux planchers, et le premier arrête tout : l’extension refuse de s’installer sous VS Code 1.136, et le hook VS Code et Copilot demande 1.137. Sous 1.136, l’installation échoue, y compris pour les trois autres assistants.",
-      "Un hook écrit dans vos réglages utilisateur reste retirable par l’utilisateur. Une application en entreprise passe par une configuration administrée.",
-      "« Aucun secret détecté » ne veut pas dire « contenu sûr ».",
-    ],
     limits: "Ce que le POC ne promet pas",
     limitsText:
       "Pas de protection automatique de tous les usages IA. Pas de certification de conformité. Le périmètre réel dépend du branchement, des règles et des fonctions éprouvées.",
@@ -642,72 +559,6 @@ export const GUARD_COPY = {
     saasCta: "Create an account",
     saasNote:
       "Scope depends on what you connect: anything that does not go through us is not governed.",
-    extKicker: "SECRET GUARD LOCAL · FREE · FRENCH PUBLISHER",
-    extTitle: "Your secrets stay on your workstation.",
-    extIntro:
-      "Detect keys, tokens and passwords before they leave in supported prompts. Local analysis, no mandatory account, no card and no scan quota. Published in France by xSOM Consulting.",
-    extPlansTitle: "On your workstation or across your organisation",
-    extFreeTitle: "Secret Guard Local",
-    extFreeLabel: "Free",
-    extFreeBody: "Extension and local installation, with no account needed. Enable protection, then explicitly trust its definition using /hooks in Codex CLI.",
-    extFreeNote: "User hooks remain removable. Changing a hook definition requires a new trust review in Codex.",
-    extEnterpriseTitle: "Secret Guard Team",
-    extEnterpriseLabel: "90 days of free discovery",
-    extEnterpriseBody: "Your administrator distributes scripts through MDM, your device management system, and enforces Codex hooks in requirements.toml. Enterprise policy trusts these hooks; they cannot be disabled from the hook management interface.",
-    extEnterpriseNote: "Codex does not distribute scripts. The publisher or your organisation handles installation and updates. This deployment path needs preparation and validation on your devices.",
-    extEnterpriseAction: "Plan your deployment",
-    extEnterpriseDocs: "OpenAI documentation: managed hooks",
-    extInstallVsix: "Download the extension",
-    extInstallMarket: "Install from VS Code",
-    extMarketSoon:
-      "Install the published VSIX release. The extension is not yet distributed on the VS Code Marketplace.",
-    extStepsTitle: "Three steps",
-    extSteps: [
-      {
-        title: "Download",
-        body: "One file, attached to the latest published version. No account, no repository to clone, no build.",
-      },
-      {
-        title: "Install",
-        body: "Command palette, then “Extensions: Install from VSIX”, and point it at the file. Opening the file does not install it: VS Code shows an archive, not an extension.",
-      },
-      {
-        title: "Activate, once",
-        body: "Command palette, then “Secret Guard: Activer la protection automatique”. In Codex CLI, open /hooks, select UserPromptSubmit, then Secret Guard, and trust its definition. Restart assistants that were already open, then test blocking.",
-      },
-    ],
-    extHostsTitle: "Verify integration in each assistant",
-    extHostsBody:
-      "Activation configures currently tested paths. An unknown capability stays unverified; a hook being present never becomes a commercial claim on its own.",
-    extHosts: [
-      "VS Code and Copilot",
-      "Claude Code",
-      "Codex",
-    ],
-    extGuardTitle: "Move to Secret Guard Team",
-    extGuardItems: [
-      "Secrets: local detection before supported prompts and file reads.",
-      "Resources: credential files and out-of-scope roots are denied for supported events.",
-      "Actions: writes, deletion, publishing, deployment, network and MCP receive an explicit decision.",
-      "Exceptions: a sensitive action waits for a short-lived approval tied to its exact context.",
-      "Custom rules: xSOM calibrates detectors on your identifiers and projects and signs them; the workstation checks the signature offline before applying them. In pilot: extension support arrives in an upcoming release.",
-      "Evidence: workstation inventory, policy, decision and interception status remain distinct.",
-    ],
-    extGuardLimit:
-      "A user hook controls neither a terminal launched outside the session nor another binary. The reinforced profile additionally imposes the system environment and network egress.",
-    extCheckTitle: "Check that it holds",
-    extCheckBody:
-      "Compose a fake token: the letters “ghp_” followed by thirty six alphanumeric characters of your choice. Paste it into a supported assistant. The send must be refused before it reaches the model.",
-    extLocalTitle: "Nothing leaves to decide",
-    extLocalBody:
-      "Detection is local and deterministic. No candidate is verified online, no telemetry is emitted, and a result carries the rule and its reason, never the detected value.",
-    extLimitsTitle: "What the lock does not say",
-    extLimits: [
-      "The status bar lock is an indicator. The lock itself is the native hook, inside the assistant submit lifecycle.",
-      "Two floors, and the first one stops everything: the extension refuses to install below VS Code 1.136, and the VS Code and Copilot hook requires 1.137. Below 1.136 the install fails, including for the other three assistants.",
-      "A hook written into your user settings stays removable by the user. Enterprise enforcement goes through managed configuration.",
-      "“No secret detected” does not mean “safe content”.",
-    ],
     limits: "What the POC does not promise",
     limitsText:
       "No automatic protection for every AI use. No compliance certification. Actual scope depends on integration, policies and proven functionality.",
