@@ -206,7 +206,7 @@
           "enumDescriptions": [
             "Bloque les messages avec des secrets détectés, les détections ambiguës et les analyses incomplètes.",
             "Nettoie automatiquement dans @secretguard et les sessions Claude raccordées à la passerelle xSOM. Sans passerelle, bloque ; un clic sur Secret Guard dans la barre d’état expurge alors le presse-papiers, prêt à coller.",
-            "Avertit et laisse passer le texte original, même avec des secrets, pendant 15 minutes, 1 heure, 4 heures ou 8 heures, au choix à l’activation ; Secret Guard repasse ensuite en Expurger."
+            "Avertit et laisse passer le texte original, même avec des secrets, pendant 15 minutes, 1 heure, 4 heures ou 8 heures, au choix à l’activation, dans la limite fixée par votre organisation le cas échéant ; Secret Guard repasse ensuite en Expurger."
           ],
           "default": "block",
           "scope": "application",

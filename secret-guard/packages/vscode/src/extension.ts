@@ -69,16 +69,22 @@ import {
   type PurgeOutcome,
 } from "./clipboard-purge.js";
 import {
+  cappedObserveMinutes,
   closeObserveWindow,
   DEFAULT_OBSERVE_MINUTES,
   isObserveMinutes,
-  OBSERVE_DURATIONS,
+  observeCapChange,
+  observeCapLine,
   observeDurationLabel,
+  observeDurationsWithin,
   observeWindowOpen,
   openObserveWindow,
   readObserveDeadline,
+  type ObserveCap,
   type ObserveMinutes,
 } from "./observe-window.js";
+import { verifiedObserveCap } from "./enrollment.js";
+import { RUNNER_VERSION } from "./runner-version.js";
 
 const FINISH_CODEX_SETUP = "Finaliser Codex";
 // Avertir asks for its length each time it is switched on; the answer is kept
@@ -97,6 +103,16 @@ let lastScan: LastScan | undefined;
 // End of the running Avertir window, mirrored from the file the hook reads.
 let observeDeadline: number | undefined;
 let observeMinutes: ObserveMinutes = DEFAULT_OBSERVE_MINUTES;
+// The organization's cap on Avertir, from the verified managed policy (0
+// forbids it). The hook reads and enforces the same policy on its own.
+let observeCap: ObserveCap;
+const OBSERVE_FORBIDDEN = "Avertir est désactivé par votre organisation.";
+
+/** The length in force: the preferred one, shortened to the cap. */
+function shownObserveMinutes(): ObserveMinutes {
+  return cappedObserveMinutes(observeMinutes, observeCap) ?? observeMinutes;
+}
+
 // The xSOM tuning applied to the scans run by the extension itself; the
 // hook runner verifies and loads the same file on its own.
 let rulesPack: CompiledRulesPack | undefined;
@@ -534,7 +550,8 @@ async function updateStatus(
       health,
       mode,
       ...(until === undefined ? {} : { observeUntil: until }),
-      observeMinutes,
+      observeMinutes: shownObserveMinutes(),
+      ...(observeCap === undefined ? {} : { observeCap }),
       modeApplicationFailed,
       ...(lastScan === undefined ? {} : { lastScan }),
       rulesPack: {
@@ -565,14 +582,20 @@ export async function activate(
   const storage = context.globalStorageUri.fsPath;
   // Set once the interface exists; the gateway may sync before that.
   let refreshAfterRules: () => Promise<void> = () => Promise.resolve();
+  let afterPolicySync: () => Promise<void> = () => Promise.resolve();
   await reloadRulesPack(storage);
-  gateway = new GatewayIntegration(context, () => manager.getHealth(), {
-    changed: async () => {
-      await reloadRulesPack(storage);
-      await refreshAfterRules();
+  gateway = new GatewayIntegration(
+    context,
+    () => manager.getHealth(),
+    {
+      changed: async () => {
+        await reloadRulesPack(storage);
+        await refreshAfterRules();
+      },
+      view: () => rulesView,
     },
-    view: () => rulesView,
-  });
+    () => afterPolicySync(),
+  );
   context.subscriptions.push(gateway);
   const status = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Right,
@@ -643,7 +666,7 @@ export async function activate(
     if (configuredMode() !== "observe") return;
     const now = Date.now();
     const remaining =
-      deadline !== undefined && observeWindowOpen(deadline, now)
+      deadline !== undefined && observeWindowOpen(deadline, now, observeCap)
         ? deadline - now
         : 0;
     observeTimer = setTimeout(() => {
@@ -658,22 +681,64 @@ export async function activate(
     observeMinutes = minutes;
     await context.globalState.update(OBSERVE_MINUTES_KEY, minutes);
   };
-  // Choosing Avertir opens a fresh window; leaving it closes the window.
+  // Choosing Avertir opens a fresh window, never longer than the
+  // organization's cap; leaving it closes the window.
   const syncObserveWindow = async (): Promise<void> => {
-    if (configuredMode() === "observe")
-      await openObserveWindow(storage, Date.now(), observeMinutes);
+    const minutes = cappedObserveMinutes(observeMinutes, observeCap);
+    if (configuredMode() === "observe" && minutes !== undefined)
+      await openObserveWindow(storage, Date.now(), minutes);
     else await closeObserveWindow(storage);
     scheduleObserveExpiry();
   };
-  // Switching Avertir on is confirmed by choosing how long it lasts.
+  // Re-read on every decision: never trust an earlier reading of the file.
+  const readObserveCap = async (): Promise<ObserveCap> => {
+    observeCap = await verifiedObserveCap(storage, RUNNER_VERSION);
+    return observeCap;
+  };
+  // A verified cap while Avertir runs: forbidden ends it now, a shorter cap
+  // shortens the window from now. The hook already enforces both on its own;
+  // this keeps the setting, the timer and the panel truthful.
+  const applyObserveCap = async (): Promise<void> => {
+    const cap = await readObserveCap();
+    if (configuredMode() !== "observe") return;
+    const now = Date.now();
+    const change = observeCapChange(readObserveDeadline(storage), now, cap);
+    if (change === "forbid") {
+      await closeObserveWindow(storage);
+      await saveMode("redact");
+      void vscode.window.showWarningMessage(
+        `${OBSERVE_FORBIDDEN} Secret Guard repasse en Expurger.`,
+      );
+    } else if (change === "shorten" && cap !== undefined && cap !== 0) {
+      const deadline = await openObserveWindow(storage, now, cap);
+      scheduleObserveExpiry();
+      void vscode.window.showInformationMessage(
+        `Avertir ${observeCapLine(cap) ?? ""} : fin à ${clockTime(deadline)}, puis retour automatique à Expurger.`,
+      );
+    }
+  };
+  // Switching Avertir on is confirmed by choosing how long it lasts, among
+  // the lengths the organization allows.
   const confirmMode = async (mode: ProtectionMode): Promise<boolean> => {
     if (mode !== "observe" || configuredMode() === "observe") return true;
+    const cap = await readObserveCap();
+    const lengths = observeDurationsWithin(cap);
+    if (lengths.length === 0) {
+      void vscode.window.showWarningMessage(
+        `${OBSERVE_FORBIDDEN} Le niveau reste ${modeShortLabel(configuredMode())}.`,
+      );
+      return false;
+    }
+    const capped =
+      cap === undefined || cap === 0
+        ? ""
+        : ` Votre organisation le plafonne à ${observeDurationLabel(cap)}.`;
     const answer = await vscode.window.showWarningMessage(
-      "Avertir transmet vos messages tels quels à l’assistant, secrets compris. Pour combien de temps ? Secret Guard repasse ensuite en Expurger.",
+      `Avertir transmet vos messages tels quels à l’assistant, secrets compris. Pour combien de temps ?${capped} Secret Guard repasse ensuite en Expurger.`,
       { modal: true },
-      ...OBSERVE_DURATIONS.map((minutes) => OBSERVE_CHOICES[minutes]),
+      ...lengths.map((minutes) => OBSERVE_CHOICES[minutes]),
     );
-    const chosen = OBSERVE_DURATIONS.find(
+    const chosen = lengths.find(
       (minutes) => OBSERVE_CHOICES[minutes] === answer,
     );
     if (chosen === undefined) return false;
@@ -706,10 +771,15 @@ export async function activate(
               ...(gateway.audit === undefined ? {} : { audit: gateway.audit }),
             },
         rulesView,
+        observeCap,
       );
     }
   };
   refreshAfterRules = refreshUi;
+  afterPolicySync = async () => {
+    await applyObserveCap();
+    await refreshUi();
+  };
   context.subscriptions.push(
     vscode.commands.registerCommand("secretGuard.connectGateway", async () => {
       closeStatusControls();
@@ -732,9 +802,19 @@ export async function activate(
       },
     ),
     vscode.commands.registerCommand("secretGuard.chooseMode", async () => {
+      const cap = await readObserveCap();
+      const capLine = observeCapLine(cap);
       const selected = await vscode.window.showQuickPick(
         PROTECTION_MODES.map((entry) => ({
           ...entry,
+          ...(entry.mode === "observe" && capLine !== undefined
+            ? {
+                description:
+                  cap === 0
+                    ? OBSERVE_FORBIDDEN
+                    : `${entry.description} Avertir ${capLine}.`,
+              }
+            : {}),
           picked: entry.mode === configuredMode(),
         })),
         {
@@ -761,6 +841,16 @@ export async function activate(
       async (minutes?: unknown) => {
         closeStatusControls();
         if (!isObserveMinutes(minutes)) return;
+        const cap = await readObserveCap();
+        if (!observeDurationsWithin(cap).includes(minutes)) {
+          void vscode.window.showWarningMessage(
+            cap === undefined || cap === 0
+              ? OBSERVE_FORBIDDEN
+              : `Avertir est plafonné à ${observeDurationLabel(cap)} par votre organisation : ${observeDurationLabel(minutes)} n’est pas disponible.`,
+          );
+          await refreshUi();
+          return;
+        }
         if (configuredMode() !== "observe") {
           if (await confirmMode("observe")) await saveMode("observe");
           return;
@@ -776,6 +866,13 @@ export async function activate(
     ),
     vscode.window.onDidChangeActiveColorTheme(async () => {
       await refreshUi();
+    }),
+    // Another window may have synchronised a new policy.
+    vscode.window.onDidChangeWindowState(async (state) => {
+      if (!state.focused) return;
+      const before = observeCap;
+      await applyObserveCap().catch(() => undefined);
+      if (observeCap !== before) await refreshUi();
     }),
     vscode.window.onDidChangeActiveTextEditor((editor) => {
       if (editor !== undefined) lastEditor = editor;
@@ -804,13 +901,17 @@ export async function activate(
     }),
   );
 
-  // Avertir left on by an earlier session: an expired window ends now, and a
-  // setting without a window (edited by hand, or kept from 0.5) starts one.
+  // Avertir left on by an earlier session: the organization's cap applies
+  // first, an expired window ends now, and a setting without a window (edited
+  // by hand, or kept from 0.5) starts one.
   try {
+    await applyObserveCap();
     if (configuredMode() === "observe") {
       const deadline = readObserveDeadline(storage);
-      if (deadline === undefined) await openObserveWindow(storage, Date.now());
-      else if (!observeWindowOpen(deadline, Date.now()))
+      const minutes = cappedObserveMinutes(DEFAULT_OBSERVE_MINUTES, observeCap);
+      if (deadline === undefined && minutes !== undefined)
+        await openObserveWindow(storage, Date.now(), minutes);
+      else if (!observeWindowOpen(deadline, Date.now(), observeCap))
         await saveMode("redact");
     }
   } catch {
@@ -973,6 +1074,21 @@ export async function activate(
           `Réglage refusé : ${result.outcome === "rejected" ? refusalLabel(result.reason) : "import impossible"}. Les règles intégrées restent actives.`,
         );
     }),
+    // Read-only state of the organization's cap on Avertir, after verifying
+    // the stored policy again and applying it. Used by the extension-host
+    // contract; it can only ever restrict Avertir.
+    vscode.commands.registerCommand(
+      "secretGuard.observePolicyStatus",
+      async () => {
+        await applyObserveCap();
+        await refreshUi();
+        return {
+          cap: observeCap ?? null,
+          durations: [...observeDurationsWithin(observeCap)],
+          mode: configuredMode(),
+        };
+      },
+    ),
     // Read-only state of the xSOM tuning (no rule content, no detected
     // value), after re-verifying the stored pack. Used by the protection
     // centre refresh and the extension-host contract.
@@ -1025,6 +1141,18 @@ export async function activate(
     vscode.workspace.onDidChangeConfiguration(async (event) => {
       if (!event.affectsConfiguration("secretGuard.mode")) return;
       modeUpdate = modeUpdate.then(async () => {
+        // Avertir set by hand against the organization's policy.
+        if (
+          configuredMode() === "observe" &&
+          (await readObserveCap().catch(() => undefined)) === 0
+        ) {
+          await closeObserveWindow(storage);
+          void vscode.window.showWarningMessage(
+            `${OBSERVE_FORBIDDEN} Secret Guard repasse en Expurger.`,
+          );
+          await saveMode("redact");
+          return;
+        }
         gateway?.record({
           kind: "mode_changed",
           assistant: "manual",

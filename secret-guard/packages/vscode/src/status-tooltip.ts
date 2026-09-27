@@ -4,8 +4,10 @@ import type { HookHealth } from "./hook-manager.js";
 import { HEALTH_LABELS, HEALTH_REASONS } from "./dashboard.js";
 import {
   DEFAULT_OBSERVE_MINUTES,
-  OBSERVE_DURATIONS,
+  observeCapLine,
   observeDurationLabel,
+  observeDurationsWithin,
+  type ObserveCap,
   type ObserveMinutes,
 } from "./observe-window.js";
 import { modeShortLabel } from "./protection-mode.js";
@@ -82,6 +84,8 @@ export interface StatusTooltipInput {
   readonly observeUntil?: string;
   // Length of the Avertir window, chosen in the panel (1 h by default).
   readonly observeMinutes?: ObserveMinutes;
+  // The organization's cap on Avertir from the verified policy (0 forbids).
+  readonly observeCap?: ObserveCap;
   readonly modeApplicationFailed?: boolean;
   readonly lastScan?: LastScan;
   readonly rulesPack?: RulesPackLine;
@@ -305,16 +309,33 @@ function levelBlocks(
   state: Readiness,
 ): readonly string[] {
   const active = TIERS.find((tier) => tier.mode === input.mode);
+  const cap = input.observeCap;
+  const capLine = observeCapLine(cap);
   const tiles = TIERS.map((tier, rank) => {
     const selected = tier === active;
-    const art = levelTile(appearance, { ...tier, rank }, selected);
+    // Forbidden by the organization: shown, never a link.
+    const locked = cap === 0 && tier.mode === "observe" && !selected;
+    const art = levelTile(
+      appearance,
+      { ...tier, rank, unavailable: locked },
+      selected,
+    );
     if (selected) return image(art, `Niveau ${tier.label} (actif)`);
+    if (locked)
+      return image(
+        art,
+        `Niveau ${tier.label} (${capLine ?? ""})`,
+        `${capLine ?? ""}.`,
+      );
+    const capped =
+      tier.mode === "observe" && capLine !== undefined ? ` (${capLine})` : "";
     return link(
       image(art, `Niveau ${tier.label}`),
       { command: "secretGuard.setMode", argument: tier.mode },
-      `${tier.title} — ${tier.description}`,
+      `${tier.title} — ${tier.description}${capped}`,
     );
   });
+  const observing = active?.mode === "observe";
   const blocks = [
     imageRow(
       image(
@@ -329,6 +350,15 @@ function levelBlocks(
       ),
     ),
     imageRow(...tiles),
+    // While Avertir runs, the duration line carries the cap instead.
+    ...(capLine === undefined || (observing && cap !== 0)
+      ? []
+      : [
+          smallLine(
+            cap === 0 ? `${capLine}.` : `Avertir ${capLine}.`,
+            COLOR.dim,
+          ),
+        ]),
   ];
   if (state.alert !== undefined) {
     const { title, reason, action } = state.alert;
@@ -352,7 +382,6 @@ function levelBlocks(
     ];
   }
   if (active === undefined) return blocks;
-  const observing = active.mode === "observe";
   const minutes = input.observeMinutes ?? DEFAULT_OBSERVE_MINUTES;
   const shown: ModeTier = observing
     ? {
@@ -374,7 +403,7 @@ function levelBlocks(
                 TONE_COLORS.warn,
               ),
             ]),
-        durationLine(minutes),
+        ...(cap === 0 ? [] : [durationLine(minutes, cap)]),
       ]
     : [];
   const effects = shown.effects
@@ -393,19 +422,25 @@ function levelBlocks(
 }
 
 // The Avertir length, changed in one click: the window restarts from now with
-// the chosen length. The current choice is plain text, the others are links.
-function durationLine(current: ObserveMinutes): string {
-  const choices = OBSERVE_DURATIONS.map((minutes) => {
-    const label = observeDurationLabel(minutes);
-    if (minutes === current) return `<strong>${label}</strong>`;
-    return link(
-      label,
-      { command: SET_OBSERVE_DURATION_COMMAND, argument: minutes },
-      `Avertir ${label} à partir de maintenant, puis retour à Expurger`,
-    );
-  }).join(" · ");
+// the chosen length. The current choice is plain text, the others are links;
+// only the lengths within the organization's cap are offered.
+function durationLine(current: ObserveMinutes, cap: ObserveCap): string {
+  const choices = observeDurationsWithin(cap)
+    .map((minutes) => {
+      const label = observeDurationLabel(minutes);
+      if (minutes === current) return `<strong>${label}</strong>`;
+      return link(
+        label,
+        { command: SET_OBSERVE_DURATION_COMMAND, argument: minutes },
+        `Avertir ${label} à partir de maintenant, puis retour à Expurger`,
+      );
+    })
+    .join(" · ");
+  const capLine = observeCapLine(cap);
+  const capped =
+    capLine === undefined ? "" : ` ${span(`· ${capLine}`, COLOR.dim)}`;
   return textLine(
-    `<small>${span("Durée d’Avertir :", COLOR.dim)} ${choices}</small>`,
+    `<small>${span("Durée d’Avertir :", COLOR.dim)} ${choices}${capped}</small>`,
   );
 }
 

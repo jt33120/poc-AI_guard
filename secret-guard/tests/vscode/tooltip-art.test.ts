@@ -69,6 +69,21 @@ describe("status tooltip art", () => {
     expect(tile(2, false).svg).not.toContain(red);
   });
 
+  it("fades a level the organization disabled, never the active one", () => {
+    const tile = (active: boolean): Art =>
+      levelTile(
+        "dark",
+        { label: "Avertir", tone: "warn", rank: 0, unavailable: true },
+        active,
+      );
+    expect(tile(false).svg).toContain('stroke-dasharray="3 3"');
+    expect(tile(false).svg).toContain('<g opacity="0.45">');
+    expect(tile(true).svg).not.toContain("stroke-dasharray");
+    expect(
+      levelTile("dark", { label: "L", tone: "warn", rank: 0 }, false).svg,
+    ).not.toContain('opacity="0.45"');
+  });
+
   it("dashes the frame of an uncovered scope", () => {
     expect(
       scopeTile("dark", "paperclip", "P", "Hors", undefined).svg,

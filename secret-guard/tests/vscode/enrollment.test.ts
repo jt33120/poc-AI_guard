@@ -9,6 +9,7 @@ import {
   policyKeyPath,
   policyPath,
   syncManagedPolicy,
+  verifiedObserveCap,
   verifiedPolicyTenant,
 } from "../../packages/vscode/src/enrollment.js";
 
@@ -174,5 +175,42 @@ describe("managed policy enrollment", () => {
       }),
     );
     expect(await verifiedPolicyTenant(storage)).toBeUndefined();
+  });
+
+  it("reads the organization's Avertir cap only from a re-verified policy", async () => {
+    storage = await mkdtemp(join(tmpdir(), "developer-guard-enrollment-"));
+    expect(await verifiedObserveCap(storage, "0.7.1")).toBeUndefined();
+    const envelope = signedEnvelope(
+      validPolicy(1, {
+        minRunnerVersion: "0.7.1",
+        workstation: { observeMaxMinutes: 60 },
+      }),
+    );
+    await writeFile(policyPath(storage), JSON.stringify(envelope));
+    // Not pinned yet: nothing is read from the file.
+    expect(await verifiedObserveCap(storage, "0.7.1")).toBeUndefined();
+    await writeFile(policyKeyPath(storage), `${envelope.publicKey}\n`);
+    expect(await verifiedObserveCap(storage, "0.7.1")).toBe(60);
+    // A runner too old for the policy reads no cap from it (and the hook
+    // refuses the managed actions instead).
+    expect(await verifiedObserveCap(storage, "0.7.0")).toBeUndefined();
+    // Loosening the stored cap by hand breaks the signature.
+    await writeFile(
+      policyPath(storage),
+      JSON.stringify({
+        ...envelope,
+        policy: { ...envelope.policy, workstation: { observeMaxMinutes: 480 } },
+      }),
+    );
+    expect(await verifiedObserveCap(storage, "0.7.1")).toBeUndefined();
+    const forbidding = signedEnvelope(
+      validPolicy(2, {
+        minRunnerVersion: "0.7.1",
+        workstation: { observeMaxMinutes: 0 },
+      }),
+    );
+    await writeFile(policyKeyPath(storage), `${forbidding.publicKey}\n`);
+    await writeFile(policyPath(storage), JSON.stringify(forbidding));
+    expect(await verifiedObserveCap(storage, "0.7.1")).toBe(0);
   });
 });

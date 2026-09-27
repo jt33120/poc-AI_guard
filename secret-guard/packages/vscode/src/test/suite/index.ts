@@ -1,10 +1,23 @@
 import assert from "node:assert/strict";
+import { generateKeyPairSync, sign } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import process from "node:process";
 
 import Mocha from "mocha";
 import * as vscode from "vscode";
+import { canonicalizePolicyPayload } from "@xsom/developer-guard-runner";
+
+async function eventually(
+  condition: () => boolean | Promise<boolean>,
+  failure: string,
+): Promise<void> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    if (await condition()) return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(failure);
+}
 
 function registerTests(mocha: Mocha): void {
   const extensionSuite = Mocha.Suite.create(
@@ -39,6 +52,7 @@ function registerTests(mocha: Mocha): void {
         "secretGuard.importRulesPack",
         "secretGuard.rulesPackStatus",
         "secretGuard.setObserveDuration",
+        "secretGuard.observePolicyStatus",
       ]) {
         assert.ok(commands.has(command), `${command} is registered`);
       }
@@ -158,6 +172,186 @@ function registerTests(mocha: Mocha): void {
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
         throw new Error("leaving Avertir must close its window");
+      },
+    ),
+  );
+
+  extensionSuite.addTest(
+    new Mocha.Test(
+      "caps Avertir from the verified organization policy, and forbids it at zero",
+      async () => {
+        const home = process.env.XSOM_VSCODE_TEST_HOME;
+        assert.ok(home, "isolated test home is configured");
+        const storage = join(
+          home,
+          "user",
+          "User",
+          "globalStorage",
+          "xsom.xsom-secret-guard-vscode",
+        );
+        const deadlineFile = join(storage, "observe-until");
+        const config = (): vscode.WorkspaceConfiguration =>
+          vscode.workspace.getConfiguration("secretGuard");
+        const mode = (): unknown => config().inspect("mode")?.globalValue;
+        type CapStatus = { cap: number | null; durations: number[] };
+        const status = async (): Promise<CapStatus> =>
+          (await vscode.commands.executeCommand(
+            "secretGuard.observePolicyStatus",
+          )) as CapStatus;
+        const remainingNear = async (target: number): Promise<void> => {
+          await eventually(
+            async () => {
+              try {
+                const deadline = Number(
+                  (await readFile(deadlineFile, "utf8")).trim(),
+                );
+                const minutes = (deadline - Date.now()) / 60_000;
+                return minutes > target - 1 && minutes <= target;
+              } catch {
+                return false;
+              }
+            },
+            `the Avertir window never reached ${String(target)} minutes`,
+          );
+        };
+        const windowClosed = async (): Promise<boolean> => {
+          try {
+            await readFile(deadlineFile, "utf8");
+            return false;
+          } catch {
+            return true;
+          }
+        };
+        // A policy signed as the platform signs it, under a key pinned as an
+        // enrollment pins it. Test key only; never part of a build.
+        const keys = generateKeyPairSync("ed25519");
+        const pinned = Buffer.from(
+          (keys.publicKey.export({ format: "jwk" }) as { x: string }).x,
+          "base64url",
+        ).toString("base64");
+        const store = async (
+          version: number,
+          observeMaxMinutes: number,
+          storedCap = observeMaxMinutes,
+        ): Promise<void> => {
+          const policy = {
+            schemaVersion: 1,
+            tenantId: "00000000-0000-4000-8000-000000000001",
+            policyId: "equipe",
+            version,
+            issuedAt: "2026-09-01T00:00:00Z",
+            expiresAt: "2099-01-01T00:00:00Z",
+            minRunnerVersion: "0.7.1",
+            defaults: { unknownAction: "allow" },
+            rules: [],
+            workstation: { observeMaxMinutes },
+          };
+          const signature = sign(
+            null,
+            Buffer.from(canonicalizePolicyPayload(policy)),
+            keys.privateKey,
+          ).toString("base64");
+          await mkdir(storage, { recursive: true });
+          await writeFile(join(storage, "developer-policy.pub"), `${pinned}\n`);
+          await writeFile(
+            join(storage, "developer-policy.json"),
+            JSON.stringify({
+              policy: {
+                ...policy,
+                workstation: { observeMaxMinutes: storedCap },
+              },
+              signature,
+              publicKey: pinned,
+              keyId: "test",
+            }),
+          );
+        };
+
+        try {
+          assert.deepEqual(await status(), {
+            cap: null,
+            durations: [15, 60, 240, 480],
+            mode: mode() ?? "block",
+          });
+          // A night's work in Avertir, before the organization caps it.
+          await config().update(
+            "mode",
+            "observe",
+            vscode.ConfigurationTarget.Global,
+          );
+          await eventually(
+            async () => !(await windowClosed()),
+            "Avertir must open a window",
+          );
+          await vscode.commands.executeCommand(
+            "secretGuard.setObserveDuration",
+            480,
+          );
+          await remainingNear(480);
+
+          // A one-hour cap arrives: the running window ends within the hour.
+          await store(1, 60);
+          const capped = await status();
+          assert.equal(capped.cap, 60);
+          assert.deepEqual(capped.durations, [15, 60]);
+          assert.equal(mode(), "observe");
+          await remainingNear(60);
+          // Longer than the cap: refused, the window keeps its end.
+          await vscode.commands.executeCommand(
+            "secretGuard.setObserveDuration",
+            240,
+          );
+          await remainingNear(60);
+          await vscode.commands.executeCommand(
+            "secretGuard.setObserveDuration",
+            15,
+          );
+          await remainingNear(15);
+
+          // A cap loosened by hand fails the signature: nothing is read.
+          await store(2, 60, 480);
+          assert.equal((await status()).cap, null);
+
+          // Forbidden: back to Expurger at once, the window closed.
+          await store(3, 0);
+          assert.deepEqual((await status()).durations, []);
+          await eventually(
+            () => mode() === "redact",
+            "a forbidding policy must end Avertir",
+          );
+          await eventually(windowClosed, "the Avertir window must close");
+          // Not from the panel, not from a length, not by hand.
+          await vscode.commands.executeCommand(
+            "secretGuard.setMode",
+            "observe",
+          );
+          assert.equal(mode(), "redact");
+          await vscode.commands.executeCommand(
+            "secretGuard.setObserveDuration",
+            15,
+          );
+          assert.equal(mode(), "redact");
+          await config().update(
+            "mode",
+            "observe",
+            vscode.ConfigurationTarget.Global,
+          );
+          await eventually(
+            () => mode() === "redact",
+            "Avertir set by hand must be refused",
+          );
+          assert.ok(await windowClosed());
+        } finally {
+          await rm(join(storage, "developer-policy.json"), { force: true });
+          await rm(join(storage, "developer-policy.pub"), { force: true });
+          assert.equal((await status()).cap, null);
+          await config().update(
+            "mode",
+            undefined,
+            vscode.ConfigurationTarget.Global,
+          );
+          await eventually(windowClosed, "leaving Avertir must close it");
+        }
       },
     ),
   );

@@ -112,6 +112,8 @@ export class GatewayIntegration implements vscode.Disposable {
     private readonly context: vscode.ExtensionContext,
     private readonly readHookHealth: () => Promise<HookHealth>,
     private readonly rules?: RulesPackLink,
+    /** Re-read the managed policy after a sync (Avertir cap). */
+    private readonly policyChanged?: () => Promise<void>,
   ) {}
   public get summary(): string {
     const audit = this.audit;
@@ -258,6 +260,7 @@ export class GatewayIntegration implements vscode.Disposable {
       this.context.globalStorageUri.fsPath,
       runnerVersion,
     );
+    await this.policyChanged?.().catch(() => undefined);
     // The enrolled tenant, as stated by the platform: at registration when it
     // says so, else in the signed policy; otherwise the first pack pins it.
     const policyTenant = await verifiedPolicyTenant(

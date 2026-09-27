@@ -178,6 +178,65 @@ describe("status bar tooltip controls", () => {
     expect(STATUS_TOOLTIP_COMMANDS).toContain("secretGuard.setObserveDuration");
   });
 
+  it("offers only the Avertir lengths within the organization's cap and says so", () => {
+    const durationLinks = (markdown: string): number[] =>
+      [
+        ...markdown.matchAll(
+          /href="command:secretGuard\.setObserveDuration\?([^"]+)"/gu,
+        ),
+      ].map(
+        (match) => (JSON.parse(decodeURIComponent(match[1]!)) as number[])[0]!,
+      );
+    const capped = render({
+      mode: "observe",
+      observeUntil: "17:42",
+      observeMinutes: 60,
+      observeCap: 60,
+    });
+    expect(capped).toContain("<strong>1 h</strong>");
+    expect(durationLinks(capped)).toEqual([15]);
+    expect(capped).toContain("plafonné à 1 h par votre organisation");
+    expect(render({ mode: "observe", observeCap: 240 })).toContain(
+      "plafonné à 4 h par votre organisation",
+    );
+    expect(durationLinks(render({ mode: "observe", observeCap: 240 }))).toEqual(
+      [15, 240],
+    );
+    // Outside Avertir, the cap is stated once, and the tile stays a link.
+    const blocked = render({ mode: "block", observeCap: 15 });
+    expect(blocked).toContain(
+      "Avertir plafonné à 15 min par votre organisation.",
+    );
+    expect(modeLinks(blocked)).toEqual(["observe", "redact"]);
+    // No organization cap: nothing is said about one.
+    expect(render({ mode: "observe" })).not.toContain("organisation");
+  });
+
+  it("shows Avertir forbidden by the organization as a tile that is not a link", () => {
+    for (const mode of ["block", "redact"] as const) {
+      const markdown = render({ mode, observeCap: 0 });
+      expect(modeLinks(markdown)).not.toContain("observe");
+      const tile = pictures(markdown).find((picture) =>
+        picture.alt.startsWith("Niveau Avertir"),
+      );
+      expect(tile?.alt).toBe(
+        "Niveau Avertir (Avertir est désactivé par votre organisation)",
+      );
+      expect(tile?.title).toBe("Avertir est désactivé par votre organisation.");
+      expect(tile?.svg).toContain('stroke-dasharray="3 3"');
+      expect(linkFor(markdown, tile!.alt)).toBeUndefined();
+      expect(markdown).toContain(
+        "Avertir est désactivé par votre organisation.",
+      );
+    }
+    // Still in Avertir when the policy arrives: no length is offered.
+    const observing = render({ mode: "observe", observeCap: 0 });
+    expect(observing).not.toContain("setObserveDuration");
+    expect(observing).toContain(
+      "Avertir est désactivé par votre organisation.",
+    );
+  });
+
   it("follows the color theme kind for drawn controls", () => {
     const card = (appearance: "dark" | "light"): string =>
       pictures(render({ mode: "redact", appearance })).find((picture) =>
