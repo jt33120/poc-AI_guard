@@ -5,11 +5,11 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 import psycopg
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator
 
 from core import audit
 
@@ -34,6 +34,7 @@ class Event(BaseModel):
         "policy_synced",
         "posture",
         "heartbeat",
+        "rules_pack_synced",
     ]
     assistant: Literal["manual", "secretguard", "claude", "codex", "copilot", "windsurf"]
     mode: Literal["block", "redact", "observe"]
@@ -60,12 +61,31 @@ class Event(BaseModel):
             "config_invalid",
             "hook_modified",
             "canary_failed",
+            "rules_pack_rejected",
+            "rules_pack_expired",
         ]
-    ] = Field(default_factory=list, max_length=9)
+    ] = Field(default_factory=list, max_length=11)
     policy_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
     policy_version: int | None = Field(default=None, ge=1)
     runner_version: str | None = Field(default=None, pattern=r"^\d{1,3}\.\d{1,3}\.\d{1,3}$")
     queue_pending: int = Field(default=0, ge=0, le=1000)
+    # Règles sur mesure (RULES-PACK.md §7) : ce que le poste déclare appliquer, jamais
+    # une valeur détectée ni un terme — un identifiant, une version, une empreinte, des
+    # comptes et des identifiants de détecteurs.
+    rules_pack_id: str | None = Field(default=None, pattern=r"^[a-z0-9][a-z0-9._-]{0,63}$")
+    rules_pack_version: int | None = Field(default=None, ge=1, le=2_147_483_647)
+    rules_pack_digest: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    custom_findings: int | None = Field(default=None, ge=0, le=10000)
+    custom_detector_ids: (
+        list[Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9._-]{0,63}$")]] | None
+    ) = Field(default=None, max_length=20)
+
+    @field_validator("custom_detector_ids")
+    @classmethod
+    def _unique_detectors(cls, value: list[str] | None) -> list[str] | None:
+        if value is not None and len(set(value)) != len(value):
+            raise ValueError("custom_detector_ids must be unique")
+        return value
 
 
 class Batch(BaseModel):

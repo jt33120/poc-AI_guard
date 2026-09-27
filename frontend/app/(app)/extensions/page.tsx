@@ -182,6 +182,20 @@ export default function ExtensionsPage() {
           transite par votre passerelle, mais n’est pas conservé dans cet audit.
         </p>
       </section>
+      <section className="console-panel">
+        <div className="console-panel-heading">
+          <h2>Réglage sur mesure</h2>
+          <Link className="btn btn-ghost" href="/extensions/reglage">
+            Consulter le réglage
+          </Link>
+        </div>
+        <p className="console-note">
+          Secret Guard Équipe : des règles calibrées par xSOM sur vos
+          identifiants et projets, signées, que les postes compatibles
+          vérifient puis appliquent hors ligne. Vous les lisez ; xSOM les
+          ajuste à votre demande.
+        </p>
+      </section>
       {error != null && (
         <ConsoleError error={error} retry={() => void refresh()} />
       )}

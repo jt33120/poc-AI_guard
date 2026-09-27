@@ -1,4 +1,8 @@
-"""The public Developer Guard ledger is generated, complete and fail-closed."""
+"""The public Secret Guard ledger is generated, complete and fail-closed.
+
+« Developer Guard » reste le nom interne du générateur ; le document publié porte le nom
+commercial (`CLAUDE.md` §1), et c'est ce nom que le contrôle de dérive altère.
+"""
 
 from __future__ import annotations
 
@@ -26,7 +30,7 @@ def test_generated_product_coverage_is_current_and_complete() -> None:
     document = json.loads(OUTPUT.read_text(encoding="utf-8"))
     threats = document["threats"]
     assert document["schemaVersion"] == 1
-    assert document["product"] == "Developer Guard"
+    assert document["product"] == "Secret Guard"
     assert len(threats) == 77
     assert len({threat["id"] for threat in threats}) == 77
     for threat in threats:
@@ -38,7 +42,8 @@ def test_generated_product_coverage_is_current_and_complete() -> None:
 def test_generated_product_coverage_gate_rejects_drift() -> None:
     original = OUTPUT.read_text(encoding="utf-8")
     try:
-        stale = original.replace('"Developer Guard"', '"Stale Guard"', 1)
+        stale = original.replace('"Secret Guard"', '"Stale Guard"', 1)
+        assert stale != original
         OUTPUT.write_text(stale, encoding="utf-8")
         result = _check()
         assert result.returncode != 0

@@ -16,6 +16,7 @@ const PROTECTED = [
   "/risk",
   "/settings",
   "/extensions",
+  "/xsom",
 ];
 
 export async function proxy(request: NextRequest) {

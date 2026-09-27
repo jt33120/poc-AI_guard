@@ -47,6 +47,19 @@ export const CONTROL_ROUTES: readonly Route[] = [
     ),
     methods: ["POST"],
   },
+  // Règles sur mesure : lecture du client, atelier des opérateurs xSOM. L'API décide
+  // qui est opérateur (`XSOM_OPERATOR_SUBJECTS`) ; cette table ne fait que borner les
+  // chemins que la console emprunte.
+  { pattern: new RegExp("^v1/rules-pack$"), methods: ["GET"] },
+  { pattern: new RegExp("^v1/xsom/tenants$"), methods: ["GET"] },
+  {
+    pattern: new RegExp(`^v1/xsom/tenants/${SEG}/rules-pack$`),
+    methods: ["GET"],
+  },
+  {
+    pattern: new RegExp(`^v1/xsom/tenants/${SEG}/rules-pack/(?:dry-run|publish)$`),
+    methods: ["POST"],
+  },
   { pattern: new RegExp("^v1/agents$"), methods: ["GET"] },
   { pattern: new RegExp("^v1/approvals$"), methods: ["GET"] },
   { pattern: new RegExp(`^v1/approvals/${SEG}/decision$`), methods: ["POST"] },

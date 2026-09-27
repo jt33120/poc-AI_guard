@@ -6,8 +6,9 @@
  * diverger de la première sans que personne ne le remarque, puisque rien ne teste une
  * chaîne de caractères recopiée.
  */
-export const CONTACT_MAILTO =
-  "mailto:julian.talou@xsom.fr?subject=xSOM%20AI%20Guard%20%3A%20cas%20d%E2%80%99usage";
+export const XSOM_CONTACT_EMAIL = "julian.talou@xsom.fr";
+
+export const CONTACT_MAILTO = `mailto:${XSOM_CONTACT_EMAIL}?subject=xSOM%20AI%20Guard%20%3A%20cas%20d%E2%80%99usage`;
 
 /**
  * Le canal de distribution de l'extension, et l'état réel de sa publication.
@@ -362,6 +363,7 @@ export const GUARD_COPY = {
       "Ressources : fichiers de credentials et racines hors périmètre refusés dans les événements supportés.",
       "Actions : écriture, suppression, publication, déploiement, réseau et MCP reçoivent une décision explicite.",
       "Exceptions : une action sensible attend une approbation courte et liée à son contexte exact.",
+      "Règles sur mesure : xSOM calibre des détecteurs sur vos identifiants et vos projets, les signe ; le poste vérifie la signature hors ligne avant de les appliquer. En pilote : la prise en charge par l’extension arrive dans une prochaine version.",
       "Preuves : inventaire du poste, politique, décision et statut d’interception restent distincts.",
     ],
     extGuardLimit:
@@ -688,6 +690,7 @@ export const GUARD_COPY = {
       "Resources: credential files and out-of-scope roots are denied for supported events.",
       "Actions: writes, deletion, publishing, deployment, network and MCP receive an explicit decision.",
       "Exceptions: a sensitive action waits for a short-lived approval tied to its exact context.",
+      "Custom rules: xSOM calibrates detectors on your identifiers and projects and signs them; the workstation checks the signature offline before applying them. In pilot: extension support arrives in an upcoming release.",
       "Evidence: workstation inventory, policy, decision and interception status remain distinct.",
     ],
     extGuardLimit:

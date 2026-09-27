@@ -158,7 +158,18 @@ def evaluate(
 
 
 def _canonical(payload: dict[str, Any]) -> bytes:
-    return json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    """Octets signés : l'équivalent exact de ``canonicalizePolicyPayload`` du runner.
+
+    Le poste reconstruit la forme canonique avec ``JSON.stringify``, qui écrit les
+    caractères non ASCII tels quels. ``ensure_ascii`` (le défaut de ``json.dumps``) les
+    échappait en ``\\uXXXX`` : une seule lettre accentuée dans un ``reason`` suffisait
+    pour que tous les postes refusent la signature. Une politique ASCII garde les mêmes
+    octets, donc les enveloppes déjà publiées restent valides
+    (``tests/test_developer_policy_canonical.py``).
+    """
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode(
+        "utf-8"
+    )
 
 
 def signer(settings: Settings) -> Ed25519Signer:
