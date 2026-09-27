@@ -13,12 +13,25 @@ const TYPES: Record<SecretType, string> = {
   api_key: "Clé API",
   generic_secret: "Secret potentiel",
   high_entropy: "Valeur à vérifier",
+  custom_rule: "Règle sur mesure xSOM",
   scan_limit: "Limite d’analyse",
   scan_error: "Analyse indisponible",
 };
 
+/** Plain text in chat markdown: a signed label still never becomes a link. */
+function escapeMarkdown(value: string): string {
+  return value.replace(/[\\`*_{}[\]()#+\-.!<>|~]/gu, "\\$&");
+}
+
+/** What was found: the signed label of an xSOM detector, else the secret type. */
+export function findingName(finding: Finding): string {
+  return finding.custom === undefined
+    ? TYPES[finding.secretType]
+    : `${finding.custom.label} (réglage xSOM)`;
+}
+
 export function findingSummary(finding: Finding): string {
-  return `${TYPES[finding.secretType]} · ligne ${finding.span.start.line}, colonne ${finding.span.start.column}`;
+  return `${findingName(finding)} · ligne ${finding.span.start.line}, colonne ${finding.span.start.column}`;
 }
 
 export function markdownReport(result: ScanResult): string {
@@ -32,7 +45,7 @@ export function markdownReport(result: ScanResult): string {
       : "🔎 **Secret Guard · Vérification nécessaire**";
   const lines = result.findings
     .slice(0, MAX_FINDINGS)
-    .map((finding) => `- ${findingSummary(finding)}`);
+    .map((finding) => `- ${escapeMarkdown(findingSummary(finding))}`);
   const omitted = result.findings.length - lines.length;
   if (omitted > 0)
     lines.push(`- ${omitted} autre(s) détection(s) non affichée(s).`);

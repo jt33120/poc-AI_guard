@@ -25,3 +25,15 @@ def test_release_publishes_sbom_provenance_and_checksums_with_vsix() -> None:
         "SHA256SUMS",
     ):
         assert required in workflow
+
+
+def test_release_compiles_the_rules_authority_from_a_public_repository_variable() -> None:
+    """xSOM custom tuning: public keys come from a variable, the seed never enters."""
+    workflow = (ROOT / ".github" / "workflows" / "secret-guard-release.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "XSOM_RULES_AUTHORITY_KEYS: ${{ vars.XSOM_RULES_AUTHORITY_KEYS }}" in workflow
+    assert 'XSOM_RULES_REQUIRE_AUTHORITY: "1"' in workflow
+    assert "Require the xSOM rules authority public key" in workflow
+    assert "XSOM_RULES_SIGNING_KEY" not in workflow
+    assert "secrets.XSOM_RULES" not in workflow

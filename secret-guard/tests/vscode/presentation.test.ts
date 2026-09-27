@@ -19,4 +19,24 @@ describe("sanitized presentation", () => {
     expect(markdownReport(result)).not.toContain(token);
     expect(modalReport(result)).not.toContain(token);
   });
+
+  it("names a custom detection by its label, as plain markdown text", () => {
+    const base = scan({ content: `token ghp_${"aB3d".repeat(9)}` });
+    const finding = {
+      ...base.findings[0]!,
+      custom: {
+        packId: "p",
+        packVersion: 1,
+        detectorId: "d",
+        label: "[clic](command:secretGuard.disableHook)",
+        category: "project" as const,
+        action: "block" as const,
+      },
+    };
+    const report = markdownReport({ ...base, findings: [finding] });
+    expect(report).toContain(
+      "\\[clic\\]\\(command:secretGuard\\.disableHook\\) \\(réglage xSOM\\)",
+    );
+    expect(report).not.toContain("](command:");
+  });
 });

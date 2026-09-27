@@ -1,7 +1,7 @@
 {
   "name": "xsom-secret-guard-vscode",
   "displayName": "xSOM Secret Guard",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "Vos idées à l’IA, vos secrets à l’abri. Détection locale et protection des prompts pour Claude Code, Codex et GitHub Copilot.",
   "publisher": "xsom",
   "type": "module",
@@ -45,7 +45,9 @@
     "onCommand:secretGuard.enableHook",
     "onCommand:secretGuard.finishCodexSetup",
     "onCommand:secretGuard.disableHook",
-    "onCommand:secretGuard.copyRedacted"
+    "onCommand:secretGuard.copyRedacted",
+    "onCommand:secretGuard.requestRulesPack",
+    "onCommand:secretGuard.importRulesPack"
   ],
   "contributes": {
     "icons": {
@@ -162,6 +164,14 @@
       {
         "command": "secretGuard.copyRedacted",
         "title": "Secret Guard: Copier la version expurgée"
+      },
+      {
+        "command": "secretGuard.requestRulesPack",
+        "title": "Secret Guard: Demander un réglage sur mesure xSOM"
+      },
+      {
+        "command": "secretGuard.importRulesPack",
+        "title": "Secret Guard: Importer un réglage xSOM (poste hors ligne)"
       }
     ],
     "menus": {

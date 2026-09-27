@@ -8,6 +8,33 @@ les contenus sensibles détectés, avant leur traitement par le modèle.
 
 **Analyse locale · Passerelle xSOM optionnelle · Intégré à VS Code**
 
+### Réglage sur mesure xSOM (0.7.0, édition Équipe)
+
+En plus des règles intégrées, Secret Guard applique le **réglage de votre
+organisation** : des règles calibrées et signées par xSOM pour vos propres données
+(identifiants clients, noms de code de projets, serveurs internes). Ce n’est pas une
+option à cocher : le réglage se fait avec xSOM, puis arrive sur le poste raccordé.
+
+- Il est vérifié hors ligne avec la clé d’autorité xSOM intégrée à l’extension :
+  un réglage modifié, destiné à une autre organisation ou plus ancien est refusé.
+- Il n’ajoute que des détections : les règles intégrées restent actives, refus ou
+  panne compris. Un réglage expiré reste appliqué et l’état le signale.
+- L’analyse reste locale, déterministe, sans LLM ni réseau, et bornée : si un
+  texte dépasse le budget d’analyse, l’envoi est bloqué (« analyse incomplète »).
+- Expurger masque aussi ces détections dans `@secretguard` et le presse-papiers,
+  sous le nom de la règle, par exemple `<REDACTED_Identifiant_client_ACME>`. Le relais
+  Claude ne connaît pas ce réglage : un message concerné est alors arrêté, pas
+  délégué. La valeur n’est jamais affichée ni journalisée.
+
+Poste sans accès à la plateforme (édition Renforcé) : **Secret Guard: Importer un
+réglage xSOM (poste hors ligne)** vérifie et applique un fichier de réglage remis par
+xSOM, avec exactement les mêmes contrôles.
+
+L’infobulle et le centre de protection indiquent l’état en quelques mots :
+« Réglage xSOM · v3 · 12 règles · jusqu’au 01/09/2027 », « Réglage refusé :
+signature invalide », ou « Aucun réglage sur mesure » avec un lien pour en
+demander un.
+
 ### Raccordement xSOM (0.3.0)
 
 Le centre de protection propose **Raccorder ce poste à xSOM**. Un jeton de passerelle

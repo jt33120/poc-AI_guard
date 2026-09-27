@@ -1,4 +1,8 @@
-import { redactAndRescan } from "@xsom/secret-guard-core";
+import {
+  redactAndRescan,
+  type CompiledRulesPack,
+  type Finding,
+} from "@xsom/secret-guard-core";
 
 // Metadata and the sanitized text only: the original content and the detected
 // values never leave this function.
@@ -9,11 +13,13 @@ export type PurgeOutcome =
       readonly status: "purged";
       readonly content: string;
       readonly findings: number;
+      readonly detected: readonly Finding[];
     }
   | {
       readonly status: "failed";
       readonly reason: "incomplete" | "residual";
       readonly findings: number;
+      readonly detected: readonly Finding[];
     };
 
 export interface PurgeFeedback {
@@ -29,7 +35,10 @@ export interface PurgeFeedback {
  * redacted text rescans clean produces a replacement; anything else leaves the
  * clipboard untouched and reports why.
  */
-export function purgeClipboardText(content: string): PurgeOutcome {
+export function purgeClipboardText(
+  content: string,
+  rules?: CompiledRulesPack,
+): PurgeOutcome {
   if (content.trim() === "") return { status: "empty" };
   const {
     initial,
@@ -38,18 +47,21 @@ export function purgeClipboardText(content: string): PurgeOutcome {
   } = redactAndRescan({
     content,
     sourceKind: "clipboard",
+    ...(rules === undefined ? {} : { rules }),
   });
   const findings = initial.findings.length;
+  // Findings carry offsets and rule identities only, never the values.
+  const detected = initial.findings;
   if (!initial.complete)
-    return { status: "failed", reason: "incomplete", findings };
+    return { status: "failed", reason: "incomplete", findings, detected };
   if (initial.decision === "ALLOW") return { status: "clean" };
   if (
     final.complete &&
     final.decision === "ALLOW" &&
     final.findings.length === 0
   )
-    return { status: "purged", content: redacted, findings };
-  return { status: "failed", reason: "residual", findings };
+    return { status: "purged", content: redacted, findings, detected };
+  return { status: "failed", reason: "residual", findings, detected };
 }
 
 function detected(count: number): string {
@@ -66,7 +78,7 @@ function secrets(count: number): string {
 
 const FAILURE_MESSAGES: Record<"incomplete" | "residual", string> = {
   incomplete:
-    "Secret Guard n’a pas pu analyser tout le presse-papiers (plus de 1 Mio ou texte illisible). Il n’a pas été modifié : ne le collez pas tel quel.",
+    "Secret Guard n’a pas pu analyser tout le presse-papiers (plus de 1 Mio, texte illisible ou analyse trop longue). Il n’a pas été modifié : ne le collez pas tel quel.",
   residual:
     "Un secret subsiste après nettoyage. Le presse-papiers n’a pas été modifié : retirez la valeur à la main avant de le coller.",
 };
@@ -130,7 +142,7 @@ export function checkFeedback(outcome: PurgeOutcome): PurgeFeedback {
             text: "$(error) Presse-papiers non vérifié en entier",
             failed: true,
             message:
-              "Secret Guard n’a pas pu analyser tout le presse-papiers (plus de 1 Mio ou texte illisible). Ne le collez pas tel quel.",
+              "Secret Guard n’a pas pu analyser tout le presse-papiers (plus de 1 Mio, texte illisible ou analyse trop longue). Ne le collez pas tel quel.",
           }
         : {
             text: `$(warning) Presse-papiers · ${detected(outcome.findings)}`,

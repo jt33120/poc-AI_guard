@@ -85,6 +85,28 @@ export async function storedPolicyKey(
   }
 }
 
+/**
+ * The tenant stated by the stored managed policy, only once its signature is
+ * verified again with the pinned policy key. Anything else gives undefined.
+ */
+export async function verifiedPolicyTenant(
+  storage: string,
+): Promise<string | undefined> {
+  try {
+    const pinned = await storedPolicyKey(storage);
+    const policy = validateSignedPolicyDocument(
+      JSON.parse(await readFile(policyPath(storage), "utf8")),
+      pinned,
+      "999.999.999",
+    );
+    return typeof policy.tenantId === "string" && policy.tenantId !== ""
+      ? policy.tenantId
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function storedPolicyVersion(
   storage: string,
 ): Promise<{ policyId: string; version: number } | undefined> {

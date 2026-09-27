@@ -4,6 +4,11 @@ import { readFile, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  readAuthorityKeys,
+  TEST_AUTHORITY_PUBLIC_KEYS,
+} from "./rules-authority.mjs";
+
 const workspace = dirname(dirname(fileURLToPath(import.meta.url)));
 const vsix = join(
   workspace,
@@ -16,6 +21,7 @@ const expectedFiles = [
   "[Content_Types].xml",
   "extension.vsixmanifest",
   "extension/LICENSE.txt",
+  "extension/changelog.md",
   "extension/dist/extension.cjs",
   "extension/dist/hook.cjs",
   "extension/icon.png",
@@ -25,6 +31,7 @@ const expectedFiles = [
 ].sort();
 const localEquivalents = new Map([
   ["extension/LICENSE.txt", "packages/vscode/LICENSE.txt"],
+  ["extension/changelog.md", "packages/vscode/CHANGELOG.md"],
   ["extension/dist/extension.cjs", "packages/vscode/dist/extension.cjs"],
   ["extension/dist/hook.cjs", "packages/vscode/dist/hook.cjs"],
   ["extension/icon.png", "packages/vscode/icon.png"],
@@ -158,6 +165,32 @@ for (const [path, content] of archivedContents) {
   }
 }
 
+// The public test authority must never ship; the configured release keys
+// must be compiled into both bundles (the extension and the hook runner).
+const bundles = ["extension/dist/extension.cjs", "extension/dist/hook.cjs"];
+for (const [path, content] of archivedContents) {
+  const text = content.toString("utf8");
+  if (TEST_AUTHORITY_PUBLIC_KEYS.some((key) => text.includes(key)))
+    throw new Error(`VSIX trusts the public TEST rules authority in ${path}`);
+}
+const releaseKeys = readAuthorityKeys({
+  XSOM_RULES_AUTHORITY_KEYS: process.env.XSOM_RULES_AUTHORITY_KEYS,
+});
+for (const path of bundles) {
+  const text = archivedContents.get(path).toString("utf8");
+  if (releaseKeys.some((key) => !text.includes(key)))
+    throw new Error(
+      `VSIX is missing a configured rules authority key in ${path}`,
+    );
+}
+if (
+  process.env.XSOM_RULES_REQUIRE_AUTHORITY === "1" &&
+  releaseKeys.length === 0
+)
+  throw new Error(
+    "Release build without a rules authority key: set the XSOM_RULES_AUTHORITY_KEYS repository variable.",
+  );
+
 const packagedManifest = JSON.parse(
   archivedContents.get("extension/package.json").toString("utf8"),
 );
@@ -174,5 +207,5 @@ if (
 
 const archiveDigest = sha256(await readFile(vsix));
 process.stdout.write(
-  `VSIX inspection: OK (${archive.size} bytes, ${files.length} exact files, sha256=${archiveDigest})\n`,
+  `VSIX inspection: OK (${archive.size} bytes, ${files.length} exact files, rules authority keys: ${String(releaseKeys.length)}, sha256=${archiveDigest})\n`,
 );

@@ -310,6 +310,57 @@ describe("status bar tooltip controls", () => {
     }
   });
 
+  it("shows the xSOM tuning in one line under the readiness line", () => {
+    const markdown = render({
+      rulesPack: {
+        line: "Réglage xSOM · v3 · 12 règles · jusqu’au 01/09/2027",
+        tone: "ok",
+        offerRequest: false,
+      },
+    });
+    const lines = markdown.split("\n");
+    expect(lines[1]).toContain("Prêt à veiller");
+    expect(lines[2]).toContain(
+      "Réglage xSOM · v3 · 12 règles · jusqu’au 01/09/2027",
+    );
+    expect(linkedCommands(markdown)).not.toContain(
+      "secretGuard.requestRulesPack",
+    );
+    // The line is text: the image controls keep their places.
+    expect(alts(markdown)).toEqual(alts(render()));
+  });
+
+  it("offers a tuning request to Local users with a discreet link", () => {
+    const markdown = render({
+      rulesPack: {
+        line: "Aucun réglage sur mesure",
+        tone: "info",
+        offerRequest: true,
+      },
+    });
+    expect(markdown).toContain("Aucun réglage sur mesure");
+    expect(linkedCommands(markdown)).toContain("secretGuard.requestRulesPack");
+    expect(STATUS_TOOLTIP_COMMANDS).toContain("secretGuard.requestRulesPack");
+  });
+
+  it("escapes the tuning line and keeps the sanitizer rules", () => {
+    const markdown = render({
+      rulesPack: {
+        line: 'Réglage refusé : <img src=x onerror="alert(1)"> $(bug)',
+        tone: "danger",
+        offerRequest: true,
+      },
+    });
+    expect(markdown).not.toContain("<img src=x");
+    expect(markdown).not.toContain("$(bug)");
+    for (const [, tag] of markdown.matchAll(/<\/?([a-z]+)/gu))
+      expect(USED_TAGS).toContain(tag);
+    for (const [, name] of markdown.matchAll(/ ([a-z-]+)="/gu))
+      expect(VSCODE_ATTRIBUTES).toContain(name);
+    for (const [, style] of markdown.matchAll(/style="([^"]*)"/gu))
+      expect(style).toMatch(VSCODE_SPAN_STYLE);
+  });
+
   it("fills every image row to the drawn width", () => {
     const markdown = render({
       mode: "redact",

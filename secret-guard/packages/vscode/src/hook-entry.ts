@@ -14,9 +14,11 @@ import {
 } from "@xsom/developer-guard-adapters";
 import {
   evaluateHookInput,
+  loadAppliedRulesPack,
   loadPolicy,
   resolveApproval,
 } from "@xsom/developer-guard-runner";
+import type { CompiledRulesPack } from "@xsom/secret-guard-core";
 
 const MAX_HOOK_INPUT_BYTES = 1_200_000;
 const STALE_SESSION_MESSAGE =
@@ -46,7 +48,18 @@ async function check(storage: string): Promise<void> {
     readObserveDeadline(storage),
     Date.now(),
   );
-  const response = runHook(rawInput, mode);
+  // The relay cleans with the platform's rules only. With an xSOM tuning
+  // loaded, a custom detection, or a scan that could not finish (budget,
+  // too many findings: the tuning may not have run), must stay here.
+  const rulesPack = await verifiedRulesPack(storage);
+  let tuningNeedsLocalBlock = false;
+  const response = runHook(rawInput, mode, undefined, rulesPack, (result) => {
+    if (
+      result.findings.some((finding) => finding.custom !== undefined) ||
+      (rulesPack !== undefined && !result.complete)
+    )
+      tuningNeedsLocalBlock = true;
+  });
   const adapter = adapterFor(process.argv.slice(2));
   const policyResponse = await policyResponseFor(rawInput, adapter, storage);
   if (policyResponse !== undefined && !policyResponse.continue) {
@@ -72,6 +85,7 @@ async function check(storage: string): Promise<void> {
     !response.continue &&
     relayedEvent &&
     mode === "redact" &&
+    !tuningNeedsLocalBlock &&
     (await canDelegate(storage, process.env.ANTHROPIC_BASE_URL))
   ) {
     // The original travels only to the registered, mandatory-redaction route.
@@ -84,6 +98,7 @@ async function check(storage: string): Promise<void> {
     const staleClaudeSession =
       relayedEvent &&
       mode === "redact" &&
+      !tuningNeedsLocalBlock &&
       process.env.CLAUDE_PROJECT_DIR !== undefined &&
       (await relayConnected(storage));
     process.stderr.write(
@@ -93,6 +108,22 @@ async function check(storage: string): Promise<void> {
     return;
   }
   process.stdout.write(`${JSON.stringify(response)}\n`);
+}
+
+/**
+ * The xSOM rules pack stored by the extension, verified again here with the
+ * authority keys of this build: the storage folder is not a trust anchor. A
+ * refused, absent or unreadable pack leaves the built-in rules only.
+ */
+async function verifiedRulesPack(
+  storage: string,
+): Promise<CompiledRulesPack | undefined> {
+  try {
+    const applied = await loadAppliedRulesPack(storage);
+    return applied.status === "applied" ? applied.pack : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function adapterFor(args: readonly string[]): HostAdapter {
