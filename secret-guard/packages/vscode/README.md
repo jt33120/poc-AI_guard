@@ -85,7 +85,7 @@ installation.
 | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 🔒 Bloquer (défaut)          | Arrête l’envoi en cas de secret détecté, de contenu ambigu ou d’analyse incomplète.                                                                             |
 | 🧹 Expurger                  | Dans `@secretguard`, masque les secrets puis rescane avant l’envoi. Dans les autres chats, arrête l’envoi ; un clic sur Secret Guard expurge le presse-papiers. |
-| 👁️ Avertir et laisser passer | Signale les détections et transmet le texte original, secrets compris, sans nettoyage. Dure 1 heure, puis retour automatique à Expurger.                        |
+| 👁️ Avertir et laisser passer | Signale les détections et transmet le texte original, secrets compris, sans nettoyage. Dure 15 min, 1 h ou 4 h au choix, puis retour automatique à Expurger.    |
 
 En mode **Expurger**, un clic sur **Secret Guard** dans la barre d’état expurge
 le presse-papiers : copiez votre message, cliquez, puis collez directement dans
@@ -98,7 +98,8 @@ presse-papiers sans le modifier ; si un secret s’y trouve, l’alerte propose
 **Expurger**. Le survol ouvre toujours le panneau de contrôle.
 Les hooks natifs actuels ne remplacent pas le prompt original par une copie nettoyée.
 
-**Avertir** est limité à 1 heure : VS Code demande confirmation à l’activation,
+**Avertir** dure 15 minutes, 1 heure ou 4 heures : VS Code demande la durée à l’activation,
+le panneau de contrôle permet d’en changer pendant qu’il tourne,
 affiche l’heure de fin dans la barre d’état, puis repasse en Expurger. Le hook
 applique lui-même cette limite, même si VS Code est fermé entre-temps.
 

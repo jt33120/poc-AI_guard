@@ -20,6 +20,10 @@
   réglage pour les postes Local.
 - Posture et audit sans contenu : identité du réglage, nombre de détections sur
   mesure et identifiants des règles.
+- **Durée d’Avertir au choix** : 15 minutes, 1 heure ou 4 heures, demandée à
+  l’activation et modifiable d’un clic dans le panneau de contrôle pendant que le
+  mode tourne. Le hook refuse toute fenêtre plus longue que 4 heures, même si VS
+  Code est fermé.
 - Correctif macOS : le pont d’approbation Developer Guard écoute sur un socket
   court et privé (le chemin précédent dépassait la limite de 104 octets).
 

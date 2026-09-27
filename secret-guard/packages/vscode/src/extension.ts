@@ -52,6 +52,7 @@ import {
 import {
   CHECK_CLIPBOARD_COMMAND,
   PURGE_CLIPBOARD_COMMAND,
+  SET_OBSERVE_DURATION_COMMAND,
   statusBarClickCommand,
   statusTooltipMarkdown,
   STATUS_TOOLTIP_COMMANDS,
@@ -69,19 +70,32 @@ import {
 } from "./clipboard-purge.js";
 import {
   closeObserveWindow,
+  DEFAULT_OBSERVE_MINUTES,
+  isObserveMinutes,
+  OBSERVE_DURATIONS,
+  observeDurationLabel,
   observeWindowOpen,
   openObserveWindow,
   readObserveDeadline,
+  type ObserveMinutes,
 } from "./observe-window.js";
 
 const FINISH_CODEX_SETUP = "Finaliser Codex";
-const OBSERVE_CONFIRMATION = "Activer pour 1 heure";
+// Avertir asks for its length each time it is switched on; the answer is kept
+// so the panel shows it and offers the other lengths.
+const OBSERVE_MINUTES_KEY = "secretGuard.observeMinutes";
+const OBSERVE_CHOICES: Record<ObserveMinutes, string> = {
+  15: "15 minutes",
+  60: "1 heure",
+  240: "4 heures",
+};
 const PURGE_ACTION = "Expurger";
 let gateway: GatewayIntegration | undefined;
 // Metadata only: the scanned content and detected values are never retained.
 let lastScan: LastScan | undefined;
 // End of the running Avertir window, mirrored from the file the hook reads.
 let observeDeadline: number | undefined;
+let observeMinutes: ObserveMinutes = DEFAULT_OBSERVE_MINUTES;
 // The xSOM tuning applied to the scans run by the extension itself; the
 // hook runner verifies and loads the same file on its own.
 let rulesPack: CompiledRulesPack | undefined;
@@ -519,6 +533,7 @@ async function updateStatus(
       health,
       mode,
       ...(until === undefined ? {} : { observeUntil: until }),
+      observeMinutes,
       modeApplicationFailed,
       ...(lastScan === undefined ? {} : { lastScan }),
       rulesPack: {
@@ -614,7 +629,7 @@ export async function activate(
     if (configuredMode() !== "observe") return;
     await saveMode("redact");
     void vscode.window.showInformationMessage(
-      "⏱️ L’heure en mode Avertir est écoulée : Secret Guard repasse en Expurger.",
+      "⏱️ La durée d’Avertir est écoulée : Secret Guard repasse en Expurger.",
     );
   };
   // Avertir never outlives its window: the hook falls back to Expurger on its
@@ -634,21 +649,35 @@ export async function activate(
       void expireObserveWindow();
     }, remaining);
   };
+  const stored = context.globalState.get<unknown>(OBSERVE_MINUTES_KEY);
+  observeMinutes = isObserveMinutes(stored) ? stored : DEFAULT_OBSERVE_MINUTES;
+  const chooseObserveMinutes = async (
+    minutes: ObserveMinutes,
+  ): Promise<void> => {
+    observeMinutes = minutes;
+    await context.globalState.update(OBSERVE_MINUTES_KEY, minutes);
+  };
   // Choosing Avertir opens a fresh window; leaving it closes the window.
   const syncObserveWindow = async (): Promise<void> => {
     if (configuredMode() === "observe")
-      await openObserveWindow(storage, Date.now());
+      await openObserveWindow(storage, Date.now(), observeMinutes);
     else await closeObserveWindow(storage);
     scheduleObserveExpiry();
   };
+  // Switching Avertir on is confirmed by choosing how long it lasts.
   const confirmMode = async (mode: ProtectionMode): Promise<boolean> => {
     if (mode !== "observe" || configuredMode() === "observe") return true;
     const answer = await vscode.window.showWarningMessage(
-      "Avertir transmet vos messages tels quels à l’assistant, secrets compris. Ce mode dure 1 heure, puis Secret Guard repasse en Expurger.",
+      "Avertir transmet vos messages tels quels à l’assistant, secrets compris. Pour combien de temps ? Secret Guard repasse ensuite en Expurger.",
       { modal: true },
-      OBSERVE_CONFIRMATION,
+      ...OBSERVE_DURATIONS.map((minutes) => OBSERVE_CHOICES[minutes]),
     );
-    return answer === OBSERVE_CONFIRMATION;
+    const chosen = OBSERVE_DURATIONS.find(
+      (minutes) => OBSERVE_CHOICES[minutes] === answer,
+    );
+    if (chosen === undefined) return false;
+    await chooseObserveMinutes(chosen);
+    return true;
   };
   context.subscriptions.push({
     dispose: () => {
@@ -722,6 +751,26 @@ export async function activate(
         closeStatusControls();
         if (isProtectionMode(mode) && (await confirmMode(mode)))
           await saveMode(mode);
+      },
+    ),
+    // From the panel, while Avertir runs: restart the window with another
+    // length. Outside Avertir, the same click goes through the confirmation.
+    vscode.commands.registerCommand(
+      SET_OBSERVE_DURATION_COMMAND,
+      async (minutes?: unknown) => {
+        closeStatusControls();
+        if (!isObserveMinutes(minutes)) return;
+        if (configuredMode() !== "observe") {
+          if (await confirmMode("observe")) await saveMode("observe");
+          return;
+        }
+        await chooseObserveMinutes(minutes);
+        await syncObserveWindow();
+        await refreshUi();
+        const until = observeUntil();
+        void vscode.window.showInformationMessage(
+          `Avertir pour ${observeDurationLabel(minutes)}${until === undefined ? "" : `, jusqu’à ${until}`}, puis retour automatique à Expurger.`,
+        );
       },
     ),
     vscode.window.onDidChangeActiveColorTheme(async () => {

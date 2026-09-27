@@ -201,12 +201,12 @@
           "enumItemLabels": [
             "🔒 Bloquer",
             "🧹 Expurger",
-            "👁️ Avertir et laisser passer (1 heure)"
+            "👁️ Avertir et laisser passer (15 min à 4 h)"
           ],
           "enumDescriptions": [
             "Bloque les messages avec des secrets détectés, les détections ambiguës et les analyses incomplètes.",
             "Nettoie automatiquement dans @secretguard et les sessions Claude raccordées à la passerelle xSOM. Sans passerelle, bloque ; un clic sur Secret Guard dans la barre d’état expurge alors le presse-papiers, prêt à coller.",
-            "Avertit et laisse passer le texte original, même avec des secrets, pendant 1 heure au plus ; Secret Guard repasse ensuite en Expurger."
+            "Avertit et laisse passer le texte original, même avec des secrets, pendant 15 minutes, 1 heure ou 4 heures, au choix à l’activation ; Secret Guard repasse ensuite en Expurger."
           ],
           "default": "block",
           "scope": "application",

@@ -24,7 +24,7 @@ export const PROTECTION_MODES: ReadonlyArray<{
     mode: "observe",
     label: "👁️ Avertir et laisser passer",
     description:
-      "Transmettre le texte original, même avec des secrets, pendant 1 heure.",
+      "Transmettre le texte original, même avec des secrets, pendant 15 min, 1 h ou 4 h.",
     detail:
       "Secret Guard signale les détections sans bloquer ni nettoyer, puis repasse automatiquement en Expurger.",
   },

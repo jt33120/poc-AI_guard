@@ -140,11 +140,42 @@ describe("status bar tooltip controls", () => {
     const card = pictures(observe).find((picture) =>
       picture.alt.startsWith("Avertir et laisser passer."),
     );
-    expect(card?.alt).toContain("Durée : 1 heure, puis retour à Expurger");
+    expect(card?.alt).toContain("Durée : 1 h, puis retour à Expurger");
     expect(render({ mode: "redact", observeUntil: "17:42" })).not.toContain(
       "Avertir jusqu’à",
     );
     expect(render()).not.toContain("réglage permissif");
+  });
+
+  it("lets the Avertir length be changed from the panel, and only in Avertir", () => {
+    const durationLinks = (markdown: string): number[] =>
+      [
+        ...markdown.matchAll(
+          /href="command:secretGuard\.setObserveDuration\?([^"]+)"/gu,
+        ),
+      ].map(
+        (match) => (JSON.parse(decodeURIComponent(match[1]!)) as number[])[0]!,
+      );
+    const quarter = render({
+      mode: "observe",
+      observeUntil: "17:42",
+      observeMinutes: 15,
+    });
+    expect(quarter).toContain("Durée d’Avertir :");
+    expect(quarter).toContain("<strong>15 min</strong>");
+    expect(durationLinks(quarter)).toEqual([60, 240]);
+    const card = pictures(quarter).find((picture) =>
+      picture.alt.startsWith("Avertir et laisser passer."),
+    );
+    expect(card?.alt).toContain("Durée : 15 min, puis retour à Expurger");
+    // One hour by default, as before the choice existed.
+    expect(durationLinks(render({ mode: "observe" }))).toEqual([15, 240]);
+    for (const mode of ["redact", "block"] as const) {
+      const markdown = render({ mode, observeMinutes: 240 });
+      expect(durationLinks(markdown)).toEqual([]);
+      expect(markdown).not.toContain("Durée d’Avertir");
+    }
+    expect(STATUS_TOOLTIP_COMMANDS).toContain("secretGuard.setObserveDuration");
   });
 
   it("follows the color theme kind for drawn controls", () => {

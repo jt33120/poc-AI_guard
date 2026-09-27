@@ -2,6 +2,12 @@ import type { ProtectionMode } from "@xsom/secret-guard-cli/hook";
 import type { Decision } from "@xsom/secret-guard-core";
 import type { HookHealth } from "./hook-manager.js";
 import { HEALTH_LABELS, HEALTH_REASONS } from "./dashboard.js";
+import {
+  DEFAULT_OBSERVE_MINUTES,
+  OBSERVE_DURATIONS,
+  observeDurationLabel,
+  type ObserveMinutes,
+} from "./observe-window.js";
 import { modeShortLabel } from "./protection-mode.js";
 import {
   alertCard,
@@ -37,6 +43,7 @@ export function statusBarClickCommand(mode: ProtectionMode): string {
 // dynamic lines. Image rows and 19px text lines stack with no other spacing.
 
 export const REQUEST_RULES_PACK_COMMAND = "secretGuard.requestRulesPack";
+export const SET_OBSERVE_DURATION_COMMAND = "secretGuard.setObserveDuration";
 
 export const STATUS_TOOLTIP_COMMANDS = [
   "secretGuard.setMode",
@@ -45,6 +52,7 @@ export const STATUS_TOOLTIP_COMMANDS = [
   CHECK_CLIPBOARD_COMMAND,
   "secretGuard.showDashboard",
   REQUEST_RULES_PACK_COMMAND,
+  SET_OBSERVE_DURATION_COMMAND,
 ] as const;
 
 type TooltipCommand = (typeof STATUS_TOOLTIP_COMMANDS)[number];
@@ -72,6 +80,8 @@ export interface StatusTooltipInput {
   readonly mode: ProtectionMode;
   // End of the running Avertir window, already formatted for display.
   readonly observeUntil?: string;
+  // Length of the Avertir window, chosen in the panel (1 h by default).
+  readonly observeMinutes?: ObserveMinutes;
   readonly modeApplicationFailed?: boolean;
   readonly lastScan?: LastScan;
   readonly rulesPack?: RulesPackLine;
@@ -107,7 +117,7 @@ const TIERS: readonly ModeTier[] = [
     description: "Transmet le texte original après avertissement.",
     effects: [
       ["Envoi", "Tel quel, secrets compris"],
-      ["Durée", "1 heure, puis retour à Expurger"],
+      ["Durée", "1 h, puis retour à Expurger"],
     ],
   },
   {
@@ -157,7 +167,7 @@ const HELP = {
 
 interface Target {
   readonly command: TooltipCommand;
-  readonly argument?: string;
+  readonly argument?: string | number;
 }
 
 interface Action extends Target {
@@ -342,28 +352,61 @@ function levelBlocks(
     ];
   }
   if (active === undefined) return blocks;
-  const window =
-    active.mode === "observe" && input.observeUntil !== undefined
-      ? [
-          smallLine(
-            `Avertir jusqu’à ${escapeHtml(input.observeUntil)}, puis retour automatique à Expurger.`,
-            TONE_COLORS.warn,
-          ),
-        ]
-      : [];
-  const effects = active.effects
+  const observing = active.mode === "observe";
+  const minutes = input.observeMinutes ?? DEFAULT_OBSERVE_MINUTES;
+  const shown: ModeTier = observing
+    ? {
+        ...active,
+        effects: active.effects.map(([name, value]) =>
+          name === "Durée"
+            ? [name, `${observeDurationLabel(minutes)}, puis retour à Expurger`]
+            : [name, value],
+        ),
+      }
+    : active;
+  const window = observing
+    ? [
+        ...(input.observeUntil === undefined
+          ? []
+          : [
+              smallLine(
+                `Avertir jusqu’à ${escapeHtml(input.observeUntil)}, puis retour automatique à Expurger.`,
+                TONE_COLORS.warn,
+              ),
+            ]),
+        durationLine(minutes),
+      ]
+    : [];
+  const effects = shown.effects
     .map(([name, value]) => `${name} : ${value}`)
     .join(". ");
   return [
     ...blocks,
     imageRow(
       image(
-        stateCard(appearance, active),
-        `${active.title}. ${active.description} Exposition ${active.exposure}. ${effects}.`,
+        stateCard(appearance, shown),
+        `${shown.title}. ${shown.description} Exposition ${shown.exposure}. ${effects}.`,
       ),
     ),
     ...window,
   ];
+}
+
+// The Avertir length, changed in one click: the window restarts from now with
+// the chosen length. The current choice is plain text, the others are links.
+function durationLine(current: ObserveMinutes): string {
+  const choices = OBSERVE_DURATIONS.map((minutes) => {
+    const label = observeDurationLabel(minutes);
+    if (minutes === current) return `<strong>${label}</strong>`;
+    return link(
+      label,
+      { command: SET_OBSERVE_DURATION_COMMAND, argument: minutes },
+      `Avertir ${label} à partir de maintenant, puis retour à Expurger`,
+    );
+  }).join(" · ");
+  return textLine(
+    `<small>${span("Durée d’Avertir :", COLOR.dim)} ${choices}</small>`,
+  );
 }
 
 function scanLine(scan: LastScan): string {
