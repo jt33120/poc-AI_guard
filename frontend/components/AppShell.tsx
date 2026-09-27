@@ -89,7 +89,14 @@ export function AppShell({
             <span>Control plane</span>
             <span aria-hidden="true">/</span>
             <strong>
-              {active?.[lang] ?? (lang === "fr" ? "Réglages" : "Settings")}
+              {active?.[lang] ??
+                (pathname.startsWith("/xsom")
+                  ? lang === "fr"
+                    ? "Atelier xSOM"
+                    : "xSOM workshop"
+                  : lang === "fr"
+                    ? "Réglages"
+                    : "Settings")}
             </strong>
           </div>
           <div className="console-topbar-actions">

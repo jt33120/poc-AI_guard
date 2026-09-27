@@ -277,3 +277,26 @@ def require_role(*roles: Role) -> Callable[..., CurrentUser]:
         return user
 
     return dependency
+
+
+def is_xsom_operator(settings: Settings, user: CurrentUser) -> bool:
+    """Le sujet vérifié figure-t-il dans ``XSOM_OPERATOR_SUBJECTS`` ?
+
+    Indépendant du tenant et du rôle portés par le jeton : l'administrateur d'un client
+    est admin **de son tenant**, jamais opérateur xSOM. Liste vide : personne.
+    """
+    # En fédération (`oidc_groups`), c'est l'IdP du client qui émet le `sub` : il pourrait
+    # frapper celui d'un opérateur. Ce mode sert un déploiement chez le client, où la clé
+    # d'autorité xSOM n'a rien à faire ; on y ferme l'atelier.
+    if settings.issuer_claims == "oidc_groups":
+        return False
+    return user.user_id.strip().lower() in settings.xsom_operators
+
+
+def require_xsom_operator(
+    request: Request, user: CurrentUser = Depends(get_current_user)
+) -> CurrentUser:
+    """Dependency : seul un opérateur xSOM compose et signe un réglage (RULES-PACK §6)."""
+    if not is_xsom_operator(request.app.state.settings, user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="xSOM operator only")
+    return user

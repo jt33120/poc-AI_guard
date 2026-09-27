@@ -2,6 +2,7 @@ import {
   redact,
   RULESET_VERSION,
   scan,
+  type CompiledRulesPack,
   type ScanInput,
   type ScanResult,
 } from "@xsom/secret-guard-core";
@@ -22,6 +23,8 @@ export interface DispatchDependencies {
   readonly chooseForWarning: (result: ScanResult) => Promise<WarnChoice>;
   readonly transport: (content: string) => Promise<void>;
   readonly scanner?: (input: ScanInput) => ScanResult;
+  /** Verified xSOM rules pack, applied to the scan and to the rescan. */
+  readonly rules?: CompiledRulesPack;
 }
 
 function scannerFailure(content: string): ScanResult {
@@ -52,9 +55,11 @@ export async function dispatchGuarded(
   dependencies: DispatchDependencies,
 ): Promise<DispatchOutcome> {
   const scanner = dependencies.scanner ?? scan;
+  const rules =
+    dependencies.rules === undefined ? {} : { rules: dependencies.rules };
   let initial: ScanResult;
   try {
-    initial = scanner({ content, sourceKind: "prompt" });
+    initial = scanner({ content, sourceKind: "prompt", ...rules });
   } catch {
     initial = scannerFailure(content);
   }
@@ -93,12 +98,22 @@ export async function dispatchGuarded(
     return { initial, final: initial, sent: true, redacted: false };
   }
 
-  const sanitized = redact(content, initial.findings);
-  let final: ScanResult;
-  try {
-    final = scanner({ content: sanitized, sourceKind: "prompt" });
-  } catch {
-    final = scannerFailure(sanitized);
+  const rescan = (text: string): ScanResult => {
+    try {
+      return scanner({ content: text, sourceKind: "prompt", ...rules });
+    } catch {
+      return scannerFailure(text);
+    }
+  };
+  let sanitized = redact(content, initial.findings);
+  let final = rescan(sanitized);
+  if (
+    !(final.complete && final.decision === "ALLOW") &&
+    initial.findings.some((finding) => finding.custom !== undefined)
+  ) {
+    // A tuning label can contain a word the tuning itself detects.
+    sanitized = redact(content, initial.findings, { neutralCustomNames: true });
+    final = rescan(sanitized);
   }
   if (
     !final.complete ||

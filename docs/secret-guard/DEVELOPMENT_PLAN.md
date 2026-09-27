@@ -1,8 +1,8 @@
 # Secret Guard — Plan de développement
 
-**Statut :** roadmap V0 → enterprise ; seuls les éléments de l’état livré ci-dessous sont implémentés
+**Statut :** roadmap historique V0 ; l’exécution Developer Guard est suivie séparément
 
-**Date :** 11 septembre 2026
+**Date :** 23 septembre 2026
 
 **Architecture :** [ARCHITECTURE.md](./ARCHITECTURE.md)
 
@@ -11,6 +11,8 @@
 Après la section « État réellement livré », les listes de composants,
 livrables, tests et critères décrivent la **cible** de chaque phase, sauf mention
 explicite contraire. Elles ne valent pas inventaire de capacités présentes.
+
+La roadmap actuelle Developer Guard, ses lots T00–T14 et leur état vérifiable se trouvent dans [DEVELOPER-GUARD-PLAN.md](./DEVELOPER-GUARD-PLAN.md) et [IMPLEMENTATION-STATUS.md](./IMPLEMENTATION-STATUS.md). En cas de contradiction sur ce nouveau périmètre, ces deux documents priment sur les mentions « futur » de la roadmap V0, sans modifier les invariants de confidentialité et de fermeture par défaut.
 
 ## 0. État réellement livré
 

@@ -28,8 +28,26 @@ def inventory(
             "select d.id,d.platform,d.extension_version,d.mode,d.registered_at,d.last_seen_at,"
             "g.name,g.revoked_at,"
             "(select count(*) from extension_events e "
-            "where e.device_id=d.id and e.source='gateway') "
+            "where e.device_id=d.id and e.source='gateway'),"
+            "p.policy_id,p.version,p.expires_at,p.policy->>'minRunnerVersion',"
+            "posture.received_at,posture.payload,"
+            "case when pack.payload is null then null else jsonb_build_object("
+            "'rules_pack_id',pack.payload->'rules_pack_id',"
+            "'rules_pack_version',pack.payload->'rules_pack_version',"
+            "'rules_pack_digest',pack.payload->'rules_pack_digest',"
+            "'received_at',pack.received_at) end "
             "from extension_devices d join gateway_tokens g on g.id=d.gateway_token_id "
+            "left join developer_policy_assignments a "
+            "on a.tenant_id=d.tenant_id and a.device_id=d.id "
+            "left join developer_policies p "
+            "on p.tenant_id=a.tenant_id and p.policy_id=a.policy_id and p.revoked_at is null "
+            "left join lateral (select e.received_at,e.payload from extension_events e "
+            "where e.device_id=d.id and e.payload->>'kind'='posture' "
+            "order by e.id desc limit 1) posture on true "
+            "left join lateral (select e.received_at,e.payload from extension_events e "
+            "where e.device_id=d.id and e.source='extension' "
+            "and e.payload->>'rules_pack_digest' is not null "
+            "order by e.id desc limit 1) pack on true "
             "order by d.last_seen_at desc limit 500"
         ).fetchall()
     columns = (
@@ -42,6 +60,13 @@ def inventory(
         "name",
         "revoked_at",
         "gateway_events",
+        "assigned_policy_id",
+        "assigned_policy_version",
+        "assigned_policy_expires_at",
+        "minimum_runner_version",
+        "posture_received_at",
+        "posture",
+        "rules_pack",
     )
     return [dict(zip(columns, row, strict=True)) for row in rows]
 

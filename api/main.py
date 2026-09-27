@@ -29,6 +29,8 @@ from api.clients import router as clients_router
 from api.compliance import router as compliance_router
 from api.corpora import router as corpora_router
 from api.credentials import router as credentials_router
+from api.developer_policies import console_router as developer_policies_router
+from api.developer_policies import router as developer_policy_ingest_router
 from api.dlp import router as dlp_router
 from api.entitlement_guard import requires
 from api.errors import register_exception_handlers
@@ -44,7 +46,9 @@ from api.policy import router as policy_router
 from api.promotion import router as promotion_router
 from api.ratelimit import limiter
 from api.read_tokens import router as read_tokens_router
-from api.security import build_federation, build_verifier, get_current_user
+from api.rules_packs import console_router as rules_packs_router
+from api.rules_packs import router as rules_pack_ingest_router
+from api.security import build_federation, build_verifier, get_current_user, is_xsom_operator
 from api.servers import router as servers_router
 from api.shadow_ai import router as shadow_ai_router
 from api.signup import router as signup_router
@@ -113,10 +117,17 @@ _SOCLE: tuple[APIRouter, ...] = (health_router, ops_router)
 #: un module d'`api/` expose un `router` absent d'ici.
 _PLANS: dict[Plane, tuple[APIRouter, ...]] = {
     Plane.DECISION: (authorize_router,),
-    Plane.LLM: (llm_proxy_router, extension_ingest_router),
+    Plane.LLM: (
+        llm_proxy_router,
+        extension_ingest_router,
+        developer_policy_ingest_router,
+        rules_pack_ingest_router,
+    ),
     Plane.CONSOLE: (
         servers_router,
         policy_router,
+        developer_policies_router,
+        rules_packs_router,
         approvals_router,
         audit_router,
         extension_devices_router,
@@ -167,6 +178,13 @@ _CAPACITE_PAR_ROUTEUR: tuple[tuple[APIRouter, Capability | None], ...] = (
     (extension_devices_router, None),  # device evidence uses the same tenant boundary
     (extension_ingest_router, None),  # gateway-token authentication on ingestion
     (policy_router, None),  # sans policy éditable, le produit ne fait rien
+    (developer_policies_router, None),  # policy posture is a security baseline
+    (developer_policy_ingest_router, None),  # gateway-token authentication on workstation fetch
+    # Règles sur mesure : la lecture tenant est une posture de sécurité, et l'écriture
+    # n'est ouverte qu'aux opérateurs xSOM — c'est la prestation qui se vend, pas une
+    # case du palier. Le poste s'authentifie par jeton de passerelle, pas par JWT.
+    (rules_packs_router, None),
+    (rules_pack_ingest_router, None),
     (trust_router, None),  # lecture du capital de confiance, adossée à l'audit
     # --- Ceux qui n'authentifient PAS par JWT, et que ce garde ne peut pas tenir ----
     #
@@ -323,12 +341,15 @@ def create_app(settings: Settings | None = None, *, plane: Plane = Plane.ALL) ->
         return {"status": "ok"}
 
     @app.get("/v1/me", tags=["auth"])
-    async def me(user: CurrentUser = Depends(get_current_user)) -> dict[str, str | None]:
+    async def me(
+        request: Request, user: CurrentUser = Depends(get_current_user)
+    ) -> dict[str, str | bool | None]:
         """Return the authenticated principal (protected route, requires JWT)."""
         return {
             "user_id": user.user_id,
             "tenant_id": user.tenant_id,
             "role": user.role.value if user.role else None,
+            "xsom_operator": is_xsom_operator(request.app.state.settings, user),
         }
 
     for router in routers_for(plane):

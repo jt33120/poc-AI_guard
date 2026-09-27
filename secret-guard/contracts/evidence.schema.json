@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xsom.fr/contracts/developer-guard/evidence/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "kind", "assistant", "outcome", "occurredAt"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "kind": { "enum": ["hook", "policy", "posture", "approval"] },
+    "assistant": { "enum": ["claude", "codex", "copilot", "unknown"] },
+    "outcome": {
+      "enum": ["allowed", "denied", "approval_required", "unverified", "failed"]
+    },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "policyId": { "type": "string", "maxLength": 128 },
+    "policyVersion": { "type": "integer", "minimum": 1 },
+    "ruleIds": {
+      "type": "array",
+      "items": { "type": "string", "maxLength": 128 },
+      "maxItems": 20
+    },
+    "detail": { "type": "string", "maxLength": 240 }
+  }
+}

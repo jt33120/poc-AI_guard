@@ -31,7 +31,12 @@ def test_protected_route_accepts_valid_token(
     token = make_token(sub=user_id, tenant_id=tenant_id, role="admin")
     response = auth_client.get("/v1/me", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
-    assert response.json() == {"user_id": user_id, "tenant_id": tenant_id, "role": "admin"}
+    assert response.json() == {
+        "user_id": user_id,
+        "tenant_id": tenant_id,
+        "role": "admin",
+        "xsom_operator": False,
+    }
 
 
 def test_expired_token_rejected(auth_client: TestClient, make_token: Callable[..., str]) -> None:

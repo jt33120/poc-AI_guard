@@ -120,9 +120,12 @@ class Sentinel:
     name: str  # policy / column / trigger name
 
 
-#: The 14 files shipped before the ledger existed (0012 is a grandfathered gap),
-#: in application order. Adoption walks this list and stops at the first absent
-#: sentinel; anything present after that gap is a state we refuse to explain.
+#: Files that can already exist on a manually provisioned, pre-ledger database
+#: and cannot safely be replayed (0012 is a grandfathered gap). 0034--0036 were
+#: initially deployed through the same manual path and create objects without a
+#: complete ``if not exists`` guard, so adoption must prove and record them too.
+#: Adoption walks this list and stops at the first absent sentinel; anything
+#: present after that gap is a state we refuse to explain.
 _BASELINE: tuple[Sentinel, ...] = (
     Sentinel("0001_init_tenancy.sql", "policy", "gateway_tokens", "gateway_tokens_select_own"),
     Sentinel(
@@ -149,6 +152,24 @@ _BASELINE: tuple[Sentinel, ...] = (
     ),
     Sentinel(
         "0015_tool_fingerprints_last_fp.sql", "column", "tool_fingerprints", "last_fingerprint"
+    ),
+    Sentinel(
+        "0034_extension_devices.sql",
+        "trigger",
+        "extension_events",
+        "extension_events_no_truncate",
+    ),
+    Sentinel(
+        "0035_developer_policies.sql",
+        "policy",
+        "developer_policy_assignments",
+        "developer_policy_assignments_read",
+    ),
+    Sentinel(
+        "0036_developer_approvals.sql",
+        "column",
+        "approvals",
+        "developer_action_binding",
     ),
 )
 

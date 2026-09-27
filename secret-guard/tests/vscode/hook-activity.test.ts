@@ -10,6 +10,7 @@ import {
   ActivityMonitor,
   beginActivity,
   QUIET_ACTIVITY_ENV,
+  readLastHookAt,
   runningChecks,
 } from "../../packages/vscode/src/hook-activity.js";
 
@@ -38,6 +39,13 @@ async function until(condition: () => boolean, timeoutMs = 4_000) {
 }
 
 describe("hook activity markers", () => {
+  it("records only a timestamp for posture freshness", () => {
+    const folder = storage();
+    const done = beginActivity(folder);
+    expect(readLastHookAt(folder)).toBeTypeOf("number");
+    done();
+  });
+
   it("marks a running check and clears it when done", () => {
     const folder = storage();
     const done = beginActivity(folder);

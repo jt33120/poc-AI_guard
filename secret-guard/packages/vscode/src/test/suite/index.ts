@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import process from "node:process";
 
 import Mocha from "mocha";
@@ -34,6 +35,10 @@ function registerTests(mocha: Mocha): void {
         "secretGuard.finishCodexSetup",
         "secretGuard.disableHook",
         "secretGuard.copyRedacted",
+        "secretGuard.requestRulesPack",
+        "secretGuard.importRulesPack",
+        "secretGuard.rulesPackStatus",
+        "secretGuard.setObserveDuration",
       ]) {
         assert.ok(commands.has(command), `${command} is registered`);
       }
@@ -67,6 +72,98 @@ function registerTests(mocha: Mocha): void {
 
   extensionSuite.addTest(
     new Mocha.Test(
+      "changes the Avertir length from the panel, never beyond eight hours",
+      async () => {
+        const home = process.env.XSOM_VSCODE_TEST_HOME;
+        assert.ok(home, "isolated test home is configured");
+        const deadlineFile = join(
+          home,
+          "user",
+          "User",
+          "globalStorage",
+          "xsom.xsom-secret-guard-vscode",
+          "observe-until",
+        );
+        const config = (): vscode.WorkspaceConfiguration =>
+          vscode.workspace.getConfiguration("secretGuard");
+        const remainingMinutes = async (
+          accept: (minutes: number) => boolean,
+        ): Promise<number> => {
+          // The window is written by the configuration listener, after the
+          // command or update returns: wait for the expected length.
+          for (let attempt = 0; attempt < 50; attempt += 1) {
+            try {
+              const deadline = Number(
+                (await readFile(deadlineFile, "utf8")).trim(),
+              );
+              const minutes = (deadline - Date.now()) / 60_000;
+              if (accept(minutes)) return minutes;
+            } catch {
+              // Not written yet.
+            }
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
+          throw new Error(
+            "the Avertir window never reached the expected length",
+          );
+        };
+        const near = (target: number) => (minutes: number) =>
+          minutes > target - 1 && minutes <= target;
+
+        // Avertir asks for its length in a modal; the setting stands in here.
+        await config().update(
+          "mode",
+          "observe",
+          vscode.ConfigurationTarget.Global,
+        );
+        await remainingMinutes(near(60));
+        await vscode.commands.executeCommand(
+          "secretGuard.setObserveDuration",
+          15,
+        );
+        await remainingMinutes(near(15));
+        await vscode.commands.executeCommand(
+          "secretGuard.setObserveDuration",
+          240,
+        );
+        await remainingMinutes(near(240));
+        // A night's work.
+        await vscode.commands.executeCommand(
+          "secretGuard.setObserveDuration",
+          480,
+        );
+        await remainingMinutes(near(480));
+        // Not one of the panel's choices: nothing changes.
+        await vscode.commands.executeCommand(
+          "secretGuard.setObserveDuration",
+          1440,
+        );
+        await vscode.commands.executeCommand(
+          "secretGuard.setObserveDuration",
+          "60",
+        );
+        await remainingMinutes(near(480));
+
+        await config().update(
+          "mode",
+          undefined,
+          vscode.ConfigurationTarget.Global,
+        );
+        for (let attempt = 0; attempt < 50; attempt += 1) {
+          try {
+            await readFile(deadlineFile, "utf8");
+          } catch {
+            return;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        throw new Error("leaving Avertir must close its window");
+      },
+    ),
+  );
+
+  extensionSuite.addTest(
+    new Mocha.Test(
       "purges the clipboard in place and leaves a clean one untouched",
       async () => {
         // Assembled at run time so the dogfood scan of this file stays clean.
@@ -91,6 +188,98 @@ function registerTests(mocha: Mocha): void {
           await vscode.env.clipboard.readText(),
           `deploy with ${canary}`,
         );
+      },
+    ),
+  );
+
+  extensionSuite.addTest(
+    new Mocha.Test(
+      "applies a verified xSOM tuning to its own scans and shows it",
+      async () => {
+        const extension = vscode.extensions.getExtension(
+          "xsom.xsom-secret-guard-vscode",
+        );
+        assert.ok(extension);
+        const home = process.env.XSOM_VSCODE_TEST_HOME;
+        assert.ok(home, "isolated test home is configured");
+        const storage = join(
+          home,
+          "user",
+          "User",
+          "globalStorage",
+          "xsom.xsom-secret-guard-vscode",
+        );
+        type Status = { state: string; line: string; packId?: string };
+        const status = async (): Promise<Status> =>
+          (await vscode.commands.executeCommand(
+            "secretGuard.rulesPackStatus",
+          )) as Status;
+
+        assert.deepEqual(await status(), {
+          state: "none",
+          line: "Aucun réglage sur mesure",
+        });
+
+        // The contract's signed reference pack, trusted by this TEST build
+        // only, stored as a synchronisation would store it.
+        const vectors = JSON.parse(
+          await readFile(
+            join(
+              extension.extensionPath,
+              "..",
+              "..",
+              "contracts",
+              "fixtures",
+              "rules-pack-vectors.json",
+            ),
+            "utf8",
+          ),
+        ) as { signature: { envelope: unknown } };
+        await mkdir(storage, { recursive: true });
+        await writeFile(
+          join(storage, "rules-pack.json"),
+          JSON.stringify(vectors.signature.envelope),
+        );
+        await writeFile(
+          join(storage, "rules-pack-state.json"),
+          JSON.stringify({
+            schemaVersion: 1,
+            tenantId: "00000000-0000-4000-8000-000000000001",
+            tenantSource: "register",
+            highest: {},
+          }),
+        );
+        try {
+          const active = await status();
+          assert.equal(active.state, "active");
+          assert.equal(active.packId, "acme-main");
+          assert.match(active.line, /^Réglage xSOM · v3 · 3 règles · /u);
+
+          // Expurger masks the custom finding with the detector label.
+          const customer = ["CLI", "00421337"].join("-");
+          await vscode.env.clipboard.writeText(`Le client ${customer}.`);
+          await vscode.commands.executeCommand("secretGuard.purgeClipboard");
+          assert.equal(
+            await vscode.env.clipboard.readText(),
+            "Le client <REDACTED_Identifiant_client_ACME>.",
+          );
+
+          // A pack edited on disk is refused; built-in rules stay.
+          await writeFile(
+            join(storage, "rules-pack.json"),
+            JSON.stringify({
+              ...(vectors.signature.envelope as object),
+              signature: "A".repeat(86) + "==",
+            }),
+          );
+          const refused = await status();
+          assert.equal(refused.state, "rejected");
+          assert.equal(refused.line, "Réglage refusé : signature invalide");
+        } finally {
+          await rm(join(storage, "rules-pack.json"), { force: true });
+          await rm(join(storage, "rules-pack-state.json"), { force: true });
+        }
+        assert.equal((await status()).state, "none");
       },
     ),
   );

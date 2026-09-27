@@ -1,10 +1,10 @@
 # Secret Guard — Architecture de référence
 
-**Statut :** photographie de l’implémentation V0.2 livrée et trajectoire future
+**Statut :** architecture historique Secret Guard V0.2, complétée par le socle Developer Guard validé localement
 
 **Référence :** SG-ADR-001
 
-**Date de vérification des API :** 11 septembre 2026
+**Date de vérification des API :** 23 septembre 2026
 
 **Cible V0.2 :** VS Code 1.136 ou plus récent ; Node.js 22.13 ou plus récent pour le workspace et le CLI autonome
 
@@ -12,6 +12,12 @@ Les paragraphes marqués **Futur** décrivent une direction et non une capacité
 livrée. Les intégrations utilisateur sont testées au niveau de leur contrat de
 processus ; elles ne constituent pas une attestation d’exécution hôte ni un
 déploiement administrateur non contournable.
+
+## Mise à jour Developer Guard
+
+Le périmètre approuvé est défini par [DEVELOPER-GUARD-PLAN.md](./DEVELOPER-GUARD-PLAN.md). Le dépôt contient désormais des contrats JSON stricts, un évaluateur déterministe TypeScript/Python, des adaptateurs d’hôtes, un runner de ressources/commandes/MCP, des politiques Ed25519 liées au tenant, des approbations liées à l’action et au poste, une posture sans contenu et une console d’administration. Ces briques sont validées localement ; elles ne constituent pas une preuve d’interception réelle par Claude Code ou Codex.
+
+Les invariants V0 restent applicables : aucune valeur détectée dans l’audit, aucune permission déduite d’une simple configuration, aucune garantie universelle de l’extension sur le système. Le profil renforcé Linux ajoute une frontière système distincte ; les profils macOS et Windows de ce dépôt sont des profils administrés, pas des sandboxes qualifiées.
 
 ## 1. Décision
 
@@ -438,7 +444,7 @@ croissance et ne constitue ni une campagne coverage-guided ni une preuve génér
 d’absence de comportement superlinéaire. Toute extension du catalogue doit
 ajouter des cas et budgets ciblés avant release.
 
-Avant d’accepter des règles personnalisées, la Phase 1 benchmarke [google/re2-wasm](https://github.com/google/re2-wasm), sous licence Apache-2.0. RE2 refuse les constructions de backtracking problématiques, mais impose un binaire Wasm, un coût d’initialisation, un SBOM/checksum et ne prend pas en charge lookahead/backreferences. La décision d’embarquer RE2-Wasm doit être consignée dans un ADR avec mesures. En attendant, **aucune regex dynamique n’est autorisée**.
+**Mise à jour 0.7.0 — réglages sur mesure xSOM.** Les seuls motifs chargés à l’exécution sont ceux d’un réglage signé par xSOM (contrat `secret-guard/contracts/RULES-PACK.md`). Ils appartiennent à un sous-ensemble sûr (ASCII imprimable, quantificateurs bornés à 64, pas de répétition imbriquée, longueur de correspondance ≤ 256, ancre littérale ou contexte obligatoire). Ils ne sont **pas** exécutés par `RegExp` : V8 ne sait pas interrompre une expression, et un motif valide mais pathologique pourrait bloquer l’hôte. Un interpréteur à retour arrière compté reproduit la sémantique ECMAScript (test différentiel contre la RegExp compilée, sans drapeau `u`, `\d \w \s` développés en classes ASCII) sous un budget de travail déterministe ; un budget dépassé bloque (« analyse incomplète »). RE2-Wasm n’est donc pas nécessaire. Aucune regex fournie par un projet ou un utilisateur n’est exécutée.
 
 ## 7. Risk engine
 
@@ -682,6 +688,8 @@ terrain de précision/rappel. Un corpus dédupliqué, indépendant et annoté re
 gate avant GA ou enterprise.
 
 ## 12. Rulesets et compatibilité
+
+**Mise à jour 0.7.0.** Les règles intégrées restent compilées dans l’extension (`RULESET_VERSION`). S’y ajoute au plus un **réglage sur mesure** par organisation, composé et signé par xSOM (Ed25519), distribué par la plateforme (`GET /v1/extension/rules-pack`) et vérifié hors ligne sur le poste : clés d’autorité compilées dans la build (jamais celle de l’enveloppe), tenant enrôlé, version jamais inférieure à la plus haute acceptée, validité et auto-tests du paquet. Il n’ajoute que des détections ; refusé ou absent, les règles intégrées restent seules. Le hook revérifie le fichier stocké à chaque appel. Le paragraphe suivant décrit l’état V0 antérieur.
 
 Le V0 embarque directement les règles TypeScript et expose la constante de version
 `2026-09-11.v0`. Il ne charge aucun ruleset externe, ne valide pas de checksum ou

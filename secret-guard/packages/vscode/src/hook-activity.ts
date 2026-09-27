@@ -15,6 +15,7 @@ import process from "node:process";
 // to show that a check is running. Markers carry no content, path or verdict.
 export const ACTIVITY_FOLDER = "activity";
 export const QUIET_ACTIVITY_ENV = "XSOM_SECRET_GUARD_QUIET";
+export const LAST_HOOK_FILE = "last-hook-at";
 
 // Past the host's 30 s hook timeout, a marker belongs to a killed process.
 const STALE_AFTER_MS = 35_000;
@@ -29,6 +30,9 @@ export function beginActivity(storage: string): () => void {
   const marker = join(folder, `${String(process.pid)}.busy`);
   try {
     mkdirSync(folder, { recursive: true });
+    writeFileSync(join(storage, LAST_HOOK_FILE), new Date().toISOString(), {
+      mode: 0o600,
+    });
     writeFileSync(marker, "");
   } catch {
     // The indicator is cosmetic: it never affects the verdict.
@@ -41,6 +45,15 @@ export function beginActivity(storage: string): () => void {
       // Left behind, the marker expires as stale.
     }
   };
+}
+
+export function readLastHookAt(storage: string): number | undefined {
+  try {
+    const value = statSync(join(storage, LAST_HOOK_FILE)).mtimeMs;
+    return Number.isFinite(value) ? value : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function runningChecks(storage: string, now = Date.now()): number {
@@ -82,10 +95,12 @@ export class ActivityMonitor {
       watcher = undefined;
     }
     this.watcher = watcher;
-    // Watch events can be dropped; a slow poll ends a stuck indicator.
+    // Watch events can be dropped; polling must also discover the first marker,
+    // otherwise a dropped create event leaves the status bar falsely idle.
     this.recheck = setInterval(() => {
-      if (this.busy) this.update();
+      this.update();
     }, RECHECK_MS);
+    this.update();
   }
 
   private update(): void {

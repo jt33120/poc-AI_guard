@@ -22,7 +22,7 @@ Pour chaque menace, confronter la parade proposée au périmètre produit : cont
 
 - Catégorie : prompt
 - Parade de référence : Provenance, assainissement à l’ingestion, zones de confiance, ACL sur la recherche.
-- Outils libres à évaluer : Promptfoo, Filtres RAG sur mesure, Custom RAG filters
+- Outils libres à évaluer : Promptfoo, Filtres RAG sur mesure
 
 ## Jailbreak `jailbreak`
 
@@ -40,13 +40,13 @@ Pour chaque menace, confronter la parade proposée au périmètre produit : cont
 
 - Catégorie : prompt
 - Parade de référence : Hiérarchie des instructions et segmentation du contexte.
-- Outils libres à évaluer : Guardrails, Moteur de policy maison, Custom policy engine
+- Outils libres à évaluer : Guardrails, Moteur de policy maison
 
 ## Attaques par encodage et obfuscation `obfuscation`
 
 - Catégorie : prompt
 - Parade de référence : Canoniser et normaliser les entrées ; décoder avant d’analyser.
-- Outils libres à évaluer : PyRIT, Promptfoo, Bibliothèques de sécurité Unicode, Unicode security libraries
+- Outils libres à évaluer : PyRIT, Promptfoo, Bibliothèques de sécurité Unicode
 
 ## Jailbreak multilingue `jailbreak-multilingue`
 
@@ -58,13 +58,13 @@ Pour chaque menace, confronter la parade proposée au périmètre produit : cont
 
 - Catégorie : prompt
 - Parade de référence : Séparer perception et exécution ; OCR et inspection du contenu ; pas d’usage autonome des outils.
-- Outils libres à évaluer : Outils de recherche, Research tooling, Red teaming multimodal, Multimodal red teaming
+- Outils libres à évaluer : Outils de recherche, Red teaming multimodal
 
 ## Autonomie excessive `autonomie-excessive`
 
 - Catégorie : agents
 - Parade de référence : Moindre privilège, portées par outil, approbation humaine, bac à sable.
-- Outils libres à évaluer : Open Policy Agent (OPA)
+- Outils libres à évaluer : Open Policy Agent (OPA), Conteneurs
 
 ## Injection d’appels d’outils `injection-appel-outil`
 
@@ -76,55 +76,55 @@ Pour chaque menace, confronter la parade proposée au périmètre produit : cont
 
 - Catégorie : agents
 - Parade de référence : Lier l’autorisation à l’utilisateur, pas au modèle ; jetons de capacité.
-- Outils libres à évaluer : OPA, Portées OAuth, OAuth scopes
+- Outils libres à évaluer : OPA, Portées OAuth
 
 ## Élévation de privilèges d’un agent `escalade-privileges-agent`
 
 - Catégorie : agents
 - Parade de référence : RBAC ou ABAC, bac à sable, comptes de service distincts.
-- Outils libres à évaluer : OPA, SELinux, AppArmor
+- Outils libres à évaluer : OPA, SELinux, AppArmor, Conteneurs
 
 ## Transactions non autorisées `transactions-non-autorisees`
 
 - Catégorie : agents
 - Parade de référence : Approbation humaine des opérations lourdes de conséquences ; plafonds de transaction.
-- Outils libres à évaluer : Moteurs de workflow, Workflow engines, OPA
+- Outils libres à évaluer : Moteurs de workflow, OPA
 
 ## Boucle d’agent incontrôlée `boucle-agent`
 
 - Catégorie : agents
 - Parade de référence : Nombre maximal d’étapes, budgets d’exécution, délais, coupe-circuits.
-- Outils libres à évaluer : Contrôles applicatifs, Application controls
+- Outils libres à évaluer : Contrôles applicatifs
 
 ## Injection entre agents `injection-inter-agents`
 
 - Catégorie : agents
 - Parade de référence : Authentifier les messages entre agents ; protocoles structurés ; séparation des niveaux de confiance.
-- Outils libres à évaluer : OPA, Validation sur mesure, Custom validation
+- Outils libres à évaluer : OPA, Validation sur mesure
 
 ## Mémoire d’agent empoisonnée `memoire-empoisonnee`
 
 - Catégorie : agents
 - Parade de référence : Provenance, autorisation d’écriture, expiration, journaux immuables.
-- Outils libres à évaluer : ACL de base vectorielle, Vector DB ACLs, Contrôles sur mesure, Custom controls
+- Outils libres à évaluer : ACL de base vectorielle, Contrôles sur mesure
 
 ## Outil piégé (tool poisoning, rug pull) `outil-piege`
 
 - Catégorie : agents
 - Parade de référence : Épingler et relire les définitions d’outils ; détecter leurs changements ; liste blanche de serveurs.
-- Outils libres à évaluer : mcp-scan, Épinglage des outils, Tool pinning
+- Outils libres à évaluer : mcp-scan, Épinglage des outils
 
 ## Agent sous identité humaine `identite-empruntee`
 
 - Catégorie : agents
 - Parade de référence : Identités propres aux agents, accès de courte durée, journaux attribués.
-- Outils libres à évaluer : SPIFFE/SPIRE, Comptes de service dédiés, Dedicated service accounts
+- Outils libres à évaluer : SPIFFE/SPIRE, Comptes de service dédiés
 
 ## Délégation en cascade entre agents `delegation-en-cascade`
 
 - Catégorie : agents
 - Parade de référence : Propager le mandat d’origine et le vérifier à chaque étape.
-- Outils libres à évaluer : OPA, Échange de jetons OAuth, OAuth token exchange
+- Outils libres à évaluer : OPA, Échange de jetons OAuth
 
 ## Empoisonnement du RAG `empoisonnement-rag`
 
@@ -142,25 +142,25 @@ Pour chaque menace, confronter la parade proposée au périmètre produit : cont
 
 - Catégorie : rag
 - Parade de référence : Limiter les embeddings sensibles ; chiffrement et contrôle d’accès.
-- Outils libres à évaluer : Chiffrement et contrôle d’accès standard, Standard crypto and access control
+- Outils libres à évaluer : Chiffrement et contrôle d’accès standard
 
 ## Accès indu aux documents du RAG `acces-rag`
 
 - Catégorie : rag
 - Parade de référence : Autorisation avant la recherche ; ACL par document.
-- Outils libres à évaluer : OPA, ACL de base vectorielle, Vector-store ACLs
+- Outils libres à évaluer : OPA, ACL de base vectorielle
 
 ## Fuite entre clients dans le RAG `fuite-inter-clients-rag`
 
 - Catégorie : rag
 - Parade de référence : Cloisonnement strict des espaces de noms et authentification liée au client.
-- Outils libres à évaluer : ACL de base de données et vectorielle, Database and vector DB ACLs
+- Outils libres à évaluer : ACL de base de données et vectorielle
 
 ## Empoisonnement des données d’entraînement `empoisonnement`
 
 - Catégorie : model
 - Parade de référence : Provenance des jeux de données, assainissement, détection d’anomalies, écriture restreinte.
-- Outils libres à évaluer : Frameworks de validation de données, Data validation frameworks, ART
+- Outils libres à évaluer : Frameworks de validation de données, ART
 
 ## Empoisonnement du fine-tuning `empoisonnement-fine-tuning`
 
@@ -168,17 +168,17 @@ Pour chaque menace, confronter la parade proposée au périmètre produit : cont
 - Parade de référence : Jeux de données de confiance, tests différentiels, évaluation du modèle.
 - Outils libres à évaluer : garak, Giskard, ART
 
-##  `modele-piege`
+## Modèle piégé (backdoor) `modele-piege`
 
 - Catégorie : model
-- Parade de référence : À qualifier
+- Parade de référence : Provenance du modèle, analyse, tests comportementaux.
 - Outils libres à évaluer : ModelScan, Fickling, garak
 
 ## Altération du modèle avant déploiement `alteration-source-modele`
 
 - Catégorie : model
 - Parade de référence : Empreintes, signatures, chaînes de build reproductibles.
-- Outils libres à évaluer : Sigstore/cosign, Signature Git, Git signing
+- Outils libres à évaluer : Sigstore/cosign, Signature Git
 
 ## Modèle sérialisé malveillant `modele-serialise-malveillant`
 
@@ -190,13 +190,13 @@ Pour chaque menace, confronter la parade proposée au périmètre produit : cont
 
 - Catégorie : model
 - Parade de référence : IAM, chiffrement, isolement réseau, journalisation.
-- Outils libres à évaluer : Pile IAM et sécurité open source, Open-source IAM and security stack
+- Outils libres à évaluer : Pile IAM et sécurité open source
 
 ## Extraction de modèle par l’API `extraction-par-api`
 
 - Catégorie : model
 - Parade de référence : Limites de débit, contrôle des sorties, détection, recherche sur le tatouage.
-- Outils libres à évaluer : Passerelles d’API, API gateways, Limitation de débit, Rate limiting
+- Outils libres à évaluer : Passerelles d’API, Limitation de débit
 
 ## Inversion de modèle `inversion-de-modele`
 
@@ -238,7 +238,7 @@ Pour chaque menace, confronter la parade proposée au périmètre produit : cont
 
 - Catégorie : output
 - Parade de référence : Traiter la sortie du modèle comme une entrée non fiable ; paramétrer ; encoder et valider.
-- Outils libres à évaluer : Semgrep, Bibliothèques OWASP, OWASP libraries
+- Outils libres à évaluer : Semgrep, Bibliothèques OWASP
 
 ## Code généré vulnérable `code-vulnerable`
 
@@ -250,13 +250,13 @@ Pour chaque menace, confronter la parade proposée au périmètre produit : cont
 
 - Catégorie : output
 - Parade de référence : Requêtes paramétrées et interface de requête restreinte.
-- Outils libres à évaluer : SQLAlchemy, Droits de base de données, Database permissions
+- Outils libres à évaluer : SQLAlchemy, Droits de base de données
 
 ## Injection de commande `injection-de-commande`
 
 - Catégorie : output
 - Parade de référence : Éviter le shell ; API en liste blanche ; bac à sable.
-- Outils libres à évaluer : seccomp
+- Outils libres à évaluer : seccomp, Conteneurs
 
 ## XSS par contenu généré `xss-contenu-genere`
 
@@ -268,13 +268,13 @@ Pour chaque menace, confronter la parade proposée au périmètre produit : cont
 
 - Catégorie : output
 - Parade de référence : Liste blanche de sortie, isolement réseau, validation des URL.
-- Outils libres à évaluer : Pare-feu et proxys, Firewalls and proxies, OPA
+- Outils libres à évaluer : Pare-feu et proxys, OPA
 
 ## Traversée de répertoire `traversee-de-chemin`
 
 - Catégorie : output
 - Parade de référence : Canonisation des chemins et répertoires cloisonnés.
-- Outils libres à évaluer : Codage sécurisé standard, Standard secure coding
+- Outils libres à évaluer : Codage sécurisé standard
 
 ## Divulgation d’informations sensibles `fuite-de-donnees`
 
@@ -286,7 +286,7 @@ Pour chaque menace, confronter la parade proposée au périmètre produit : cont
 
 - Catégorie : privacy
 - Parade de référence : Masquage, journalisation restreinte, chiffrement.
-- Outils libres à évaluer : Presidio, Filtres OpenTelemetry, OpenTelemetry filters
+- Outils libres à évaluer : Presidio, Filtres OpenTelemetry
 
 ## Fuite de secrets `fuite-de-secrets`
 
@@ -304,7 +304,7 @@ Pour chaque menace, confronter la parade proposée au périmètre produit : cont
 
 - Catégorie : privacy
 - Parade de référence : Minimisation des données, sorties restreintes, tests de confidentialité.
-- Outils libres à évaluer : ART, Outils de confidentialité, Privacy tooling
+- Outils libres à évaluer : ART, Outils de confidentialité
 
 ## Dépôt de modèles compromis `depot-de-modeles-compromis`
 
@@ -322,13 +322,13 @@ Pour chaque menace, confronter la parade proposée au périmètre produit : cont
 
 - Catégorie : supply
 - Parade de référence : Registre interne, contrôle des espaces de noms, fichiers de verrouillage.
-- Outils libres à évaluer : Contrôles pip et npm, pip and npm controls, Analyseurs de dépendances, Dependency scanners
+- Outils libres à évaluer : Contrôles pip et npm, Analyseurs de dépendances
 
 ## Framework d’entraînement compromis `framework-compromis`
 
 - Catégorie : supply
 - Parade de référence : Builds de confiance, empreintes, SBOM, artefacts signés.
-- Outils libres à évaluer : Sigstore, Outillage SLSA, SLSA tooling
+- Outils libres à évaluer : Sigstore, Outillage SLSA
 
 ## Format de modèle dangereux `format-de-modele-dangereux`
 
@@ -340,7 +340,7 @@ Pour chaque menace, confronter la parade proposée au périmètre produit : cont
 
 - Catégorie : infra
 - Parade de référence : Identité de charge de travail, identifiants de courte durée, coffre à secrets.
-- Outils libres à évaluer : OpenBao / Vault, Outillage des secrets Kubernetes, Kubernetes secrets tooling
+- Outils libres à évaluer : OpenBao / Vault, Outillage des secrets Kubernetes
 
 ## Vol de clé d’API IA `vol-cle-api-ia`
 
@@ -364,7 +364,7 @@ Pour chaque menace, confronter la parade proposée au périmètre produit : cont
 
 - Catégorie : infra
 - Parade de référence : Authentification, isolement réseau, bac à sable par utilisateur.
-- Outils libres à évaluer : JupyterHub
+- Outils libres à évaluer : JupyterHub, Conteneurs
 
 ## Déni de service du modèle `deni-de-service-modele`
 
@@ -376,13 +376,13 @@ Pour chaque menace, confronter la parade proposée au périmètre produit : cont
 
 - Catégorie : availability
 - Parade de référence : Budgets et limites par utilisateur ; alertes de dépense.
-- Outils libres à évaluer : Passerelles d’API, API gateways, Suivi de facturation, Billing monitors
+- Outils libres à évaluer : Passerelles d’API, Suivi de facturation
 
 ## Attaques par complexité algorithmique `complexite-algorithmique`
 
 - Catégorie : availability
 - Parade de référence : Plafonds de jetons et de taille d’entrée, délais.
-- Outils libres à évaluer : Contrôles de passerelle standard, Standard gateway controls
+- Outils libres à évaluer : Contrôles de passerelle standard
 
 ## Épuisement des ressources GPU `epuisement-gpu`
 
@@ -394,19 +394,19 @@ Pour chaque menace, confronter la parade proposée au périmètre produit : cont
 
 - Catégorie : integrity
 - Parade de référence : Ancrage dans des sources, recherche, vérification, approbation avant d’agir.
-- Outils libres à évaluer : Giskard, Frameworks d’évaluation, Eval frameworks
+- Outils libres à évaluer : Giskard, Frameworks d’évaluation
 
 ## Fausses citations `fausses-citations`
 
 - Catégorie : integrity
 - Parade de référence : Résoudre et vérifier les sources citées par programme.
-- Outils libres à évaluer : Validateurs sur mesure, Custom validators
+- Outils libres à évaluer : Validateurs sur mesure
 
 ## Manipulation de la base de connaissances `manipulation-base-de-connaissances`
 
 - Catégorie : integrity
 - Parade de référence : Données signées, provenance, pondération des sources.
-- Outils libres à évaluer : Sigstore, Contrôles sur mesure, Custom controls
+- Outils libres à évaluer : Sigstore, Contrôles sur mesure
 
 ## Phishing augmenté par l’IA `phishing-augmente`
 
@@ -424,7 +424,7 @@ Pour chaque menace, confronter la parade proposée au périmètre produit : cont
 
 - Catégorie : human
 - Parade de référence : Ne jamais accepter une voix seule comme authentification.
-- Outils libres à évaluer : MFA standard, Standard MFA
+- Outils libres à évaluer : MFA standard
 
 ## Malware généré par IA `malware-genere`
 
@@ -442,7 +442,7 @@ Pour chaque menace, confronter la parade proposée au périmètre produit : cont
 
 - Catégorie : governance
 - Parade de référence : Inventaire des applications, contrôles sur les postes, services approuvés.
-- Outils libres à évaluer : Surveillance DNS et proxy, DNS and proxy monitoring, DLP
+- Outils libres à évaluer : Surveillance DNS et proxy, DLP
 
 ## Provenance de modèle inconnue `provenance-modele-inconnue`
 

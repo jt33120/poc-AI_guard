@@ -1,10 +1,26 @@
 import { randomUUID } from "node:crypto";
+import type { PostureReason } from "@xsom/developer-guard-runner";
+
+export type AuditPostureReason =
+  | PostureReason
+  | "config_invalid"
+  | "hook_modified"
+  | "canary_failed"
+  | "rules_pack_rejected"
+  | "rules_pack_expired";
 
 export type AuditEvent = {
   event_id: string;
   at: string;
   kind:
-    "scan" | "mode_changed" | "local_test" | "gateway_configured" | "heartbeat";
+    | "scan"
+    | "mode_changed"
+    | "local_test"
+    | "gateway_configured"
+    | "policy_synced"
+    | "posture"
+    | "heartbeat"
+    | "rules_pack_synced";
   assistant: "manual" | "secretguard" | "claude" | "codex" | "copilot";
   mode: "block" | "redact" | "observe";
   outcome:
@@ -14,10 +30,66 @@ export type AuditEvent = {
     | "warned"
     | "passed"
     | "failed"
-    | "configured";
+    | "configured"
+    | "unverified";
   findings: number;
   dropped: number;
+  posture_reasons?: readonly AuditPostureReason[];
+  policy_id?: string;
+  policy_version?: number;
+  runner_version?: string;
+  queue_pending?: number;
+  // xSOM custom tuning (contract RULES-PACK.md §7): identity and counts only.
+  rules_pack_id?: string;
+  rules_pack_version?: number;
+  rules_pack_digest?: string;
+  custom_findings?: number;
+  custom_detector_ids?: readonly string[];
 };
+
+type PendingEvent = Omit<AuditEvent, "event_id" | "at" | "dropped">;
+
+/**
+ * The event as this platform can ingest it. Its model forbids unknown
+ * fields: until the platform has shown it serves the xSOM tuning (contract
+ * §7), the tuning fields are left out and `rules_pack_synced` is not sent,
+ * so that one new field never makes a whole audit batch refused.
+ */
+export function platformCompatibleEvent(
+  event: PendingEvent,
+  platformServesRulesPack: boolean,
+): PendingEvent | undefined {
+  if (platformServesRulesPack) return event;
+  if (event.kind === "rules_pack_synced") return undefined;
+  const legacy: PendingEvent = { ...event };
+  delete legacy.rules_pack_id;
+  delete legacy.rules_pack_version;
+  delete legacy.rules_pack_digest;
+  delete legacy.custom_findings;
+  delete legacy.custom_detector_ids;
+  if (legacy.posture_reasons === undefined) return legacy;
+  return {
+    ...legacy,
+    posture_reasons: legacy.posture_reasons.filter(
+      (reason) =>
+        reason !== "rules_pack_rejected" && reason !== "rules_pack_expired",
+    ),
+  };
+}
+
+/** Custom-finding fields of a scan event: at most 20 unique detector ids. */
+export function customFindingFields(
+  findings: readonly { readonly custom?: { readonly detectorId: string } }[],
+): Pick<AuditEvent, "custom_findings" | "custom_detector_ids"> {
+  const custom = findings.flatMap((finding) =>
+    finding.custom === undefined ? [] : [finding.custom.detectorId],
+  );
+  if (custom.length === 0) return {};
+  return {
+    custom_findings: Math.min(custom.length, 10_000),
+    custom_detector_ids: [...new Set(custom)].slice(0, 20),
+  };
+}
 
 export function gatewayUrl(value: string): string {
   const url = new URL(value);
@@ -68,6 +140,24 @@ export async function gatewayJson(
     reader.releaseLock();
   }
   return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
+}
+
+export async function gatewayGetJson(
+  base: string,
+  token: string,
+  path: string,
+): Promise<unknown> {
+  const response = await fetch(`${gatewayUrl(base)}${path}`, {
+    method: "GET",
+    redirect: "error",
+    signal: AbortSignal.timeout(10000),
+    headers: { "X-Gateway-Token": token },
+  });
+  if (response.status === 404) return undefined;
+  if (!response.ok) throw new Error(`gateway_http_${response.status}`);
+  const content = await response.text();
+  if (content.length > 64000) throw new Error("gateway_response_too_large");
+  return JSON.parse(content) as unknown;
 }
 
 export interface QueueState {

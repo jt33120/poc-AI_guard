@@ -68,6 +68,7 @@ export function renderPosixCommand(
   executable: string,
   hookPath: string,
   warnMode: WarnMode,
+  host: HookHost = "vscode",
 ): string {
   return [
     "/usr/bin/env",
@@ -76,6 +77,7 @@ export function renderPosixCommand(
     quotePosix(executable),
     quotePosix(hookPath),
     quotePosix(hookModeArgument(warnMode)),
+    quotePosix(`--host=${host === "vscode" ? "copilot" : host}`),
   ].join(" ");
 }
 
@@ -83,6 +85,7 @@ export function renderPowerShellCommand(
   executable: string,
   hookPath: string,
   warnMode: WarnMode,
+  host: HookHost = "vscode",
 ): string {
   const commandLine = [
     '"%XSOM_SECRET_GUARD_EXECUTABLE%"',
@@ -94,7 +97,7 @@ export function renderPowerShellCommand(
     `$env:XSOM_SECRET_GUARD_MANAGED='${MANAGED_MARKER}'`,
     `$env:XSOM_SECRET_GUARD_EXECUTABLE=${quotePowerShell(executable)}`,
     `$env:XSOM_SECRET_GUARD_HOOK=${quotePowerShell(hookPath)}`,
-    `$env:XSOM_SECRET_GUARD_WARN_ARGUMENT=${quotePowerShell(hookModeArgument(warnMode))}`,
+    `$env:XSOM_SECRET_GUARD_WARN_ARGUMENT=${quotePowerShell(`${hookModeArgument(warnMode)} --host=${host === "vscode" ? "copilot" : host}`)}`,
     // Code.exe is a GUI-subsystem executable on Windows. PowerShell can run it
     // but does not reliably populate $LASTEXITCODE, so Codex cannot observe the
     // scanner's blocking exit code. cmd.exe is a console process and preserves
@@ -121,8 +124,9 @@ export function renderWindowsCommand(
   executable: string,
   hookPath: string,
   warnMode: WarnMode,
+  host: HookHost = "vscode",
 ): string {
-  const script = renderPowerShellCommand(executable, hookPath, warnMode);
+  const script = renderPowerShellCommand(executable, hookPath, warnMode, host);
   return `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "${script.replaceAll('"', '\\"')}"`;
 }
 
@@ -130,8 +134,9 @@ export function renderClaudeWindowsCommand(
   executable: string,
   hookPath: string,
   warnMode: WarnMode,
+  host: HookHost = "claude",
 ): string {
-  const script = renderPowerShellCommand(executable, hookPath, warnMode);
+  const script = renderPowerShellCommand(executable, hookPath, warnMode, host);
   const encoded = Buffer.from(script, "utf16le").toString("base64");
   // Claude Code runs Windows hooks through PowerShell. Passing another
   // double-quoted -Command makes the outer shell expand $env:* and
@@ -150,17 +155,18 @@ function renderLegacyWindowsCommand(
 }
 
 function directEntry(
+  host: HookHost,
   executable: string,
   hookPath: string,
   warnMode: WarnMode,
 ): Record<string, unknown> {
-  const command = renderPosixCommand(executable, hookPath, warnMode);
+  const command = renderPosixCommand(executable, hookPath, warnMode, host);
   return {
     type: "command",
     command,
     linux: command,
     osx: command,
-    windows: renderWindowsCommand(executable, hookPath, warnMode),
+    windows: renderWindowsCommand(executable, hookPath, warnMode, host),
     timeout: HOST_HOOK_TIMEOUT_SECONDS,
   };
 }
@@ -179,12 +185,12 @@ function nestedEntry(
   warnMode: WarnMode,
   statusMessage?: string,
 ): Record<string, unknown> {
-  const posix = renderPosixCommand(executable, hookPath, warnMode);
+  const posix = renderPosixCommand(executable, hookPath, warnMode, host.id);
   const handler: Record<string, unknown> = {
     type: "command",
     command:
       host.id === "claude" && process.platform === "win32"
-        ? renderClaudeWindowsCommand(executable, hookPath, warnMode)
+        ? renderClaudeWindowsCommand(executable, hookPath, warnMode, host.id)
         : posix,
     timeout: HOST_HOOK_TIMEOUT_SECONDS,
   };
@@ -197,6 +203,7 @@ function nestedEntry(
       executable,
       hookPath,
       warnMode,
+      host.id,
     );
   return { hooks: [handler] };
 }
@@ -208,7 +215,7 @@ function managedEntry(
   warnMode: WarnMode,
 ): Record<string, unknown> {
   if (host.format === "direct")
-    return directEntry(executable, hookPath, warnMode);
+    return directEntry(host.id, executable, hookPath, warnMode);
   return nestedEntry(
     host,
     executable,
@@ -225,13 +232,13 @@ function legacyManagedEntry(
   warnMode: WarnMode,
 ): Record<string, unknown> | null {
   if (host.format === "direct") {
-    const command = renderPosixCommand(executable, hookPath, warnMode);
+    const command = renderPosixCommand(executable, hookPath, warnMode, host.id);
     return {
       type: "command",
       command,
       linux: command,
       osx: command,
-      windows: renderPowerShellCommand(executable, hookPath, warnMode),
+      windows: renderPowerShellCommand(executable, hookPath, warnMode, host.id),
       timeout: HOST_HOOK_TIMEOUT_SECONDS,
     };
   }
@@ -240,7 +247,7 @@ function legacyManagedEntry(
       hooks: [
         {
           type: "command",
-          command: renderPosixCommand(executable, hookPath, warnMode),
+          command: renderPosixCommand(executable, hookPath, warnMode, host.id),
           timeout: HOST_HOOK_TIMEOUT_SECONDS,
         },
       ],
@@ -255,7 +262,7 @@ function legacyGuiExecutableEntry(
   hookPath: string,
   warnMode: WarnMode,
 ): Record<string, unknown> {
-  const posix = renderPosixCommand(executable, hookPath, warnMode);
+  const posix = renderPosixCommand(executable, hookPath, warnMode, host.id);
   const powershell = renderLegacyPowerShellCommand(
     executable,
     hookPath,

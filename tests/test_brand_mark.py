@@ -35,7 +35,7 @@ _LOGO = _RACINE / "frontend" / "public" / "xsom-mark.svg"
 _LOGO_CLAIR = _RACINE / "frontend" / "public" / "xsom-mark-light.svg"
 _SIGNAL = _RACINE / "frontend" / "design-system" / "assets" / "mark.svg"
 _COMPOSANT = _RACINE / "frontend" / "components" / "brand.tsx"
-_MIDDLEWARE = _RACINE / "frontend" / "middleware.ts"
+_MIDDLEWARE = _RACINE / "frontend" / "proxy.ts"
 
 _SVG = "{http://www.w3.org/2000/svg}"
 

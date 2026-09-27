@@ -140,11 +140,42 @@ describe("status bar tooltip controls", () => {
     const card = pictures(observe).find((picture) =>
       picture.alt.startsWith("Avertir et laisser passer."),
     );
-    expect(card?.alt).toContain("Durée : 1 heure, puis retour à Expurger");
+    expect(card?.alt).toContain("Durée : 1 h, puis retour à Expurger");
     expect(render({ mode: "redact", observeUntil: "17:42" })).not.toContain(
       "Avertir jusqu’à",
     );
     expect(render()).not.toContain("réglage permissif");
+  });
+
+  it("lets the Avertir length be changed from the panel, and only in Avertir", () => {
+    const durationLinks = (markdown: string): number[] =>
+      [
+        ...markdown.matchAll(
+          /href="command:secretGuard\.setObserveDuration\?([^"]+)"/gu,
+        ),
+      ].map(
+        (match) => (JSON.parse(decodeURIComponent(match[1]!)) as number[])[0]!,
+      );
+    const quarter = render({
+      mode: "observe",
+      observeUntil: "17:42",
+      observeMinutes: 15,
+    });
+    expect(quarter).toContain("Durée d’Avertir :");
+    expect(quarter).toContain("<strong>15 min</strong>");
+    expect(durationLinks(quarter)).toEqual([60, 240, 480]);
+    const card = pictures(quarter).find((picture) =>
+      picture.alt.startsWith("Avertir et laisser passer."),
+    );
+    expect(card?.alt).toContain("Durée : 15 min, puis retour à Expurger");
+    // One hour by default, as before the choice existed.
+    expect(durationLinks(render({ mode: "observe" }))).toEqual([15, 240, 480]);
+    for (const mode of ["redact", "block"] as const) {
+      const markdown = render({ mode, observeMinutes: 240 });
+      expect(durationLinks(markdown)).toEqual([]);
+      expect(markdown).not.toContain("Durée d’Avertir");
+    }
+    expect(STATUS_TOOLTIP_COMMANDS).toContain("secretGuard.setObserveDuration");
   });
 
   it("follows the color theme kind for drawn controls", () => {
@@ -308,6 +339,57 @@ describe("status bar tooltip controls", () => {
         expect(attributes).not.toContain("$(");
       expect(markdown).not.toMatch(/\n\s*\n/u);
     }
+  });
+
+  it("shows the xSOM tuning in one line under the readiness line", () => {
+    const markdown = render({
+      rulesPack: {
+        line: "Réglage xSOM · v3 · 12 règles · jusqu’au 01/09/2027",
+        tone: "ok",
+        offerRequest: false,
+      },
+    });
+    const lines = markdown.split("\n");
+    expect(lines[1]).toContain("Prêt à veiller");
+    expect(lines[2]).toContain(
+      "Réglage xSOM · v3 · 12 règles · jusqu’au 01/09/2027",
+    );
+    expect(linkedCommands(markdown)).not.toContain(
+      "secretGuard.requestRulesPack",
+    );
+    // The line is text: the image controls keep their places.
+    expect(alts(markdown)).toEqual(alts(render()));
+  });
+
+  it("offers a tuning request to Local users with a discreet link", () => {
+    const markdown = render({
+      rulesPack: {
+        line: "Aucun réglage sur mesure",
+        tone: "info",
+        offerRequest: true,
+      },
+    });
+    expect(markdown).toContain("Aucun réglage sur mesure");
+    expect(linkedCommands(markdown)).toContain("secretGuard.requestRulesPack");
+    expect(STATUS_TOOLTIP_COMMANDS).toContain("secretGuard.requestRulesPack");
+  });
+
+  it("escapes the tuning line and keeps the sanitizer rules", () => {
+    const markdown = render({
+      rulesPack: {
+        line: 'Réglage refusé : <img src=x onerror="alert(1)"> $(bug)',
+        tone: "danger",
+        offerRequest: true,
+      },
+    });
+    expect(markdown).not.toContain("<img src=x");
+    expect(markdown).not.toContain("$(bug)");
+    for (const [, tag] of markdown.matchAll(/<\/?([a-z]+)/gu))
+      expect(USED_TAGS).toContain(tag);
+    for (const [, name] of markdown.matchAll(/ ([a-z-]+)="/gu))
+      expect(VSCODE_ATTRIBUTES).toContain(name);
+    for (const [, style] of markdown.matchAll(/style="([^"]*)"/gu))
+      expect(style).toMatch(VSCODE_SPAN_STYLE);
   });
 
   it("fills every image row to the drawn width", () => {

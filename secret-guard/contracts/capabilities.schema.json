@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xsom.fr/contracts/developer-guard/capabilities/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "assistant",
+    "hostVersion",
+    "platform",
+    "events"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "assistant": { "enum": ["claude", "codex", "copilot"] },
+    "hostVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "platform": { "enum": ["darwin", "linux", "win32"] },
+    "events": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "prompt",
+          "read",
+          "write",
+          "delete",
+          "command",
+          "network",
+          "mcp"
+        ]
+      },
+      "uniqueItems": true
+    }
+  }
+}

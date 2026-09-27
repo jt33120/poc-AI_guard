@@ -245,6 +245,11 @@ def policy_draft_rate_limit() -> str:
     return get_settings().policy_draft_rate_limit
 
 
+def rules_pack_rate_limit() -> str:
+    """Essai et publication d'un réglage sur mesure : chaque appel exécute des motifs."""
+    return get_settings().rules_pack_rate_limit
+
+
 def signup_rate_limit() -> str:
     """Dynamic limit string for the public self-serve signup endpoint."""
     return get_settings().signup_rate_limit

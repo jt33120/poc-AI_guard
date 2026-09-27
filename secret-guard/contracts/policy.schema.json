@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xsom.fr/contracts/developer-guard/policy/v1",
+  "title": "xSOM Developer Guard policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "policyId",
+    "version",
+    "issuedAt",
+    "expiresAt",
+    "defaults",
+    "rules"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "tenantId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "policyId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "version": { "type": "integer", "minimum": 1 },
+    "issuedAt": { "type": "string", "format": "date-time" },
+    "expiresAt": { "type": "string", "format": "date-time" },
+    "minRunnerVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unknownAction"],
+      "properties": {
+        "unknownAction": { "enum": ["allow", "deny", "require_approval"] }
+      }
+    },
+    "rules": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "effect", "match"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$" },
+          "effect": { "enum": ["allow", "deny", "require_approval"] },
+          "reason": { "type": "string", "maxLength": 240 },
+          "match": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "assistants": {
+                "type": "array",
+                "items": { "enum": ["claude", "codex", "copilot", "unknown"] },
+                "maxItems": 4
+              },
+              "events": {
+                "type": "array",
+                "items": {
+                  "enum": [
+                    "prompt",
+                    "read",
+                    "write",
+                    "delete",
+                    "command",
+                    "network",
+                    "mcp",
+                    "unknown"
+                  ]
+                },
+                "maxItems": 8
+              },
+              "actionClasses": {
+                "type": "array",
+                "items": {
+                  "enum": [
+                    "read",
+                    "write",
+                    "delete",
+                    "publish",
+                    "deploy",
+                    "network",
+                    "security",
+                    "mcp",
+                    "unknown"
+                  ]
+                },
+                "maxItems": 9
+              },
+              "resourcePrefixes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024
+                },
+                "maxItems": 100
+              },
+              "tools": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+                "maxItems": 100
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

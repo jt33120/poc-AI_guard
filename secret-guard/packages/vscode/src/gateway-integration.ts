@@ -2,15 +2,75 @@ import { randomUUID } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import process from "node:process";
 import * as vscode from "vscode";
+import { evaluatePosture } from "@xsom/developer-guard-runner";
 import {
   AuditQueue,
   gatewayJson,
   gatewayUrl,
+  platformCompatibleEvent,
   type AuditEvent,
   type QueueState,
 } from "./gateway-client.js";
 import { startGatewayBridge, type GatewayBridge } from "./gateway-bridge.js";
+import { startApprovalBridge, type ApprovalBridge } from "./approval-bridge.js";
 import { canDelegate, routeFile } from "./gateway-delegation.js";
+import {
+  readManagedPolicySummary,
+  syncManagedPolicy,
+  verifiedPolicyTenant,
+} from "./enrollment.js";
+import { readLastHookAt } from "./hook-activity.js";
+import type { HookHealth } from "./hook-manager.js";
+import {
+  forgetEnrollment,
+  syncRulesPack,
+  type EnrolledTenant,
+  type RulesPackSyncOutcome,
+} from "./rules-pack-sync.js";
+import type { RulesPackView } from "./rules-pack-view.js";
+
+/** How the gateway reports the xSOM tuning it synchronises. */
+export interface RulesPackLink {
+  /** Re-read the verified pack after a sync and refresh the interface. */
+  readonly changed: () => Promise<void>;
+  /** The current state, for the posture event. */
+  readonly view: () => RulesPackView;
+}
+
+const RULES_PACK_SYNC_MS = 60 * 60 * 1000;
+
+function registeredTenant(value: unknown): EnrolledTenant | undefined {
+  return typeof value === "string" && value.length >= 1 && value.length <= 128
+    ? { id: value, source: "register" }
+    : undefined;
+}
+
+function rulesPackEvent(
+  outcome: RulesPackSyncOutcome,
+  view: RulesPackView,
+): Omit<AuditEvent, "event_id" | "at" | "dropped"> {
+  return {
+    kind: "rules_pack_synced",
+    assistant: "secretguard",
+    mode: "redact",
+    outcome:
+      outcome.outcome === "rejected"
+        ? "failed"
+        : outcome.outcome === "error"
+          ? "unverified"
+          : "configured",
+    findings: 0,
+    ...(outcome.outcome === "applied" &&
+    view.packId !== undefined &&
+    view.version !== undefined
+      ? {
+          rules_pack_id: view.packId,
+          rules_pack_version: view.version,
+          rules_pack_digest: outcome.digest,
+        }
+      : {}),
+  };
+}
 
 export type GatewayState = "online" | "retrying" | "offline";
 
@@ -39,11 +99,24 @@ const CONNECTION_ERRORS: Record<string, string> = {
 
 export class GatewayIntegration implements vscode.Disposable {
   private bridge: GatewayBridge | undefined;
+  private approvalBridge: ApprovalBridge | undefined;
   private queue: AuditQueue | undefined;
   private timer: ReturnType<typeof setInterval> | undefined;
+  private rulesTimer: ReturnType<typeof setInterval> | undefined;
+  // Set once the platform has answered the rules-pack route (contract §7).
+  private platformServesRulesPack = false;
+  private pendingRulesSync: Promise<void> = Promise.resolve();
   private retry: ReturnType<typeof setTimeout> | undefined;
   public status = "Non connecté";
-  public constructor(private readonly context: vscode.ExtensionContext) {}
+  public constructor(
+    private readonly context: vscode.ExtensionContext,
+    private readonly readHookHealth: () => Promise<HookHealth>,
+    private readonly rules?: RulesPackLink,
+  ) {}
+  public get summary(): string {
+    const audit = this.audit;
+    return `${this.status}${audit === undefined ? "" : ` · ${audit}`}`;
+  }
   public get audit(): string | undefined {
     return this.queue
       ? `Audit : ${this.queue.pending} en attente, ${this.queue.dropped} perdu(s) · ${this.queue.lastSync}`
@@ -54,7 +127,12 @@ export class GatewayIntegration implements vscode.Disposable {
     return this.retry ? "retrying" : "offline";
   }
   public record(event: Omit<AuditEvent, "event_id" | "at" | "dropped">): void {
-    if (this.queue) void this.queue.enqueue(event);
+    if (!this.queue) return;
+    const compatible = platformCompatibleEvent(
+      event,
+      this.platformServesRulesPack,
+    );
+    if (compatible !== undefined) void this.queue.enqueue(compatible);
   }
   public async restore(): Promise<void> {
     if (vscode.env.remoteName) return;
@@ -124,6 +202,32 @@ export class GatewayIntegration implements vscode.Disposable {
       );
     }
   }
+  /** Fetch and verify the xSOM tuning, then let the interface re-read it. */
+  private syncRules(
+    connection: Connection,
+    enrolledTenant: EnrolledTenant | undefined,
+  ): Promise<RulesPackSyncOutcome> {
+    // One synchronisation at a time; a disconnection waits for it before
+    // forgetting the enrollment, so a late sync cannot re-apply a pack.
+    const run = this.pendingRulesSync.then(async () => {
+      const outcome = await syncRulesPack(
+        connection.endpoint,
+        connection.token,
+        this.context.globalStorageUri.fsPath,
+        enrolledTenant === undefined ? {} : { enrolledTenant },
+      ).catch((): RulesPackSyncOutcome => ({ outcome: "error" }));
+      // Any answer of the route, even "no tuning", shows the platform speaks
+      // contract §7; a network error leaves what was known.
+      if (outcome.outcome !== "error") this.platformServesRulesPack = true;
+      await this.rules?.changed().catch(() => undefined);
+      return outcome;
+    });
+    this.pendingRulesSync = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
   private async start(connection: Connection): Promise<void> {
     const registration = (await gatewayJson(
       connection.endpoint,
@@ -135,13 +239,36 @@ export class GatewayIntegration implements vscode.Disposable {
         extension_version: this.context.extension.packageJSON.version as string,
         mode: "redact",
       },
-    )) as { device_id?: unknown; redaction?: unknown; protocol?: unknown };
+    )) as {
+      device_id?: unknown;
+      redaction?: unknown;
+      protocol?: unknown;
+      tenant_id?: unknown;
+    };
     if (
       registration.device_id !== connection.installation ||
       registration.redaction !== "required" ||
       registration.protocol !== "anthropic-messages-v1"
     )
       throw new Error("unsupported_gateway");
+    const runnerVersion = this.context.extension.packageJSON.version as string;
+    const policyState = await syncManagedPolicy(
+      connection.endpoint,
+      connection.token,
+      this.context.globalStorageUri.fsPath,
+      runnerVersion,
+    );
+    // The enrolled tenant, as stated by the platform: at registration when it
+    // says so, else in the signed policy; otherwise the first pack pins it.
+    const policyTenant = await verifiedPolicyTenant(
+      this.context.globalStorageUri.fsPath,
+    );
+    const enrolledTenant =
+      registeredTenant(registration.tenant_id) ??
+      (policyTenant === undefined
+        ? undefined
+        : { id: policyTenant, source: "policy" as const });
+    const rulesOutcome = await this.syncRules(connection, enrolledTenant);
     const config = vscode.workspace.getConfiguration("claudeCode");
     if (!vscode.extensions.getExtension("anthropic.claude-code"))
       throw new Error("claude_extension_missing");
@@ -187,6 +314,16 @@ export class GatewayIntegration implements vscode.Disposable {
       await this.stopBridge();
       throw error;
     }
+    try {
+      this.approvalBridge = await startApprovalBridge(
+        this.context.globalStorageUri.fsPath,
+        connection.endpoint,
+        connection.token,
+      );
+    } catch (error) {
+      await this.stopBridge();
+      throw error;
+    }
     const queueKey = `xsom.audit.${connection.installation}.${connection.endpoint}`;
     this.queue = new AuditQueue(
       this.context.globalState.get<QueueState>(queueKey) ?? {
@@ -218,7 +355,75 @@ export class GatewayIntegration implements vscode.Disposable {
       outcome: "configured",
       findings: 0,
     });
+    this.record({
+      kind: "policy_synced",
+      assistant: "secretguard",
+      mode: "redact",
+      outcome: policyState === "assigned" ? "configured" : "unverified",
+      findings: 0,
+    });
+    if (this.rules !== undefined)
+      this.record(rulesPackEvent(rulesOutcome, this.rules.view()));
+    const emitPosture = async (): Promise<void> => {
+      const [hookHealth, policy] = await Promise.all([
+        this.readHookHealth(),
+        readManagedPolicySummary(this.context.globalStorageUri.fsPath),
+      ]);
+      const lastHookAt = readLastHookAt(this.context.globalStorageUri.fsPath);
+      const result = evaluatePosture({
+        policyPresent: policyState === "assigned" && policy !== undefined,
+        ...(policy === undefined ? {} : { policyExpiresAt: policy.expiresAt }),
+        hookInstalled:
+          hookHealth.state === "active" || hookHealth.state === "partial",
+        ...(lastHookAt === undefined
+          ? {}
+          : { lastHookInvocationAt: new Date(lastHookAt).toISOString() }),
+        queuePending: this.queue?.pending ?? 0,
+        queueDropped: this.queue?.dropped ?? 0,
+      });
+      const specificReason =
+        hookHealth.reason === "config_invalid" ||
+        hookHealth.reason === "hook_modified" ||
+        hookHealth.reason === "canary_failed"
+          ? hookHealth.reason
+          : undefined;
+      const rules = this.rules?.view();
+      const reasons: AuditEvent["posture_reasons"] = [
+        ...new Set([
+          ...result.reasons,
+          ...(specificReason === undefined ? [] : [specificReason]),
+          ...(rules?.reason === undefined ? [] : [rules.reason]),
+        ]),
+      ];
+      this.record({
+        kind: "posture",
+        assistant: "secretguard",
+        mode: "redact",
+        outcome:
+          result.state === "healthy" && rules?.reason === undefined
+            ? "configured"
+            : "unverified",
+        findings: 0,
+        posture_reasons: reasons,
+        ...(policy === undefined
+          ? {}
+          : { policy_id: policy.policyId, policy_version: policy.version }),
+        ...(rules?.packId === undefined ||
+        rules.version === undefined ||
+        rules.digest === undefined
+          ? {}
+          : {
+              rules_pack_id: rules.packId,
+              rules_pack_version: rules.version,
+              rules_pack_digest: rules.digest,
+            }),
+        runner_version: runnerVersion,
+        queue_pending: this.queue?.pending ?? 0,
+      });
+    };
+    await emitPosture();
     this.timer = setInterval(() => {
+      void emitPosture();
       this.record({
         kind: "heartbeat",
         assistant: "claude",
@@ -228,6 +433,14 @@ export class GatewayIntegration implements vscode.Disposable {
       });
       void this.queue?.flush();
     }, 30000);
+    this.rulesTimer = setInterval(() => {
+      void this.syncRules(connection, enrolledTenant)
+        .then((outcome) => {
+          if (this.rules !== undefined)
+            this.record(rulesPackEvent(outcome, this.rules.view()));
+        })
+        .catch(() => undefined);
+    }, RULES_PACK_SYNC_MS);
     void this.queue.flush();
     this.status =
       "Claude raccordé · nettoyage obligatoire · session réelle à vérifier";
@@ -237,6 +450,8 @@ export class GatewayIntegration implements vscode.Disposable {
     this.retry = undefined;
     if (this.timer) clearInterval(this.timer);
     this.timer = undefined;
+    if (this.rulesTimer) clearInterval(this.rulesTimer);
+    this.rulesTimer = undefined;
     if (this.bridge) {
       const old = this.bridge;
       this.bridge = undefined;
@@ -262,8 +477,19 @@ export class GatewayIntegration implements vscode.Disposable {
         vscode.ConfigurationTarget.Global,
       );
     }
+    if (this.approvalBridge) {
+      const old = this.approvalBridge;
+      this.approvalBridge = undefined;
+      await old.close();
+    }
     await this.stopBridge();
     this.queue = undefined;
+    // Leaving xSOM ends the tuning of this workstation: built-in rules only.
+    await this.pendingRulesSync;
+    await forgetEnrollment(this.context.globalStorageUri.fsPath).catch(
+      () => undefined,
+    );
+    await this.rules?.changed().catch(() => undefined);
     await this.context.secrets.delete(CONNECTION_STORAGE_KEY);
     await this.context.globalState.update("xsom.claudeBase", undefined);
     this.status = "Déconnecté";

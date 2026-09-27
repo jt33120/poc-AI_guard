@@ -1,0 +1,92 @@
+{
+  "description": "Enveloppe produite par la plateforme (tests/test_rules_pack_cross_product.py), signée avec la clé de TEST des vecteurs. Les termes en clair du brouillon ne sont que dans les deux tests, jamais dans ce fichier.",
+  "payloadDigest": "315a8598c6d23f26f2749929c514af961a506cdfc69ad293e4a7883faa5f466b",
+  "envelope": {
+    "payload": {
+      "schemaVersion": 1,
+      "kind": "xsom.secret-guard.rules-pack",
+      "packId": "heron-main",
+      "tenantId": "00000000-0000-4000-8000-00000000c0de",
+      "version": 1,
+      "issuedAt": "2026-09-27T08:00:00Z",
+      "expiresAt": "2027-09-27T08:00:00Z",
+      "issuer": "xSOM",
+      "detectors": [
+        {
+          "id": "heron.dossier",
+          "label": "Numéro de dossier Héron",
+          "category": "customer_data",
+          "action": "block",
+          "match": {
+            "type": "pattern",
+            "pattern": "DOS-[0-9]{6}-[A-Z]{2}"
+          }
+        },
+        {
+          "id": "heron.contrat",
+          "label": "Référence de contrat",
+          "category": "customer_data",
+          "action": "warn",
+          "match": {
+            "type": "pattern",
+            "pattern": "[0-9]{10}"
+          },
+          "context": {
+            "keywords": ["contrat", "contract"],
+            "window": 24
+          }
+        },
+        {
+          "id": "heron.hosts",
+          "label": "Hôte interne",
+          "category": "internal_infra",
+          "action": "block",
+          "match": {
+            "type": "pattern",
+            "pattern": "[a-z0-9\\-]{2,20}\\.corp\\.heron",
+            "caseInsensitive": true
+          }
+        },
+        {
+          "id": "heron.codenames",
+          "label": "Nom de code",
+          "category": "project",
+          "action": "block",
+          "match": {
+            "type": "terms",
+            "salt": "yMnKy8zNzs/Q0dLT1NXW1w==",
+            "digests": [
+              "d72ec7790c0960908fff7f178ded46ac147c240e3ccbfdfe243b972d1a543c2c",
+              "dcf5c2dfa5a619d5b05efe268ee05cb4dc0493e735ed931aa0a7a717c54216ba",
+              "f6e41a3b860766a20d37dd0075a8eb5a6609a9b05da6225e6649d5c514d50797"
+            ],
+            "maxWords": 3
+          }
+        }
+      ],
+      "tests": {
+        "positives": [
+          {
+            "detector": "heron.dossier",
+            "text": "Voir le dossier DOS-104233-FR avant lundi."
+          },
+          {
+            "detector": "heron.contrat",
+            "text": "Contrat n° 4400012345, signé hier."
+          },
+          {
+            "detector": "heron.hosts",
+            "text": "ssh deploy@api-01.corp.heron"
+          }
+        ],
+        "negatives": [
+          "Le ticket 4400012345 est clos.",
+          "DOS-12-FR n'est pas un dossier.",
+          "api-01.corp.example.com répond."
+        ]
+      }
+    },
+    "keyId": "56475aa75463474c0285df5dbf2bcab73da651358839e9b77481b2eab107708c",
+    "signature": "UEjj3sziu0u7frIXLZMARYW9M3WyTCKTEUZJUVhqAu4GmNlALaJTrFLgHL5N2dZGa333hXKhKZs35m/cdsMSCQ=="
+  }
+}

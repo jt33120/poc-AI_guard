@@ -7,6 +7,7 @@ import {
   redactAndRescan,
   scan,
   MAX_INPUT_BYTES,
+  type CompiledRulesPack,
   type ScanInput,
 } from "@xsom/secret-guard-core";
 
@@ -25,6 +26,14 @@ import {
 import { ActivityMonitor } from "./hook-activity.js";
 import { HookManager, type HookHealth } from "./hook-manager.js";
 import { GatewayIntegration } from "./gateway-integration.js";
+import { customFindingFields } from "./gateway-client.js";
+import { builtInAuthorityKeys } from "@xsom/developer-guard-runner";
+import { importRulesPack, readRulesPackSnapshot } from "./rules-pack-sync.js";
+import {
+  refusalLabel,
+  rulesPackView,
+  type RulesPackView,
+} from "./rules-pack-view.js";
 import { activationStrategy, supportsVsCodePromptHooks } from "./onboarding.js";
 import { defaultHostDefinitions } from "./host-config.js";
 import { markdownReport, modalReport } from "./presentation.js";
@@ -43,6 +52,7 @@ import {
 import {
   CHECK_CLIPBOARD_COMMAND,
   PURGE_CLIPBOARD_COMMAND,
+  SET_OBSERVE_DURATION_COMMAND,
   statusBarClickCommand,
   statusTooltipMarkdown,
   STATUS_TOOLTIP_COMMANDS,
@@ -60,19 +70,65 @@ import {
 } from "./clipboard-purge.js";
 import {
   closeObserveWindow,
+  DEFAULT_OBSERVE_MINUTES,
+  isObserveMinutes,
+  OBSERVE_DURATIONS,
+  observeDurationLabel,
   observeWindowOpen,
   openObserveWindow,
   readObserveDeadline,
+  type ObserveMinutes,
 } from "./observe-window.js";
 
 const FINISH_CODEX_SETUP = "Finaliser Codex";
-const OBSERVE_CONFIRMATION = "Activer pour 1 heure";
+// Avertir asks for its length each time it is switched on; the answer is kept
+// so the panel shows it and offers the other lengths.
+const OBSERVE_MINUTES_KEY = "secretGuard.observeMinutes";
+const OBSERVE_CHOICES: Record<ObserveMinutes, string> = {
+  15: "15 minutes",
+  60: "1 heure",
+  240: "4 heures",
+  480: "8 heures",
+};
 const PURGE_ACTION = "Expurger";
 let gateway: GatewayIntegration | undefined;
 // Metadata only: the scanned content and detected values are never retained.
 let lastScan: LastScan | undefined;
 // End of the running Avertir window, mirrored from the file the hook reads.
 let observeDeadline: number | undefined;
+let observeMinutes: ObserveMinutes = DEFAULT_OBSERVE_MINUTES;
+// The xSOM tuning applied to the scans run by the extension itself; the
+// hook runner verifies and loads the same file on its own.
+let rulesPack: CompiledRulesPack | undefined;
+let rulesView: RulesPackView = rulesPackView({
+  applied: { status: "none" },
+  enrolled: false,
+  authorityKeys: 0,
+});
+const RULES_PACK_REQUEST_URL = `mailto:julian.talou@xsom.fr?subject=${encodeURIComponent("Secret Guard Équipe — réglage sur mesure")}`;
+
+/** Re-read and re-verify the stored pack; never trusts the file as is. */
+async function reloadRulesPack(storage: string): Promise<void> {
+  try {
+    const snapshot = await readRulesPackSnapshot(storage);
+    rulesPack =
+      snapshot.applied.status === "applied" ? snapshot.applied.pack : undefined;
+    rulesView = rulesPackView(snapshot);
+  } catch {
+    // Never "no tuning" by default: an unexpected failure is shown and
+    // reported as a refused tuning, with the built-in rules still active.
+    rulesPack = undefined;
+    rulesView = rulesPackView({
+      applied: { status: "rejected", reason: "unreadable" },
+      enrolled: true,
+      authorityKeys: builtInAuthorityKeys().length,
+    });
+  }
+}
+
+function withRules<T extends ScanInput>(input: T): T {
+  return rulesPack === undefined ? input : { ...input, rules: rulesPack };
+}
 
 function clockTime(epoch: number): string {
   return new Date(epoch).toLocaleTimeString("fr-FR", {
@@ -136,7 +192,8 @@ async function presentScan(
   input: ScanInput & { sourceKind: LastScan["source"] },
   onScanned: () => Promise<void>,
 ): Promise<void> {
-  const result = scan(input);
+  const guarded = withRules(input);
+  const result = scan(guarded);
   lastScan = {
     source: input.sourceKind,
     decision: result.decision,
@@ -151,13 +208,14 @@ async function presentScan(
     mode: configuredMode(),
     outcome: result.decision === "ALLOW" ? "clean" : "warned",
     findings: result.findings.length,
+    ...customFindingFields(result.findings),
   });
   if (result.decision === "ALLOW") {
     await vscode.window.showInformationMessage(modalReport(result));
     return;
   }
 
-  const sanitized = result.complete ? redactAndRescan(input) : undefined;
+  const sanitized = result.complete ? redactAndRescan(guarded) : undefined;
   const redactedContent =
     sanitized?.final.complete === true &&
     sanitized.final.decision === "ALLOW" &&
@@ -286,6 +344,7 @@ async function handleChat(
   try {
     outcome = await dispatchGuarded(content, {
       mode,
+      ...(rulesPack === undefined ? {} : { rules: rulesPack }),
       notifyWarning: () => {
         stream.markdown(
           "👁️ **Mode Avertir** · Le texte original est transmis sans nettoyage malgré une détection ou une analyse incomplète.\n\n",
@@ -318,11 +377,12 @@ async function handleChat(
         ? "redacted"
         : "passed",
     findings: outcome.initial.findings.length,
+    ...customFindingFields(outcome.initial.findings),
   });
   if (!outcome.sent || response === undefined) {
     stream.markdown(markdownReport(outcome.final));
     const sanitized = outcome.initial.complete
-      ? redactAndRescan({ content, sourceKind: "prompt" })
+      ? redactAndRescan(withRules({ content, sourceKind: "prompt" as const }))
       : undefined;
     if (
       sanitized?.final.complete &&
@@ -371,6 +431,7 @@ async function clipboardShortcut(
 ): Promise<PurgeFeedback> {
   const outcome: PurgeOutcome = purgeClipboardText(
     await vscode.env.clipboard.readText(),
+    rulesPack,
   );
   const purged = action === "purge" && outcome.status === "purged";
   if (purged) await vscode.env.clipboard.writeText(outcome.content);
@@ -392,6 +453,9 @@ async function clipboardShortcut(
       mode: configuredMode(),
       outcome: CLIPBOARD_AUDIT_OUTCOMES[action][outcome.status],
       findings,
+      ...(outcome.status === "clean"
+        ? {}
+        : customFindingFields(outcome.detected)),
     });
   }
   return action === "purge" ? purgeFeedback(outcome) : checkFeedback(outcome);
@@ -470,8 +534,14 @@ async function updateStatus(
       health,
       mode,
       ...(until === undefined ? {} : { observeUntil: until }),
+      observeMinutes,
       modeApplicationFailed,
       ...(lastScan === undefined ? {} : { lastScan }),
+      rulesPack: {
+        line: rulesView.line,
+        tone: rulesView.tone,
+        offerRequest: rulesView.offerRequest,
+      },
     }),
     true,
   );
@@ -492,7 +562,17 @@ export async function activate(
     (host) => host.id !== "vscode" || supportsVsCodePromptHooks(vscode.version),
   );
   const manager = new HookManager(context, { hosts });
-  gateway = new GatewayIntegration(context);
+  const storage = context.globalStorageUri.fsPath;
+  // Set once the interface exists; the gateway may sync before that.
+  let refreshAfterRules: () => Promise<void> = () => Promise.resolve();
+  await reloadRulesPack(storage);
+  gateway = new GatewayIntegration(context, () => manager.getHealth(), {
+    changed: async () => {
+      await reloadRulesPack(storage);
+      await refreshAfterRules();
+    },
+    view: () => rulesView,
+  });
   context.subscriptions.push(gateway);
   const status = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Right,
@@ -545,13 +625,12 @@ export async function activate(
     status.show();
   };
 
-  const storage = context.globalStorageUri.fsPath;
   let observeTimer: ReturnType<typeof setTimeout> | undefined;
   const expireObserveWindow = async (): Promise<void> => {
     if (configuredMode() !== "observe") return;
     await saveMode("redact");
     void vscode.window.showInformationMessage(
-      "⏱️ L’heure en mode Avertir est écoulée : Secret Guard repasse en Expurger.",
+      "⏱️ La durée d’Avertir est écoulée : Secret Guard repasse en Expurger.",
     );
   };
   // Avertir never outlives its window: the hook falls back to Expurger on its
@@ -571,21 +650,35 @@ export async function activate(
       void expireObserveWindow();
     }, remaining);
   };
+  const stored = context.globalState.get<unknown>(OBSERVE_MINUTES_KEY);
+  observeMinutes = isObserveMinutes(stored) ? stored : DEFAULT_OBSERVE_MINUTES;
+  const chooseObserveMinutes = async (
+    minutes: ObserveMinutes,
+  ): Promise<void> => {
+    observeMinutes = minutes;
+    await context.globalState.update(OBSERVE_MINUTES_KEY, minutes);
+  };
   // Choosing Avertir opens a fresh window; leaving it closes the window.
   const syncObserveWindow = async (): Promise<void> => {
     if (configuredMode() === "observe")
-      await openObserveWindow(storage, Date.now());
+      await openObserveWindow(storage, Date.now(), observeMinutes);
     else await closeObserveWindow(storage);
     scheduleObserveExpiry();
   };
+  // Switching Avertir on is confirmed by choosing how long it lasts.
   const confirmMode = async (mode: ProtectionMode): Promise<boolean> => {
     if (mode !== "observe" || configuredMode() === "observe") return true;
     const answer = await vscode.window.showWarningMessage(
-      "Avertir transmet vos messages tels quels à l’assistant, secrets compris. Ce mode dure 1 heure, puis Secret Guard repasse en Expurger.",
+      "Avertir transmet vos messages tels quels à l’assistant, secrets compris. Pour combien de temps ? Secret Guard repasse ensuite en Expurger.",
       { modal: true },
-      OBSERVE_CONFIRMATION,
+      ...OBSERVE_DURATIONS.map((minutes) => OBSERVE_CHOICES[minutes]),
     );
-    return answer === OBSERVE_CONFIRMATION;
+    const chosen = OBSERVE_DURATIONS.find(
+      (minutes) => OBSERVE_CHOICES[minutes] === answer,
+    );
+    if (chosen === undefined) return false;
+    await chooseObserveMinutes(chosen);
+    return true;
   };
   context.subscriptions.push({
     dispose: () => {
@@ -612,9 +705,11 @@ export async function activate(
               status: gateway.status,
               ...(gateway.audit === undefined ? {} : { audit: gateway.audit }),
             },
+        rulesView,
       );
     }
   };
+  refreshAfterRules = refreshUi;
   context.subscriptions.push(
     vscode.commands.registerCommand("secretGuard.connectGateway", async () => {
       closeStatusControls();
@@ -657,6 +752,26 @@ export async function activate(
         closeStatusControls();
         if (isProtectionMode(mode) && (await confirmMode(mode)))
           await saveMode(mode);
+      },
+    ),
+    // From the panel, while Avertir runs: restart the window with another
+    // length. Outside Avertir, the same click goes through the confirmation.
+    vscode.commands.registerCommand(
+      SET_OBSERVE_DURATION_COMMAND,
+      async (minutes?: unknown) => {
+        closeStatusControls();
+        if (!isObserveMinutes(minutes)) return;
+        if (configuredMode() !== "observe") {
+          if (await confirmMode("observe")) await saveMode("observe");
+          return;
+        }
+        await chooseObserveMinutes(minutes);
+        await syncObserveWindow();
+        await refreshUi();
+        const until = observeUntil();
+        void vscode.window.showInformationMessage(
+          `Avertir pour ${observeDurationLabel(minutes)}${until === undefined ? "" : `, jusqu’à ${until}`}, puis retour automatique à Expurger.`,
+        );
       },
     ),
     vscode.window.onDidChangeActiveColorTheme(async () => {
@@ -814,6 +929,67 @@ export async function activate(
       );
     }),
     vscode.commands.registerCommand("secretGuard.copyRedacted", copyRedacted),
+    vscode.commands.registerCommand(
+      "secretGuard.requestRulesPack",
+      async () => {
+        closeStatusControls();
+        await vscode.env.openExternal(vscode.Uri.parse(RULES_PACK_REQUEST_URL));
+      },
+    ),
+    // Offline import for air-gapped workstations. The file is always chosen
+    // by the developer in a dialog: arguments from other extensions are
+    // ignored. Same verification as a synchronisation.
+    vscode.commands.registerCommand("secretGuard.importRulesPack", async () => {
+      closeStatusControls();
+      const [target] =
+        (await vscode.window.showOpenDialog({
+          title: "Secret Guard · Importer un réglage xSOM",
+          openLabel: "Vérifier et importer",
+          canSelectMany: false,
+          filters: { "Réglage xSOM": ["json"] },
+        })) ?? [];
+      if (target === undefined) return;
+      let raw: string;
+      try {
+        const bytes = await vscode.workspace.fs.readFile(target);
+        raw = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      } catch {
+        await vscode.window.showErrorMessage(
+          "Fichier illisible : aucun réglage importé. Les règles intégrées restent actives.",
+        );
+        return;
+      }
+      const result = await importRulesPack(storage, raw).catch(
+        () => ({ outcome: "error" }) as const,
+      );
+      await reloadRulesPack(storage);
+      await refreshUi();
+      if (result.outcome === "applied")
+        await vscode.window.showInformationMessage(
+          `${rulesView.line}. Réglage vérifié hors ligne et appliqué sur ce poste.`,
+        );
+      else
+        await vscode.window.showErrorMessage(
+          `Réglage refusé : ${result.outcome === "rejected" ? refusalLabel(result.reason) : "import impossible"}. Les règles intégrées restent actives.`,
+        );
+    }),
+    // Read-only state of the xSOM tuning (no rule content, no detected
+    // value), after re-verifying the stored pack. Used by the protection
+    // centre refresh and the extension-host contract.
+    vscode.commands.registerCommand("secretGuard.rulesPackStatus", async () => {
+      await reloadRulesPack(storage);
+      await refreshUi();
+      return {
+        state: rulesView.state,
+        line: rulesView.line,
+        ...(rulesView.packId === undefined ? {} : { packId: rulesView.packId }),
+        ...(rulesView.version === undefined
+          ? {}
+          : { version: rulesView.version }),
+        ...(rulesView.digest === undefined ? {} : { digest: rulesView.digest }),
+        ...(rulesView.reason === undefined ? {} : { reason: rulesView.reason }),
+      };
+    }),
     vscode.commands.registerCommand(
       "secretGuard.finishCodexSetup",
       openCodexHookReview,

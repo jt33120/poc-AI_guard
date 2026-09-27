@@ -168,8 +168,8 @@ def test_a_number_written_into_the_markup_is_refused() -> None:
     try:
         _PAGE.write_text(
             original.replace(
-                '<main>',
-                '<main>\n      <p>16 lignes de menace, 8 bloquées</p>',
+                "<main>",
+                "<main>\n      <p>16 lignes de menace, 8 bloquées</p>",
                 1,
             ),
             encoding="utf-8",
@@ -273,7 +273,7 @@ def test_a_number_in_a_comment_is_not_read_as_markup(page_restauree: Path) -> No
     """Un commentaire n'est pas de la copie : le visiteur ne le lit jamais."""
     _inserer(
         page_restauree,
-        '<main>',
+        "<main>",
         "{/* Seize lignes de menace : le relevé les publie via <ThreatLedger />. */}\n      ",
     )
     rendu = _gate()
@@ -290,7 +290,7 @@ def test_a_number_in_markup_beside_a_comment_is_still_refused(page_restauree: Pa
     """
     _inserer(
         page_restauree,
-        '<main>',
+        "<main>",
         "{/* Un commentaire qui cite <ThreatLedger /> et parle de menaces. */}\n"
         "      <p>16 lignes de menace, 8 bloquées</p>\n      ",
     )
@@ -307,7 +307,7 @@ def test_a_double_slash_inside_a_string_opens_no_comment(page_restauree: Path) -
     """
     _inserer(
         page_restauree,
-        '<main>',
+        "<main>",
         '<a href="https://exemple.test/a">16 lignes de menace</a>\n      ',
     )
     rendu = _gate()
@@ -325,7 +325,7 @@ def test_a_regex_literal_does_not_swallow_the_rest_of_its_line(page_restauree: P
     """
     _inserer(
         page_restauree,
-        '<main>',
+        "<main>",
         '<span>{"x".replace(/^https?:\\/\\//, "")}</span><p>16 lignes de menace</p>\n      ',
     )
     rendu = _gate()
@@ -348,7 +348,7 @@ def test_a_file_opening_on_a_jsdoc_block_is_still_scanned(page_restauree: Path) 
     """
     _inserer(
         page_restauree,
-        '<main>',
+        "<main>",
         "{/**\n       * Un en-tête qui cite <ThreatLedger /> et parle de menaces.\n       */}\n"
         "      <p>16 lignes de menace</p>\n      ",
     )
