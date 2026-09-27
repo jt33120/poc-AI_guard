@@ -69,6 +69,9 @@ const DEVELOPER_MODULES = [...new Set(DEVELOPER_GUARD_COVERAGE.threats.map((entr
 const DEVELOPER_ASSISTANTS = [...new Set(DEVELOPER_GUARD_COVERAGE.threats.flatMap((entry) => entry.hosts.map((host) => host.assistant)))].sort();
 const DEVELOPER_ENVIRONMENTS = [...new Set(DEVELOPER_GUARD_COVERAGE.threats.flatMap((entry) => [entry.environment, ...entry.hosts.map((host) => host.environment)]))].sort();
 
+/** Les facettes repliées sous « Plus de filtres » : secondaires, elles n'encombrent pas le premier regard. */
+const ADVANCED_FACETS = ["category", "surface", "impact", "status", "product", "module", "assistant", "environment"] as const;
+
 const SORTS = ["category", "risk", "coverage", "name"] as const;
 type Sort = (typeof SORTS)[number];
 type SearchState = "idle" | "searching" | "ready" | "unavailable";
@@ -142,6 +145,7 @@ export function ThreatGlossary() {
   const [searchState, setSearchState] = useState<SearchState>("idle");
   const [preview, setPreview] = useState<VisualPreview | null>(null);
   const [urlReady, setUrlReady] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   // Un lien profond `/menaces#<id>` ouvre la ligne qu'il vise : le navigateur y
   // défile déjà, il reste à montrer son détail.
@@ -158,6 +162,8 @@ export function ThreatGlossary() {
     if (assistant && DEVELOPER_ASSISTANTS.includes(assistant)) next.assistant = assistant;
     if (environment && DEVELOPER_ENVIRONMENTS.includes(environment)) next.environment = environment;
     setFilters(next);
+    // Un lien partagé qui porte un filtre replié doit le montrer, pas le cacher.
+    setMoreOpen(ADVANCED_FACETS.some((facet) => next[facet] !== "all"));
     setUrlReady(true);
     const id = decodeURIComponent(window.location.hash.slice(1));
     if (THREAT_GLOSSARY.some((entry) => entry.id === id)) setOpen(new Set([id]));
@@ -265,6 +271,21 @@ export function ThreatGlossary() {
   }
 
   const coverageCounts = GLOSSARY_COVERAGES.map((id) => ({ id, count: countWith("coverage", id) }));
+  const activeFacets = (Object.keys(filters) as Facet[]).filter((facet) => filters[facet] !== "all");
+  const advancedActive = ADVANCED_FACETS.filter((facet) => filters[facet] !== "all").length;
+
+  function facetValueLabel(facet: Facet, value: string) {
+    switch (facet) {
+      case "use": return copy.uses[value as GlossaryUse];
+      case "coverage": return copy.coverage[value as GlossaryCoverage];
+      case "category": return copy.categories[value as GlossaryCategory];
+      case "surface": return copy.surfaces[value as GlossarySurface];
+      case "impact": return copy.impacts[value as GlossaryImpact];
+      case "status": return copy.statuses[value as GlossaryStatus];
+      case "product": return "Secret Guard";
+      default: return value;
+    }
+  }
 
   return (
     <div className="guard-landing guard-glossary">
@@ -291,32 +312,32 @@ export function ThreatGlossary() {
           <h2 id="glossary-table-heading" className="guard-glossary__sr">{copy.tableHeading}</h2>
           <DiagrammeDefs />
           <div className="guard-glossary__toolbar reveal" data-delay="1">
-            <div className="guard-glossary__toolbar-top">
-              <div className="guard-glossary__search">
-                <label htmlFor="threat-search">{copy.search}</label>
-                <div>
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6.5" /><path d="m15 15 5 5" /></svg>
-                  <input
-                    id="threat-search"
-                    type="search"
-                    autoComplete="off"
-                    placeholder={copy.placeholder}
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    aria-controls="threat-definitions"
-                  />
-                </div>
-                {searchState === "searching" && <p className="guard-glossary__search-status" role="status">{lang === "fr" ? "Recherche IA en cours…" : "AI search in progress…"}</p>}
-                {searchState === "ready" && <p className="guard-glossary__search-status" role="status">{lang === "fr" ? "Menaces pertinentes sélectionnées par IA." : "Relevant threats selected by AI."}</p>}
-                {searchState === "unavailable" && <p className="guard-glossary__search-status" role="status">{lang === "fr" ? "Recherche textuelle affichée ; la recherche IA est indisponible." : "Text search is shown; AI search is unavailable."}</p>}
+            <div className="guard-glossary__search">
+              <label htmlFor="threat-search">{copy.search}</label>
+              <div>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6.5" /><path d="m15 15 5 5" /></svg>
+                <input
+                  id="threat-search"
+                  type="search"
+                  autoComplete="off"
+                  placeholder={copy.placeholder}
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  aria-controls="threat-definitions"
+                />
               </div>
-              <SelectField id="threat-sort" label={copy.sort} value={sort} onChange={(value) => setSort(value as Sort)}>
-                {SORTS.map((id) => <option key={id} value={id}>{copy.sorts[id]}</option>)}
-              </SelectField>
+              {searchState === "searching" && <p className="guard-glossary__search-status" role="status">{lang === "fr" ? "Recherche IA en cours…" : "AI search in progress…"}</p>}
+              {searchState === "ready" && <p className="guard-glossary__search-status" role="status">{lang === "fr" ? "Menaces pertinentes sélectionnées par IA." : "Relevant threats selected by AI."}</p>}
+              {searchState === "unavailable" && <p className="guard-glossary__search-status" role="status">{lang === "fr" ? "Recherche textuelle affichée ; la recherche IA est indisponible." : "Text search is shown; AI search is unavailable."}</p>}
             </div>
 
+            <p className="guard-glossary__hint">{copy.filterHint}</p>
+
             <div className="guard-glossary__facet">
-              <p id="threat-use-label" className="guard-glossary__facet-label">{copy.filter}</p>
+              <p id="threat-use-label" className="guard-glossary__facet-label">
+                <span className="guard-glossary__step" aria-hidden="true">1</span>
+                {copy.filter}
+              </p>
               <div className="guard-glossary__filters" role="group" aria-labelledby="threat-use-label">
                 {(["all", ...GLOSSARY_USES] as const).map((id) => (
                   <FilterChip key={id} pressed={filters.use === id} count={countWith("use", id)} onClick={() => setFacet("use", id)}>
@@ -327,51 +348,85 @@ export function ThreatGlossary() {
             </div>
 
             <div className="guard-glossary__facet">
-              <p id="threat-coverage-label" className="guard-glossary__facet-label">{copy.coverageFilter}</p>
-              <CoverageMeter counts={coverageCounts} selected={filters.coverage} copy={copy} />
-              <div className="guard-glossary__filters" role="group" aria-labelledby="threat-coverage-label">
+              <p id="threat-coverage-label" className="guard-glossary__facet-label">
+                <span className="guard-glossary__step" aria-hidden="true">2</span>
+                {copy.coverageFilter}
+              </p>
+              <div className="guard-glossary__filters guard-glossary__filters--coverage" role="group" aria-labelledby="threat-coverage-label">
                 <FilterChip pressed={filters.coverage === "all"} count={countWith("coverage", "all")} onClick={() => setFacet("coverage", "all")}>
                   {copy.coverageAll}
                 </FilterChip>
                 {coverageCounts.map(({ id, count }) => (
-                  <FilterChip key={id} pressed={filters.coverage === id} count={count} onClick={() => setFacet("coverage", id)}>
+                  <FilterChip key={id} coverage={id} hint={copy.coverageHints[id]} pressed={filters.coverage === id} count={count} onClick={() => setFacet("coverage", id)}>
                     <CoverageIcon coverage={id} />
                     {copy.coverage[id]}
                   </FilterChip>
                 ))}
               </div>
-              <p className="guard-glossary__legend">{copy.coverageLegend}</p>
             </div>
 
-            <div className="guard-glossary__selects">
-              <FacetSelect id="threat-category" label={copy.category} all={copy.categoryAll} options={GLOSSARY_CATEGORIES} labels={copy.categories} value={filters.category} count={(value) => countWith("category", value)} onChange={(value) => setFacet("category", value)} />
-              <FacetSelect id="threat-surface" label={copy.surface} all={copy.surfaceAll} options={GLOSSARY_SURFACES} labels={copy.surfaces} value={filters.surface} count={(value) => countWith("surface", value)} onChange={(value) => setFacet("surface", value)} />
-              <FacetSelect id="threat-impact" label={copy.impact} all={copy.impactAll} options={GLOSSARY_IMPACTS} labels={copy.impacts} value={filters.impact} count={(value) => countWith("impact", value)} onChange={(value) => setFacet("impact", value)} />
-              <FacetSelect id="threat-status" label={copy.status} all={copy.statusAll} options={GLOSSARY_STATUSES} labels={copy.statuses} value={filters.status} count={(value) => countWith("status", value)} onChange={(value) => setFacet("status", value)} />
-            </div>
-
-            <div className="guard-glossary__developer-filters">
-              <div>
-                <p className="guard-glossary__facet-label">{copy.developerFilters}</p>
-                <p>{copy.developerFiltersNote}</p>
+            <details className="guard-glossary__more" open={moreOpen} onToggle={(event) => setMoreOpen(event.currentTarget.open)}>
+              <summary>
+                <span className="guard-glossary__step" aria-hidden="true">3</span>
+                <span className="guard-glossary__more-title">
+                  {copy.moreFilters}
+                  {advancedActive > 0 && <span className="guard-glossary__badge">{advancedActive}</span>}
+                </span>
+                <span className="guard-glossary__more-hint">{copy.moreFiltersHint}</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
+              </summary>
+              <div className="guard-glossary__more-body">
+                <fieldset className="guard-glossary__group-fields">
+                  <legend>{copy.threatFilters}</legend>
+                  <div className="guard-glossary__selects">
+                    <FacetSelect id="threat-category" label={copy.category} all={copy.categoryAll} options={GLOSSARY_CATEGORIES} labels={copy.categories} value={filters.category} count={(value) => countWith("category", value)} onChange={(value) => setFacet("category", value)} />
+                    <FacetSelect id="threat-surface" label={copy.surface} all={copy.surfaceAll} options={GLOSSARY_SURFACES} labels={copy.surfaces} value={filters.surface} count={(value) => countWith("surface", value)} onChange={(value) => setFacet("surface", value)} />
+                    <FacetSelect id="threat-impact" label={copy.impact} all={copy.impactAll} options={GLOSSARY_IMPACTS} labels={copy.impacts} value={filters.impact} count={(value) => countWith("impact", value)} onChange={(value) => setFacet("impact", value)} />
+                    <FacetSelect id="threat-status" label={copy.status} all={copy.statusAll} options={GLOSSARY_STATUSES} labels={copy.statuses} value={filters.status} count={(value) => countWith("status", value)} onChange={(value) => setFacet("status", value)} />
+                  </div>
+                </fieldset>
+                <fieldset className="guard-glossary__group-fields" aria-describedby="threat-developer-note">
+                  <legend>{copy.developerFilters}</legend>
+                  <p id="threat-developer-note" className="guard-glossary__legend">{copy.developerFiltersNote}</p>
+                  <div className="guard-glossary__selects">
+                    <SelectField id="threat-product" label={copy.product} value={filters.product} onChange={(value) => setFacet("product", value)}>
+                      <option value="all">{copy.productAll} ({countWith("product", "all")})</option>
+                      <option value="developer-guard">Secret Guard ({countWith("product", "developer-guard")})</option>
+                    </SelectField>
+                    <StringFacetSelect id="threat-module" label={copy.module} all={copy.moduleAll} options={DEVELOPER_MODULES} value={filters.module} count={(value) => countWith("module", value)} onChange={(value) => setFacet("module", value)} />
+                    <StringFacetSelect id="threat-assistant" label={copy.assistant} all={copy.assistantAll} options={DEVELOPER_ASSISTANTS} value={filters.assistant} count={(value) => countWith("assistant", value)} onChange={(value) => setFacet("assistant", value)} />
+                    <StringFacetSelect id="threat-environment" label={copy.environment} all={copy.environmentAll} options={DEVELOPER_ENVIRONMENTS} value={filters.environment} count={(value) => countWith("environment", value)} onChange={(value) => setFacet("environment", value)} />
+                  </div>
+                </fieldset>
               </div>
-              <div className="guard-glossary__selects">
-                <SelectField id="threat-product" label={copy.product} value={filters.product} onChange={(value) => setFacet("product", value)}>
-                  <option value="all">{copy.productAll} ({countWith("product", "all")})</option>
-                  <option value="developer-guard">Secret Guard ({countWith("product", "developer-guard")})</option>
-                </SelectField>
-                <StringFacetSelect id="threat-module" label={copy.module} all={copy.moduleAll} options={DEVELOPER_MODULES} value={filters.module} count={(value) => countWith("module", value)} onChange={(value) => setFacet("module", value)} />
-                <StringFacetSelect id="threat-assistant" label={copy.assistant} all={copy.assistantAll} options={DEVELOPER_ASSISTANTS} value={filters.assistant} count={(value) => countWith("assistant", value)} onChange={(value) => setFacet("assistant", value)} />
-                <StringFacetSelect id="threat-environment" label={copy.environment} all={copy.environmentAll} options={DEVELOPER_ENVIRONMENTS} value={filters.environment} count={(value) => countWith("environment", value)} onChange={(value) => setFacet("environment", value)} />
-              </div>
-            </div>
+            </details>
           </div>
 
           <div className="guard-glossary__results-heading">
-            <p role="status" aria-atomic="true">
-              {entries.length} {entries.length === 1 ? copy.countOne : copy.count} {copy.of} {THREAT_GLOSSARY.length}
-            </p>
-            {filtered && <button type="button" onClick={resetFilters}>{copy.reset}</button>}
+            <div className="guard-glossary__results-summary">
+              <p role="status" aria-atomic="true">
+                <strong>{entries.length}</strong> {entries.length === 1 ? copy.countOne : copy.count} {copy.of} {THREAT_GLOSSARY.length}
+              </p>
+              {activeFacets.length > 0 && (
+                <ul className="guard-glossary__active" aria-label={copy.activeFilters}>
+                  {activeFacets.map((facet) => {
+                    const label = facetValueLabel(facet, filters[facet]);
+                    return (
+                      <li key={facet}>
+                        <button type="button" onClick={() => setFacet(facet, "all")} aria-label={`${copy.removeFilter} : ${label}`} aria-controls="threat-definitions">
+                          {label}
+                          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 4.5 7 7m0-7-7 7" /></svg>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {filtered && <button type="button" className="guard-glossary__reset" onClick={resetFilters}>{copy.reset}</button>}
+            </div>
+            <SelectField id="threat-sort" label={copy.sort} value={sort} inline onChange={(value) => setSort(value as Sort)}>
+              {SORTS.map((id) => <option key={id} value={id}>{copy.sorts[id]}</option>)}
+            </SelectField>
           </div>
 
           <div id="threat-definitions">
@@ -451,17 +506,27 @@ function FilterChip({
   pressed,
   count,
   onClick,
+  coverage,
+  hint,
   children,
 }: {
   pressed: boolean;
   count: number;
   onClick: () => void;
+  coverage?: GlossaryCoverage;
+  hint?: string;
   children: ReactNode;
 }) {
+  // L'explication reste hors du nom accessible : « Couvert » se nomme « Couvert »,
+  // et sa définition arrive en description.
+  const hintId = hint && coverage ? `threat-coverage-hint-${coverage}` : undefined;
   return (
-    <button type="button" aria-pressed={pressed} aria-controls="threat-definitions" onClick={onClick}>
-      {children}
-      <span className="guard-glossary__count" aria-hidden="true">{count}</span>
+    <button type="button" aria-pressed={pressed} aria-controls="threat-definitions" aria-describedby={hintId} data-coverage={coverage} onClick={onClick}>
+      <span className="guard-glossary__chip-label">
+        {children}
+        <span className="guard-glossary__count" aria-hidden="true">{count}</span>
+      </span>
+      {hint && <small id={hintId} aria-hidden="true">{hint}</small>}
     </button>
   );
 }
@@ -470,17 +535,19 @@ function SelectField({
   id,
   label,
   value,
+  inline = false,
   onChange,
   children,
 }: {
   id: string;
   label: string;
   value: string;
+  inline?: boolean;
   onChange: (value: string) => void;
   children: ReactNode;
 }) {
   return (
-    <div className="guard-glossary__select">
+    <div className="guard-glossary__select" data-inline={inline ? "" : undefined}>
       <label htmlFor={id}>{label}</label>
       <div>
         <select id={id} value={value} onChange={(event) => onChange(event.target.value)} aria-controls="threat-definitions">
@@ -536,36 +603,6 @@ function StringFacetSelect({ id, label, all, options, value, count, onChange }: 
         return <option key={option} value={option} disabled={n === 0 && option !== value}>{option} ({n})</option>;
       })}
     </SelectField>
-  );
-}
-
-/**
- * La répartition de la couverture sur les lignes que les autres filtres laissent.
- *
- * Décorative pour les technologies d'assistance : les boutons qui la suivent portent
- * les mêmes libellés, et le statut annonce le nombre de lignes affichées.
- */
-function CoverageMeter({
-  counts,
-  selected,
-  copy,
-}: {
-  counts: readonly { id: GlossaryCoverage; count: number }[];
-  selected: GlossaryCoverage | "all";
-  copy: Copy;
-}) {
-  return (
-    <div className="guard-glossary__meter" data-selected={selected === "all" ? undefined : selected} aria-hidden="true">
-      {counts.filter(({ count }) => count > 0).map(({ id, count }) => (
-        <span
-          key={id}
-          data-coverage={id}
-          data-active={selected === id ? "" : undefined}
-          style={{ flexGrow: count }}
-          title={`${copy.coverage[id]} · ${count}`}
-        />
-      ))}
-    </div>
   );
 }
 
