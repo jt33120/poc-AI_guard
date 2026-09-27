@@ -32,6 +32,17 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen --dev
 
+      # Some Python gates run the repo's Node generators (TypeScript AST of the
+      # front copy) and the workstation's TypeScript through Node 22 type
+      # stripping: without these, they fail or skip in CI.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies (for the Node generators)
+        run: npm --prefix frontend ci --no-audit --no-fund
+
       - name: Ruff lint
         run: uv run ruff check .
 
