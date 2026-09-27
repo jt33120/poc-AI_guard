@@ -18,46 +18,13 @@
 .guard-home .guard-header .console-language button[aria-pressed="true"] { color: #152b45; }
 .guard-home .guard-header :is(a, button):focus-visible { outline-color: #195ca8; }
 .guard-home-section { padding-block: clamp(3.5rem, 7vw, 6.5rem) 0; scroll-margin-top: 2rem; }
-.guard-home-heading__kicker { display: flex; align-items: center; gap: .7rem; }
-.guard-home-heading__kicker .guard-french-mark { width: 19px; height: 12px; }
-.guard-masthead { position: relative; isolation: isolate; overflow: hidden; background: var(--home-ink); color: #f5f9ff; }
-.guard-masthead__video, .guard-masthead__scrim { position: absolute; width: 100%; height: 100%; inset: 0; z-index: -2; object-fit: cover; }
-.guard-masthead__scrim { z-index: -1; background: linear-gradient(90deg, rgba(9,23,43,.96) 0%, rgba(9,23,43,.84) 36%, rgba(9,23,43,.3) 72%, rgba(9,23,43,.08)); }
-.guard-masthead__inner { padding-top: clamp(3.5rem, 6vw, 6rem); }
-.guard-masthead__copy { max-width: 730px; padding-bottom: 3.5rem; }
-.guard-masthead__eyebrow { display: flex; align-items: center; gap: .75rem; font-size: .875rem; color: #c6d7ec; }
-.guard-french-mark { display: flex; width: 21px; height: 13px; flex-shrink: 0; overflow: hidden; border-radius: 2px; }
-.guard-french-mark i { flex: 1; background: #3983ee; }
-.guard-french-mark i:nth-child(2) { background: #f4f6fa; }
-.guard-french-mark i:last-child { background: #f07883; }
-.guard-masthead h1 { margin-top: 2.5rem; color: #f5f9ff; font-size: clamp(2.8rem, 5.1vw, 4.85rem); font-weight: 600; line-height: 1.13; letter-spacing: -.045em; }
-.guard-masthead h1 > span:last-child { color: var(--home-ice); }
-.guard-masthead__intro { margin-top: 1.6rem !important; max-width: 49ch; font-size: 1.2rem; color: #c6d7ec; line-height: 1.65; }
-.guard-masthead__actions { display: flex; align-items: center; gap: 1.75rem; margin-top: 2rem; flex-wrap: wrap; }
-/* Le lien secondaire, et lui seul : la règle visait le dernier enfant, si bien
-   qu'une bannière à un seul bouton peignait son texte en blanc sur le bleu clair
-   du bouton, illisible. */
-.guard-masthead__actions > a:not(.guard-button) { display: inline-flex; align-items: center; gap: 1.5rem; color: #f5f9ff; min-height: 44px; font-size: .95rem; }
-.guard-masthead .guard-button { background: #dbeaff; border-color: #dbeaff; color: #123459; }
-.guard-masthead__note { display: flex; align-items: center; gap: .6rem; margin-top: 1.75rem !important; font-size: .8rem; color: var(--home-muted); }
-.guard-masthead__note > span { width: 6px; height: 6px; background: #91b3da; border-radius: 50%; }
-.guard-masthead__principles { border-top: 1px solid #ffffff26; display: flex; gap: 3rem; padding-block: 1.5rem; padding-right: 3rem; color: #c6d7ec; }
-.guard-masthead__principles > span { display: flex; align-items: center; gap: .75rem; font-size: .9rem; }
-.guard-masthead__principles small { font-family: var(--font-mono), monospace; font-size: .65rem; color: #a2c8f5; }
-.guard-masthead__video-control { position: absolute; right: max(1rem, calc((100vw - var(--container)) / 2)); bottom: 1rem; width: 44px; height: 44px; border-radius: 50%; border: 1px solid #ffffff40; background: #0c1c33b3; color: #fff; }
-.guard-home .guard-masthead :is(a, button):focus-visible { outline-color: #dbeaff; }
 .guard-product-feature__tag { display: flex; gap: .5rem; align-items: center; font-size: .8rem; color: var(--signal-accent-text); }
 .guard-product-feature__tag > span { width: 6px; height: 6px; border-radius: 50%; background: var(--signal-accent-text); }
 .guard-product-feature__lead { font-size: 1.2rem; color: var(--signal-text); margin-top: .6rem !important; }
 .guard-product-feature__copy > p:not([class]) { color: var(--signal-muted); margin-top: 1rem; }
 .guard-home .guard-product-feature__copy > ul { display: flex; flex-wrap: wrap; list-style: none; gap: .5rem 1rem; padding: 0; margin-top: 1.2rem; font-size: .8rem; color: var(--signal-accent-text); }
 .guard-product-feature__copy > ul li::before { content: "↗"; margin-right: .35rem; }
-.guard-developer-callout { display: grid; grid-template-columns: 1fr 1.15fr auto; gap: var(--sp-8); align-items: center; padding-block: var(--sp-10); border-block: var(--signal-border) solid var(--signal-line); }
-.guard-developer-callout h2 { margin-top: var(--sp-2); font-size: var(--fs-h3); }
-.guard-developer-callout > p { color: var(--signal-muted); }
-.guard-developer-callout > a { display: inline-flex; align-items: center; gap: var(--sp-4); min-height: var(--signal-touch); color: var(--signal-accent-text); font-weight: 600; white-space: nowrap; }
 .guard-product-feature__note { margin-top: 1rem !important; color: var(--signal-muted); font-size: .78rem; max-width: 55ch; }
-.guard-ext-market { margin-top: 2rem; }
 .guard-product-feature__learn { display: inline-flex; align-items: center; gap: 1rem; margin-top: 1rem; min-height: var(--signal-touch); }
 .guard-product-feature__hosts { margin-top: .8rem; color: var(--signal-muted); font-size: .85rem; }
 .guard-product-feature__price { display: block; color: var(--signal-accent-text); }
@@ -66,18 +33,12 @@
 .guard-glossary-link h3 { font-size: 1.1rem; font-weight: 600; }
 .guard-glossary-link p { color: var(--signal-muted); font-size: .9rem; margin-top: .25rem; max-width: 58ch; }
 .guard-glossary-link a { display: inline-flex; align-items: center; gap: 1rem; flex-shrink: 0; color: var(--signal-accent-text); margin-left: auto; font-size: .9rem; min-height: 44px; }
-.guard-home .guard-who { padding-top: 5rem; padding-bottom: 5rem; }
 @media (max-width: 1100px) {
   .guard-home .guard-header nav { gap: 1rem; }
   .guard-glossary-link { flex-wrap: wrap; }
   .guard-glossary-link a { margin-left: 0; }
 }
 @media (max-width: 800px) {
-  .guard-developer-callout { grid-template-columns: 1fr; align-items: start; }
-  .guard-masthead__copy { max-width: 640px; }
-  .guard-masthead__scrim { background: linear-gradient(90deg, #09172bea, #09172b99); }
-  .guard-masthead__principles { gap: 1rem; justify-content: space-between; }
-  .guard-masthead__principles > span { font-size: .8rem; gap: .5rem; }
   .guard-glossary-link > div { flex: 1; }
   .guard-glossary-link a { width: 100%; padding-left: calc(50px + 1.5rem); }
 }
@@ -91,19 +52,9 @@
   .guard-home .guard-header .console-language { margin-left: 0; font-size: .62rem; }
   .guard-home .guard-header .console-language button { min-width: 1.35rem; padding-inline: .1rem; }
   .guard-home .guard-header .guard-button { position: absolute; right: 0; top: 1rem; padding: .5rem .7rem; gap: .6rem; font-size: .75rem; min-height: 40px; }
-  .guard-masthead__inner { padding-top: 3rem; }
-  .guard-masthead h1 { font-size: clamp(2.55rem, 9.3vw, 3.6rem); margin-top: 1.8rem; }
-  .guard-masthead__eyebrow { font-size: .75rem; align-items: flex-start; }
-  .guard-french-mark { margin-top: .2rem; }
-  .guard-masthead__intro { font-size: 1.1rem; }
-  .guard-masthead__actions { gap: .8rem; align-items: flex-start; flex-direction: column; }
-  .guard-masthead__copy { padding-bottom: 2rem; }
-  .guard-masthead__principles { flex-direction: column; padding-block: 1.25rem; gap: .5rem; }
-  .guard-masthead__principles > span { font-size: .85rem; }
   .guard-glossary-link { gap: 1rem; margin-top: 2rem; }
   .guard-glossary-link__icon { width: 35px; font-size: 1.4rem; }
   .guard-glossary-link a { padding-left: 0; font-size: .85rem; }
-  .guard-home .guard-who { padding-block: 3.5rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   .guard-home *, .guard-home *::before, .guard-home *::after { animation: none !important; transition: none !important; }
