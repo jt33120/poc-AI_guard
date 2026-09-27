@@ -29,6 +29,15 @@
         "unknownAction": { "enum": ["allow", "deny", "require_approval"] }
       }
     },
+    "workstation": {
+      "description": "Workstation settings the organization restricts. observeMaxMinutes caps Secret Guard's Avertir (warn) mode: 0 forbids it, a length bounds it. Absent, the extension's own 8-hour ceiling applies. Runners before 0.7.1 must refuse a policy carrying this object (minRunnerVersion).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observeMaxMinutes"],
+      "properties": {
+        "observeMaxMinutes": { "enum": [0, 15, 60, 240, 480] }
+      }
+    },
     "rules": {
       "type": "array",
       "maxItems": 500,

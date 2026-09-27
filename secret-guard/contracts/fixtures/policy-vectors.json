@@ -69,5 +69,94 @@
       },
       "effect": "deny"
     }
-  ]
+  ],
+  "workstation": {
+    "valid": [
+      { "observeMaxMinutes": 0 },
+      { "observeMaxMinutes": 15 },
+      { "observeMaxMinutes": 60 },
+      { "observeMaxMinutes": 240 },
+      { "observeMaxMinutes": 480 }
+    ],
+    "invalid": [
+      {
+        "name": "thirty minutes is not a choice",
+        "value": { "observeMaxMinutes": 30 }
+      },
+      {
+        "name": "longer than eight hours",
+        "value": { "observeMaxMinutes": 720 }
+      },
+      { "name": "negative", "value": { "observeMaxMinutes": -15 } },
+      { "name": "string", "value": { "observeMaxMinutes": "60" } },
+      { "name": "boolean", "value": { "observeMaxMinutes": false } },
+      { "name": "fraction", "value": { "observeMaxMinutes": 60.5 } },
+      { "name": "null cap", "value": { "observeMaxMinutes": null } },
+      { "name": "empty settings", "value": {} },
+      {
+        "name": "unknown setting",
+        "value": { "observeMaxMinutes": 60, "clipboard": "off" }
+      },
+      { "name": "not an object", "value": 60 },
+      { "name": "null settings", "value": null }
+    ]
+  },
+  "signature": {
+    "note": "Signed by the platform (core/developer_policies.py) with the TEST seed bytes 0..31; the workstation verifies it under envelope.publicKey. minRunnerVersion was set by the platform because workstation is present.",
+    "tenantId": "00000000-0000-4000-8000-000000000001",
+    "body": {
+      "schemaVersion": 1,
+      "policyId": "equipe-avertir",
+      "version": 3,
+      "issuedAt": "2026-09-27T00:00:00Z",
+      "expiresAt": "2027-09-27T00:00:00Z",
+      "defaults": {
+        "unknownAction": "deny"
+      },
+      "rules": [
+        {
+          "id": "lecture-source",
+          "effect": "allow",
+          "reason": "Lecture du dépôt autorisée",
+          "match": {
+            "events": ["read"]
+          }
+        }
+      ],
+      "workstation": {
+        "observeMaxMinutes": 60
+      }
+    },
+    "canonical": "{\"defaults\":{\"unknownAction\":\"deny\"},\"expiresAt\":\"2027-09-27T00:00:00Z\",\"issuedAt\":\"2026-09-27T00:00:00Z\",\"minRunnerVersion\":\"0.7.1\",\"policyId\":\"equipe-avertir\",\"rules\":[{\"effect\":\"allow\",\"id\":\"lecture-source\",\"match\":{\"events\":[\"read\"]},\"reason\":\"Lecture du dépôt autorisée\"}],\"schemaVersion\":1,\"tenantId\":\"00000000-0000-4000-8000-000000000001\",\"version\":3,\"workstation\":{\"observeMaxMinutes\":60}}",
+    "envelope": {
+      "policy": {
+        "schemaVersion": 1,
+        "policyId": "equipe-avertir",
+        "version": 3,
+        "issuedAt": "2026-09-27T00:00:00Z",
+        "expiresAt": "2027-09-27T00:00:00Z",
+        "minRunnerVersion": "0.7.1",
+        "defaults": {
+          "unknownAction": "deny"
+        },
+        "rules": [
+          {
+            "id": "lecture-source",
+            "effect": "allow",
+            "reason": "Lecture du dépôt autorisée",
+            "match": {
+              "events": ["read"]
+            }
+          }
+        ],
+        "workstation": {
+          "observeMaxMinutes": 60
+        },
+        "tenantId": "00000000-0000-4000-8000-000000000001"
+      },
+      "keyId": "56475aa75463474c0285df5dbf2bcab73da651358839e9b77481b2eab107708c",
+      "publicKey": "A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=",
+      "signature": "CclvGHPiq8YjY0iZH4dMjX1ffjZvJNQKE6wmjfHR53D7JMmWt9Mu/JkcyWXIikMi3uuEmXBde7rdSdYlnk7ZCw=="
+    }
+  }
 }

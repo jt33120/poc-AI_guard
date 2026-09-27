@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
@@ -67,6 +68,44 @@ class DeveloperPolicyDefaults(BaseModel):
     unknown_action: PolicyEffect = Field(alias="unknownAction")
 
 
+ObserveCapMinutes = Literal[0, 15, 60, 240, 480]
+# Première extension qui applique ``workstation`` : un poste plus ancien refuse la
+# politique (``runner_version_too_old``) au lieu d'ignorer le plafond.
+WORKSTATION_MIN_RUNNER = "0.7.1"
+_SEMVER = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$")
+
+
+def _version_tuple(value: str) -> tuple[int, int, int] | None:
+    match = _SEMVER.match(value)
+    if match is None:
+        return None
+    return int(match[1]), int(match[2]), int(match[3])
+
+
+_WORKSTATION_MIN_RUNNER_TUPLE = tuple(int(part) for part in WORKSTATION_MIN_RUNNER.split("."))
+
+
+class DeveloperPolicyWorkstation(BaseModel):
+    """Réglages du poste portés par la politique signée. Ils ne font que restreindre.
+
+    ``observeMaxMinutes`` plafonne le mode Avertir de Secret Guard : 0 l'interdit, une
+    durée le borne. Absent, le plafond de 8 h de l'extension s'applique seul.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    observe_max_minutes: ObserveCapMinutes = Field(alias="observeMaxMinutes")
+
+    @field_validator("observe_max_minutes", mode="before")
+    @classmethod
+    def _plain_integer(cls, value: object) -> object:
+        # ``False == 0`` et ``60.0 == 60`` en Python : le poste, lui, refuse un booléen,
+        # et un flottant serait signé « 60.0 » mais relu « 60 ». Un entier, rien d'autre.
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError("observeMaxMinutes must be one of 0, 15, 60, 240, 480")
+        return value
+
+
 class DeveloperPolicyBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -78,12 +117,21 @@ class DeveloperPolicyBody(BaseModel):
     min_runner_version: str | None = Field(alias="minRunnerVersion", default=None, max_length=64)
     defaults: DeveloperPolicyDefaults
     rules: list[DeveloperPolicyRule] = Field(max_length=500)
+    workstation: DeveloperPolicyWorkstation | None = None
 
     @field_validator("schema_version")
     @classmethod
     def _version_one(cls, value: int) -> int:
         if value != 1:
             raise ValueError("unsupported policy schema")
+        return value
+
+    @field_validator("workstation", mode="before")
+    @classmethod
+    def _settings_or_nothing(cls, value: object) -> object:
+        # Comme le poste : un plafond se donne ou s'omet, ``null`` n'est pas « aucun ».
+        if value is None:
+            raise ValueError("workstation must be an object; omit it for no cap")
         return value
 
     @field_validator("rules")
@@ -99,6 +147,25 @@ class DeveloperPolicyBody(BaseModel):
             raise ValueError("policy timestamps must include a timezone")
         if self.expires_at <= self.issued_at:
             raise ValueError("policy expiry must be after issuance")
+        return self
+
+    @model_validator(mode="after")
+    def _workstation_requires_a_runner_that_applies_it(self) -> DeveloperPolicyBody:
+        """Un plafond du poste n'est jamais ignoré en silence par un poste ancien.
+
+        La plateforme relève ``minRunnerVersion`` à la première extension qui l'applique ;
+        une version déjà plus exigeante est gardée telle quelle.
+        """
+        if self.workstation is None:
+            return self
+        if self.min_runner_version is None:
+            self.min_runner_version = WORKSTATION_MIN_RUNNER
+            return self
+        current = _version_tuple(self.min_runner_version)
+        if current is None:
+            raise ValueError("minRunnerVersion must be a semantic version")
+        if current < _WORKSTATION_MIN_RUNNER_TUPLE:
+            self.min_runner_version = WORKSTATION_MIN_RUNNER
         return self
 
     def canonical_payload(self, tenant_id: str) -> dict[str, Any]:

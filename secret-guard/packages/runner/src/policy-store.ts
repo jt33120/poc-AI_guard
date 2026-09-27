@@ -1,7 +1,9 @@
 import { readFile } from "node:fs/promises";
-import type {
-  DeveloperPolicy,
-  PolicyEffect,
+import {
+  OBSERVE_CAP_MINUTES,
+  type DeveloperPolicy,
+  type ObserveCapMinutes,
+  type PolicyEffect,
 } from "@xsom/developer-guard-policy";
 import { verifyPolicySignature } from "./policy-signature.js";
 
@@ -108,6 +110,21 @@ function isRule(value: unknown): boolean {
   );
 }
 
+function isObserveCap(value: unknown): value is ObserveCapMinutes {
+  return OBSERVE_CAP_MINUTES.some((minutes) => minutes === value);
+}
+
+function isWorkstation(value: unknown): boolean {
+  if (value === undefined) return true;
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    return false;
+  const settings = value as Record<string, unknown>;
+  return (
+    exactKeys(settings, ["observeMaxMinutes"]) &&
+    isObserveCap(settings.observeMaxMinutes)
+  );
+}
+
 function isPolicy(value: unknown): value is DeveloperPolicy {
   if (typeof value !== "object" || value === null || Array.isArray(value))
     return false;
@@ -132,6 +149,7 @@ function isPolicy(value: unknown): value is DeveloperPolicy {
       "minRunnerVersion",
       "defaults",
       "rules",
+      "workstation",
     ]) &&
     policy.schemaVersion === 1 &&
     (policy.tenantId === undefined ||
@@ -158,7 +176,8 @@ function isPolicy(value: unknown): value is DeveloperPolicy {
     policy.rules.length <= 500 &&
     policy.rules.every(isRule) &&
     new Set(policy.rules.map((rule) => (rule as Record<string, unknown>).id))
-      .size === policy.rules.length
+      .size === policy.rules.length &&
+    isWorkstation(policy.workstation)
   );
 }
 
@@ -196,22 +215,39 @@ export function validateSignedPolicyDocument(
     pinnedPublicKey !== parsed.publicKey
   )
     throw new Error("policy_key_not_pinned");
+  const signed = parsed.policy;
   if (
-    !isPolicy(parsed.policy) ||
+    typeof signed !== "object" ||
+    signed === null ||
+    Array.isArray(signed) ||
     !verifyPolicySignature(
-      parsed.policy as unknown as Record<string, unknown>,
+      signed as Record<string, unknown>,
       parsed.signature,
       parsed.publicKey,
     )
   )
     throw new Error("invalid_policy_signature");
-  const policy = parsed.policy;
+  // Checked before the shape: a policy written for a newer runner may carry
+  // fields this one does not know, and says so instead of looking malformed.
+  const required = (signed as Record<string, unknown>).minRunnerVersion;
   if (
-    policy.minRunnerVersion !== undefined &&
-    compareVersions(runnerVersion, policy.minRunnerVersion) < 0
+    typeof required === "string" &&
+    compareVersions(runnerVersion, required) < 0
   )
     throw new Error("runner_version_too_old");
-  return policy;
+  if (!isPolicy(signed)) throw new Error("invalid_policy_signature");
+  return signed;
+}
+
+/**
+ * The organization's cap on Avertir from a verified policy, in minutes: 0
+ * forbids Avertir. Undefined without a policy or without a cap, where the
+ * extension's own ceiling applies. Never a reason to allow more.
+ */
+export function observeCapOf(
+  policy: DeveloperPolicy | undefined,
+): ObserveCapMinutes | undefined {
+  return policy?.workstation?.observeMaxMinutes;
 }
 
 export async function loadPolicy(
