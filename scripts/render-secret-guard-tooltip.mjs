@@ -22,7 +22,7 @@ const output = join(root, "frontend/public/signal-media/secret-guard-tooltip.png
 const map = join(root, "frontend/components/secret-guard/tooltip-map.json");
 const version = JSON.parse(await readFile(join(extension, "package.json"), "utf8")).version;
 
-// A protected workstation in Expurger, the clipboard just cleaned of two secrets.
+// A protected Team workstation in Expurger, with its xSOM tuning, the clipboard just cleaned of two secrets.
 const DEMO_STATE = {
   appearance: "dark",
   health: {
@@ -36,6 +36,8 @@ const DEMO_STATE = {
   },
   mode: "redact",
   lastScan: { source: "clipboard", decision: "BLOCK", findings: 2, complete: true, purged: true, time: "14:32" },
+  // Édition Équipe : un réglage sur mesure signé par xSOM, appliqué sur le poste.
+  rulesPack: { line: "Réglage xSOM · v3 · 12 règles · jusqu’au 01/09/2027", tone: "ok", offerRequest: false },
 };
 
 // Each control the page explains, found by what the extension itself puts on it.
@@ -120,7 +122,7 @@ try {
     "# Tooltip Secret Guard",
     "",
     `- Rendu depuis \`statusTooltipMarkdown\` de l’extension ${version} (\`secret-guard/packages/vscode/src/status-tooltip.ts\`), cadre VS Code Dark Modern, à 2×.`,
-    "- État de démonstration : protection active, niveau Expurger, presse-papiers nettoyé de deux secrets à 14:32.",
+    "- État de démonstration : poste Équipe protégé, réglage xSOM v3 appliqué, niveau Expurger, presse-papiers nettoyé de deux secrets à 14:32.",
     "- La position de chaque bouton est relevée dans `frontend/components/secret-guard/tooltip-map.json`, que la page `/secret-guard` lit pour ses légendes.",
     "- Reproduction : `node scripts/render-secret-guard-tooltip.mjs [dossier de l’extension]`.",
     "",
