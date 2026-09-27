@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
@@ -67,6 +68,44 @@ class DeveloperPolicyDefaults(BaseModel):
     unknown_action: PolicyEffect = Field(alias="unknownAction")
 
 
+ObserveCapMinutes = Literal[0, 15, 60, 240, 480]
+# Première extension qui applique ``workstation`` : un poste plus ancien refuse la
+# politique (``runner_version_too_old``) au lieu d'ignorer le plafond.
+WORKSTATION_MIN_RUNNER = "0.7.1"
+_SEMVER = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$")
+
+
+def _version_tuple(value: str) -> tuple[int, int, int] | None:
+    match = _SEMVER.match(value)
+    if match is None:
+        return None
+    return int(match[1]), int(match[2]), int(match[3])
+
+
+_WORKSTATION_MIN_RUNNER_TUPLE = tuple(int(part) for part in WORKSTATION_MIN_RUNNER.split("."))
+
+
+class DeveloperPolicyWorkstation(BaseModel):
+    """Réglages du poste portés par la politique signée. Ils ne font que restreindre.
+
+    ``observeMaxMinutes`` plafonne le mode Avertir de Secret Guard : 0 l'interdit, une
+    durée le borne. Absent, le plafond de 8 h de l'extension s'applique seul.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    observe_max_minutes: ObserveCapMinutes = Field(alias="observeMaxMinutes")
+
+    @field_validator("observe_max_minutes", mode="before")
+    @classmethod
+    def _plain_integer(cls, value: object) -> object:
+        # ``False == 0`` et ``60.0 == 60`` en Python : le poste, lui, refuse un booléen,
+        # et un flottant serait signé « 60.0 » mais relu « 60 ». Un entier, rien d'autre.
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError("observeMaxMinutes must be one of 0, 15, 60, 240, 480")
+        return value
+
+
 class DeveloperPolicyBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -78,12 +117,21 @@ class DeveloperPolicyBody(BaseModel):
     min_runner_version: str | None = Field(alias="minRunnerVersion", default=None, max_length=64)
     defaults: DeveloperPolicyDefaults
     rules: list[DeveloperPolicyRule] = Field(max_length=500)
+    workstation: DeveloperPolicyWorkstation | None = None
 
     @field_validator("schema_version")
     @classmethod
     def _version_one(cls, value: int) -> int:
         if value != 1:
             raise ValueError("unsupported policy schema")
+        return value
+
+    @field_validator("workstation", mode="before")
+    @classmethod
+    def _settings_or_nothing(cls, value: object) -> object:
+        # Comme le poste : un plafond se donne ou s'omet, ``null`` n'est pas « aucun ».
+        if value is None:
+            raise ValueError("workstation must be an object; omit it for no cap")
         return value
 
     @field_validator("rules")
@@ -101,8 +149,32 @@ class DeveloperPolicyBody(BaseModel):
             raise ValueError("policy expiry must be after issuance")
         return self
 
+    @model_validator(mode="after")
+    def _workstation_requires_a_runner_that_applies_it(self) -> DeveloperPolicyBody:
+        """Un plafond du poste n'est jamais ignoré en silence par un poste ancien.
+
+        La plateforme relève ``minRunnerVersion`` à la première extension qui l'applique ;
+        une version déjà plus exigeante est gardée telle quelle.
+        """
+        if self.workstation is None:
+            return self
+        if self.min_runner_version is None:
+            self.min_runner_version = WORKSTATION_MIN_RUNNER
+            return self
+        current = _version_tuple(self.min_runner_version)
+        if current is None:
+            raise ValueError("minRunnerVersion must be a semantic version")
+        if current < _WORKSTATION_MIN_RUNNER_TUPLE:
+            self.min_runner_version = WORKSTATION_MIN_RUNNER
+        return self
+
     def canonical_payload(self, tenant_id: str) -> dict[str, Any]:
-        payload = self.model_dump(by_alias=True, mode="json")
+        """Le document signé, sans champ vide.
+
+        Le poste refuse un ``null`` là où il attend une valeur ou rien
+        (``policy-store.ts``) : un champ optionnel absent n'est pas écrit du tout.
+        """
+        payload = self.model_dump(by_alias=True, mode="json", exclude_none=True)
         payload["tenantId"] = tenant_id
         return payload
 
@@ -274,8 +346,14 @@ def assign(conn: psycopg.Connection, *, tenant_id: str, device_id: str, policy_i
 
 
 def list_for_tenant(conn: psycopg.Connection, tenant_id: str) -> list[dict[str, Any]]:
+    """Le résumé des politiques, lu dans le document signé lui-même.
+
+    ``observe_max_minutes`` : plafond d'Avertir sur les postes (0 = interdit, ``None`` =
+    aucun plafond de l'organisation) ; ``min_runner_version`` : l'extension minimale.
+    """
     rows = conn.execute(
-        "select policy_id,version,expires_at,published_at,revoked_at,key_id "
+        "select policy_id,version,expires_at,published_at,revoked_at,key_id,"
+        "(policy#>>'{workstation,observeMaxMinutes}')::int,policy->>'minRunnerVersion' "
         "from developer_policies "
         "where tenant_id=%s order by published_at desc",
         (tenant_id,),
@@ -288,6 +366,8 @@ def list_for_tenant(conn: psycopg.Connection, tenant_id: str) -> list[dict[str, 
             "published_at": row[3],
             "revoked_at": row[4],
             "key_id": row[5],
+            "observe_max_minutes": row[6],
+            "min_runner_version": row[7],
         }
         for row in rows
     ]

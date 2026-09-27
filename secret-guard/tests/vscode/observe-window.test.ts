@@ -4,18 +4,23 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  cappedObserveMinutes,
   closeObserveWindow,
   DEFAULT_OBSERVE_MINUTES,
   effectiveMode,
   isObserveMinutes,
   OBSERVE_DURATIONS,
   OBSERVE_WINDOW_MAX_MS,
+  observeCapChange,
+  observeCapLine,
   observeDurationLabel,
+  observeDurationsWithin,
   observeWindowOpen,
   openObserveWindow,
   readObserveDeadline,
   type ObserveMinutes,
 } from "../../packages/vscode/src/observe-window.js";
+import { RUNNER_VERSION } from "../../packages/vscode/src/runner-version.js";
 
 const HOUR = 60 * 60 * 1000;
 
@@ -89,5 +94,72 @@ describe("Avertir window", () => {
     await closeObserveWindow(storage);
     await closeObserveWindow(storage);
     expect(readObserveDeadline(storage)).toBeUndefined();
+  });
+});
+
+describe("Avertir capped by the organization", () => {
+  const now = 1_800_000_000_000;
+  const MINUTE = 60 * 1000;
+
+  it("offers only the lengths within the cap, none when forbidden", () => {
+    expect(observeDurationsWithin(undefined)).toEqual([15, 60, 240, 480]);
+    expect(observeDurationsWithin(480)).toEqual([15, 60, 240, 480]);
+    expect(observeDurationsWithin(240)).toEqual([15, 60, 240]);
+    expect(observeDurationsWithin(60)).toEqual([15, 60]);
+    expect(observeDurationsWithin(15)).toEqual([15]);
+    expect(observeDurationsWithin(0)).toEqual([]);
+  });
+
+  it("shortens the preferred length to the cap, never lengthens it", () => {
+    expect(cappedObserveMinutes(480, 60)).toBe(60);
+    expect(cappedObserveMinutes(15, 60)).toBe(15);
+    expect(cappedObserveMinutes(240, undefined)).toBe(240);
+    expect(cappedObserveMinutes(60, 0)).toBeUndefined();
+  });
+
+  it("closes a window longer than the cap, and every window at zero", () => {
+    expect(observeWindowOpen(now + 60 * MINUTE, now, 60)).toBe(true);
+    expect(observeWindowOpen(now + 60 * MINUTE + 1, now, 60)).toBe(false);
+    expect(observeWindowOpen(now + 1, now, 0)).toBe(false);
+    // A cap above the ceiling does not raise it.
+    expect(observeWindowOpen(now + OBSERVE_WINDOW_MAX_MS + 1, now, 480)).toBe(
+      false,
+    );
+    expect(effectiveMode("observe", now + 4 * 60 * MINUTE, now, 60)).toBe(
+      "redact",
+    );
+    expect(effectiveMode("observe", now + 30 * MINUTE, now, 60)).toBe(
+      "observe",
+    );
+    expect(effectiveMode("observe", now + 15 * MINUTE, now, 0)).toBe("redact");
+    // Without an organization cap, the 8-hour ceiling alone applies.
+    expect(
+      effectiveMode("observe", now + 4 * 60 * MINUTE, now, undefined),
+    ).toBe("observe");
+    expect(effectiveMode("block", undefined, now, 0)).toBe("block");
+  });
+
+  it("says what a new cap does to a running window", () => {
+    expect(observeCapChange(now + 8 * 60 * MINUTE, now, undefined)).toBe(
+      "none",
+    );
+    expect(observeCapChange(now + 15 * MINUTE, now, 0)).toBe("forbid");
+    expect(observeCapChange(now + 4 * 60 * MINUTE, now, 60)).toBe("shorten");
+    expect(observeCapChange(now + 60 * MINUTE, now, 60)).toBe("none");
+    expect(observeCapChange(undefined, now, 60)).toBe("none");
+  });
+
+  it("names the organization as the source of the cap", () => {
+    expect(observeCapLine(undefined)).toBeUndefined();
+    expect(observeCapLine(60)).toBe("plafonné à 1 h par votre organisation");
+    expect(observeCapLine(15)).toBe("plafonné à 15 min par votre organisation");
+    expect(observeCapLine(0)).toBe(
+      "Avertir est désactivé par votre organisation",
+    );
+  });
+
+  it("refuses version floors when the runner version was not compiled in", () => {
+    // build.mjs defines it for the release; unbuilt, no floor is met.
+    expect(RUNNER_VERSION).toBe("0.0.0");
   });
 });

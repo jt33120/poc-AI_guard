@@ -1,5 +1,26 @@
 # Journal des versions
 
+## 0.7.1
+
+- **Avertir plafonné par votre organisation (édition Équipe)** : la politique signée
+  du poste peut limiter Avertir à 4 heures, 1 heure ou 15 minutes, ou l’interdire.
+  Le hook applique ce plafond lui-même, à partir de la politique revérifiée avec la
+  clé épinglée, même si VS Code est fermé : au-delà, Avertir devient Expurger. Une
+  politique absente, altérée ou signée par une autre clé n’élargit rien ; le plafond
+  de 8 heures reste.
+- La modale d’activation et le panneau ne proposent que les durées permises, et
+  disent « plafonné à 1 h par votre organisation ». Interdit, Avertir garde sa tuile,
+  inactive, avec la raison ; l’activer, depuis le panneau, une durée ou les
+  paramètres, est refusé avec un message.
+- Quand une politique plafonnée arrive pendant Avertir, une fenêtre plus longue est
+  raccourcie au plafond à partir de maintenant ; interdit, Secret Guard repasse
+  aussitôt en Expurger.
+- Une politique qui porte ce plafond exige l’extension 0.7.1 : une version plus
+  ancienne la refuse au lieu de l’ignorer.
+- Correctif : le hook comparait l’exigence de version d’une politique à 0.1.0, et
+  refusait donc toute politique demandant une extension récente. Il la compare
+  désormais à la version installée.
+
 ## 0.7.0
 
 - **Réglage sur mesure xSOM (édition Équipe)** : l’extension applique les règles

@@ -21,6 +21,35 @@ describe("protection dashboard boundaries", () => {
     expect(html).toContain("secretGuard.chooseMode");
     expect(html).toContain("même avec des secrets");
   });
+  it("says when Avertir is capped or forbidden by the organization", () => {
+    const capped = dashboardHtml(
+      healthy,
+      "observe",
+      "nonce",
+      false,
+      undefined,
+      undefined,
+      60,
+    );
+    expect(capped).toContain(
+      "Avertir plafonné à 1 h par votre organisation. Réglage de la politique signée",
+    );
+    const forbidden = dashboardHtml(
+      healthy,
+      "redact",
+      "nonce",
+      false,
+      undefined,
+      undefined,
+      0,
+    );
+    expect(forbidden).toContain(
+      "Avertir est désactivé par votre organisation.",
+    );
+    expect(dashboardHtml(healthy, "observe", "nonce")).not.toContain(
+      "votre organisation",
+    );
+  });
   it("explains where redaction is automatic and where it is manual", () => {
     const html = dashboardHtml(healthy, "redact", "nonce");
     expect(html).toContain("Automatique dans @secretguard");

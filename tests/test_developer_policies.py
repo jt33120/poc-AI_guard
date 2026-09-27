@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import base64
+import json
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from fastapi.testclient import TestClient
 
 from api.main import create_app
@@ -242,3 +244,91 @@ def test_publishing_a_policy_without_a_signing_key_fails_closed(
         "select count(*) from developer_policies where tenant_id=%s", (tenant,)
     ).fetchone()
     assert rows == (0,)
+
+
+def _capped(policy_id: str, cap: object, version: int = 1) -> dict[str, object]:
+    return {**_payload(policy_id, version), "workstation": {"observeMaxMinutes": cap}}
+
+
+def test_an_admin_caps_avertir_and_the_workstation_receives_it_signed(
+    db: DBHandle,
+    test_verifier: TokenVerifier,
+    make_token: Callable[..., str],
+) -> None:
+    """Plafond d'Avertir : validé, signé, exigeant 0.7.1, résumé et distribué au poste."""
+    tenant = str(uuid4())
+    db.conn.execute("insert into tenants (id,name) values (%s,'Plafond Avertir')", (tenant,))
+    raw, _ = tenant_tokens.mint(db.conn, tenant_id=tenant, name="developer-laptop")
+    db.conn.commit()
+    client = _client(db, test_verifier)
+    admin = {"Authorization": f"Bearer {make_token(tenant_id=tenant, role='admin')}"}
+    viewer = {"Authorization": f"Bearer {make_token(tenant_id=tenant, role='viewer')}"}
+    device_id = str(uuid4())
+    assert (
+        client.post(
+            "/v1/extension/register",
+            headers={"X-Gateway-Token": raw},
+            json={
+                "installation_id": device_id,
+                "platform": "darwin",
+                "extension_version": "0.7.1",
+                "mode": "redact",
+            },
+        ).status_code
+        == 200
+    )
+    for invalid in (30, 720, -15, "60", True, None):
+        refused = client.put(
+            "/v1/developer-policies/equipe", headers=admin, json=_capped("equipe", invalid)
+        )
+        assert refused.status_code == 422, invalid
+    refused_null = client.put(
+        "/v1/developer-policies/equipe",
+        headers=admin,
+        json={**_payload("equipe"), "workstation": None},
+    )
+    assert refused_null.status_code == 422
+    forbidden = client.put(
+        "/v1/developer-policies/equipe", headers=viewer, json=_capped("equipe", 60)
+    )
+    assert forbidden.status_code == 403
+
+    created = client.put("/v1/developer-policies/equipe", headers=admin, json=_capped("equipe", 60))
+    assert created.status_code == 200, created.text
+    envelope = created.json()
+    assert envelope["policy"]["workstation"] == {"observeMaxMinutes": 60}
+    assert envelope["policy"]["minRunnerVersion"] == developer_policies.WORKSTATION_MIN_RUNNER
+    assert "null" not in json.dumps(envelope["policy"])
+    public = Ed25519PublicKey.from_public_bytes(base64.b64decode(envelope["publicKey"]))
+    public.verify(
+        base64.b64decode(envelope["signature"]),
+        developer_policies._canonical(envelope["policy"]),
+    )
+
+    uncapped = client.put("/v1/developer-policies/libre", headers=admin, json=_payload("libre"))
+    assert uncapped.status_code == 200
+    assert "workstation" not in uncapped.json()["policy"]
+    forbid = client.put(
+        "/v1/developer-policies/equipe", headers=admin, json=_capped("equipe", 0, version=2)
+    )
+    assert forbid.status_code == 200
+
+    listed = {
+        row["policy_id"]: row for row in client.get("/v1/developer-policies", headers=viewer).json()
+    }
+    assert listed["equipe"]["observe_max_minutes"] == 0
+    assert listed["equipe"]["min_runner_version"] == "0.7.1"
+    assert listed["equipe"]["version"] == 2
+    assert listed["libre"]["observe_max_minutes"] is None
+    assert listed["libre"]["min_runner_version"] is None
+
+    assert (
+        client.post(f"/v1/developer-policies/equipe/assign/{device_id}", headers=admin).status_code
+        == 204
+    )
+    fetched = client.get("/v1/extension/policy", headers={"X-Gateway-Token": raw}).json()
+    assert fetched["policy"]["workstation"] == {"observeMaxMinutes": 0}
+    public.verify(
+        base64.b64decode(fetched["signature"]),
+        developer_policies._canonical(fetched["policy"]),
+    )

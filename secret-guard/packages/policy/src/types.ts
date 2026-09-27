@@ -37,6 +37,18 @@ export interface PolicyRule {
   readonly match: PolicyMatch;
 }
 
+/**
+ * Longest Avertir (warn) window the organization allows on its workstations,
+ * in minutes: 0 forbids Avertir, a length bounds it.
+ */
+export const OBSERVE_CAP_MINUTES = [0, 15, 60, 240, 480] as const;
+export type ObserveCapMinutes = (typeof OBSERVE_CAP_MINUTES)[number];
+
+/** Workstation settings a signed policy can only restrict. */
+export interface WorkstationSettings {
+  readonly observeMaxMinutes: ObserveCapMinutes;
+}
+
 export interface DeveloperPolicy {
   readonly schemaVersion: typeof POLICY_SCHEMA_VERSION;
   readonly tenantId?: string;
@@ -47,6 +59,7 @@ export interface DeveloperPolicy {
   readonly minRunnerVersion?: string;
   readonly defaults: { readonly unknownAction: PolicyEffect };
   readonly rules: readonly PolicyRule[];
+  readonly workstation?: WorkstationSettings;
 }
 
 export interface ActionRequest {

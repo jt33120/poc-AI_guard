@@ -104,6 +104,14 @@ le panneau de contrôle permet d’en changer pendant qu’il tourne,
 affiche l’heure de fin dans la barre d’état, puis repasse en Expurger. Le hook
 applique lui-même cette limite, même si VS Code est fermé entre-temps.
 
+Sur un poste de l’édition Équipe, votre organisation peut plafonner Avertir
+(4 heures, 1 heure ou 15 minutes) ou l’interdire, dans sa politique signée.
+Seules les durées permises sont proposées ; le panneau l’indique (« plafonné à
+1 h par votre organisation ») et, si Avertir est interdit, sa tuile reste
+visible mais inactive. Le hook applique ce plafond lui-même, à partir de la
+politique vérifiée avec la clé épinglée ; une politique absente ou altérée
+n’élargit rien.
+
 Après un changement de mode, ouvrez une nouvelle session de votre assistant.
 Codex peut demander de valider le hook actualisé. Le mode Avertir ne bloque pas
 les erreurs d’analyse, mais un appel de hook invalide reste refusé. Les pièces

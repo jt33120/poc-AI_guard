@@ -1,10 +1,12 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
+  observeCapOf,
   validateSignedPolicyDocument,
   verifyPolicySignature,
 } from "@xsom/developer-guard-runner";
 import { gatewayGetJson } from "./gateway-client.js";
+import type { ObserveCap } from "./observe-window.js";
 
 interface PolicyEnvelope {
   readonly policy: Record<string, unknown>;
@@ -102,6 +104,29 @@ export async function verifiedPolicyTenant(
     return typeof policy.tenantId === "string" && policy.tenantId !== ""
       ? policy.tenantId
       : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The organization's cap on Avertir, read from the stored managed policy only
+ * once it is verified again with the pinned key and this runner's version, as
+ * the hook does. Anything else gives undefined: the 8-hour ceiling alone.
+ */
+export async function verifiedObserveCap(
+  storage: string,
+  runnerVersion: string,
+): Promise<ObserveCap> {
+  try {
+    const pinned = await storedPolicyKey(storage);
+    return observeCapOf(
+      validateSignedPolicyDocument(
+        JSON.parse(await readFile(policyPath(storage), "utf8")),
+        pinned,
+        runnerVersion,
+      ),
+    );
   } catch {
     return undefined;
   }

@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { canDelegate, relayConnected } from "./gateway-delegation.js";
 import { beginActivity } from "./hook-activity.js";
 import { effectiveMode, readObserveDeadline } from "./observe-window.js";
+import { RUNNER_VERSION } from "./runner-version.js";
 
 import { parseHookMode, runHook } from "@xsom/secret-guard-cli/hook";
 import {
@@ -16,6 +17,7 @@ import {
   evaluateHookInput,
   loadAppliedRulesPack,
   loadPolicy,
+  observeCapOf,
   resolveApproval,
 } from "@xsom/developer-guard-runner";
 import type { CompiledRulesPack } from "@xsom/secret-guard-core";
@@ -43,10 +45,14 @@ async function check(storage: string): Promise<void> {
   } catch {
     // Empty input produces the protocol's fail-closed response.
   }
+  // The organization's cap on Avertir comes from the managed policy verified
+  // here again; without one, the 8-hour ceiling alone applies.
+  const managed = await managedPolicy(storage);
   const mode = effectiveMode(
     parseHookMode(process.argv.slice(2)),
     readObserveDeadline(storage),
     Date.now(),
+    managed.state === "verified" ? observeCapOf(managed.policy) : undefined,
   );
   // The relay cleans with the platform's rules only. With an xSOM tuning
   // loaded, a custom detection, or a scan that could not finish (budget,
@@ -61,7 +67,12 @@ async function check(storage: string): Promise<void> {
       tuningNeedsLocalBlock = true;
   });
   const adapter = adapterFor(process.argv.slice(2));
-  const policyResponse = await policyResponseFor(rawInput, adapter, storage);
+  const policyResponse = await policyResponseFor(
+    rawInput,
+    adapter,
+    storage,
+    managed,
+  );
   if (policyResponse !== undefined && !policyResponse.continue) {
     process.stderr.write(
       `${policyResponse.stderr ?? "xSOM Secret Guard refused this action."}\n`,
@@ -142,26 +153,56 @@ function managedRoots(): readonly string[] {
     : raw.split(process.platform === "win32" ? ";" : ":").filter(Boolean);
 }
 
+type VerifiedPolicy = NonNullable<Awaited<ReturnType<typeof loadPolicy>>>;
+
+type ManagedPolicy =
+  | { readonly state: "unmanaged" }
+  | { readonly state: "unavailable" }
+  | { readonly state: "verified"; readonly policy: VerifiedPolicy };
+
+/**
+ * The managed policy stored by the extension, verified again with the pinned
+ * key and this build's version: the storage folder is not a trust anchor.
+ */
+async function managedPolicy(storage: string): Promise<ManagedPolicy> {
+  let publicKey: string;
+  try {
+    publicKey = (
+      await readFile(join(storage, "developer-policy.pub"), "utf8")
+    ).trim();
+  } catch {
+    return { state: "unmanaged" };
+  }
+  if (publicKey === "") return { state: "unmanaged" };
+  try {
+    const policy = await loadPolicy(
+      join(storage, "developer-policy.json"),
+      publicKey,
+      RUNNER_VERSION,
+    );
+    return policy === undefined
+      ? { state: "unavailable" }
+      : { state: "verified", policy };
+  } catch {
+    return { state: "unavailable" };
+  }
+}
+
 async function policyResponseFor(
   rawInput: string,
   adapter: HostAdapter,
   storage: string,
+  managed: ManagedPolicy,
 ) {
-  const policyPath = join(storage, "developer-policy.json");
-  const publicKeyPath = join(storage, "developer-policy.pub");
-  let publicKey: string;
+  if (managed.state === "unmanaged") return undefined;
   try {
-    publicKey = (await readFile(publicKeyPath, "utf8")).trim();
-  } catch {
-    return undefined;
-  }
-  if (publicKey === "") return undefined;
-  try {
+    if (managed.state === "unavailable")
+      throw new Error("managed_policy_unavailable");
     const input = JSON.parse(rawInput) as Record<string, unknown>;
     const result = evaluateHookInput(
       adapter,
       input,
-      await loadPolicy(policyPath, publicKey),
+      managed.policy,
       managedRoots(),
     );
     if (result.decision?.effect === "require_approval") {

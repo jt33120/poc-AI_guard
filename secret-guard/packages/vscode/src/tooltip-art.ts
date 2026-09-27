@@ -235,6 +235,8 @@ export interface LevelTile {
   readonly tone: Tone;
   // 0-based strength shown by the signal bars.
   readonly rank: number;
+  // Disabled by the organization: faded, with a dashed frame.
+  readonly unavailable?: boolean;
 }
 
 export function levelTile(
@@ -246,21 +248,25 @@ export function levelTile(
   const width = TOOLTIP_WIDTH / 3;
   const color = palette.tones[level.tone];
   const bar = active ? color : palette.dim;
+  const faded = level.unavailable === true && !active;
   const signal = (index: number, x: number, y: number, h: number): string =>
     `<rect x="${String(x)}" y="${String(y)}" width="3" height="${String(h)}" rx="1" fill="${index <= level.rank ? bar : palette.stroke}"/>`;
+  const content = [
+    signal(0, 12, 23, 6),
+    signal(1, 17, 20, 9),
+    signal(2, 22, 17, 12),
+    text(level.label, 33, 23, {
+      size: 11.5,
+      weight: active ? 700 : 400,
+      fill: active ? color : palette.dim,
+    }),
+  ].join("");
   return svg(
     width,
     36,
     [
-      `<rect x="1" y="1" width="${String(width - 2)}" height="34" rx="5" fill="${active ? color : palette.surface}" fill-opacity="${active ? "0.14" : "1"}" stroke="${active ? color : palette.stroke}" stroke-opacity="${active ? "0.55" : "1"}"/>`,
-      signal(0, 12, 23, 6),
-      signal(1, 17, 20, 9),
-      signal(2, 22, 17, 12),
-      text(level.label, 33, 23, {
-        size: 11.5,
-        weight: active ? 700 : 400,
-        fill: active ? color : palette.dim,
-      }),
+      `<rect x="1" y="1" width="${String(width - 2)}" height="34" rx="5" fill="${active ? color : palette.surface}" fill-opacity="${active ? "0.14" : "1"}" stroke="${active ? color : palette.stroke}" stroke-opacity="${active ? "0.55" : "1"}"${faded ? ' stroke-dasharray="3 3"' : ""}/>`,
+      faded ? `<g opacity="0.45">${content}</g>` : content,
     ].join(""),
   );
 }
