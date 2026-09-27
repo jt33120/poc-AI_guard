@@ -46,7 +46,7 @@ export const SECRET_GUARD_COPY = {
       recommended: "Recommandé",
       controls: {
         dashboard: ["Centre de protection", "L’état de chaque assistant et du relais, en un coup d’œil."],
-        observe: ["Avertir", "Prévient, puis laisse passer le texte tel quel. Une heure, puis retour à Expurger."],
+        observe: ["Avertir", "Prévient, puis laisse passer le texte tel quel pendant 15 min, 1 h, 4 h ou 8 h, au choix dans le panneau. Puis retour à Expurger."],
         redact: ["Expurger", "Le secret est masqué, le message part quand même : dans @secretguard et Claude raccordé. Ailleurs, l’envoi s’arrête et un clic expurge le presse-papiers : il n’y a plus qu’à recoller."],
         block: ["Bloquer", "Arrête tout message où un secret est détecté, ambigu ou mal analysé."],
         effects: ["Ce qui part", "Le niveau d’exposition et le sort de votre message, assistant par assistant."],
@@ -108,7 +108,7 @@ export const SECRET_GUARD_COPY = {
       recommended: "Recommended",
       controls: {
         dashboard: ["Protection centre", "The state of each assistant and of the relay, at a glance."],
-        observe: ["Warn", "Warns, then lets the text through as is. One hour, then back to Redact."],
+        observe: ["Warn", "Warns, then lets the text through as is for 15 min, 1 h, 4 h or 8 h, chosen in the panel. Then back to Redact."],
         redact: ["Redact", "The secret is masked and the message still goes: in @secretguard and a connected Claude. Elsewhere, sending stops and one click redacts the clipboard: just paste again."],
         block: ["Block", "Stops any message where a secret is detected, ambiguous or not fully scanned."],
         effects: ["What gets sent", "The exposure level and what happens to your message, assistant by assistant."],

@@ -44,7 +44,7 @@ describe("Avertir window", () => {
     expect(readObserveDeadline(storage)).toBeUndefined();
     expect(effectiveMode("observe", undefined, now)).toBe("redact");
     // A deadline further than the longest choice was not written by Secret Guard.
-    expect(OBSERVE_WINDOW_MAX_MS).toBe(4 * HOUR);
+    expect(OBSERVE_WINDOW_MAX_MS).toBe(8 * HOUR);
     expect(observeWindowOpen(now + OBSERVE_WINDOW_MAX_MS, now)).toBe(true);
     expect(observeWindowOpen(now + OBSERVE_WINDOW_MAX_MS + 1, now)).toBe(false);
     await writeFile(join(storage, "observe-until"), "tomorrow");
@@ -53,7 +53,7 @@ describe("Avertir window", () => {
 
   it("lasts exactly the length chosen in the panel", async () => {
     const now = 1_800_000_000_000;
-    expect(OBSERVE_DURATIONS).toEqual([15, 60, 240]);
+    expect(OBSERVE_DURATIONS).toEqual([15, 60, 240, 480]);
     for (const minutes of OBSERVE_DURATIONS) {
       const deadline = await openObserveWindow(storage, now, minutes);
       expect(deadline).toBe(now + minutes * 60 * 1000);
@@ -61,15 +61,15 @@ describe("Avertir window", () => {
       expect(effectiveMode("observe", deadline, deadline)).toBe("redact");
     }
     expect(
-      [15, 60, 240].map((minutes) =>
+      [15, 60, 240, 480].map((minutes) =>
         observeDurationLabel(minutes as ObserveMinutes),
       ),
-    ).toEqual(["15 min", "1 h", "4 h"]);
+    ).toEqual(["15 min", "1 h", "4 h", "8 h"]);
   });
 
   it("never opens a window longer than the choices allow", async () => {
     const now = 1_800_000_000_000;
-    for (const invalid of [0, 30, 480, 1440, -15, 60.5, "60", undefined])
+    for (const invalid of [0, 30, 720, 1440, -15, 60.5, "60", undefined])
       expect(isObserveMinutes(invalid)).toBe(false);
     const deadline = await openObserveWindow(
       storage,

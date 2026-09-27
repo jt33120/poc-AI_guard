@@ -72,7 +72,7 @@ function registerTests(mocha: Mocha): void {
 
   extensionSuite.addTest(
     new Mocha.Test(
-      "changes the Avertir length from the panel, never beyond four hours",
+      "changes the Avertir length from the panel, never beyond eight hours",
       async () => {
         const home = process.env.XSOM_VSCODE_TEST_HOME;
         assert.ok(home, "isolated test home is configured");
@@ -127,6 +127,12 @@ function registerTests(mocha: Mocha): void {
           240,
         );
         await remainingMinutes(near(240));
+        // A night's work.
+        await vscode.commands.executeCommand(
+          "secretGuard.setObserveDuration",
+          480,
+        );
+        await remainingMinutes(near(480));
         // Not one of the panel's choices: nothing changes.
         await vscode.commands.executeCommand(
           "secretGuard.setObserveDuration",
@@ -136,7 +142,7 @@ function registerTests(mocha: Mocha): void {
           "secretGuard.setObserveDuration",
           "60",
         );
-        await remainingMinutes(near(240));
+        await remainingMinutes(near(480));
 
         await config().update(
           "mode",

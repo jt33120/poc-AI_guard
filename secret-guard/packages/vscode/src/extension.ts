@@ -88,6 +88,7 @@ const OBSERVE_CHOICES: Record<ObserveMinutes, string> = {
   15: "15 minutes",
   60: "1 heure",
   240: "4 heures",
+  480: "8 heures",
 };
 const PURGE_ACTION = "Expurger";
 let gateway: GatewayIntegration | undefined;

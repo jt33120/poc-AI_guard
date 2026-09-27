@@ -71,7 +71,7 @@ describe("protection dashboard boundaries", () => {
 
   it("makes the time-limited Avertir policy and pending Codex approval visible", () => {
     const html = dashboardHtml(healthy, "observe", "nonce");
-    expect(html).toContain("pendant 15 min, 1 h ou 4 h");
+    expect(html).toContain("pendant 15 min, 1 h, 4 h ou 8 h");
     expect(html).toContain("repasse automatiquement en Expurger");
     expect(html).not.toContain("Mode permissif");
     expect(html).toContain("Approbation du hook requise dans Codex");

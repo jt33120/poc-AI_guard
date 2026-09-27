@@ -8,7 +8,7 @@ import type { ProtectionMode } from "@xsom/secret-guard-cli/hook";
  * is also the ceiling the hook enforces: a deadline further away was not
  * written by Secret Guard and closes the window.
  */
-export const OBSERVE_DURATIONS = [15, 60, 240] as const;
+export const OBSERVE_DURATIONS = [15, 60, 240, 480] as const;
 export type ObserveMinutes = (typeof OBSERVE_DURATIONS)[number];
 export const DEFAULT_OBSERVE_MINUTES: ObserveMinutes = 60;
 export const OBSERVE_WINDOW_MAX_MS = Math.max(...OBSERVE_DURATIONS) * 60 * 1000;
@@ -17,7 +17,7 @@ export function isObserveMinutes(value: unknown): value is ObserveMinutes {
   return OBSERVE_DURATIONS.some((minutes) => minutes === value);
 }
 
-/** « 15 min », « 1 h », « 4 h ». */
+/** « 15 min », « 1 h », « 4 h », « 8 h ». */
 export function observeDurationLabel(minutes: ObserveMinutes): string {
   return minutes < 60 ? `${String(minutes)} min` : `${String(minutes / 60)} h`;
 }

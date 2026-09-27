@@ -163,13 +163,13 @@ describe("status bar tooltip controls", () => {
     });
     expect(quarter).toContain("Durée d’Avertir :");
     expect(quarter).toContain("<strong>15 min</strong>");
-    expect(durationLinks(quarter)).toEqual([60, 240]);
+    expect(durationLinks(quarter)).toEqual([60, 240, 480]);
     const card = pictures(quarter).find((picture) =>
       picture.alt.startsWith("Avertir et laisser passer."),
     );
     expect(card?.alt).toContain("Durée : 15 min, puis retour à Expurger");
     // One hour by default, as before the choice existed.
-    expect(durationLinks(render({ mode: "observe" }))).toEqual([15, 240]);
+    expect(durationLinks(render({ mode: "observe" }))).toEqual([15, 240, 480]);
     for (const mode of ["redact", "block"] as const) {
       const markdown = render({ mode, observeMinutes: 240 });
       expect(durationLinks(markdown)).toEqual([]);
