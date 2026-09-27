@@ -67,13 +67,37 @@ def test_non_ascii_characters_are_signed_as_raw_utf8() -> None:
     canonical = developer_policies._canonical(_payload(_FRENCH))
     expected = (
         '{"defaults":{"unknownAction":"deny"},"expiresAt":"2027-09-01T00:00:00Z",'
-        '"issuedAt":"2026-09-01T00:00:00Z","minRunnerVersion":null,"policyId":"equipe",'
-        '"rules":[{"effect":"deny","id":"no-prod-delete","match":{"actionClasses":["delete"],'
-        '"assistants":null,"events":null,"resourcePrefixes":null,"tools":null},'
+        '"issuedAt":"2026-09-01T00:00:00Z","policyId":"equipe",'
+        '"rules":[{"effect":"deny","id":"no-prod-delete","match":{"actionClasses":["delete"]},'
         f'"reason":"{_FRENCH}"}}],"schemaVersion":1,"tenantId":"{_TENANT}","version":2}}'
     ).encode()
     assert canonical == expected
     assert b"\\u" not in canonical
+
+
+def test_optional_fields_are_left_out_not_signed_as_null() -> None:
+    """Le poste refuse ``null`` là où il attend une valeur ou rien.
+
+    ``policy-store.ts`` n'accepte pour ``minRunnerVersion``, ``reason`` ou un critère de
+    ``match`` qu'une valeur typée ou l'absence : une politique signée avec des ``null``
+    était refusée par chaque poste, signature pourtant valide. Un champ optionnel vide
+    n'est donc pas écrit.
+    """
+    body = developer_policies.DeveloperPolicyBody.model_validate(
+        {
+            "schemaVersion": 1,
+            "policyId": "equipe",
+            "version": 1,
+            "issuedAt": "2026-09-01T00:00:00Z",
+            "expiresAt": "2027-09-01T00:00:00Z",
+            "defaults": {"unknownAction": "deny"},
+            "rules": [{"id": "lecture", "effect": "allow", "match": {"events": ["read"]}}],
+        }
+    )
+    payload = body.canonical_payload(_TENANT)
+    assert b"null" not in developer_policies._canonical(payload)
+    assert "minRunnerVersion" not in payload
+    assert payload["rules"] == [{"id": "lecture", "effect": "allow", "match": {"events": ["read"]}}]
 
 
 def test_ascii_policies_keep_the_bytes_already_signed() -> None:

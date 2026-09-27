@@ -102,7 +102,12 @@ class DeveloperPolicyBody(BaseModel):
         return self
 
     def canonical_payload(self, tenant_id: str) -> dict[str, Any]:
-        payload = self.model_dump(by_alias=True, mode="json")
+        """Le document signé, sans champ vide.
+
+        Le poste refuse un ``null`` là où il attend une valeur ou rien
+        (``policy-store.ts``) : un champ optionnel absent n'est pas écrit du tout.
+        """
+        payload = self.model_dump(by_alias=True, mode="json", exclude_none=True)
         payload["tenantId"] = tenant_id
         return payload
 
