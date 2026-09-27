@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { build } from "esbuild";
 
 import {
@@ -14,10 +16,17 @@ process.stdout.write(
     : `Rules authority: ${String(authorityKeys.length)} key(s): ${authorityKeys.map((key) => authorityKeyId(key).slice(0, 12)).join(", ")}\n`,
 );
 
+// The version a managed policy's minRunnerVersion is checked against, in the
+// extension and in the hook, which runs without the manifest next to it.
+const { version } = JSON.parse(
+  readFileSync(new URL("./package.json", import.meta.url), "utf8"),
+);
+
 const common = {
   bundle: true,
   define: {
     __XSOM_RULES_AUTHORITY_KEYS__: JSON.stringify(authorityKeys.join(",")),
+    __XSOM_RUNNER_VERSION__: JSON.stringify(version),
   },
   logLevel: "info",
   minify: false,

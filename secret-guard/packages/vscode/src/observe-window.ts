@@ -17,6 +17,45 @@ export function isObserveMinutes(value: unknown): value is ObserveMinutes {
   return OBSERVE_DURATIONS.some((minutes) => minutes === value);
 }
 
+/**
+ * The organization's cap on Avertir, from its verified signed policy: 0
+ * forbids Avertir, a length bounds it. Undefined: no organization cap, the
+ * 8-hour ceiling alone applies. A cap only ever shortens a window.
+ */
+export type ObserveCap = 0 | ObserveMinutes | undefined;
+
+/** The lengths the panel and the activation modal may offer. */
+export function observeDurationsWithin(
+  cap: ObserveCap,
+): readonly ObserveMinutes[] {
+  return OBSERVE_DURATIONS.filter(
+    (minutes) => cap === undefined || minutes <= cap,
+  );
+}
+
+/** The preferred length, shortened to the cap; undefined when forbidden. */
+export function cappedObserveMinutes(
+  minutes: ObserveMinutes,
+  cap: ObserveCap,
+): ObserveMinutes | undefined {
+  if (cap === 0) return undefined;
+  return cap === undefined || minutes <= cap ? minutes : cap;
+}
+
+/** « plafonné à 1 h par votre organisation », or why Avertir is unavailable. */
+export function observeCapLine(cap: ObserveCap): string | undefined {
+  if (cap === undefined) return undefined;
+  return cap === 0
+    ? "Avertir est désactivé par votre organisation"
+    : `plafonné à ${observeDurationLabel(cap)} par votre organisation`;
+}
+
+function observeLimitMs(cap: ObserveCap): number {
+  return cap === undefined
+    ? OBSERVE_WINDOW_MAX_MS
+    : Math.min(OBSERVE_WINDOW_MAX_MS, cap * 60 * 1000);
+}
+
 /** « 15 min », « 1 h », « 4 h », « 8 h ». */
 export function observeDurationLabel(minutes: ObserveMinutes): string {
   return minutes < 60 ? `${String(minutes)} min` : `${String(minutes / 60)} h`;
@@ -38,17 +77,19 @@ export function readObserveDeadline(storage: string): number | undefined {
 }
 
 /**
- * Whether an Avertir window is running at `now`. A missing, unreadable,
- * expired or longer-than-allowed deadline closes it.
+ * Whether an Avertir window is running at `now`. A missing, unreadable or
+ * expired deadline closes it, and so does one further away than allowed: the
+ * 8-hour ceiling, or the organization's cap when lower (0 closes every window).
  */
 export function observeWindowOpen(
   deadline: number | undefined,
   now: number,
+  cap?: ObserveCap,
 ): boolean {
   return (
     deadline !== undefined &&
     now < deadline &&
-    deadline - now <= OBSERVE_WINDOW_MAX_MS
+    deadline - now <= observeLimitMs(cap)
   );
 }
 
@@ -57,9 +98,26 @@ export function effectiveMode(
   mode: ProtectionMode,
   deadline: number | undefined,
   now: number,
+  cap?: ObserveCap,
 ): ProtectionMode {
   if (mode !== "observe") return mode;
-  return observeWindowOpen(deadline, now) ? "observe" : "redact";
+  return observeWindowOpen(deadline, now, cap) ? "observe" : "redact";
+}
+
+/**
+ * What a newly verified cap asks of a running Avertir window: end it (cap 0),
+ * shorten it to the cap from now (more time left than the cap), or nothing.
+ */
+export function observeCapChange(
+  deadline: number | undefined,
+  now: number,
+  cap: ObserveCap,
+): "none" | "forbid" | "shorten" {
+  if (cap === undefined) return "none";
+  if (cap === 0) return "forbid";
+  return deadline !== undefined && deadline - now > cap * 60 * 1000
+    ? "shorten"
+    : "none";
 }
 
 export async function openObserveWindow(

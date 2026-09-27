@@ -89,3 +89,13 @@ def test_a_cap_raises_the_runner_floor_so_older_workstations_refuse_it() -> None
     uncapped = developer_policies.DeveloperPolicyBody.model_validate(base)
     assert uncapped.min_runner_version is None
     assert "workstation" not in uncapped.canonical_payload("tenant-a")
+
+
+def test_the_extension_that_applies_the_cap_meets_the_floor_the_platform_sets() -> None:
+    """Le plancher ``minRunnerVersion`` désigne une extension qui existe dans ce dépôt."""
+    manifest = json.loads(
+        (FIXTURE.parents[2] / "packages" / "vscode" / "package.json").read_text(encoding="utf-8")
+    )
+    shipped = tuple(int(part) for part in manifest["version"].split("."))
+    floor = tuple(int(part) for part in developer_policies.WORKSTATION_MIN_RUNNER.split("."))
+    assert shipped >= floor
