@@ -346,8 +346,14 @@ def assign(conn: psycopg.Connection, *, tenant_id: str, device_id: str, policy_i
 
 
 def list_for_tenant(conn: psycopg.Connection, tenant_id: str) -> list[dict[str, Any]]:
+    """Le résumé des politiques, lu dans le document signé lui-même.
+
+    ``observe_max_minutes`` : plafond d'Avertir sur les postes (0 = interdit, ``None`` =
+    aucun plafond de l'organisation) ; ``min_runner_version`` : l'extension minimale.
+    """
     rows = conn.execute(
-        "select policy_id,version,expires_at,published_at,revoked_at,key_id "
+        "select policy_id,version,expires_at,published_at,revoked_at,key_id,"
+        "(policy#>>'{workstation,observeMaxMinutes}')::int,policy->>'minRunnerVersion' "
         "from developer_policies "
         "where tenant_id=%s order by published_at desc",
         (tenant_id,),
@@ -360,6 +366,8 @@ def list_for_tenant(conn: psycopg.Connection, tenant_id: str) -> list[dict[str, 
             "published_at": row[3],
             "revoked_at": row[4],
             "key_id": row[5],
+            "observe_max_minutes": row[6],
+            "min_runner_version": row[7],
         }
         for row in rows
     ]
