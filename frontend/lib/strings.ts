@@ -1252,6 +1252,67 @@ export const STR = {
   "rtok.used": { en: "used {date}", fr: "utilisé {date}" },
   "rtok.never": { en: "never used", fr: "jamais utilisé" },
   "rtok.empty": { en: "No read tokens yet.", fr: "Aucun read token pour l'instant." },
+
+  // Secret Guard policies (console /extensions)
+  "devpol.title": { en: "Secret Guard policies", fr: "Politiques Secret Guard" },
+  "devpol.note": {
+    en: "A policy is signed server-side. The runner refuses an invalid signature, an unpinned key or an inconsistent validity window. Rules carry no prompt and no secret.",
+    fr: "Une politique est signée côté serveur. Le runner refuse une signature, une clé épinglée ou une durée de validité incohérente. Les règles ne transportent ni prompt ni secret.",
+  },
+  "devpol.json": { en: "Policy JSON", fr: "Politique JSON" },
+  "devpol.observe.legend": { en: "Warn mode (Avertir) on workstations", fr: "Avertir sur les postes" },
+  "devpol.observe.hint": {
+    en: "Avertir sends the original text, secrets included, for a limited time. The workstation hook enforces this cap itself, even with VS Code closed. A cap requires Secret Guard 0.7.1 or later: older extensions refuse the policy.",
+    fr: "Avertir transmet le texte original, secrets compris, pour une durée limitée. Le hook du poste applique ce plafond lui-même, même VS Code fermé. Un plafond exige Secret Guard 0.7.1 ou plus récent : une extension plus ancienne refuse la politique.",
+  },
+  "devpol.observe.unreadable": {
+    en: "Fix the policy JSON to choose the Avertir cap.",
+    fr: "Corrigez le JSON de la politique pour choisir le plafond d’Avertir.",
+  },
+  "devpol.observe.unknown": {
+    en: "The JSON carries an Avertir cap the platform will refuse: choose one above.",
+    fr: "Le JSON porte un plafond d’Avertir que la plateforme refusera : choisissez-en un ci-dessus.",
+  },
+  "devpol.cap.none": { en: "Allowed (8 h max)", fr: "Autorisé (8 h max)" },
+  "devpol.cap.240": { en: "4 h max", fr: "4 h max" },
+  "devpol.cap.60": { en: "1 h max", fr: "1 h max" },
+  "devpol.cap.15": { en: "15 min max", fr: "15 min max" },
+  "devpol.cap.0": { en: "Forbidden", fr: "Interdit" },
+  "devpol.summary.none": { en: "Avertir: allowed (8 h max)", fr: "Avertir : autorisé (8 h max)" },
+  "devpol.summary.240": { en: "Avertir: 4 h max", fr: "Avertir : 4 h max" },
+  "devpol.summary.60": { en: "Avertir: 1 h max", fr: "Avertir : 1 h max" },
+  "devpol.summary.15": { en: "Avertir: 15 min max", fr: "Avertir : 15 min max" },
+  "devpol.summary.0": { en: "Avertir: forbidden", fr: "Avertir : interdit" },
+  "devpol.summary.unknown": { en: "Avertir: unrecognized cap", fr: "Avertir : plafond non reconnu" },
+  "devpol.summary.expires": { en: "expires {date}", fr: "expire le {date}" },
+  "devpol.summary.runner": { en: "extension {v} or later", fr: "extension {v} ou plus récente" },
+  "devpol.publish": { en: "Publish policy", fr: "Publier la politique" },
+  "devpol.published": { en: "Policy signed and published.", fr: "Politique signée et publiée." },
+  "devpol.missingId": { en: "Missing policy id.", fr: "Identifiant de politique manquant." },
+  "devpol.invalid": {
+    en: "The policy is invalid or the signer is not configured.",
+    fr: "La politique est invalide ou le signeur n’est pas configuré.",
+  },
+  "devpol.list.title": { en: "Published policies", fr: "Politiques publiées" },
+  "devpol.list.emptyTitle": { en: "No policy published", fr: "Aucune politique publiée" },
+  "devpol.list.emptyBody": {
+    en: "Publish a first policy above, then assign it to a workstation.",
+    fr: "Publiez une première politique ci-dessus, puis attribuez-la à un poste.",
+  },
+  "devpol.assign.policyLabel": { en: "Policy", fr: "Politique" },
+  "devpol.assign.policy": { en: "Policy to assign", fr: "Politique à attribuer" },
+  "devpol.assign.deviceLabel": { en: "Workstation", fr: "Poste" },
+  "devpol.assign.device": { en: "Workstation to assign", fr: "Poste à attribuer" },
+  "devpol.assign.choose": { en: "Choose", fr: "Choisir" },
+  "devpol.assign": { en: "Assign", fr: "Attribuer" },
+  "devpol.assigned": {
+    en: "Policy assigned. The workstation will fetch it at its next connection.",
+    fr: "Politique attribuée. Le poste la récupérera à son prochain raccordement.",
+  },
+  "devpol.assignFailed": {
+    en: "Assignment failed: check your rights and the workstation's state.",
+    fr: "Attribution impossible : vérifiez vos droits et l’état du poste.",
+  },
 } satisfies Record<string, Entry>;
 
 export type StrKey = keyof typeof STR;

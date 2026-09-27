@@ -1314,6 +1314,62 @@
   height: var(--sp-5);
   accent-color: var(--copper);
 }
+.console-shell input[type="radio"] {
+  width: var(--sp-4);
+  height: var(--sp-4);
+  accent-color: var(--copper);
+}
+/* Politique Secret Guard : composition et plafond d'Avertir. */
+.devpol-compose {
+  display: grid;
+  gap: var(--sp-4);
+  padding: 0 var(--sp-5) var(--sp-4);
+}
+.devpol-observe {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.devpol-observe legend {
+  padding: 0;
+  font-weight: 600;
+}
+.devpol-observe-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-5);
+  margin-top: var(--sp-3);
+}
+.devpol-observe-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  cursor: pointer;
+}
+.devpol-observe:disabled .devpol-observe-options label {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.devpol-observe-hint {
+  margin-top: var(--sp-3);
+  font-size: var(--console-small-size);
+  line-height: var(--console-line-height);
+  color: var(--text-mid);
+  max-width: 72ch;
+}
+.devpol-list-title {
+  padding: var(--sp-4) var(--sp-5) 0;
+  font-size: var(--console-small-size);
+  font-weight: 600;
+}
+.devpol-cap {
+  font-size: var(--console-small-size);
+  white-space: nowrap;
+}
+.devpol-cap[data-cap="0"] {
+  color: var(--signal-deny);
+}
 @media (min-width: 1600px) {
   .console-canvas {
     padding: var(--sp-10);
