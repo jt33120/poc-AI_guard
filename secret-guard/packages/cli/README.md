@@ -16,6 +16,28 @@ printf '%s' '{"hook_event_name":"UserPromptSubmit","prompt":"hello"}' | secret-g
 exits `2`, leaves stdout empty, and writes a non-sensitive reason to stderr for a
 blocked WARN/BLOCK or invalid event.
 
+## Hidden instructions
+
+`hook` also stops prompts and files that carry characters a person cannot see but a
+model reads: Unicode tag characters (ASCII smuggling), bidirectional controls
+(Trojan Source), runs of zero-width characters and runs of variation selectors.
+Reports give the kind, line and column, never what the characters spell.
+
+```bash
+secret-guard instructions               # the instruction files under the current folder
+secret-guard instructions --fix         # remove the hidden characters, in place
+secret-guard instructions src docs      # every text file under these folders
+pbpaste | secret-guard instructions --fix - | pbcopy
+```
+
+`instructions` exits `0` when nothing is hidden (or `--fix` cleaned it), `1` when hidden
+characters are found and `2` when a file could not be checked entirely. It looks for
+`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.cursorrules`, `.windsurfrules`, `.clinerules`,
+`.github/copilot-instructions.md`, `*.instructions.md`, `*.prompt.md`, `.cursor/rules`,
+`.claude/` and MCP configurations, without entering `node_modules` or `.git`. Flags,
+emoji sequences, the joiners of scripts that need them and directional marks are left
+alone. See `docs/secret-guard/INSTRUCTION-GUARD.md`.
+
 Only the delivered VS Code Preview configuration uses this hook process. Its
 contract has not been certified against Claude Code or Codex. A successful local
 invocation proves the process response, not that an IDE host loaded, trusted, or
