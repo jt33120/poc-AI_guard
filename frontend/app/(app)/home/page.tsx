@@ -13,15 +13,14 @@ import {
   EmptyState,
   localTime,
 } from "@/components/ConsoleUI";
+import { SupervisionBoard } from "@/components/supervision/SupervisionBoard";
 import { AuthorizationFlow, VerdictBadge } from "@/design-system/react";
 import { apiGet } from "@/lib/client";
-import { type AuditEntry, type ToolView } from "@/lib/console-types";
+import { type AuditEntry } from "@/lib/console-types";
 import { useT } from "@/lib/i18n";
 export default function HomePage() {
   const { lang } = useT();
   const { selected } = useClientScope();
-  const [tools, setTools] = useState<ToolView[] | null>(null);
-  const [pending, setPending] = useState<number | null>(null);
   const [events, setEvents] = useState<AuditEntry[] | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
@@ -31,28 +30,22 @@ export default function HomePage() {
     let current = true;
     setLoading(true);
     setError(null);
-    Promise.allSettled([
-      apiGet<ToolView[]>("v1/tools"),
-      apiGet<unknown[]>("v1/approvals?status=pending"),
-      apiGet<AuditEntry[]>(`v1/audit${clientSuffix(selected)}`),
-    ]).then(([registry, queue, audit]) => {
-      if (!current) return;
-      setTools(registry.status === "fulfilled" ? registry.value : null);
-      setPending(queue.status === "fulfilled" ? queue.value.length : null);
-      setEvents(audit.status === "fulfilled" ? audit.value : null);
-      const failed = [registry, queue, audit].find(
-        (result) => result.status === "rejected",
-      );
-      if (failed?.status === "rejected") setError(failed.reason);
-      setLoading(false);
-    });
+    apiGet<AuditEntry[]>(`v1/audit${clientSuffix(selected)}`)
+      .then((audit) => {
+        if (current) setEvents(audit);
+      })
+      .catch((reason: unknown) => {
+        if (!current) return;
+        setEvents(null);
+        setError(reason);
+      })
+      .finally(() => {
+        if (current) setLoading(false);
+      });
     return () => {
       current = false;
     };
   }, [selected, revision]);
-  const blocked = events?.filter((event) =>
-    ["deny", "hitl_denied", "expired"].includes(event.decision ?? ""),
-  ).length;
   return (
     <section className="console-page">
       <ConsoleHeader
@@ -75,36 +68,7 @@ export default function HomePage() {
       {error != null && (
         <ConsoleError error={error} retry={() => setRevision((n) => n + 1)} />
       )}
-      {loading ? (
-        <ConsoleSkeleton rows={2} />
-      ) : (
-        <div className="console-metrics">
-          <div className="console-metric">
-            <span>
-              {tr("Outils déclarés · tenant", "Registered tools · tenant")}
-            </span>
-            <strong>{tools?.length ?? "—"}</strong>
-            <Link href="/inspector">{tr("Registre", "Registry")} ↗</Link>
-          </div>
-          <div className="console-metric" data-attention={!!pending}>
-            <span>{tr("À signer · tenant", "Awaiting approval · tenant")}</span>
-            <strong>{pending ?? "—"}</strong>
-            <Link href="/approvals">{tr("File HITL", "HITL queue")} ↗</Link>
-          </div>
-          <div className="console-metric">
-            <span>{tr("Événements chargés", "Loaded events")}</span>
-            <strong>{events?.length ?? "—"}</strong>
-            <Link href="/audit">{tr("Journal", "Audit trail")} ↗</Link>
-          </div>
-          <div className="console-metric">
-            <span>{tr("Refus dans le lot", "Denials in batch")}</span>
-            <strong>{blocked ?? "—"}</strong>
-            <Link href="/risk">
-              {tr("Risque & intégrité", "Risk & integrity")} ↗
-            </Link>
-          </div>
-        </div>
-      )}
+      <SupervisionBoard lang={lang} clientId={selected} />
       <div className="overview-workspace">
         <section className="console-panel overview-flow">
           <div className="console-panel-heading">
