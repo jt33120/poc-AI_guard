@@ -67,6 +67,10 @@ _RESERVED: frozenset[str] = frozenset(
 )
 
 
+#: The ASGI server's loggers, which come with plain-text handlers of their own.
+_SERVER_LOGGERS = ("uvicorn", "uvicorn.error", "uvicorn.access")
+
+
 class JsonFormatter(logging.Formatter):
     """Render log records as single-line JSON."""
 
@@ -101,3 +105,11 @@ def configure_logging(level: str = "INFO") -> None:
     root.handlers.clear()
     root.addHandler(handler)
     root.setLevel(level.upper())
+    # uvicorn installs its own plain-text handlers. Railway reads a plain line on
+    # stderr as an error, so every "Started server process" showed up as one and
+    # buried the real errors. Its records now go through the same JSON handler,
+    # where the `level` field says what they are.
+    for name in _SERVER_LOGGERS:
+        server = logging.getLogger(name)
+        server.handlers.clear()
+        server.propagate = True
