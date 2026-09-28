@@ -223,6 +223,7 @@
   },
   "scripts": {
     "build": "node build.mjs",
+    "build:local": "node build-local.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:extension": "node ../../scripts/run-vscode-tests.mjs",
     "package": "vsce package --no-dependencies --out dist/xsom-secret-guard-vscode.vsix",
