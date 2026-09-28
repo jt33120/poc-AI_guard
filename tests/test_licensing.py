@@ -1,57 +1,40 @@
-"""La frontière de licence suit la frontière commerciale, et elle ne pourrit pas.
+"""Le code open source tient seul, et la liste qui le délimite ne pourrit pas.
 
-`LICENSING.md` énumère les chemins sous licence commerciale. Deux fautes la rendent
-fausse sans que rien ne casse.
+Tout le dépôt est sous licence commerciale, sauf les chemins du bloc
+`open-source-scope` de `LICENSING.md`. Le défaut est fermé : un fichier ajouté ou
+déplacé reste commercial tant que personne ne l'a ouvert exprès.
 
-**Un chemin renommé sort de la liste.** Le fichier déplacé tombe sous Apache 2.0
-par défaut, et une fonctionnalité payante devient libre, définitivement, pour toute
-version publiée ainsi.
+Deux fautes restent possibles, et aucune ne casse la construction.
 
-**Un routeur payant ajouté n'y entre jamais.** `_CAPACITE_PAR_ROUTEUR` le verrouille
-bien derrière son palier, mais son code est publié sous Apache 2.0 : n'importe qui
-peut le reprendre sans l'abonnement. Ce test part des routeurs réellement montés.
+**Un chemin ouvert est renommé.** Il sort de la liste, redevient commercial sans que
+personne l'ait décidé, et « le détecteur est open source » devient une promesse fausse.
+
+**Le code ouvert se met à dépendre du code commercial.** Il compile toujours ici, mais
+personne ne peut plus le construire avec la seule licence Apache : l'open source n'est
+plus qu'une vitrine. Ce test lit donc les imports, les dépendances et les `extends`.
 """
 
 from __future__ import annotations
 
+import json
 import re
-import sys
-from pathlib import Path
-
-from fastapi import APIRouter
-
-from api.main import _CAPACITE_PAR_ROUTEUR
+from pathlib import Path, PurePosixPath
 
 RACINE = Path(__file__).resolve().parent.parent
+PAQUETS = RACINE / "secret-guard" / "packages"
 _BLOC = re.compile(
-    r"<!-- commercial-scope:start -->\s*```text\n(.*?)```\s*<!-- commercial-scope:end -->",
+    r"<!-- open-source-scope:start -->\s*```text\n(.*?)```\s*<!-- open-source-scope:end -->",
     re.DOTALL,
 )
-_CAPACITE_LIBRE = re.compile(r"\('free',\s*'([a-z_]+)'\)")
+_IMPORT = re.compile(r"""(?:\bfrom|\bimport)\s*\(?\s*["']([^"']+)["']""")
 
 
-def _perimetre_commercial() -> list[str]:
+def _perimetre_ouvert() -> list[str]:
     texte = (RACINE / "LICENSING.md").read_text(encoding="utf-8")
     bloc = _BLOC.search(texte)
-    assert bloc, "LICENSING.md a perdu son bloc `commercial-scope`"
+    assert bloc, "LICENSING.md a perdu son bloc `open-source-scope`"
     lignes = (ligne.strip() for ligne in bloc.group(1).splitlines())
     return [ligne for ligne in lignes if ligne and not ligne.startswith("#")]
-
-
-def _capacites_libres() -> frozenset[str]:
-    migrations = sorted((RACINE / "supabase" / "migrations").glob("*.sql"))
-    return frozenset(
-        capacite
-        for fichier in migrations
-        for capacite in _CAPACITE_LIBRE.findall(fichier.read_text(encoding="utf-8"))
-    )
-
-
-def _fichier_du_routeur(routeur: APIRouter) -> str:
-    for nom, module in list(sys.modules.items()):
-        if nom.startswith("api.") and getattr(module, "router", None) is routeur:
-            return f"{nom.replace('.', '/')}.py"
-    raise AssertionError(f"aucun module `api.*` n'expose ce routeur : {routeur.prefix!r}")
 
 
 def _existe(chemin: str) -> bool:
@@ -59,45 +42,117 @@ def _existe(chemin: str) -> bool:
     return cible.is_dir() if chemin.endswith("/") else cible.is_file()
 
 
-def _couvert(chemin: str, perimetre: list[str]) -> bool:
+def _ouvert(chemin: str, perimetre: list[str]) -> bool:
     return any(chemin == p or (p.endswith("/") and chemin.startswith(p)) for p in perimetre)
 
 
-def test_the_licence_states_both_licences() -> None:
-    texte = (RACINE / "LICENSE").read_text(encoding="utf-8")
-    assert "Apache License" in texte and "Version 2.0, January 2004" in texte
-    assert "LICENSE-COMMERCIAL.md" in texte and "LICENSING.md" in texte
-    assert (RACINE / "LICENSE-COMMERCIAL.md").is_file()
+def _relatif(cible: Path) -> str:
+    return PurePosixPath(cible.resolve().relative_to(RACINE)).as_posix()
 
 
-def test_every_commercial_path_exists() -> None:
-    perimetre = _perimetre_commercial()
-    assert perimetre, "le périmètre commercial est vide"
+def _paquets_ouverts(perimetre: list[str]) -> list[Path]:
+    return [
+        dossier
+        for dossier in sorted(PAQUETS.iterdir())
+        if (dossier / "package.json").is_file() and _ouvert(f"{_relatif(dossier)}/", perimetre)
+    ]
+
+
+def _dossiers_des_paquets() -> dict[str, Path]:
+    return {
+        json.loads((dossier / "package.json").read_text(encoding="utf-8"))["name"]: dossier
+        for dossier in PAQUETS.iterdir()
+        if (dossier / "package.json").is_file()
+    }
+
+
+def _sources_ouvertes(perimetre: list[str]) -> list[Path]:
+    fichiers: list[Path] = []
+    for chemin in perimetre:
+        cible = RACINE / chemin
+        candidats = cible.rglob("*.ts") if chemin.endswith("/") else [cible]
+        fichiers += [
+            f
+            for f in candidats
+            if f.suffix == ".ts" and f.is_file() and "node_modules" not in f.parts
+        ]
+    return fichiers
+
+
+def _import_ferme(source: Path, specificateur: str, perimetre: list[str]) -> str | None:
+    """Le chemin commercial qu'un import atteint, ou `None` s'il reste ouvert."""
+    if specificateur.startswith("."):
+        cible = _relatif(source.parent / specificateur)
+        return None if _ouvert(cible, perimetre) else cible
+    nom = "/".join(specificateur.split("/")[:2]) if specificateur.startswith("@") else ""
+    dossier = _dossiers_des_paquets().get(nom)
+    if dossier is None:  # `node:`, ou un paquet tiers qui garde sa propre licence
+        return None
+    cible = f"{_relatif(dossier)}/"
+    return None if _ouvert(cible, perimetre) else cible
+
+
+def test_the_licence_files_point_to_each_other() -> None:
+    licence = (RACINE / "LICENSE").read_text(encoding="utf-8")
+    for fichier in ("LICENSE-COMMERCIAL.md", "LICENSE-APACHE", "LICENSING.md"):
+        assert fichier in licence and (RACINE / fichier).is_file()
+    apache = (RACINE / "LICENSE-APACHE").read_text(encoding="utf-8")
+    assert "Apache License" in apache and "Version 2.0, January 2004" in apache
+
+
+def test_every_open_path_exists() -> None:
+    perimetre = _perimetre_ouvert()
+    assert perimetre, "le périmètre open source est vide"
     absents = [p for p in perimetre if not _existe(p)]
     assert not absents, (
-        f"LICENSING.md cite des chemins qui n'existent plus : {absents}\n"
-        "  un fichier renommé est retombé sous Apache 2.0.\n"
-        "  fix : remplacez l'ancien chemin par le nouveau dans le bloc `commercial-scope`."
+        f"LICENSING.md ouvre des chemins qui n'existent plus : {absents}\n"
+        "  le fichier renommé est redevenu commercial sans que personne l'ait décidé.\n"
+        "  fix : remplacez l'ancien chemin par le nouveau dans le bloc `open-source-scope`."
     )
 
 
-def test_the_free_plan_is_read_from_the_migrations() -> None:
-    """Sans ce garde-fou, une regex muette rendrait tous les routeurs payants."""
-    assert {"authorize", "audit_chain", "hitl_single", "policy_edit"} <= _capacites_libres()
+def test_every_open_package_ships_the_apache_licence() -> None:
+    apache = (RACINE / "LICENSE-APACHE").read_text(encoding="utf-8")
+    paquets = _paquets_ouverts(_perimetre_ouvert())
+    assert paquets, "aucun paquet ouvert : le bloc `open-source-scope` a changé"
+    for dossier in paquets:
+        manifeste = json.loads((dossier / "package.json").read_text(encoding="utf-8"))
+        assert manifeste.get("license") == "Apache-2.0", dossier.name
+        assert (dossier / "LICENSE").read_text(encoding="utf-8") == apache, dossier.name
 
 
-def test_every_paid_router_is_under_the_commercial_licence() -> None:
-    libres = _capacites_libres()
-    perimetre = _perimetre_commercial()
-    payants = sorted(
-        _fichier_du_routeur(routeur)
-        for routeur, capacite in _CAPACITE_PAR_ROUTEUR
-        if capacite is not None and capacite.value not in libres
-    )
-    assert payants, "aucun routeur payant trouvé : la table ou le plan `free` a changé"
-    oublies = [chemin for chemin in payants if not _couvert(chemin, perimetre)]
-    assert not oublies, (
-        f"ces routeurs sont réservés à un palier payant mais publiés sous Apache 2.0 : {oublies}\n"
-        "  fix : ajoutez-les, avec leur module `core/`, au bloc `commercial-scope`\n"
-        "  de LICENSING.md."
+def test_open_packages_depend_only_on_open_packages() -> None:
+    perimetre = _perimetre_ouvert()
+    dossiers = _dossiers_des_paquets()
+    fautes: list[str] = []
+    for dossier in _paquets_ouverts(perimetre):
+        manifeste = json.loads((dossier / "package.json").read_text(encoding="utf-8"))
+        for champ in ("dependencies", "peerDependencies", "optionalDependencies"):
+            for nom in manifeste.get(champ, {}):
+                cible = dossiers.get(nom)
+                if cible is not None and not _ouvert(f"{_relatif(cible)}/", perimetre):
+                    fautes.append(f"{dossier.name} → {nom}")
+        tsconfig = json.loads((dossier / "tsconfig.json").read_text(encoding="utf-8"))
+        if "extends" in tsconfig and not _ouvert(
+            _relatif(dossier / tsconfig["extends"]), perimetre
+        ):
+            fautes.append(f"{dossier.name} → {tsconfig['extends']}")
+    assert not fautes, f"des paquets ouverts dépendent de code commercial : {fautes}"
+
+
+def test_open_sources_import_only_open_code() -> None:
+    perimetre = _perimetre_ouvert()
+    sources = _sources_ouvertes(perimetre)
+    assert sources, "aucune source TypeScript dans le périmètre ouvert"
+    fautes = [
+        f"{_relatif(source)} → {ferme}"
+        for source in sources
+        for specificateur in _IMPORT.findall(source.read_text(encoding="utf-8"))
+        if (ferme := _import_ferme(source, specificateur, perimetre)) is not None
+    ]
+    assert not fautes, (
+        f"du code open source importe du code commercial : {fautes}\n"
+        "  il ne se construit plus avec la seule licence Apache 2.0.\n"
+        "  fix : déplacez la dépendance derrière un point d'extension côté commercial,\n"
+        "  ou ouvrez aussi le fichier importé dans LICENSING.md, si c'est voulu."
     )
