@@ -22,6 +22,7 @@ from psycopg import sql
 from api.main import create_app
 from api.security import TokenVerifier
 from core import audit
+from core import db as core_db
 from core.config import Settings
 from tests import pgcluster
 
@@ -53,6 +54,18 @@ def _hermetic_settings_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for field in Settings.model_fields:
         monkeypatch.delenv(field.upper(), raising=False)
         monkeypatch.delenv(field.lower(), raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _pool_ferme_apres_chaque_test() -> Iterator[None]:
+    """Le pool de connexions est un état de processus : aucun test ne le lègue.
+
+    `create_app` l'allume dès que les réglages disent `prod`, et chaque base de
+    test est détruite à la fin du test. Un pool resté ouvert viserait une base
+    disparue au test suivant.
+    """
+    yield
+    core_db.configure_pool(0)
 
 
 @pytest.fixture

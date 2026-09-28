@@ -57,6 +57,7 @@ from api.triage import router as triage_router
 from api.trust import router as trust_router
 from api.usage import router as usage_router
 from api.verdicts import router as verdicts_router
+from core import db
 from core.config import Settings, get_settings
 from core.entitlements import Capability
 from core.logging import configure_logging
@@ -279,6 +280,7 @@ def create_app(settings: Settings | None = None, *, plane: Plane = Plane.ALL) ->
     settings = settings or get_settings()
     configure_logging(settings.log_level)
     init_observability(settings)
+    db.configure_pool(settings.database_pool_max)
 
     app = FastAPI(
         title=settings.app_name if plane is Plane.ALL else f"{settings.app_name} · {plane.value}",

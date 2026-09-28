@@ -121,6 +121,11 @@ class Settings(BaseSettings):
     # psycopg DSN. The backend connects as the DSN's own role and relies on table
     # ownership; it does NOT bypass RLS (see `core/db.py`, corrected under `FR-195`).
     database_url: str | None = Field(default=None, max_length=500)
+    # Connections kept open per process and reused (`core/db.py`). Unset means 5
+    # in production and 0 elsewhere: 0 opens one connection per use, as before.
+    # Measured on Railway: opening a TLS connection to the database costs about
+    # 1.5 s, so a route that opened two answered in 3 s and its callers timed out.
+    database_pool_size: int | None = Field(default=None, ge=0, le=50)
 
     # --- LLM judge (M6) — LiteLLM -> Mistral, optional -------------------
     mistral_api_key: str | None = Field(default=None, max_length=255)
@@ -333,6 +338,13 @@ class Settings(BaseSettings):
     @property
     def is_prod(self) -> bool:
         return self.env == "prod"
+
+    @property
+    def database_pool_max(self) -> int:
+        """Connections a process may keep open for reuse; 0 disables the pool."""
+        if self.database_pool_size is not None:
+            return self.database_pool_size
+        return 5 if self.is_prod else 0
 
     @property
     def docs_enabled(self) -> bool:
