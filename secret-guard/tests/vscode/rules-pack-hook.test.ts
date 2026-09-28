@@ -13,8 +13,8 @@ import {
   rulesPackPath,
   writeRulesPackState,
 } from "../../packages/runner/src/index.js";
-import { startGatewayBridge } from "../../packages/vscode/src/gateway-bridge.js";
-import { routeFile } from "../../packages/vscode/src/gateway-delegation.js";
+import { startGatewayBridge } from "../../packages/vscode/src/team/gateway-bridge.js";
+import { routeFile } from "../../packages/vscode/src/team/gateway-delegation.js";
 
 // The real hook runner, bundled like the release (esbuild `define`), run as
 // the subprocess an assistant starts. It must verify the stored pack itself.

@@ -21,20 +21,21 @@ import {
 import {
   customFindingFields,
   platformCompatibleEvent,
-} from "../../packages/vscode/src/gateway-client.js";
+} from "../../packages/vscode/src/team/gateway-client.js";
 import { dashboardHtml } from "../../packages/vscode/src/dashboard.js";
+import { teamDashboard } from "../../packages/vscode/src/team/dashboard.js";
 import {
   fetchRulesPack,
   forgetEnrollment,
   importRulesPack,
   readRulesPackSnapshot,
   syncRulesPack,
-} from "../../packages/vscode/src/rules-pack-sync.js";
+} from "../../packages/vscode/src/team/rules-pack-sync.js";
 import {
   rulesPackView,
   shortDate,
   type RulesPackView,
-} from "../../packages/vscode/src/rules-pack-view.js";
+} from "../../packages/vscode/src/team/rules-pack-view.js";
 import type { HookHealth } from "../../packages/vscode/src/hook-manager.js";
 
 const vectors = JSON.parse(
@@ -511,30 +512,30 @@ describe("rules pack presentation", () => {
       reason: "local_canaries_verified",
       hosts: [],
     };
-    const html = dashboardHtml(health, "redact", "nonce", false, undefined, {
-      state: "rejected",
-      tone: "danger",
-      line: "x",
-      title: "Réglage <refusé>",
-      detail: "raison & détail",
-      offerRequest: false,
+    const html = dashboardHtml(health, "redact", "nonce", {
+      team: teamDashboard(undefined, {
+        state: "rejected",
+        tone: "danger",
+        line: "x",
+        title: "Réglage <refusé>",
+        detail: "raison & détail",
+        offerRequest: false,
+      }),
     });
     expect(html).toContain("Règles sur mesure");
     expect(html).toContain("Réglage &lt;refusé&gt;");
     expect(html).toContain("raison &amp; détail");
     expect(html).not.toContain("secretGuard.requestRulesPack");
-    const local = dashboardHtml(
-      health,
-      "redact",
-      "nonce",
-      false,
-      undefined,
-      rulesPackView({
-        applied: { status: "none" },
-        enrolled: false,
-        authorityKeys: 1,
-      }),
-    );
+    const local = dashboardHtml(health, "redact", "nonce", {
+      team: teamDashboard(
+        undefined,
+        rulesPackView({
+          applied: { status: "none" },
+          enrolled: false,
+          authorityKeys: 1,
+        }),
+      ),
+    });
     expect(local).toContain(
       '<a href="command:secretGuard.requestRulesPack">Demander un réglage à xSOM →</a>',
     );

@@ -6,7 +6,7 @@ import {
   verifyPolicySignature,
 } from "@xsom/developer-guard-runner";
 import { gatewayGetJson } from "./gateway-client.js";
-import type { ObserveCap } from "./observe-window.js";
+import type { ObserveCap } from "../observe-window.js";
 
 interface PolicyEnvelope {
   readonly policy: Record<string, unknown>;

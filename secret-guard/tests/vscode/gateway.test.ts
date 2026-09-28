@@ -13,16 +13,16 @@ import {
   gatewayUrl,
   type AuditEvent,
   type QueueState,
-} from "../../packages/vscode/src/gateway-client.js";
+} from "../../packages/vscode/src/team/gateway-client.js";
 import {
   startGatewayBridge,
   type GatewayBridge,
-} from "../../packages/vscode/src/gateway-bridge.js";
+} from "../../packages/vscode/src/team/gateway-bridge.js";
 import {
   canDelegate,
   relayConnected,
   routeFile,
-} from "../../packages/vscode/src/gateway-delegation.js";
+} from "../../packages/vscode/src/team/gateway-delegation.js";
 
 const event = {
   kind: "scan",
