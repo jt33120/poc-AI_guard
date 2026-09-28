@@ -211,6 +211,11 @@ def export_rate_limit() -> str:
     return get_settings().export_rate_limit
 
 
+def supervision_rate_limit() -> str:
+    """Dynamic limit string for the supervision aggregate (from settings)."""
+    return get_settings().supervision_rate_limit
+
+
 def authorize_rate_limit() -> str:
     """Le **plafond d'infrastructure** de `/v1/authorize` — pas la limite commerciale.
 

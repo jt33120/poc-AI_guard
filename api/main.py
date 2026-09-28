@@ -52,6 +52,7 @@ from api.security import build_federation, build_verifier, get_current_user, is_
 from api.servers import router as servers_router
 from api.shadow_ai import router as shadow_ai_router
 from api.signup import router as signup_router
+from api.supervision import router as supervision_router
 from api.threats import router as threats_router
 from api.triage import router as triage_router
 from api.trust import router as trust_router
@@ -131,6 +132,7 @@ _PLANS: dict[Plane, tuple[APIRouter, ...]] = {
         rules_packs_router,
         approvals_router,
         audit_router,
+        supervision_router,
         extension_devices_router,
         gateway_tokens_router,
         agents_router,
@@ -176,6 +178,7 @@ _CAPACITE_PAR_ROUTEUR: tuple[tuple[APIRouter, Capability | None], ...] = (
     (authorize_router, None),  # §4.1 — le verdict est la garantie, il ne se facture pas
     (approvals_router, None),  # §4.1 — tenir un humain dans la boucle non plus
     (audit_router, None),  # §4.2 — le journal prouve ; le facturer serait vendre le risque
+    (supervision_router, None),  # §4.2 — le même journal, compté ; voir ses chiffres ne se vend pas
     (extension_devices_router, None),  # device evidence uses the same tenant boundary
     (extension_ingest_router, None),  # gateway-token authentication on ingestion
     (policy_router, None),  # sans policy éditable, le produit ne fait rien

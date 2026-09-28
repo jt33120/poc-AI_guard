@@ -153,6 +153,9 @@ class Settings(BaseSettings):
     prompt_guard_max_calls: int = Field(default=500, ge=1, le=100_000)
     # slowapi limit string for the costly export endpoint.
     export_rate_limit: str = Field(default="30/minute", max_length=40)
+    # The supervision room aggregates the whole window in SQL and re-verifies the
+    # audit chain: generous for a console, bounded for a script.
+    supervision_rate_limit: str = Field(default="60/minute", max_length=40)
     # **Plafond d'INFRASTRUCTURE de `/v1/authorize`, pas la limite commerciale.**
     #
     # Ce que ce processus accepte d'un seul compartiment, quel que soit le palier. La
@@ -260,7 +263,7 @@ class Settings(BaseSettings):
     sentry_dsn: str | None = None
     sentry_traces_sample_rate: float = Field(default=0.0, ge=0.0, le=1.0)
 
-    @field_validator("issuer_claims", "checkpoint_key_custody", mode="before")
+    @field_validator("issuer_claims", "checkpoint_key_custody", "database_pool_size", mode="before")
     @classmethod
     def _blank_is_undeclared(cls, value: object) -> object:
         """``ISSUER_CLAIMS=`` vide se lit « non déclaré », pas « valeur invalide ».
