@@ -215,10 +215,8 @@ independent, locally enforced add-on with its own phased plan in
 
 ## License
 
-xSOM AI Guard is open core. The Community Edition (the gateway, policy engine,
-human approval, hash-chained audit log, LLM proxy and CLI) is licensed under
-[Apache 2.0](LICENSE). Advanced traceability and compliance, advanced protection,
-enterprise features, Secret Guard, Developer Guard and the web console are
-source-available under the [xSOM Commercial License](LICENSE-COMMERCIAL.md) and
-need an xSOM subscription in production. [`LICENSING.md`](LICENSING.md) lists
-exactly which paths are commercial.
+This repository is source-available under the
+[xSOM Commercial License](LICENSE-COMMERCIAL.md): you may read, audit and test it,
+and production use requires an xSOM subscription. The Secret Guard Local detector
+and its command-line hook are open source under [Apache 2.0](LICENSE-APACHE).
+[`LICENSING.md`](LICENSING.md) lists exactly which paths are open.
