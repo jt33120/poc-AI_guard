@@ -212,3 +212,13 @@ DLP, AI observability and the LLM proxy. See `docs/BUILD_PLAN.md` for the MVP an
 v2 adds next — starting with one-command deployment. Secret Guard V0 is an
 independent, locally enforced add-on with its own phased plan in
 `docs/secret-guard/DEVELOPMENT_PLAN.md`.
+
+## License
+
+xSOM AI Guard is open core. The Community Edition (the gateway, policy engine,
+human approval, hash-chained audit log, LLM proxy and CLI) is licensed under
+[Apache 2.0](LICENSE). Advanced traceability and compliance, advanced protection,
+enterprise features, Secret Guard, Developer Guard and the web console are
+source-available under the [xSOM Commercial License](LICENSE-COMMERCIAL.md) and
+need an xSOM subscription in production. [`LICENSING.md`](LICENSING.md) lists
+exactly which paths are commercial.
