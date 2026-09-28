@@ -194,8 +194,11 @@ See [`../docs/secret-guard/ARCHITECTURE.md`](../docs/secret-guard/ARCHITECTURE.m
 
 ## License
 
-`@xsom/secret-guard-core` and `@xsom/secret-guard-cli` are open source under
-[Apache 2.0](packages/core/LICENSE). The other packages, including the VS Code
-extension, are published under the [xSOM Commercial License](../LICENSE-COMMERCIAL.md).
-The Local edition of the extension is free to use under its
-[end-user licence](../docs/legal/LICENCE-SECRET-GUARD-LOCAL.md).
+`@xsom/secret-guard-core`, `@xsom/secret-guard-cli` and the Local edition of the
+VS Code extension are open source under [Apache 2.0](packages/core/LICENSE). The
+Équipe edition (`packages/vscode/src/team/`, `packages/policy`, `packages/runner`,
+`packages/adapters`) is published under the
+[xSOM Commercial License](../LICENSE-COMMERCIAL.md). `npm run build:local --workspace
+xsom-secret-guard-vscode` builds the Local edition alone. The official extension is
+free to use under its [end-user licence](../docs/legal/LICENCE-SECRET-GUARD-LOCAL.md);
+[`LICENSING.md`](../LICENSING.md) lists the exact files.

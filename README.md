@@ -217,6 +217,7 @@ independent, locally enforced add-on with its own phased plan in
 
 This repository is source-available under the
 [xSOM Commercial License](LICENSE-COMMERCIAL.md): you may read, audit and test it,
-and production use requires an xSOM subscription. The Secret Guard Local detector
-and its command-line hook are open source under [Apache 2.0](LICENSE-APACHE).
+and production use requires an xSOM subscription. Secret Guard Local (its detector,
+its command-line hook and the Local edition of its VS Code extension) is open source
+under [Apache 2.0](LICENSE-APACHE).
 [`LICENSING.md`](LICENSING.md) lists exactly which paths are open.
