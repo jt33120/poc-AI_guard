@@ -87,7 +87,11 @@ test("the glossary table combines search, facets and sorting, expands rows and t
 
   const table = page.getByRole("table");
   const rows = page.locator(".guard-glossary__row");
-  const status = page.getByRole("status");
+  // Le compteur de résultats, et lui seul. Un second `role="status"` apparaît dès
+  // que la recherche IA a répondu (ou échoué, ici : elle est moquée en 503), à un
+  // instant qui dépend du délai d'anti-rebond : un sélecteur par rôle seul devenait
+  // ambigu ou non selon la vitesse de la machine.
+  const status = page.locator('p[role="status"][aria-atomic="true"]');
   const search = page.getByRole("searchbox", {
     name: "Rechercher une menace",
     exact: true,
