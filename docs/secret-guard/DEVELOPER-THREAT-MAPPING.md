@@ -10,6 +10,7 @@ Trois décisions : **socle** = traiter une facette développeur dans les lots pr
 |---|---|---|
 | `injection-directe`, `injection-de-prompt`, `jailbreak`, `detournement-de-contexte`, `jailbreak-multilingue` | Socle : limiter les conséquences par droits/actions ; les classifieurs d'injection ne sont pas une frontière absolue | T04, T06, T10, T14 |
 | `injection-persistante`, `memoire-empoisonnee`, `manipulation-base-de-connaissances` | Socle pour mémoire/instructions locales : intégrité, provenance, écritures ; option séparée pour connaissances distantes | T03, T08, T14 |
+| `injection-persistante`, facette « consignes invisibles » (étiquettes Unicode, bidi, largeur nulle, sélecteurs de variante) | Local : Instruction Guard bloque prompt, Read et `@` porteurs ; `secret-guard instructions` trouve et nettoie les fichiers de consignes chargés sans hook (`INSTRUCTION-GUARD.md`) | Lot 1 livré, lots 2-4 |
 | `extraction-prompt-systeme` | Socle : aucun secret dans les instructions ; les considérer comme lisibles par l'agent, protection ciblée des valeurs | T03, T07 |
 | `obfuscation` | Socle : budgets de décodage et normalisation, formes non reconnues explicites ; pas de décodeur illimité | T03, T04, T14 |
 | `injection-multimodale` | Socle sur actions possibles après lecture ; option sur inspection multimodale au relais, sans prétendre éliminer l'injection | T04, T07 |

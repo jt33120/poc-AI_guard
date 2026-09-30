@@ -1,16 +1,28 @@
 #!/usr/bin/env node
 
+import { statSync } from "node:fs";
 import { open } from "node:fs/promises";
-import { basename, extname } from "node:path";
+import { basename, extname, relative } from "node:path";
 import process from "node:process";
 
 import {
+  findHidden,
+  hiddenKindLabel,
   MAX_INPUT_BYTES,
   redactAndRescan,
   scan,
+  stripHidden,
+  type HiddenFinding,
 } from "@xsom/secret-guard-core";
 
 import { parseHookMode, runHook, type ProtectionMode } from "./hook.js";
+import {
+  checkFile,
+  fixFile,
+  isInstructionFile,
+  walk,
+  type FileCheck,
+} from "./instructions.js";
 import { humanReport } from "./report.js";
 
 const MAX_STDIN_BYTES = 1_200_000;
@@ -163,13 +175,131 @@ async function hookCommand(args: readonly string[]): Promise<number> {
   return 0;
 }
 
+function findingLines(
+  label: string,
+  findings: readonly HiddenFinding[],
+): string[] {
+  return findings.map(
+    (finding) =>
+      `${label}:${String(finding.line)}:${String(finding.column)} · ${hiddenKindLabel(finding.kind)} · ${String(finding.count)} caractère${finding.count > 1 ? "s" : ""}`,
+  );
+}
+
+async function instructionsFromStdin(
+  fix: boolean,
+  json: boolean,
+): Promise<number> {
+  const input = await readStdin(MAX_INPUT_BYTES + 1);
+  if (fix) {
+    const stripped = stripHidden(input.content);
+    if (input.truncated || !stripped.complete) {
+      process.stderr.write(
+        "Secret Guard refused to clean an input over 1 MiB.\n",
+      );
+      return 2;
+    }
+    process.stdout.write(stripped.text);
+    return 0;
+  }
+  const report = findHidden(input.content);
+  if (json) process.stdout.write(`${JSON.stringify(report)}\n`);
+  else if (report.hidden > 0)
+    process.stdout.write(`${findingLines("-", report.findings).join("\n")}\n`);
+  if (input.truncated || !report.complete) return 2;
+  return report.hidden > 0 ? 1 : 0;
+}
+
+/** The files to check: the named ones, every file of a named folder, or the instruction files under the current folder. */
+function instructionTargets(targets: readonly string[]): {
+  files: { path: string; strict: boolean }[];
+  truncated: boolean;
+} {
+  if (targets.length === 0) {
+    const found = walk(process.cwd(), isInstructionFile);
+    return {
+      files: found.files.map((path) => ({ path, strict: true })),
+      truncated: found.truncated,
+    };
+  }
+  const files: { path: string; strict: boolean }[] = [];
+  let truncated = false;
+  for (const target of targets) {
+    if (statSync(target).isDirectory()) {
+      const found = walk(target, () => true);
+      truncated ||= found.truncated;
+      for (const path of found.files)
+        files.push({ path, strict: isInstructionFile(relative(target, path)) });
+    } else files.push({ path: target, strict: true });
+  }
+  return { files, truncated };
+}
+
+async function instructionsCommand(args: readonly string[]): Promise<number> {
+  const fix = args.includes("--fix");
+  const json = args.includes("--json");
+  const options = args.filter((arg) => arg.startsWith("--"));
+  if (options.some((option) => option !== "--fix" && option !== "--json"))
+    throw new UsageError("instructions received an unknown option");
+  const targets = args.filter((arg) => !arg.startsWith("--"));
+  if (targets.includes("-")) {
+    if (targets.length > 1)
+      throw new UsageError("instructions reads stdin alone or files, not both");
+    return instructionsFromStdin(fix, json);
+  }
+  const { files, truncated } = instructionTargets(targets);
+  const checks: FileCheck[] = files
+    .map(({ path, strict }) => ({ check: checkFile(path), strict }))
+    .filter(({ check, strict }) => strict || check.status !== "unreadable")
+    .map(({ check }) => check);
+  const fixed = new Map<string, number>();
+  if (fix)
+    for (const check of checks)
+      if (check.status === "hidden") fixed.set(check.path, fixFile(check.path));
+  const hidden = checks.filter((check) => check.status === "hidden");
+  const unreadable = checks.filter((check) => check.status === "unreadable");
+  if (json) {
+    process.stdout.write(
+      `${JSON.stringify({ checked: checks.length, truncated, files: checks.map((check) => ({ ...check, ...(fixed.has(check.path) ? { removed: fixed.get(check.path) } : {}) })) })}\n`,
+    );
+  } else {
+    const lines: string[] = [];
+    for (const check of hidden) {
+      const label = relative(process.cwd(), check.path) || check.path;
+      if (check.status !== "hidden") continue;
+      lines.push(
+        ...(fix
+          ? [
+              `${label} · ${String(fixed.get(check.path) ?? 0)} caractères invisibles retirés`,
+            ]
+          : findingLines(label, check.findings)),
+      );
+    }
+    for (const check of unreadable)
+      lines.push(
+        `${relative(process.cwd(), check.path) || check.path} · illisible, binaire ou de plus de 1 Mio : non vérifié`,
+      );
+    if (truncated)
+      lines.push(
+        "Analyse partielle : trop de fichiers. Nommez les dossiers à vérifier.",
+      );
+    lines.push(
+      `${hidden.length === 0 && unreadable.length === 0 && !truncated ? "✓" : "!"} ${String(checks.length)} fichier(s) vérifié(s) · ${String(hidden.length)} avec des caractères invisibles${fix && hidden.length > 0 ? ", nettoyé(s)" : ""}`,
+    );
+    process.stdout.write(`${lines.join("\n")}\n`);
+  }
+  if (unreadable.length > 0 || truncated) return 2;
+  return hidden.length > 0 && !fix ? 1 : 0;
+}
+
 function usage(): string {
   return [
     "Usage:",
     "  secret-guard scan [--json|--redact] [file|-]",
     "  secret-guard hook [--mode=block|redact|observe]",
+    "  secret-guard instructions [--fix] [--json] [path…|-]",
     "",
-    "Exit codes: scan uses 0 allow, 1 warn, 2 block; hook uses 0 allow or 2 block.",
+    "Exit codes: scan uses 0 allow, 1 warn, 2 block; hook uses 0 allow or 2 block;",
+    "instructions uses 0 clean (or cleaned), 1 hidden characters, 2 not fully checked.",
   ].join("\n");
 }
 
@@ -177,6 +307,7 @@ async function main(): Promise<number> {
   const [command, ...args] = process.argv.slice(2);
   if (command === "scan") return scanCommand(args);
   if (command === "hook") return hookCommand(args);
+  if (command === "instructions") return instructionsCommand(args);
   if (command === "--help" || command === "-h") {
     process.stdout.write(`${usage()}\n`);
     return 0;

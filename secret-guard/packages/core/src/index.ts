@@ -14,6 +14,17 @@ export {
 } from "./rules.js";
 export { MAX_INPUT_BYTES, RULESET_VERSION } from "./types.js";
 export { decodeScannableText } from "./text.js";
+export {
+  findHidden,
+  hiddenKindLabel,
+  stripHidden,
+  MAX_HIDDEN_FINDINGS,
+  SCATTERED_INVISIBLE_THRESHOLD,
+  type HiddenFinding,
+  type HiddenKind,
+  type HiddenReport,
+  type StrippedText,
+} from "./hidden.js";
 export { sha256Hex } from "./sha256.js";
 export {
   compileRulesPack,
