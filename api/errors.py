@@ -12,7 +12,8 @@ import uuid
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
+from starlette.requests import ClientDisconnect
 
 logger = logging.getLogger("xsom.api")
 
@@ -28,6 +29,20 @@ async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSON
         status_code=500,
         content={"detail": "Internal server error", "error_id": error_id},
     )
+
+
+#: nginx's "client closed request": nobody reads it, but the access log does.
+_CLIENT_CLOSED_REQUEST = 499
+
+
+async def _client_disconnect_handler(request: Request, exc: Exception) -> Response:
+    """A caller that hangs up mid-body is not a server error.
+
+    Unhandled, `ClientDisconnect` was logged as a traceback and counted as a 500
+    on Railway, next to real failures.
+    """
+    logger.info("client_disconnected", extra={"path": request.url.path, "method": request.method})
+    return Response(status_code=_CLIENT_CLOSED_REQUEST)
 
 
 #: Routes dont le corps porte des valeurs confidentielles en clair (termes d'un réglage
@@ -56,4 +71,5 @@ async def _validation_handler(request: Request, exc: Exception) -> JSONResponse:
 def register_exception_handlers(app: FastAPI) -> None:
     """Attach the generic exception handler to the app."""
     app.add_exception_handler(Exception, _unhandled_exception_handler)
+    app.add_exception_handler(ClientDisconnect, _client_disconnect_handler)
     app.add_exception_handler(RequestValidationError, _validation_handler)

@@ -121,6 +121,11 @@ class Settings(BaseSettings):
     # psycopg DSN. The backend connects as the DSN's own role and relies on table
     # ownership; it does NOT bypass RLS (see `core/db.py`, corrected under `FR-195`).
     database_url: str | None = Field(default=None, max_length=500)
+    # Connections kept open per process and reused (`core/db.py`). Unset means 5
+    # in production and 0 elsewhere: 0 opens one connection per use, as before.
+    # Measured on Railway: opening a TLS connection to the database costs about
+    # 1.5 s, so a route that opened two answered in 3 s and its callers timed out.
+    database_pool_size: int | None = Field(default=None, ge=0, le=50)
 
     # --- LLM judge (M6) — LiteLLM -> Mistral, optional -------------------
     mistral_api_key: str | None = Field(default=None, max_length=255)
@@ -148,6 +153,9 @@ class Settings(BaseSettings):
     prompt_guard_max_calls: int = Field(default=500, ge=1, le=100_000)
     # slowapi limit string for the costly export endpoint.
     export_rate_limit: str = Field(default="30/minute", max_length=40)
+    # The supervision room aggregates the whole window in SQL and re-verifies the
+    # audit chain: generous for a console, bounded for a script.
+    supervision_rate_limit: str = Field(default="60/minute", max_length=40)
     # **Plafond d'INFRASTRUCTURE de `/v1/authorize`, pas la limite commerciale.**
     #
     # Ce que ce processus accepte d'un seul compartiment, quel que soit le palier. La
@@ -255,7 +263,7 @@ class Settings(BaseSettings):
     sentry_dsn: str | None = None
     sentry_traces_sample_rate: float = Field(default=0.0, ge=0.0, le=1.0)
 
-    @field_validator("issuer_claims", "checkpoint_key_custody", mode="before")
+    @field_validator("issuer_claims", "checkpoint_key_custody", "database_pool_size", mode="before")
     @classmethod
     def _blank_is_undeclared(cls, value: object) -> object:
         """``ISSUER_CLAIMS=`` vide se lit « non déclaré », pas « valeur invalide ».
@@ -333,6 +341,13 @@ class Settings(BaseSettings):
     @property
     def is_prod(self) -> bool:
         return self.env == "prod"
+
+    @property
+    def database_pool_max(self) -> int:
+        """Connections a process may keep open for reuse; 0 disables the pool."""
+        if self.database_pool_size is not None:
+            return self.database_pool_size
+        return 5 if self.is_prod else 0
 
     @property
     def docs_enabled(self) -> bool:

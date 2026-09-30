@@ -78,6 +78,7 @@ export const CONTROL_ROUTES: readonly Route[] = [
   { pattern: new RegExp("^v1/read-tokens$"), methods: ["GET", "POST"] },
   { pattern: new RegExp(`^v1/read-tokens/${SEG}$`), methods: ["DELETE"] },
   { pattern: new RegExp("^v1/servers$"), methods: ["GET"] },
+  { pattern: new RegExp("^v1/supervision$"), methods: ["GET"] },
   { pattern: new RegExp("^v1/tools$"), methods: ["GET"] },
   { pattern: new RegExp("^v1/tools/integrity$"), methods: ["GET"] },
   { pattern: new RegExp("^v1/trust$"), methods: ["GET"] },
