@@ -1,5 +1,6 @@
 src/**
 build.mjs
+build-local.mjs
 tsconfig.json
 node_modules/**
 dist/**

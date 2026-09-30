@@ -17,7 +17,7 @@ import {
   startApprovalBridge,
   unixSocketPathLimit,
   type ApprovalBridge,
-} from "../../packages/vscode/src/approval-bridge.js";
+} from "../../packages/vscode/src/team/approval-bridge.js";
 
 const posixOnly = process.platform === "win32" ? it.skip : it;
 

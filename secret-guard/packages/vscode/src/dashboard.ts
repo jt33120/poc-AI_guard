@@ -1,14 +1,20 @@
 import type { HookHealth } from "./hook-manager.js";
 import type { ProtectionMode } from "@xsom/secret-guard-cli/hook";
 import { PROTECTION_MODES, modeLabel } from "./protection-mode.js";
-import type { GatewayState } from "./gateway-integration.js";
-import type { RulesPackView } from "./rules-pack-view.js";
 import { observeCapLine, type ObserveCap } from "./observe-window.js";
 
-export interface DashboardGateway {
-  readonly state: GatewayState;
-  readonly status: string;
-  readonly audit?: string;
+/** What the Équipe edition adds to the protection centre (see team-port.ts). */
+export interface DashboardTeam {
+  /** Its sections, already escaped, placed after the monitored scope. */
+  readonly sections: string;
+  /** Whether attachments are analysed, through the Claude relay. */
+  readonly attachmentsCovered: boolean;
+}
+
+export interface DashboardOptions {
+  readonly modeApplicationFailed?: boolean;
+  readonly observeCap?: ObserveCap;
+  readonly team?: DashboardTeam;
 }
 
 export const DASHBOARD_COMMANDS = [
@@ -19,9 +25,6 @@ export const DASHBOARD_COMMANDS = [
   "secretGuard.scanClipboard",
   "secretGuard.purgeClipboard",
   "secretGuard.scanDocument",
-  "secretGuard.connectGateway",
-  "secretGuard.disconnectGateway",
-  "secretGuard.requestRulesPack",
 ] as const;
 
 export const HEALTH_LABELS = {
@@ -42,7 +45,7 @@ export const HEALTH_REASONS: Record<HookHealth["reason"], string> = {
   canary_failed: "Le test local de protection n’a pas abouti.",
 };
 
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value.replace(
     /[&<>"']/gu,
     (character) =>
@@ -56,10 +59,7 @@ export function dashboardHtml(
   health: HookHealth,
   mode: ProtectionMode,
   nonce: string,
-  modeApplicationFailed = false,
-  gateway: DashboardGateway = { state: "offline", status: "Non connecté" },
-  rules?: RulesPackView,
-  observeCap?: ObserveCap,
+  { modeApplicationFailed = false, observeCap, team }: DashboardOptions = {},
 ): string {
   const capLine = observeCapLine(observeCap);
   const capNote =
@@ -72,11 +72,7 @@ export function dashboardHtml(
     degraded: "Non garanti",
     off: "Non surveillé",
   }[health.state];
-  const attachmentsCovered = gateway.state === "online";
-  const gatewayAction =
-    gateway.state === "offline"
-      ? '<a class="button" href="command:secretGuard.connectGateway">Raccorder ce poste →</a>'
-      : '<a class="button" href="command:secretGuard.disconnectGateway">Déconnecter le relais</a>';
+  const attachmentsCovered = team?.attachmentsCovered === true;
   const hosts = health.hosts
     .map((host) => {
       const healthy =
@@ -94,10 +90,6 @@ export function dashboardHtml(
       return `<article class="host"><div class="host-top"><span class="host-icon" aria-hidden="true">${host.id === "claude" ? "✳" : host.id === "codex" ? "⌘" : "◇"}</span><span class="badge ${healthy ? "ready" : "attention"}">${label}</span></div><h3>${escapeHtml(host.label)}</h3><p>${detail}</p>${host.id === "codex" && host.configured ? '<a href="command:secretGuard.finishCodexSetup">Finaliser Codex <span aria-hidden="true">↗</span></a>' : ""}</article>`;
     })
     .join("");
-  const rulesSection =
-    rules === undefined
-      ? ""
-      : `<section aria-labelledby="rules"><div class="section-heading"><h2 id="rules">Règles sur mesure</h2><span>Édition Équipe · signées par xSOM</span></div><div class="policy rules ${rules.tone}"><strong>${escapeHtml(rules.title)}</strong><p>${escapeHtml(rules.detail)}</p>${rules.offerRequest ? '<a href="command:secretGuard.requestRulesPack">Demander un réglage à xSOM →</a>' : ""}</div><p class="note">Aucune case à cocher : le réglage est calibré avec xSOM, vérifié hors ligne et appliqué localement, sans LLM ni réseau pendant l’analyse.</p></section>`;
   return `<!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${escapeHtml(nonce)}'; base-uri 'none'; form-action 'none'">
@@ -113,8 +105,7 @@ export function dashboardHtml(
 <section aria-labelledby="actions"><div class="section-heading"><h2 id="actions">Un doute avant de partager ?</h2><span>Analyse à votre demande</span></div><div class="actions"><a class="action" href="command:secretGuard.scanClipboard"><span class="action-icon" aria-hidden="true">📋</span><span><strong>Vérifier le presse-papiers</strong><small>Scannez le texte que vous allez coller.</small></span></a><a class="action" href="command:secretGuard.purgeClipboard"><span class="action-icon" aria-hidden="true">🧹</span><span><strong>Expurger le presse-papiers</strong><small>Remplacez-le par sa version expurgée, prête à coller.</small></span></a><a class="action" href="command:secretGuard.scanDocument"><span class="action-icon" aria-hidden="true">🔎</span><span><strong>Vérifier le document</strong><small>Analysez le fichier ouvert dans l’éditeur.</small></span></a></div></section>
 <section aria-labelledby="mode"><div class="section-heading"><h2 id="mode">Votre mode de protection</h2><a class="button" href="command:secretGuard.chooseMode">Changer de mode ▾</a></div><div class="policy"><strong>${modeLabel(mode)}</strong><p>${PROTECTION_MODES.find((entry) => entry.mode === mode)?.description}</p><p>${PROTECTION_MODES.find((entry) => entry.mode === mode)?.detail}</p>${capNote}</div><p class="note">Réglage commun aux assistants de cette installation. Après un changement, ouvrez une nouvelle session de votre assistant ; Codex peut demander de valider le hook actualisé.</p></section>
 <section aria-labelledby="scope"><div class="section-heading"><h2 id="scope">Périmètre surveillé</h2><span>État de cette installation</span></div><div class="policy"><strong>Prompts · ${promptCoverage}</strong><p>Les assistants configurés utilisent la protection locale. Un test dans chaque assistant confirme l’interception.</p></div><div class="policy"><strong>Pièces jointes · ${attachmentsCovered ? "Analysées" : "Non analysées"}</strong><p>${attachmentsCovered ? "PNG, PDF et Markdown sont analysés dans les sessions Claude raccordées au relais xSOM." : "Hors relais Claude raccordé, les pièces jointes ne sont pas analysées. Les pièces natives Codex et Copilot ne sont pas interceptées."}</p></div><p class="note">Le presse-papiers est vérifié à la demande avec les actions ci-dessus.</p></section>
-${rulesSection}
-<section aria-labelledby="gateway"><div class="section-heading"><h2 id="gateway">Relais de protection · Claude</h2></div><div class="policy"><strong>${escapeHtml(gateway.status)}</strong>${gateway.audit === undefined ? "" : `<p>${escapeHtml(gateway.audit)}</p>`}<p>Nettoyage obligatoire avant transmission, dans les sessions Claude raccordées. L’abonnement et la connexion restent gérés par Claude. Les autres assistants gardent leurs protections locales.</p><p>Après connexion, seules des métadonnées d’audit sont enregistrées : poste, date, résultat et nombre de détections. Aucun prompt ni secret dans ce journal. Le contenu original transite par votre passerelle pour être nettoyé.</p><p>La passerelle reste en mode Expurger, même si le mode local change. Pièces jointes non analysables : envoi refusé.</p>${gatewayAction}</div></section>
+${team?.sections ?? ""}
 <footer><span>Analyse locale · Aucun appel réseau du détecteur</span><span>Audit distant uniquement après raccordement xSOM</span></footer>
 </main></body></html>`;
 }

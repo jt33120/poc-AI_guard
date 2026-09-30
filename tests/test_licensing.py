@@ -79,11 +79,19 @@ def _sources_ouvertes(perimetre: list[str]) -> list[Path]:
     return fichiers
 
 
+def _candidats(cible: str) -> list[str]:
+    """Les fichiers qu'un import TypeScript relatif peut désigner."""
+    if cible.endswith(".js"):
+        return [cible, f"{cible[:-3]}.ts"]
+    return [cible] if PurePosixPath(cible).suffix else [f"{cible}.ts", f"{cible}/index.ts"]
+
+
 def _import_ferme(source: Path, specificateur: str, perimetre: list[str]) -> str | None:
     """Le chemin commercial qu'un import atteint, ou `None` s'il reste ouvert."""
     if specificateur.startswith("."):
         cible = _relatif(source.parent / specificateur)
-        return None if _ouvert(cible, perimetre) else cible
+        ouvert = any(_ouvert(candidat, perimetre) for candidat in _candidats(cible))
+        return None if ouvert else cible
     nom = "/".join(specificateur.split("/")[:2]) if specificateur.startswith("@") else ""
     dossier = _dossiers_des_paquets().get(nom)
     if dossier is None:  # `node:`, ou un paquet tiers qui garde sa propre licence

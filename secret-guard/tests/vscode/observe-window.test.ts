@@ -20,7 +20,7 @@ import {
   readObserveDeadline,
   type ObserveMinutes,
 } from "../../packages/vscode/src/observe-window.js";
-import { RUNNER_VERSION } from "../../packages/vscode/src/runner-version.js";
+import { RUNNER_VERSION } from "../../packages/vscode/src/team/runner-version.js";
 
 const HOUR = 60 * 60 * 1000;
 

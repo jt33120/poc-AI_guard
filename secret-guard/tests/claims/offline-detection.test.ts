@@ -104,7 +104,10 @@ describe("offline, LLM-free detection path", () => {
 
   it("detects an import the gate forbids", () => {
     // The walker itself is exercised on a module that does use the network.
-    const graph = walk("packages/vscode/src/gateway-client.ts", () => false);
+    const graph = walk(
+      "packages/vscode/src/team/gateway-client.ts",
+      () => false,
+    );
     expect(
       [...graph.files].some((file) =>
         NETWORK_API.test(readFileSync(file, "utf8")),

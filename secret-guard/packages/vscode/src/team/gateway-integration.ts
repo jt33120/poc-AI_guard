@@ -19,8 +19,8 @@ import {
   syncManagedPolicy,
   verifiedPolicyTenant,
 } from "./enrollment.js";
-import { readLastHookAt } from "./hook-activity.js";
-import type { HookHealth } from "./hook-manager.js";
+import { readLastHookAt } from "../hook-activity.js";
+import type { HookHealth } from "../hook-manager.js";
 import {
   forgetEnrollment,
   syncRulesPack,

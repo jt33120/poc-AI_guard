@@ -11,7 +11,7 @@ import {
   syncManagedPolicy,
   verifiedObserveCap,
   verifiedPolicyTenant,
-} from "../../packages/vscode/src/enrollment.js";
+} from "../../packages/vscode/src/team/enrollment.js";
 
 const PUBLIC_KEY_A = "MCowBQYDK2VwAyEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 

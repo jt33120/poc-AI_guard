@@ -9,7 +9,8 @@ This repository is source-available. Its content is licensed as follows:
   subscription.
 * The paths listed in the "Open source scope" section of LICENSING.md are
   open source under the Apache License, Version 2.0, in LICENSE-APACHE. They
-  are the Secret Guard Local detector and command-line hook.
+  are Secret Guard Local: its detector, its command-line hook and the Local
+  edition of its VS Code extension.
 * Third-party components keep the license chosen by their owner, stated next
   to them (for example the fonts in frontend/design-system/licenses/).
 

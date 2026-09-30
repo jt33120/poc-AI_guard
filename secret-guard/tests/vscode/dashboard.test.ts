@@ -22,27 +22,15 @@ describe("protection dashboard boundaries", () => {
     expect(html).toContain("même avec des secrets");
   });
   it("says when Avertir is capped or forbidden by the organization", () => {
-    const capped = dashboardHtml(
-      healthy,
-      "observe",
-      "nonce",
-      false,
-      undefined,
-      undefined,
-      60,
-    );
+    const capped = dashboardHtml(healthy, "observe", "nonce", {
+      observeCap: 60,
+    });
     expect(capped).toContain(
       "Avertir plafonné à 1 h par votre organisation. Réglage de la politique signée",
     );
-    const forbidden = dashboardHtml(
-      healthy,
-      "redact",
-      "nonce",
-      false,
-      undefined,
-      undefined,
-      0,
-    );
+    const forbidden = dashboardHtml(healthy, "redact", "nonce", {
+      observeCap: 0,
+    });
     expect(forbidden).toContain(
       "Avertir est désactivé par votre organisation.",
     );
@@ -56,7 +44,9 @@ describe("protection dashboard boundaries", () => {
     expect(html).toContain("envoi arrêté");
   });
   it("exposes failed mode application instead of claiming success", () => {
-    const html = dashboardHtml(healthy, "observe", "nonce", true);
+    const html = dashboardHtml(healthy, "observe", "nonce", {
+      modeApplicationFailed: true,
+    });
     expect(html).toContain("Mode à appliquer");
     expect(html).toContain("Configurer la protection");
   });
@@ -107,25 +97,13 @@ describe("protection dashboard boundaries", () => {
     expect(html).toContain("Validez le blocage dans chaque assistant");
   });
 
-  it("shows the monitored scope and relay action according to live state", () => {
-    const offline = dashboardHtml(healthy, "block", "nonce");
-    expect(offline).toContain("Périmètre surveillé");
-    expect(offline).toContain("Prompts · Surveillé");
-    expect(offline).toContain("Pièces jointes · Non analysées");
-    expect(offline).toContain('href="command:secretGuard.connectGateway"');
-    expect(offline).not.toContain(
-      'href="command:secretGuard.disconnectGateway"',
-    );
-
-    const online = dashboardHtml(healthy, "block", "nonce", false, {
-      state: "online",
-      status: "Claude raccordé",
-      audit: "Audit : 0 en attente",
-    });
-    expect(online).toContain("Pièces jointes · Analysées");
-    expect(online).toContain("Audit : 0 en attente");
-    expect(online).toContain('href="command:secretGuard.disconnectGateway"');
-    expect(online).not.toContain('href="command:secretGuard.connectGateway"');
+  it("shows the monitored scope of the Local edition, without a relay", () => {
+    const local = dashboardHtml(healthy, "block", "nonce");
+    expect(local).toContain("Périmètre surveillé");
+    expect(local).toContain("Prompts · Surveillé");
+    expect(local).toContain("Pièces jointes · Non analysées");
+    expect(local).not.toContain("Relais de protection");
+    expect(local).not.toContain("secretGuard.connectGateway");
 
     const off = dashboardHtml(
       { ...healthy, state: "off", reason: "not_configured" },
@@ -136,15 +114,16 @@ describe("protection dashboard boundaries", () => {
     expect(off).not.toContain("Prompts · Surveillé");
   });
 
-  it("escapes relay status and audit in the protection center", () => {
-    const html = dashboardHtml(healthy, "block", "nonce", false, {
-      state: "retrying",
-      status: '<img src=x onerror="alert(1)">',
-      audit: "<script>alert(1)</script>",
+  it("places the sections an edition adds before the footer", () => {
+    const html = dashboardHtml(healthy, "block", "nonce", {
+      team: {
+        sections: '<section id="added"></section>',
+        attachmentsCovered: true,
+      },
     });
-    expect(html).toContain("&lt;img");
-    expect(html).toContain("&lt;script&gt;");
-    expect(html).not.toContain("<script");
-    expect(html).toContain('href="command:secretGuard.disconnectGateway"');
+    expect(html).toContain("Pièces jointes · Analysées");
+    expect(html.indexOf('<section id="added">')).toBeLessThan(
+      html.indexOf("<footer>"),
+    );
   });
 });

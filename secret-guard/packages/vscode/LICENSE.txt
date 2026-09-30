@@ -4,11 +4,14 @@ The Local edition of xSOM Secret Guard for VS Code is free to use under the
 Secret Guard Local end-user licence:
 https://github.com/jt33120/poc-AI_guard/blob/main/docs/legal/LICENCE-SECRET-GUARD-LOCAL.md
 
-The source code of this extension is published under the xSOM Commercial
+The source code of its Équipe edition is published under the xSOM Commercial
 License: https://github.com/jt33120/poc-AI_guard/blob/main/LICENSE-COMMERCIAL.md
 No permission is granted to redistribute, sublicense or sell it without prior
 written authorization from xSOM.
 
-The extension bundles the Secret Guard detector (@xsom/secret-guard-core) and
-command-line hook (@xsom/secret-guard-cli). Both are open source under the
-Apache License, Version 2.0: https://www.apache.org/licenses/LICENSE-2.0
+The Local edition of the extension, with the Secret Guard detector
+(@xsom/secret-guard-core) and command-line hook (@xsom/secret-guard-cli) it
+bundles, is open source under the Apache License, Version 2.0:
+https://www.apache.org/licenses/LICENSE-2.0
+The exact files are listed in
+https://github.com/jt33120/poc-AI_guard/blob/main/LICENSING.md

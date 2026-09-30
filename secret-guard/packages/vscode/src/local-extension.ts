@@ -1,11 +1,9 @@
 import type * as vscode from "vscode";
 import { activateProtection } from "./protection.js";
-import { createTeam } from "./team/index.js";
 
-// The official build: Secret Guard Local with the Équipe edition plugged in.
-// The open source build starts from local-extension.ts instead.
+// The open source build: Secret Guard Local alone, without the Équipe edition.
 export function activate(context: vscode.ExtensionContext): Promise<void> {
-  return activateProtection(context, createTeam);
+  return activateProtection(context);
 }
 
 export function deactivate(): void {
