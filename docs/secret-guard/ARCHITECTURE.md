@@ -15,7 +15,7 @@ déploiement administrateur non contournable.
 
 ## Mise à jour Developer Guard
 
-Le périmètre approuvé est défini par [DEVELOPER-GUARD-PLAN.md](./DEVELOPER-GUARD-PLAN.md). Le dépôt contient désormais des contrats JSON stricts, un évaluateur déterministe TypeScript/Python, des adaptateurs d’hôtes, un runner de ressources/commandes/MCP, des politiques Ed25519 liées au tenant, des approbations liées à l’action et au poste, une posture sans contenu et une console d’administration. Ces briques sont validées localement ; elles ne constituent pas une preuve d’interception réelle par Claude Code ou Codex.
+Le dépôt contient désormais des contrats JSON stricts, un évaluateur déterministe TypeScript/Python, des adaptateurs d’hôtes, un runner de ressources/commandes/MCP, des politiques Ed25519 liées au tenant, des approbations liées à l’action et au poste, une posture sans contenu et une console d’administration. Ces briques sont validées localement ; elles ne constituent pas une preuve d’interception réelle par Claude Code ou Codex.
 
 Les invariants V0 restent applicables : aucune valeur détectée dans l’audit, aucune permission déduite d’une simple configuration, aucune garantie universelle de l’extension sur le système. Le profil renforcé Linux ajoute une frontière système distincte ; les profils macOS et Windows de ce dépôt sont des profils administrés, pas des sandboxes qualifiées.
 

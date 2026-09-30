@@ -27,7 +27,6 @@ Secret Guard traitait déjà les caractères invisibles, mais **pour une autre r
 signalait qu’un texte **portait** des caractères invisibles. Un prompt ou un fichier sans
 secret mais chargé d’une consigne en étiquettes Unicode passait tel quel.
 
-`docs/secret-guard/DEVELOPER-THREAT-MAPPING.md` ne mentionnait pas cette famille.
 
 ## 3. Le produit
 

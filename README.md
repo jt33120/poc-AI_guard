@@ -191,7 +191,7 @@ frontend/  Next.js 14 console (onboarding, inspector, approvals, audit, admin)
 secret-guard/ local TypeScript core, CLI/hook bridge, VS Code extension, tests and benchmarks
 scripts/   audit_security, audit_sovereignty, gen_coverage, verify_chain, demo, seed_demo
 tests/     pytest suite (ephemeral Postgres harness) + Playwright e2e
-docs/      SPEC, BUILD_PLAN, SECURITY, DEPLOY, product/ (PRD, architecture, epics)
+docs/      SECURITY, DEPLOY, AUDIT_FORMAT, legal/, secret-guard/ (architecture, threat model)
 ```
 
 ## Security
@@ -207,11 +207,8 @@ Secret Guard's narrower local threat model and coverage limits live in
 
 MVP milestones **M0–M8** plus **M9–M12** (AI Act compliance plane, tool integrity
 and RBAC, risk/trust-graduated escalation, taint) are complete, alongside egress
-DLP, AI observability and the LLM proxy. See `docs/BUILD_PLAN.md` for the MVP and
-`docs/product/` (PRD, `ARCHITECTURE-V2.md`, `EPICS.md`, `PLAN-REVIEW.md`) for what
-v2 adds next — starting with one-command deployment. Secret Guard V0 is an
-independent, locally enforced add-on with its own phased plan in
-`docs/secret-guard/DEVELOPMENT_PLAN.md`.
+DLP, AI observability and the LLM proxy. Secret Guard is an independent, locally
+enforced add-on; its architecture and threat model are in `docs/secret-guard/`.
 
 ## License
 

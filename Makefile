@@ -6,7 +6,7 @@ COMPOSE ?= docker compose
 XSOM_API_PORT ?= 8000
 
 .PHONY: install frontend-install secret-guard-install dev test verify demo lint fmt fmt-check typecheck audit \
-        coverage-gate coverage-map threat-rows threat-brainstorm product-coverage marketing-facts replays demo-snapshot migrations-manifest sovereignty-gate verify-frontend verify-secret-guard test-frontend seed-demo clean up down down-hard logs ps cli backup restore overhead overhead-gate
+        coverage-gate coverage-map threat-rows product-coverage marketing-facts replays demo-snapshot migrations-manifest sovereignty-gate verify-frontend verify-secret-guard test-frontend seed-demo clean up down down-hard logs ps cli backup restore overhead overhead-gate
 
 install:           ## Install backend + frontend deps
 	$(UV) sync
@@ -60,7 +60,7 @@ sovereignty-gate:  ## AD-25/SM-15: nothing on the decision path can reach the ne
 
 # verify = backend + frontend + Secret Guard quality and security gates.
 # CLAUDE.md §8. Install both Node workspaces first with `make install`.
-verify: lint fmt-check typecheck test audit sovereignty-gate coverage-gate threat-brainstorm product-coverage overhead-gate verify-frontend verify-secret-guard
+verify: lint fmt-check typecheck test audit sovereignty-gate coverage-gate product-coverage overhead-gate verify-frontend verify-secret-guard
 	@echo ">> verify: OK"
 
 seed-demo:         ## Load the committed demonstration tenant (FR-182/183)
@@ -82,9 +82,6 @@ coverage-map:      ## Regenerate the published coverage map (AD-30)
 
 threat-rows:       ## Regenerate the front's threat rows from the map (L3)
 	$(UV) run python scripts/gen_threat_rows.py
-
-threat-brainstorm: ## Check the AST-generated internal threat brainstorm (T12)
-	node scripts/gen_threat_backend_brainstorm.mjs --check
 
 product-coverage:  ## Check the generated Developer Guard coverage ledger (T12)
 	node scripts/gen_product_coverage.mjs --check

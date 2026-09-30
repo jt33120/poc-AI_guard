@@ -188,9 +188,8 @@ binary. It does not add native Codex/Copilot attachment coverage. See the
   joining is limited to 128 candidate windows of at most 16,384 characters;
   findings are capped at 2,048. There is no implemented wall-clock budget.
 
-See [`../docs/secret-guard/ARCHITECTURE.md`](../docs/secret-guard/ARCHITECTURE.md),
-[`../docs/secret-guard/THREAT_MODEL.md`](../docs/secret-guard/THREAT_MODEL.md), and
-[`../docs/secret-guard/DEVELOPMENT_PLAN.md`](../docs/secret-guard/DEVELOPMENT_PLAN.md).
+See [`../docs/secret-guard/ARCHITECTURE.md`](../docs/secret-guard/ARCHITECTURE.md) and
+[`../docs/secret-guard/THREAT_MODEL.md`](../docs/secret-guard/THREAT_MODEL.md).
 
 ## License
 

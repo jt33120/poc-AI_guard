@@ -1,6 +1,6 @@
 # CLAUDE.md — Brief de construction (xSOM AI Guard, MVP)
 
-> Tu es l'agent de dev de ce repo. Objectif : livrer un **MVP propre, sécurisé, testé**. Source d'autorité = ce fichier ; le détail = `docs/SPEC.md` ; l'ordre + les critères = `docs/BUILD_PLAN.md`. **Lis les trois avant de coder.** Travaille milestone par milestone, chaque milestone vert avant le suivant.
+> Tu es l'agent de dev de ce repo. Objectif : livrer un **MVP propre, sécurisé, testé**. Source d'autorité = ce fichier. Travaille par petits lots, chaque lot vert avant le suivant.
 
 ## 1. Mission
 
@@ -52,7 +52,7 @@ Fonctions petites et explicites, une responsabilité. Typage strict (mypy, TS st
 
 ## 6. Méthode de travail
 
-Pour chaque milestone de `docs/BUILD_PLAN.md` (M0→M8) : lire les critères → implémenter le strict nécessaire → écrire/passer les tests → `make verify` **vert** → commit. Ne pas sauter de milestone ; pas de frontend (M7) avant backend vert.
+Pour chaque lot : lire les critères → implémenter le strict nécessaire → écrire/passer les tests → `make verify` **vert** → commit. Ne pas sauter de milestone ; pas de frontend (M7) avant backend vert.
 
 ## 7. Definition of Done
 
@@ -74,4 +74,4 @@ npm --prefix secret-guard run verify  # core local + CLI/hooks + extension VS Co
 ```
 
 ## 9. Références
-`docs/SPEC.md` · `docs/BUILD_PLAN.md` · `.env.example`. En cas d'ambiguïté : préférer la sécurité (fail-closed) et le scope minimal, et poser la question dans le PR plutôt que d'élargir.
+`.env.example`. En cas d'ambiguïté : préférer la sécurité (fail-closed) et le scope minimal, et poser la question dans le PR plutôt que d'élargir.

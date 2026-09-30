@@ -150,4 +150,3 @@ secret.
 * `core/checkpoints.py` — `entry_digest`, `record`, `verify`, `build_signer`.
 * `tests/test_audit_format.py` — les vecteurs dorés, écrits en dur.
 * `tests/test_checkpoints.py` — le témoin, et ce qu'il détecte que la chaîne ne voit pas.
-* `docs/SPEC.md` §9 — la formule, dont ce fichier est le détail normatif.
