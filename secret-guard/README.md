@@ -191,3 +191,11 @@ binary. It does not add native Codex/Copilot attachment coverage. See the
 See [`../docs/secret-guard/ARCHITECTURE.md`](../docs/secret-guard/ARCHITECTURE.md),
 [`../docs/secret-guard/THREAT_MODEL.md`](../docs/secret-guard/THREAT_MODEL.md), and
 [`../docs/secret-guard/DEVELOPMENT_PLAN.md`](../docs/secret-guard/DEVELOPMENT_PLAN.md).
+
+## License
+
+`@xsom/secret-guard-core` and `@xsom/secret-guard-cli` are open source under
+[Apache 2.0](packages/core/LICENSE). The other packages, including the VS Code
+extension, are published under the [xSOM Commercial License](../LICENSE-COMMERCIAL.md).
+The Local edition of the extension is free to use under its
+[end-user licence](../docs/legal/LICENCE-SECRET-GUARD-LOCAL.md).

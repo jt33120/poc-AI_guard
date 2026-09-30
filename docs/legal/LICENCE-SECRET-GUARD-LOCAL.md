@@ -18,6 +18,8 @@ Cette licence autorise la copie strictement nécessaire à l'installation, à la
 
 Sauf autorisation écrite préalable d'xSOM ou droit impératif applicable, l'utilisateur ne peut pas vendre, louer, sous-licencier, publier un miroir, redistribuer, modifier, désassembler, décompiler ou tenter d'extraire le code source du Logiciel. Il ne peut pas supprimer les avis de propriété intellectuelle ni présenter le Logiciel comme certifié, qualifié ou approuvé par un tiers sans preuve écrite.
 
+Ces restrictions ne s'appliquent pas aux composants que le Logiciel intègre sous licence Apache 2.0, à savoir le détecteur et le hook en ligne de commande de Secret Guard : ils sont régis par cette licence, dont le périmètre est décrit dans `LICENSING.md`.
+
 ## 4. Fonctionnement et limites
 
 Secret Guard Local inspecte localement les événements et textes pris en charge. Il ne garantit pas la détection de tout secret, toute donnée sensible, toute injection ou toute action risquée. Sa couverture dépend notamment de l'hôte, de sa version, de la configuration, du système d'exploitation et du chemin effectivement raccordé. Les limites publiées dans la matrice de capacités et la documentation produit font partie de cette information.

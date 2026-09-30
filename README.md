@@ -212,3 +212,11 @@ DLP, AI observability and the LLM proxy. See `docs/BUILD_PLAN.md` for the MVP an
 v2 adds next — starting with one-command deployment. Secret Guard V0 is an
 independent, locally enforced add-on with its own phased plan in
 `docs/secret-guard/DEVELOPMENT_PLAN.md`.
+
+## License
+
+This repository is source-available under the
+[xSOM Commercial License](LICENSE-COMMERCIAL.md): you may read, audit and test it,
+and production use requires an xSOM subscription. The Secret Guard Local detector
+and its command-line hook are open source under [Apache 2.0](LICENSE-APACHE).
+[`LICENSING.md`](LICENSING.md) lists exactly which paths are open.

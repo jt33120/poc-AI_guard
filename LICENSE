@@ -1,0 +1,17 @@
+xSOM AI Guard
+Copyright (c) 2026 XSOM CONSULTING ("xSOM")
+
+This repository is source-available. Its content is licensed as follows:
+
+* By default, everything in this repository is licensed under the xSOM
+  Commercial License in LICENSE-COMMERCIAL.md. You may read, audit, test and
+  modify it outside production. Using it in production requires a valid xSOM
+  subscription.
+* The paths listed in the "Open source scope" section of LICENSING.md are
+  open source under the Apache License, Version 2.0, in LICENSE-APACHE. They
+  are the Secret Guard Local detector and command-line hook.
+* Third-party components keep the license chosen by their owner, stated next
+  to them (for example the fonts in frontend/design-system/licenses/).
+
+Neither license grants rights to the names, logos or trademarks of xSOM,
+including "xSOM AI Guard" and "Secret Guard".
