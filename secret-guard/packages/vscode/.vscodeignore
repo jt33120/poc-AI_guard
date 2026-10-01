@@ -5,4 +5,5 @@ node_modules/**
 dist/**
 !dist/extension.cjs
 !dist/hook.cjs
+!dist/relay-worker.cjs
 **/*.map

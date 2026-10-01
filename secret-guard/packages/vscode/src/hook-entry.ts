@@ -1,12 +1,18 @@
 import process from "node:process";
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { canDelegate, relayConnected } from "./gateway-delegation.js";
+import { liveRelay, relayConnected } from "./gateway-delegation.js";
 import { beginActivity } from "./hook-activity.js";
 import { effectiveMode, readObserveDeadline } from "./observe-window.js";
 import { RUNNER_VERSION } from "./runner-version.js";
+import { delegation } from "./relay-delegation.js";
 
-import { parseHookMode, runHook } from "@xsom/secret-guard-cli/hook";
+import {
+  parseHookMode,
+  readLocalFile,
+  runHook,
+  type FileReader,
+} from "@xsom/secret-guard-cli/hook";
 import {
   claudeAdapter,
   codexAdapter,
@@ -20,11 +26,11 @@ import {
   observeCapOf,
   resolveApproval,
 } from "@xsom/developer-guard-runner";
-import type { CompiledRulesPack } from "@xsom/secret-guard-core";
+import { findHidden, type CompiledRulesPack } from "@xsom/secret-guard-core";
 
 const MAX_HOOK_INPUT_BYTES = 1_200_000;
 const STALE_SESSION_MESSAGE =
-  "🔌 Secret Guard · Session non raccordée\nLe relais xSOM nettoie automatiquement, mais cette session Claude a été ouverte avant le raccordement. Ouvrez une nouvelle session, puis renvoyez votre message.";
+  "🔌 Secret Guard · Session non raccordée\nLe relais Secret Guard nettoie automatiquement, mais cette session Claude a été ouverte avant son activation. Ouvrez une nouvelle session, puis renvoyez votre message.";
 
 async function readBoundedStdin(): Promise<string> {
   const chunks: Buffer[] = [];
@@ -59,7 +65,17 @@ async function check(storage: string): Promise<void> {
   // too many findings: the tuning may not have run), must stay here.
   const rulesPack = await verifiedRulesPack(storage);
   let tuningNeedsLocalBlock = false;
-  const response = runHook(rawInput, mode, undefined, rulesPack, (result) => {
+  // What a local relay could not clean: files it cannot read, invisible
+  // characters, scans that did not finish.
+  const seen = { unanalysed: false, hidden: false, incomplete: false };
+  const readFile: FileReader = (path) => {
+    const file = readLocalFile(path);
+    if (file.status === "unreadable") seen.unanalysed = true;
+    if (file.status === "text" && hasHidden(file.content)) seen.hidden = true;
+    return file;
+  };
+  const response = runHook(rawInput, mode, readFile, rulesPack, (result) => {
+    if (!result.complete) seen.incomplete = true;
     if (
       result.findings.some((finding) => finding.custom !== undefined) ||
       (rulesPack !== undefined && !result.complete)
@@ -82,32 +98,47 @@ async function check(storage: string): Promise<void> {
   }
   // Prompts, their @-mentioned files and Read tool results all reach the
   // provider inside the request the relay cleans; nothing else is delegated.
-  let relayedEvent = false;
+  let relayedEvent: "prompt" | "read" | undefined;
   try {
     const input = JSON.parse(rawInput) as Record<string, unknown>;
-    relayedEvent =
-      (input.hook_event_name === "UserPromptSubmit" &&
-        typeof input.prompt === "string") ||
-      (input.hook_event_name === "PreToolUse" && input.tool_name === "Read");
+    if (
+      input.hook_event_name === "UserPromptSubmit" &&
+      typeof input.prompt === "string"
+    ) {
+      relayedEvent = "prompt";
+      if (hasHidden(input.prompt)) seen.hidden = true;
+    } else if (
+      input.hook_event_name === "PreToolUse" &&
+      input.tool_name === "Read"
+    )
+      relayedEvent = "read";
   } catch {
     /* Invalid envelopes must remain blocked. */
   }
-  if (
+  const relay =
     !response.continue &&
-    relayedEvent &&
+    relayedEvent !== undefined &&
     mode === "redact" &&
-    !tuningNeedsLocalBlock &&
-    (await canDelegate(storage, process.env.ANTHROPIC_BASE_URL))
-  ) {
+    !tuningNeedsLocalBlock
+      ? await liveRelay(storage, process.env.ANTHROPIC_BASE_URL)
+      : undefined;
+  const handover =
+    relay === undefined || relayedEvent === undefined
+      ? undefined
+      : delegation(relay, relayedEvent, seen);
+  if (handover?.delegate === true) {
     // The original travels only to the registered, mandatory-redaction route.
-    process.stdout.write(`${JSON.stringify({ continue: true })}\n`);
+    process.stdout.write(
+      `${JSON.stringify({ continue: true, systemMessage: handover.message })}\n`,
+    );
     return;
   }
   if (!response.continue) {
     // Claude reads ANTHROPIC_BASE_URL once, when the session starts: a session
     // opened before the relay was connected can never delegate to it.
     const staleClaudeSession =
-      relayedEvent &&
+      relayedEvent !== undefined &&
+      handover === undefined &&
       mode === "redact" &&
       !tuningNeedsLocalBlock &&
       process.env.CLAUDE_PROJECT_DIR !== undefined &&
@@ -119,6 +150,11 @@ async function check(storage: string): Promise<void> {
     return;
   }
   process.stdout.write(`${JSON.stringify(response)}\n`);
+}
+
+function hasHidden(text: string): boolean {
+  const report = findHidden(text);
+  return !report.complete || report.hidden > 0;
 }
 
 /**
