@@ -20,6 +20,9 @@ import {
 import { hiddenSummary } from "./instructions.js";
 import { findingName, findingSummary, hookMessage } from "./report.js";
 
+// The extension wraps the reader to learn which files could not be analysed.
+export { readLocalFile, type FileReader, type FileText };
+
 export type ProtectionMode = "block" | "redact" | "observe";
 // Hook arguments written before 0.6 could also say "allow" (ambiguous
 // findings passed). Such commands are still recognised so they can be

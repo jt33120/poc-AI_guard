@@ -11,6 +11,9 @@ export default defineConfig({
       "@xsom/secret-guard-core": fileURLToPath(
         new URL("./packages/core/src/index.ts", import.meta.url),
       ),
+      "@xsom/secret-guard-relay": fileURLToPath(
+        new URL("./packages/relay/src/index.ts", import.meta.url),
+      ),
       "@xsom/developer-guard-policy": fileURLToPath(
         new URL("./packages/policy/src/index.ts", import.meta.url),
       ),

@@ -332,7 +332,7 @@ describe("bounded subscription-compatible Claude relay", () => {
     );
     const stale = await run();
     expect(stale.code).toBe(2);
-    expect(stale.stderr).toContain("ouverte avant le raccordement");
+    expect(stale.stderr).toContain("ouverte avant son activation");
     expect(stale.stderr).toContain("nouvelle session");
   });
 });

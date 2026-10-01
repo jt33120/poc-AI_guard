@@ -8,7 +8,23 @@ les contenus sensibles détectés, avant leur traitement par le modèle.
 
 **Analyse locale · Passerelle xSOM optionnelle · Intégré à VS Code**
 
-### Réglage sur mesure xSOM (0.7.0, édition Équipe)
+### Purge transparente pour Claude Code (0.8.0, Basic, sans compte)
+
+En mode **Expurger**, Secret Guard propose une fois d'activer la purge transparente
+(aussi : palette › « Secret Guard: Activer la purge transparente (Claude Code) »).
+Un relais démarre sur ce PC, sur `127.0.0.1` derrière une adresse aléatoire, et
+Claude Code y envoie ses requêtes. Le relais retire les secrets détectés, revérifie,
+puis transmet à Anthropic ; Claude affiche « Prompt purgé avant envoi » et la session
+continue. Rien ne part chez xSOM. Ouvrez une nouvelle session Claude après
+l'activation.
+
+Ce que le relais ne sait pas nettoyer reste bloqué par le hook : caractères
+invisibles, analyse incomplète, et images ou captures d'écran, sauf si vous avez
+choisi **Activer et laisser passer les captures d'écran** (elles partent alors sans
+analyse, avec un message à chaque fois). Copilot et Codex ne permettent pas de
+changer leur adresse d'envoi : pour eux, Secret Guard bloque.
+
+### Réglage sur mesure xSOM (0.7.0, édition Entreprise)
 
 En plus des règles intégrées, Secret Guard applique le **réglage de votre
 organisation** : des règles calibrées et signées par xSOM pour vos propres données

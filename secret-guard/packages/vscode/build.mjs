@@ -49,6 +49,13 @@ await Promise.all([
     format: "cjs",
     outfile: "dist/hook.cjs",
   }),
+  // The local relay scans synchronously: it runs off the extension host thread.
+  build({
+    ...common,
+    entryPoints: ["src/relay-worker.ts"],
+    format: "cjs",
+    outfile: "dist/relay-worker.cjs",
+  }),
   build({
     ...common,
     entryPoints: ["src/test/suite/index.ts"],

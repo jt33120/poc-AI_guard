@@ -26,6 +26,7 @@ import {
 import { ActivityMonitor } from "./hook-activity.js";
 import { HookManager, type HookHealth } from "./hook-manager.js";
 import { GatewayIntegration } from "./gateway-integration.js";
+import { LocalRelay } from "./local-relay.js";
 import { customFindingFields } from "./gateway-client.js";
 import { builtInAuthorityKeys } from "@xsom/developer-guard-runner";
 import { importRulesPack, readRulesPackSnapshot } from "./rules-pack-sync.js";
@@ -597,6 +598,9 @@ export async function activate(
     () => afterPolicySync(),
   );
   context.subscriptions.push(gateway);
+  const localRelay = new LocalRelay(context);
+  context.subscriptions.push(localRelay);
+  void localRelay.restore();
   const status = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Right,
     100,
@@ -783,6 +787,8 @@ export async function activate(
   context.subscriptions.push(
     vscode.commands.registerCommand("secretGuard.connectGateway", async () => {
       closeStatusControls();
+      // The gateway takes over Claude's route: the local relay steps aside.
+      if (localRelay.enabled) await localRelay.disable();
       await gateway?.connect();
       await refreshUi();
     }),
@@ -799,6 +805,18 @@ export async function activate(
           await gateway?.disconnect();
           await refreshUi();
         }
+      },
+    ),
+    vscode.commands.registerCommand("secretGuard.enableLocalRelay", () =>
+      localRelay.enable(),
+    ),
+    vscode.commands.registerCommand(
+      "secretGuard.disableLocalRelay",
+      async () => {
+        await localRelay.disable();
+        void vscode.window.showInformationMessage(
+          "Purge transparente désactivée. Les nouvelles sessions Claude reprennent la route directe ; le hook bloque de nouveau les secrets.",
+        );
       },
     ),
     vscode.commands.registerCommand("secretGuard.chooseMode", async () => {
@@ -823,15 +841,19 @@ export async function activate(
           matchOnDescription: true,
         },
       );
-      if (selected !== undefined && (await confirmMode(selected.mode)))
+      if (selected !== undefined && (await confirmMode(selected.mode))) {
         await saveMode(selected.mode);
+        if (selected.mode === "redact") await localRelay.offer();
+      }
     }),
     vscode.commands.registerCommand(
       "secretGuard.setMode",
       async (mode?: unknown) => {
         closeStatusControls();
-        if (isProtectionMode(mode) && (await confirmMode(mode)))
+        if (isProtectionMode(mode) && (await confirmMode(mode))) {
           await saveMode(mode);
+          if (mode === "redact") await localRelay.offer();
+        }
       },
     ),
     // From the panel, while Avertir runs: restart the window with another

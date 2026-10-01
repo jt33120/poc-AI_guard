@@ -1,5 +1,20 @@
 # Journal des versions
 
+## 0.8.0
+
+- **Purge transparente pour Claude Code, sans compte (Secret Guard Basic)** : en
+  mode Expurger, un relais local retire les secrets des requêtes de Claude Code
+  avant Anthropic, et la session continue avec le message « Prompt purgé avant
+  envoi ». Le relais tourne hors du fil de l'hôte d'extensions, n'écoute que sur
+  `127.0.0.1` et n'envoie rien à xSOM. Activation proposée une fois en choisissant
+  Expurger, ou par la commande « Activer la purge transparente (Claude Code) ».
+- Captures d'écran : bloquées par défaut avant d'entrer dans la conversation ; sur
+  choix explicite à l'activation, transmises sans analyse avec un message.
+- Le hook ne confie au relais local que ce qu'il sait nettoyer entièrement :
+  caractères invisibles et analyses incomplètes restent bloqués sur le poste.
+- Le message « session non raccordée » vaut pour la passerelle comme pour le relais
+  local.
+
 ## 0.7.1
 
 - Correctif : les notifications de tâche que Claude Code soumet comme prompt
