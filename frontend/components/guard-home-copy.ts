@@ -31,7 +31,7 @@ export const GUARD_HOME_COPY = {
       },
     },
     productsKicker: "Nos produits", productsTitle: "Du poste de travail à l’entreprise.",
-    productsIntro: "Secret Guard protège le prompt sur le poste ; ses éditions Pro et Grand Compte ajoutent le journal, le relevé client et les règles sur mesure. AI Guard garde la passerelle, là où l’agent agit.",
+    productsIntro: "Secret Guard protège le prompt sur le poste ; ses éditions Pro et Entreprise ajoutent le journal, le relevé client et les règles sur mesure. AI Guard garde la passerelle, là où l’agent agit.",
     productsMeta: "Nos produits",
     productsDescription: "Secret Guard, l’extension qui retient les secrets avant l’envoi au modèle, et la plateforme qui encadre les actions de vos agents IA.",
     featured: "Secret Guard Basic · Gratuit", extensionTag: "Le poste de travail",

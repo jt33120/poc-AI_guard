@@ -32,7 +32,7 @@ export const SECRET_GUARD_COPY = {
         ["Entropie", "Les chaînes trop aléatoires"],
         ["Réglage sur mesure", "Vos données clients · signé par xSOM"],
       ],
-      team: "Grand Compte",
+      team: "Entreprise",
       sent: "Envoyé",
       masked: "‹ secret masqué ›",
       promptLine: "Déploie avec",
@@ -66,7 +66,7 @@ export const SECRET_GUARD_COPY = {
         ["Installer", "Palette › « Extensions : Installer à partir d’un VSIX »."],
         ["Activer", "Palette › « Secret Guard: Activer la protection automatique ». Dans Codex, approuvez le hook dans /hooks."],
       ],
-      team: "Un relevé pour vos clients ? Voir Secret Guard Pro et Grand Compte",
+      team: "Un relevé pour vos clients ? Voir Secret Guard Pro et Entreprise",
     },
   },
   en: {

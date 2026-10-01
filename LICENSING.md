@@ -9,7 +9,7 @@ open source under Apache 2.0.
 |---|---|---|
 | **Secret Guard Basic** | Free | Detector, CLI hook and local relay: [Apache 2.0](LICENSE-APACHE). VS Code extension: free to use under its [end-user licence](docs/legal/LICENCE-SECRET-GUARD-LOCAL.md), code under the commercial license for now. |
 | **Secret Guard Pro** | Paid | [xSOM Commercial License](LICENSE-COMMERCIAL.md) |
-| **Secret Guard Grand Compte** (Enterprise) | Quoted | [xSOM Commercial License](LICENSE-COMMERCIAL.md) |
+| **Secret Guard Entreprise** | Quoted | [xSOM Commercial License](LICENSE-COMMERCIAL.md) |
 | **AI Guard platform** (gateway, traces, console) | Paid or quoted | [xSOM Commercial License](LICENSE-COMMERCIAL.md) |
 
 ## Why the detector is open

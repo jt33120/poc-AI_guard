@@ -42,7 +42,7 @@ export const EXTENSION_HERO_MEDIA = {
 /** Concrete orientation copy; none of these illustrative paths claims live coverage. */
 export const GUARD_COPY = {
   fr: {
-    poc: "Secret Guard Basic gratuit · Pro et Grand Compte en pilote accompagné",
+    poc: "Secret Guard Basic gratuit · Pro et Entreprise en pilote accompagné",
     title: ["La solution cyber", "pour tous vos usages IA."],
     intro: "Simple, efficace.",
     explore: "Voir les menaces",

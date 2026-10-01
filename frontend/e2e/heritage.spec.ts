@@ -126,7 +126,7 @@ test("the products page opens on its film, then shows each product in a carousel
 
   // Les éditions payantes portent le nom du produit, pas un second nom de gamme.
   await expect(page.locator("#offres")).toContainText("Secret Guard Pro");
-  await expect(page.locator("#offres")).toContainText("Secret Guard Grand Compte");
+  await expect(page.locator("#offres")).toContainText("Secret Guard Entreprise");
   await expect(page.locator("main")).not.toContainText("Developer Guard");
   await expect(page.locator('.guard-glossary-link a[href="/menaces"]')).toHaveAttribute("href", "/menaces");
 });
@@ -268,11 +268,11 @@ test("the Secret Guard page says what it solves, how, and hands over the file", 
   await expect(fond).toHaveAttribute("poster", "/signal-media/ai-guard-extension-v1.png");
   await expect(fond).toHaveAttribute("preload", "none");
 
-  // Le schéma : le filtre et ses trois couches, dont le réglage réservé à l'édition Grand Compte.
+  // Le schéma : le filtre et ses trois couches, dont le réglage réservé à l'édition Entreprise.
   const couches = page.locator("#fonctionnement .sg-layers li");
   await expect(couches).toHaveCount(3);
   await expect(couches.nth(1)).toContainText("Entropie");
-  await expect(couches.nth(2)).toContainText("Grand Compte");
+  await expect(couches.nth(2)).toContainText("Entreprise");
 
   // Le vrai panneau, ses sept boutons légendés ; Expurger est déplié d'office, et
   // survoler une autre légende la déplie à son tour.

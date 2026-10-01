@@ -15,7 +15,7 @@ const FR = {
     eyebrow: "11 / EXTENSION VS CODE · RÉGLAGE SUR MESURE",
     title: "Réglage sur mesure",
     description:
-      "Des règles calibrées par xSOM sur vos propres données et signées, que les postes Secret Guard Grand Compte compatibles vérifient puis appliquent hors ligne. Vous les lisez ; xSOM les ajuste à votre demande.",
+      "Des règles calibrées par xSOM sur vos propres données et signées, que les postes Secret Guard Entreprise compatibles vérifient puis appliquent hors ligne. Vous les lisez ; xSOM les ajuste à votre demande.",
     back: "← Postes et journal",
     refresh: "Actualiser",
     ask: "Demander un ajustement à xSOM",
@@ -23,7 +23,7 @@ const FR = {
     operatorLink: "Atelier opérateur xSOM →",
     emptyTitle: "Aucun réglage sur mesure pour l’instant",
     emptyBody:
-      "Le réglage fait partie de Secret Guard Grand Compte : xSOM calibre des détecteurs sur vos identifiants clients, noms de projets et formats internes, et les signe ; un poste en Secret Guard 0.7 ou plus récent les applique sans réseau. Les règles intégrées restent actives dans tous les cas.",
+      "Le réglage fait partie de Secret Guard Entreprise : xSOM calibre des détecteurs sur vos identifiants clients, noms de projets et formats internes, et les signe ; un poste en Secret Guard 0.7 ou plus récent les applique sans réseau. Les règles intégrées restent actives dans tous les cas.",
     status: "État du réglage",
     version: "Version",
     validity: "Valide jusqu’au",
@@ -66,7 +66,7 @@ const FR = {
     history: "Historique",
     historyPublished: "Version {v} publiée",
     historyRevoked: "Version {v} retirée",
-    mailSubject: "Secret Guard Grand Compte · ajustement du réglage sur mesure",
+    mailSubject: "Secret Guard Entreprise · ajustement du réglage sur mesure",
     mailBody:
       "Bonjour,\n\nNous souhaitons ajuster notre réglage sur mesure{version}.\n\nDétecteur concerné :\nCe qui devrait être détecté (exemple synthétique, jamais une vraie donnée) :\nCe qui ne devrait pas l’être :\n\nMerci.",
   },
