@@ -1,16 +1,16 @@
 import { CONTACT_MAILTO } from "@/components/guard-copy";
 import type { FilmMedia } from "@/components/home/HomeFilm";
 
-/** Le film de la page produits (`scripts/render-products-film.mjs`) : ses mots sont repris dans `label`. */
+/** Le film de la page produits (Remotion : `films/src/ProductsFilm.tsx`) : ses mots sont repris dans `label`. */
 export const PRODUCTS_HERO_MEDIA: FilmMedia = {
   fr: {
-    mp4: "/signal-media/xsom-products-v1-fr.mp4",
-    poster: "/signal-media/xsom-products-v1-fr.jpg",
+    mp4: "/signal-media/xsom-products-v2-fr.mp4",
+    poster: "/signal-media/xsom-products-v2-fr.jpg",
     label: "Nos produits : sur le poste, protéger ce que vos équipes envoient aux IA. Dans votre infrastructure, contrôler chaque action de vos agents. Du poste au serveur : nos produits de cybersécurité IA.",
   },
   en: {
-    mp4: "/signal-media/xsom-products-v1-en.mp4",
-    poster: "/signal-media/xsom-products-v1-en.jpg",
+    mp4: "/signal-media/xsom-products-v2-en.mp4",
+    poster: "/signal-media/xsom-products-v2-en.jpg",
     label: "Our products: on the workstation, protect what your teams send to AI. In your infrastructure, control every action your agents take. From laptop to server: our AI cybersecurity products.",
   },
 };

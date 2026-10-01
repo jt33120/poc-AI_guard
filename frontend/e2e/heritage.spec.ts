@@ -83,7 +83,7 @@ test("the products page opens on its film, then shows each product in a carousel
   // Le film de la gamme, avec ses propres commandes, et une invitation à descendre
   // vers le carrousel. Il ne nomme aucun produit : la gamme va s'agrandir.
   const film = page.locator("#home-film");
-  await expect(film.locator("video")).toHaveAttribute("src", /xsom-products-v1-fr\.mp4$/);
+  await expect(film.locator("video")).toHaveAttribute("src", /xsom-products-v2-fr\.mp4$/);
   expect(await film.locator("video").getAttribute("controls")).toBeNull();
   expect(await film.locator("video").getAttribute("aria-label")).not.toMatch(/Secret Guard|AI Guard/);
   await expect(film.getByRole("link", { name: "Découvrir" })).toHaveAttribute("href", "#gamme");
@@ -240,15 +240,15 @@ test("the hero respects reduced motion without downloading its video", async ({ 
   const videoRequests: string[] = [];
   await page.emulateMedia({ reducedMotion: "reduce" });
   page.on("request", (request) => {
-    if (/xsom-ai-home-v3-(?:fr|en)\.mp4(?:\?|$)/.test(request.url())) videoRequests.push(request.url());
+    if (/xsom-ai-home-v4-(?:fr|en)\.mp4(?:\?|$)/.test(request.url())) videoRequests.push(request.url());
   });
   await page.goto("/");
   const video = page.locator(".home-film__video");
   await expect(video).toBeVisible();
-  await expect(video).toHaveAttribute("poster", "/signal-media/xsom-ai-home-v3-fr.jpg");
+  await expect(video).toHaveAttribute("poster", "/signal-media/xsom-ai-home-v4-fr.jpg");
   await expect(video).toHaveAttribute("preload", "none");
   await expect.poll(() => video.evaluate((element) => (element as HTMLVideoElement).paused)).toBe(true);
-  await expect(video).toHaveAttribute("src", "/signal-media/xsom-ai-home-v3-fr.mp4");
+  await expect(video).toHaveAttribute("src", "/signal-media/xsom-ai-home-v4-fr.mp4");
   expect(videoRequests).toEqual([]);
 });
 
@@ -265,7 +265,7 @@ test("the Secret Guard page says what it solves, how, and hands over the file", 
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Les meilleurs agents de code.");
   await expect(page.locator(".sg-hero__hosts li")).toHaveText(["GitHub Copilot", "Claude Code", "Codex"]);
   const fond = page.locator(".sg-hero__video");
-  await expect(fond).toHaveAttribute("poster", "/signal-media/ai-guard-extension-v1.png");
+  await expect(fond).toHaveAttribute("poster", "/signal-media/ai-guard-extension-v2.jpg");
   await expect(fond).toHaveAttribute("preload", "none");
 
   // Le schéma : le filtre et ses trois couches, dont le réglage réservé à l'édition Entreprise.

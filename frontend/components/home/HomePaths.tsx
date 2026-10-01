@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState, type CSSProperties } from "react";
 import { GUARD_OFFER_FAMILIES_COPY } from "@/components/guard-offers-copy";
 import { useT } from "@/lib/i18n";
-import extension from "@/public/signal-media/ai-guard-extension-v1.png";
+import extension from "@/public/signal-media/ai-guard-extension-v2.jpg";
 import consoleShot from "@/public/signal-media/ai-guard-console.png";
 import infrastructure from "@/public/signal-media/infrastructure-hero.webp";
 import { HOME_COPY } from "./home-copy";

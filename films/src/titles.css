@@ -1,0 +1,48 @@
+/* Burned-in kinetic titles of the guard.xsom.fr films, on a 1920 × 1080 frame.
+   The site's header covers the top of the film and its controls the bottom: no title
+   starts above 290 px or ends below 250 px from the bottom. */
+.film { position: absolute; inset: 0; font-family: Source, sans-serif; color: #f5f8ff; }
+.film .scrim, .film .flash, .film .beat { position: absolute; inset: 0; }
+.film .line { overflow: hidden; padding: .16em .08em .1em; margin: 0 -.08em -.26em; }
+.film .line > span { display: inline-block; white-space: nowrap; }
+.film .kicker, .film .slam i, .film .sub { color: #d3e5ff; text-shadow: 0 3px 24px rgba(2,10,24,.8); }
+.film .kicker { font-style: italic; font-weight: 400; letter-spacing: -.5px; }
+.film .title { font-family: Saira, sans-serif; font-weight: 800; text-transform: uppercase; line-height: 1; letter-spacing: -.02em; text-shadow: 0 6px 40px rgba(2,10,24,.55); }
+.film .sub { font-weight: 600; letter-spacing: -.3px; }
+.film .accent { color: #7cc0ff; }
+.film .rule { width: 120px; height: 7px; background: #7cc0ff; }
+
+/* Homepage */
+.home .kicker { font-size: 76px; }
+.home .scrim--top { background: linear-gradient(180deg, rgba(3,12,26,.85), rgba(3,12,26,.5) 45%, transparent 66%); }
+.home .scrim--bottom { background: linear-gradient(0deg, rgba(3,12,26,.86), rgba(3,12,26,.55) 45%, transparent 68%); }
+.home .scrim--left { background: linear-gradient(90deg, rgba(3,12,26,.88), rgba(3,12,26,.55) 45%, transparent 78%); }
+.home .scrim--final { background: radial-gradient(ellipse 70% 62% at 50% 46%, rgba(3,12,26,.7), rgba(3,12,26,.34) 70%, rgba(3,12,26,.18)); }
+.home .flash--red { background: radial-gradient(ellipse at 50% 55%, rgba(255,70,100,.55), rgba(255,70,100,.12) 70%); }
+.home .flash--blue { background: radial-gradient(ellipse at 50% 45%, rgba(140,205,255,.6), rgba(140,205,255,.12) 70%); }
+.home .beat--one .stack { position: absolute; left: 120px; top: 290px; }
+.home .beat--one .title { font-size: 176px; }
+.home .beat--two .stack { position: absolute; left: 0; right: 0; bottom: 250px; text-align: center; }
+.home .beat--two .kicker { font-size: 72px; }
+.home .threat { font-size: 216px; color: #ff4263; text-shadow: 0 0 60px rgba(255,66,99,.45), 0 6px 40px rgba(2,10,24,.6); }
+.home .beat--three .stack { position: absolute; left: 120px; top: calc(50% + 72px); transform: translateY(-50%); display: grid; gap: 34px; }
+.home .slam { display: flex; align-items: baseline; gap: 34px; transform-origin: 0 60%; }
+.home .slam b { font-family: Saira, sans-serif; font-weight: 800; font-size: 168px; line-height: .9; text-transform: uppercase; letter-spacing: -.02em; text-shadow: 0 6px 40px rgba(2,10,24,.55); }
+.home .slam i { font-weight: 400; font-size: 70px; }
+.home .beat--four .stack { position: absolute; left: 0; right: 0; top: 290px; text-align: center; }
+.home .beat--four .title { font-size: 122px; }
+.home .beat--four .rule { margin: 0 auto 30px; }
+.home .beat--four .sub { font-size: 64px; margin-top: 30px; }
+
+/* Products */
+.products .kicker { font-size: 68px; }
+.products .sub { font-size: 50px; margin-top: 24px; }
+.products .scrim--right { background: linear-gradient(270deg, rgba(3,12,26,.86), rgba(3,12,26,.5) 42%, transparent 70%); }
+.products .scrim--left { background: linear-gradient(90deg, rgba(3,12,26,.88), rgba(3,12,26,.55) 42%, transparent 72%); }
+.products .flash { background: radial-gradient(ellipse at 62% 45%, rgba(140,205,255,.5), rgba(140,205,255,.1) 70%); }
+.products .beat--device .stack { position: absolute; right: 120px; top: 290px; text-align: right; }
+.products .beat--platform .stack { position: absolute; left: 120px; top: 290px; }
+.products .product { font-size: 168px; }
+.products .beat--range .stack { position: absolute; left: 120px; bottom: 250px; }
+.products .beat--range .title { font-size: 128px; }
+.products .beat--range .rule { margin-bottom: 30px; transform-origin: 0 50%; }
