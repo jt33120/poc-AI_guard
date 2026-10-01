@@ -30,6 +30,9 @@ Final generation prompt:
 
 ## Explanatory clips
 
-The Guarded/Unguarded videos are recordings of actual shared explanatory
-components, regenerated after palette/font changes. WebM/MP4 and WebP posters
-are produced by `tools/render-signal-media.mjs`. All shown events are illustrative.
+The Guarded/Unguarded videos are motion-design renders of the shared
+Agent → Guard → Policy → Tool diagram, in the design system's light tokens and
+fonts, by the Remotion project of the AI Guard repository
+(`films/src/SignalSequence.tsx`, `npm --prefix films run render -- signal`).
+WebM, MP4 and a WebP poster on the final decision. All shown events (the call,
+the approval clock, the audit entry) are illustrative.
