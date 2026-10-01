@@ -67,7 +67,7 @@ const REFUSAL_MESSAGES: Record<RefusalReason, string> = {
   redaction_incomplete: "un secret n'a pas pu être retiré entièrement",
   secret_in_protocol_identifier:
     "un identifiant technique de la conversation contient un secret",
-  signed_thinking_contains_secret:
+  secret_in_signed_thinking:
     "un raisonnement signé du modèle contient un secret et ne peut pas être modifié",
   signed_thinking_unreadable: "un raisonnement signé du modèle est illisible",
   unanalysed_attachment:

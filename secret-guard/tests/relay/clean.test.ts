@@ -159,7 +159,7 @@ describe("cleanRequest", () => {
       [
         "a secret in signed reasoning",
         request([{ type: "thinking", thinking: SECRET, signature: "s" }]),
-        "signed_thinking_contains_secret",
+        "secret_in_signed_thinking",
       ],
       [
         "unreadable signed reasoning",

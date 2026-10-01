@@ -31,7 +31,7 @@ export type RefusalReason =
   | "scan_incomplete"
   | "redaction_incomplete"
   | "secret_in_protocol_identifier"
-  | "signed_thinking_contains_secret"
+  | "secret_in_signed_thinking"
   | "signed_thinking_unreadable"
   | "unanalysed_attachment";
 
@@ -176,7 +176,7 @@ class Walk {
           throw new Refusal("signed_thinking_unreadable");
         // Signed: it cannot be edited, so a secret in it stops the request.
         if (this.analyse(value.thinking).kinds.length > 0)
-          throw new Refusal("signed_thinking_contains_secret");
+          throw new Refusal("secret_in_signed_thinking");
         return value;
       default:
         // fromEntries defines "__proto__" as plain data, never as a prototype.
