@@ -265,6 +265,27 @@ describe("activation failures name their cause", () => {
     await expectMissing(installedHook);
   });
 
+  it("names it too when a mode change cannot be applied", async () => {
+    const { configPath, manager } = await fixture();
+    await manager.enable("block");
+    const foreign = JSON.stringify({
+      hooks: {
+        UserPromptSubmit: [
+          { type: "command", command: "other xsom-secret-guard-v1" },
+        ],
+      },
+    });
+    await writeFile(configPath, foreign, { mode: 0o600 });
+
+    const error = await failure(manager.refreshIfConfigured("observe"));
+
+    expect(error).toMatchObject({
+      failure: "unrecognized_guard",
+      path: configPath,
+    });
+    expect(await readFile(configPath, "utf8")).toBe(foreign);
+  });
+
   it("names an unreadable settings file without quoting it", async () => {
     const { configPath, manager } = await fixture();
     const quoted = `ghp_${"Sg7".repeat(12)}`;

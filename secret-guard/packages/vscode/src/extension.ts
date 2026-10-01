@@ -26,6 +26,7 @@ import {
 import { ActivityMonitor } from "./hook-activity.js";
 import {
   HookManager,
+  HookSetupError,
   setupFailureMessage,
   type HookHealth,
 } from "./hook-manager.js";
@@ -46,6 +47,7 @@ import {
   dashboardHtml,
   DASHBOARD_COMMANDS,
   HEALTH_LABELS,
+  HEALTH_REASONS,
 } from "./dashboard.js";
 import {
   isProtectionMode,
@@ -1187,16 +1189,18 @@ export async function activate(
         try {
           await syncObserveWindow();
           const health = await manager.refreshIfConfigured(configuredMode());
-          if (health.state === "degraded") throw new Error("mode_not_applied");
+          if (health.state === "degraded") throw new Error(health.reason);
           modeApplicationFailed = false;
           const until = observeUntil();
           void vscode.window.showInformationMessage(
             `${modeLabel(configuredMode())}${until === undefined ? "" : ` jusqu’à ${until}, puis retour automatique à Expurger`} · Réglage enregistré. Ouvrez une nouvelle session de votre assistant pour utiliser les hooks actualisés.`,
           );
-        } catch {
+        } catch (error) {
           modeApplicationFailed = true;
           void vscode.window.showErrorMessage(
-            "Le mode est enregistré, mais son application aux assistants a échoué. Ouvrez Secret Guard puis Configurer la protection pour réessayer.",
+            error instanceof HookSetupError
+              ? `Le mode est enregistré, mais pas appliqué aux assistants. ${setupFailureMessage(error)}`
+              : `Le mode est enregistré, mais son application aux assistants a échoué${error instanceof Error && error.message in HEALTH_REASONS ? ` : ${HEALTH_REASONS[error.message as HookHealth["reason"]]}` : "."} Ouvrez Secret Guard puis Configurer la protection pour réessayer.`,
           );
         }
         await refreshUi();

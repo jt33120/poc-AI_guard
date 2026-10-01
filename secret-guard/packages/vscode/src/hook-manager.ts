@@ -557,8 +557,11 @@ export class HookManager {
   public async refreshIfConfigured(mode: ProtectionMode): Promise<HookHealth> {
     const states = await this.configStates();
     if (states.every(({ state }) => state === "off")) return this.getHealth();
-    if (states.some(({ state }) => state === "degraded"))
-      return this.getHealth();
+    const degraded = states.filter(({ state }) => state === "degraded");
+    // Left untouched, but named: an unrecognised entry or an unreadable file.
+    for (const { host, content } of degraded)
+      this.configured(content, host, mode);
+    if (degraded.length > 0) return this.getHealth();
     return this.enable(mode);
   }
 
