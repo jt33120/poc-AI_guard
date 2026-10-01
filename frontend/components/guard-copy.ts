@@ -19,24 +19,24 @@ export const CONTACT_MAILTO = `mailto:${XSOM_CONTACT_EMAIL}?subject=xSOM%20AI%20
 export const EXTENSION_VSIX_URL =
   "https://github.com/jt33120/poc-AI_guard/releases/latest/download/xsom-secret-guard-vscode.vsix";
 
-/** Le film d'ouverture de l'accueil, un par langue (`scripts/render-home-film.mjs`). */
+/** Le film d'ouverture de l'accueil, un par langue (Remotion : `films/src/HomeFilm.tsx`). */
 export const HOME_HERO_MEDIA = {
   fr: {
-    mp4: "/signal-media/xsom-ai-home-v3-fr.mp4",
-    poster: "/signal-media/xsom-ai-home-v3-fr.jpg",
+    mp4: "/signal-media/xsom-ai-home-v4-fr.mp4",
+    poster: "/signal-media/xsom-ai-home-v4-fr.jpg",
     label: "xSOM AI Studio : vos équipes adoptent l’IA. Secrets, données, actions d’agents : exposés. Détecter les secrets, bloquer les actions à risque, tracer chaque décision. La couche cybersécurité de vos usages IA. Logiciels et conseil.",
   },
   en: {
-    mp4: "/signal-media/xsom-ai-home-v3-en.mp4",
-    poster: "/signal-media/xsom-ai-home-v3-en.jpg",
+    mp4: "/signal-media/xsom-ai-home-v4-en.mp4",
+    poster: "/signal-media/xsom-ai-home-v4-en.jpg",
     label: "xSOM AI Studio: your teams embrace AI. Secrets, data, agent actions: exposed. Detect secrets, block risky actions, trace every decision. The cybersecurity layer for every AI use case. Software and consulting.",
   },
 };
 
 /** La vidéo d'ambiance de la page Secret Guard ; son affiche tient lieu d'image fixe. */
 export const EXTENSION_HERO_MEDIA = {
-  webm: "/signal-media/ai-guard-extension-v1.webm",
-  poster: "/signal-media/ai-guard-extension-v1.png",
+  webm: "/signal-media/ai-guard-extension-v2.webm",
+  poster: "/signal-media/ai-guard-extension-v2.jpg",
 };
 
 /** Concrete orientation copy; none of these illustrative paths claims live coverage. */
