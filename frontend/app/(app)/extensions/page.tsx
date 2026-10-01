@@ -73,6 +73,19 @@ const OUTCOMES: Record<string, string> = {
   upstream_rejected: "Refusé par le fournisseur",
 };
 
+const VSIX_URL =
+  "https://github.com/jt33120/poc-AI_guard/releases/latest/download/xsom-secret-guard-vscode.vsix";
+const UPDATE_COMMANDS: ReadonlyArray<readonly [string, string]> = [
+  [
+    "PowerShell",
+    `$v="$env:TEMP\\secret-guard.vsix"; Invoke-WebRequest ${VSIX_URL} -OutFile $v; code --install-extension $v --force`,
+  ],
+  [
+    "Git Bash, macOS ou Linux",
+    `curl -fL -o /tmp/secret-guard.vsix ${VSIX_URL} && code --install-extension /tmp/secret-guard.vsix --force`,
+  ],
+];
+
 export default function ExtensionsPage() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [events, setEvents] = useState<EventPage>({
@@ -183,6 +196,22 @@ export default function ExtensionsPage() {
         </p>
       </section>
       <section className="console-panel">
+        <h2>Mettre à jour l’extension</h2>
+        <p>
+          Inutile de désinstaller : la nouvelle version remplace l’ancienne et
+          garde vos réglages. Rechargez ensuite la fenêtre VS Code et ouvrez une
+          nouvelle session Claude Code.
+        </p>
+        {UPDATE_COMMANDS.map(([label, command]) => (
+          <div key={label}>
+            <h3>{label}</h3>
+            <pre>
+              <code>{command}</code>
+            </pre>
+          </div>
+        ))}
+      </section>
+      <section className="console-panel">
         <div className="console-panel-heading">
           <h2>Réglage sur mesure</h2>
           <Link className="btn btn-ghost" href="/extensions/reglage">
@@ -191,8 +220,8 @@ export default function ExtensionsPage() {
         </div>
         <p className="console-note">
           Secret Guard Équipe : des règles calibrées par xSOM sur vos
-          identifiants et projets, signées, que les postes à jour de Secret Guard
-          vérifient puis appliquent hors ligne. Vous les lisez ; xSOM les
+          identifiants et projets, signées, que les postes à jour de Secret
+          Guard vérifient puis appliquent hors ligne. Vous les lisez ; xSOM les
           ajuste à votre demande.
         </p>
       </section>
