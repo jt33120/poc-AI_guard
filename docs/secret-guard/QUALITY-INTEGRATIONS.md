@@ -2,7 +2,7 @@
 
 `@xsom/developer-guard-runner/quality-gates` accepte un reçu SARIF seulement s’il porte le commit, la version du moteur et un verdict borné. Il n’exécute aucun script du dépôt analysé. Le gate local est informatif ; le merge gate doit être appliqué par le CI protégé du client, donc un `--no-verify` local ne le contourne pas.
 
-Avant d’ajouter un moteur, documenter sa version, licence, maintenance, flux réseau et le corpus synthétique de validation. Les choix candidats restent dans `DEVELOPER-THREAT-MAPPING.md` et ne sont pas des intégrations.
+Avant d’ajouter un moteur, documenter sa version, licence, maintenance, flux réseau et le corpus synthétique de validation. Les moteurs candidats ne sont pas des intégrations.
 
 ## Contrat livré
 

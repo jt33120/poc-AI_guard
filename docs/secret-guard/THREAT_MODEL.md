@@ -564,7 +564,7 @@ points :
 - état de couverture exact quand un hook est absent, désactivé, non fiable ou distant — non livré actuellement ;
 - revue manuelle de la liste des champs de logs/télémétrie.
 
-Les objectifs de précision/rappel globaux sont définis dans [DEVELOPMENT_PLAN.md](./DEVELOPMENT_PLAN.md), mais ces invariants de sécurité ne sont pas moyennés.
+Ces invariants de sécurité ne sont pas moyennés dans les objectifs de précision/rappel globaux.
 
 ## 16. Risques acceptés au V0
 
