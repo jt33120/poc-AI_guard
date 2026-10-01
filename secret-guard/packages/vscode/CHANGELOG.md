@@ -2,6 +2,10 @@
 
 ## 0.7.1
 
+- Correctif : les notifications de tâche que Claude Code soumet comme prompt
+  étaient bloquées, leur identifiant d'appel d'outil (`toolu_…`) étant pris pour
+  un secret. Ce format public est désormais reconnu ; un vrai secret placé dans la
+  même notification reste bloqué.
 - **Avertir plafonné par votre organisation (édition Équipe)** : la politique signée
   du poste peut limiter Avertir à 4 heures, 1 heure ou 15 minutes, ou l’interdire.
   Le hook applique ce plafond lui-même, à partir de la politique revérifiée avec la

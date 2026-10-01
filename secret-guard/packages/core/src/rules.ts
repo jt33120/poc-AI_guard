@@ -1200,6 +1200,9 @@ function entropyExcluded(value: string): boolean {
     /^(?:pk_(?:live|test)_|acct_|cus_|price_|prod_|pi_)[A-Za-z0-9_-]+$/.test(
       value,
     ) ||
+    // Identifiant d'appel d'outil Anthropic, repris tel quel dans les
+    // notifications de tâche que Claude Code soumet comme prompt.
+    /^(?:srv)?toolu_[A-Za-z0-9]{24}$/.test(value) ||
     /^REDACTED_[A-Za-z0-9_]+$/.test(value) ||
     /^(?:\/|node_modules\/)[A-Za-z0-9._/-]+$/.test(value) ||
     safeLiteral(value)
