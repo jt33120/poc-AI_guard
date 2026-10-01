@@ -219,7 +219,7 @@ export default function ExtensionsPage() {
           </Link>
         </div>
         <p className="console-note">
-          Secret Guard Équipe : des règles calibrées par xSOM sur vos
+          Secret Guard Grand Compte : des règles calibrées par xSOM sur vos
           identifiants et projets, signées, que les postes à jour de Secret
           Guard vérifient puis appliquent hors ligne. Vous les lisez ; xSOM les
           ajuste à votre demande.

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useT } from "@/lib/i18n";
 import { GUARD_OFFERS_COPY, GUARD_OFFER_FAMILIES_COPY } from "./guard-offers-copy";
+import { OfferDiagram } from "./OfferDiagram";
 import "@/app/guard-marketing.css";
 
 export function GuardOfferFamilies() {
@@ -41,6 +42,7 @@ export function GuardOffers() {
       <p className="guard-offers__badge">{offer.badge}</p><p className="guard-offers__audience">{offer.audience}</p><h3>{offer.name}</h3>
       <p className="guard-offers__price"><strong>{offer.price}</strong><span>{offer.unit}</span></p>
       <p>{offer.body}</p><ul>{offer.features.map((feature) => <li key={feature}>{feature}</li>)}</ul>
+      <OfferDiagram kind={offer.diagram} copy={copy.diagram} />
       {offer.href.startsWith("/") ? <Link className="guard-button" href={offer.href}>{offer.action} ↗</Link> : <a className="guard-button" href={offer.href}>{offer.action} ↗</a>}
       <p className="guard-offers__note">{offer.note}</p>
     </article>)}</div>

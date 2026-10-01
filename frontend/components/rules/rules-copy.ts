@@ -15,7 +15,7 @@ const FR = {
     eyebrow: "11 / EXTENSION VS CODE · RÉGLAGE SUR MESURE",
     title: "Réglage sur mesure",
     description:
-      "Des règles calibrées par xSOM sur vos propres données et signées, que les postes Secret Guard Équipe compatibles vérifient puis appliquent hors ligne. Vous les lisez ; xSOM les ajuste à votre demande.",
+      "Des règles calibrées par xSOM sur vos propres données et signées, que les postes Secret Guard Grand Compte compatibles vérifient puis appliquent hors ligne. Vous les lisez ; xSOM les ajuste à votre demande.",
     back: "← Postes et journal",
     refresh: "Actualiser",
     ask: "Demander un ajustement à xSOM",
@@ -23,7 +23,7 @@ const FR = {
     operatorLink: "Atelier opérateur xSOM →",
     emptyTitle: "Aucun réglage sur mesure pour l’instant",
     emptyBody:
-      "Le réglage fait partie de Secret Guard Équipe : xSOM calibre des détecteurs sur vos identifiants clients, noms de projets et formats internes, et les signe ; un poste en Secret Guard 0.7 ou plus récent les applique sans réseau. Les règles intégrées restent actives dans tous les cas.",
+      "Le réglage fait partie de Secret Guard Grand Compte : xSOM calibre des détecteurs sur vos identifiants clients, noms de projets et formats internes, et les signe ; un poste en Secret Guard 0.7 ou plus récent les applique sans réseau. Les règles intégrées restent actives dans tous les cas.",
     status: "État du réglage",
     version: "Version",
     validity: "Valide jusqu’au",
@@ -66,7 +66,7 @@ const FR = {
     history: "Historique",
     historyPublished: "Version {v} publiée",
     historyRevoked: "Version {v} retirée",
-    mailSubject: "Secret Guard Équipe · ajustement du réglage sur mesure",
+    mailSubject: "Secret Guard Grand Compte · ajustement du réglage sur mesure",
     mailBody:
       "Bonjour,\n\nNous souhaitons ajuster notre réglage sur mesure{version}.\n\nDétecteur concerné :\nCe qui devrait être détecté (exemple synthétique, jamais une vraie donnée) :\nCe qui ne devrait pas l’être :\n\nMerci.",
   },
@@ -227,7 +227,7 @@ const EN: RulesCopy = {
     eyebrow: "11 / VS CODE EXTENSION · CUSTOM TUNING",
     title: "Custom tuning",
     description:
-      "Rules calibrated by xSOM on your own data and signed, which compatible Secret Guard Team workstations verify and then apply offline. You read them; xSOM adjusts them on request.",
+      "Rules calibrated by xSOM on your own data and signed, which compatible Secret Guard Enterprise workstations verify and then apply offline. You read them; xSOM adjusts them on request.",
     back: "← Workstations and log",
     refresh: "Refresh",
     ask: "Ask xSOM for an adjustment",
@@ -235,7 +235,7 @@ const EN: RulesCopy = {
     operatorLink: "xSOM operator workshop →",
     emptyTitle: "No custom tuning yet",
     emptyBody:
-      "Tuning is part of Secret Guard Team: xSOM calibrates detectors on your customer identifiers, project names and internal formats, and signs them; a workstation on Secret Guard 0.7 or later applies them without network access. Built-in rules stay active either way.",
+      "Tuning is part of Secret Guard Enterprise: xSOM calibrates detectors on your customer identifiers, project names and internal formats, and signs them; a workstation on Secret Guard 0.7 or later applies them without network access. Built-in rules stay active either way.",
     status: "Tuning status",
     version: "Version",
     validity: "Valid until",
@@ -278,7 +278,7 @@ const EN: RulesCopy = {
     history: "History",
     historyPublished: "Version {v} published",
     historyRevoked: "Version {v} withdrawn",
-    mailSubject: "Secret Guard Team · custom tuning adjustment",
+    mailSubject: "Secret Guard Enterprise · custom tuning adjustment",
     mailBody:
       "Hello,\n\nWe would like to adjust our custom tuning{version}.\n\nDetector concerned:\nWhat should be detected (synthetic example, never real data):\nWhat should not:\n\nThank you.",
   },

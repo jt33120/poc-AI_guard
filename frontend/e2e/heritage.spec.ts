@@ -125,8 +125,8 @@ test("the products page opens on its film, then shows each product in a carousel
   }
 
   // Les éditions payantes portent le nom du produit, pas un second nom de gamme.
-  await expect(page.locator("#offres")).toContainText("Secret Guard Équipe");
-  await expect(page.locator("#offres")).toContainText("Secret Guard Renforcé");
+  await expect(page.locator("#offres")).toContainText("Secret Guard Pro");
+  await expect(page.locator("#offres")).toContainText("Secret Guard Grand Compte");
   await expect(page.locator("main")).not.toContainText("Developer Guard");
   await expect(page.locator('.guard-glossary-link a[href="/menaces"]')).toHaveAttribute("href", "/menaces");
 });
@@ -268,11 +268,11 @@ test("the Secret Guard page says what it solves, how, and hands over the file", 
   await expect(fond).toHaveAttribute("poster", "/signal-media/ai-guard-extension-v1.png");
   await expect(fond).toHaveAttribute("preload", "none");
 
-  // Le schéma : le filtre et ses trois couches, dont le réglage réservé à l'édition Équipe.
+  // Le schéma : le filtre et ses trois couches, dont le réglage réservé à l'édition Grand Compte.
   const couches = page.locator("#fonctionnement .sg-layers li");
   await expect(couches).toHaveCount(3);
   await expect(couches.nth(1)).toContainText("Entropie");
-  await expect(couches.nth(2)).toContainText("Équipe");
+  await expect(couches.nth(2)).toContainText("Grand Compte");
 
   // Le vrai panneau, ses sept boutons légendés ; Expurger est déplié d'office, et
   // survoler une autre légende la déplie à son tour.
@@ -298,7 +298,7 @@ test("the Secret Guard page says what it solves, how, and hands over the file", 
   await expect(telechargement).toContainText("1.133");
   await expect(telechargement).toContainText("1.137");
   await expect(telechargement.locator(".sg-download__steps li")).toHaveCount(3);
-  await expect(telechargement.getByRole("link", { name: /Secret Guard Équipe/ })).toHaveAttribute("href", "/produits#offres");
+  await expect(telechargement.getByRole("link", { name: /Secret Guard Pro/ })).toHaveAttribute("href", "/produits#offres");
 });
 
 

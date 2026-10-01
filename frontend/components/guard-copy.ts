@@ -42,7 +42,7 @@ export const EXTENSION_HERO_MEDIA = {
 /** Concrete orientation copy; none of these illustrative paths claims live coverage. */
 export const GUARD_COPY = {
   fr: {
-    poc: "Secret Guard gratuit · éditions Équipe et Renforcé en pilote accompagné",
+    poc: "Secret Guard Basic gratuit · Pro et Grand Compte en pilote accompagné",
     title: ["La solution cyber", "pour tous vos usages IA."],
     intro: "Simple, efficace.",
     explore: "Voir les menaces",
@@ -186,7 +186,7 @@ export const GUARD_COPY = {
         note: "Parcours à préparer avec votre administrateur, selon vos assistants et votre parc.",
       },
       builder: {
-        tag: "Secret Guard Local · Gratuit",
+        tag: "Secret Guard Basic · Gratuit",
         title: "Commencez sur votre poste de travail.",
         list: [
           "Télécharger l’extension et l’installer localement",
@@ -308,7 +308,7 @@ export const GUARD_COPY = {
     footer: "Édité par XSOM CONSULTING · Arcachon, France. Gratuit local et offres d’équipe sur qualification.",
   },
   en: {
-    poc: "Free Secret Guard · guided Team and Reinforced pilots",
+    poc: "Free Secret Guard Basic · guided Pro and Enterprise pilots",
     title: ["The cybersecurity solution", "for every AI use case."],
     intro: "Simple. Effective.",
     explore: "See the threats",
@@ -448,7 +448,7 @@ export const GUARD_COPY = {
         note: "Prepare with your administrator for the assistants and devices you use.",
       },
       builder: {
-        tag: "Secret Guard Local · Free",
+        tag: "Secret Guard Basic · Free",
         title: "Start on your workstation.",
         list: [
           "Download the extension and install it locally",
