@@ -21,8 +21,30 @@ describe("false-positive controls", () => {
     `sha512-${"Ab9+/".repeat(22)}==`,
     "01ARZ3NDEKTSV4RRFFQ69G5FAV",
     `pk_live_${"Ab3".repeat(16)}`,
+    "toolu_01SyE8fsUcG9zGc8xQtc6geU",
+    "srvtoolu_018xsLyD5686y26mjJUHrydr",
   ])("does not warn on a known safe identifier shape: %s", (content) => {
     expect(scan({ content }).decision).toBe("ALLOW");
+  });
+
+  it("lets a Claude Code task notification through, but not a secret inside it", () => {
+    const notification = (status: string) =>
+      [
+        "<task-notification>",
+        "<task-id>brae1kheu</task-id>",
+        "<tool-use-id>toolu_01SyE8fsUcG9zGc8xQtc6geU</tool-use-id>",
+        "<output-file>C:\\Users\\dev\\AppData\\Local\\Temp\\claude\\7dc0e841-25fd-4736-97f7-0e93ed88480b\\tasks\\brae1kheu.output</output-file>",
+        `<status>${status}</status>`,
+        "</task-notification>",
+      ].join("\n");
+    expect(scan({ content: notification("failed") }).decision).toBe("ALLOW");
+    expect(scan({ content: notification(SECRET) }).decision).toBe("BLOCK");
+  });
+
+  it("keeps warning on an entropy token that only borrows the tool-use prefix", () => {
+    expect(
+      scan({ content: "toolu_01SyE8fsUcG9zGc8xQtc6geUq7Rw" }).decision,
+    ).not.toBe("ALLOW");
   });
 
   it("does not treat the canonical Base64 alphabet as entropy", () => {
