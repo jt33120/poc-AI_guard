@@ -1,6 +1,6 @@
 # ADR-0002 — Expurger sans compte : un relais local dans Secret Guard
 
-> **Statut : Proposé (à valider avant tout code).**
+> **Statut : Accepté (D1 à D4 validées le 2026-10-01).**
 > **Date : 2026-10-01.**
 > **Contexte :** en mode Expurger, Secret Guard bloque le prompt au lieu de le
 > nettoyer, sauf si le poste est raccordé à la passerelle xSOM. On veut une purge
@@ -48,8 +48,13 @@ Côté hook : quand un secret est vu et que le relais local est vivant, le hook 
 passer et affiche `🧹 Secret Guard · Prompt purgé avant envoi`. Ni la valeur, ni
 son empreinte n'apparaissent.
 
-La passerelle xSOM reste l'option payante : même trajet, plus le journal chaîné,
-les relevés et les politiques signées.
+**Le compte xSOM ne sert qu'à la preuve.** Expurger n'en a pas besoin. Un journal
+gardé sur le poste ne prouve rien à un tiers, puisque son propriétaire peut le
+modifier. L'offre payante garde donc le nettoyage en local : le relais envoie en
+plus, à part, des métadonnées sans contenu (date, assistant, nombre de secrets
+masqués par type) à xSOM, qui les chaîne, les horodate et en tire le relevé.
+Ces métadonnées sont déclarées par le poste. La passerelle serveur actuelle reste
+disponible pour qui veut que xSOM fasse lui-même le nettoyage.
 
 ## 4. Contrat de nettoyage
 
@@ -140,7 +145,7 @@ Tous les tests utilisent un faux fournisseur local, jamais Anthropic.
    fixer, voir D4.
 9. `npm --prefix secret-guard run verify` vert, contenu du VSIX vérifié.
 
-## 9. Décisions à prendre
+## 9. Décisions (validées le 2026-10-01)
 
 | # | Question | Recommandation |
 |---|---|---|
