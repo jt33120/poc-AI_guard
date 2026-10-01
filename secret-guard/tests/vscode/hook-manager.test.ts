@@ -14,7 +14,11 @@ import { afterEach, describe, expect, it } from "vitest";
 import type * as vscode from "vscode";
 
 import { defaultHostDefinitions } from "../../packages/vscode/src/host-config.js";
-import { HookManager } from "../../packages/vscode/src/hook-manager.js";
+import {
+  HookManager,
+  HookSetupError,
+  setupFailureMessage,
+} from "../../packages/vscode/src/hook-manager.js";
 
 const HEALTHY_HOOK = [
   '"use strict";',
@@ -225,5 +229,82 @@ describe("transactional hook lifecycle", () => {
     await expectMissing(configPath);
     await expectMissing(installedHook);
     await expectMissing(`${installedHook}.${process.pid}.candidate`);
+  });
+});
+
+describe("activation failures name their cause", () => {
+  async function failure(promise: Promise<unknown>): Promise<HookSetupError> {
+    const error: unknown = await promise.then(
+      () => undefined,
+      (reason: unknown) => reason,
+    );
+    expect(error).toBeInstanceOf(HookSetupError);
+    return error as HookSetupError;
+  }
+
+  it("names a Secret Guard entry this installation does not recognise", async () => {
+    const { configPath, installedHook, manager } = await fixture();
+    const foreign = JSON.stringify({
+      hooks: {
+        UserPromptSubmit: [
+          { type: "command", command: "other xsom-secret-guard-v1" },
+        ],
+      },
+    });
+    await mkdir(dirname(configPath), { recursive: true });
+    await writeFile(configPath, foreign, { mode: 0o600 });
+
+    const error = await failure(manager.enable("redact"));
+
+    expect(error).toMatchObject({
+      failure: "unrecognized_guard",
+      path: configPath,
+    });
+    expect(setupFailureMessage(error)).toContain(configPath);
+    expect(await readFile(configPath, "utf8")).toBe(foreign);
+    await expectMissing(installedHook);
+  });
+
+  it("names an unreadable settings file without quoting it", async () => {
+    const { configPath, manager } = await fixture();
+    const quoted = `ghp_${"Sg7".repeat(12)}`;
+    await mkdir(dirname(configPath), { recursive: true });
+    await writeFile(configPath, `{"env": {"TOKEN": "${quoted}"`, {
+      mode: 0o600,
+    });
+
+    const error = await failure(manager.enable("redact"));
+
+    expect(error).toMatchObject({
+      failure: "unreadable_config",
+      path: configPath,
+    });
+    const message = setupFailureMessage(error);
+    expect(message).toContain(configPath);
+    expect(message).not.toContain(quoted);
+    expect(error.message).not.toContain(quoted);
+  });
+
+  it("names the file it cannot access and its system code", async () => {
+    const { configPath, manager } = await fixture();
+    await mkdir(configPath, { recursive: true });
+
+    const error = await failure(manager.enable("redact"));
+
+    expect(error).toMatchObject({ failure: "file_access", path: configPath });
+    expect(error.code).toMatch(/^E[A-Z]+$/);
+    expect(setupFailureMessage(error)).toContain(`(${error.code})`);
+  });
+
+  it("names a failed canary and keeps a generic message for the unexpected", async () => {
+    const { manager } = await fixture(NON_BLOCKING_HOOK);
+
+    const error = await failure(manager.enable("block"));
+
+    expect(error.failure).toBe("hook_canary_failed");
+    expect(setupFailureMessage(error)).toContain("canari");
+    expect(setupFailureMessage(new Error("boom"))).toContain(
+      "erreur inattendue",
+    );
   });
 });

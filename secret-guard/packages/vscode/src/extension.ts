@@ -24,7 +24,11 @@ import {
   type WarnChoice,
 } from "./dispatch.js";
 import { ActivityMonitor } from "./hook-activity.js";
-import { HookManager, type HookHealth } from "./hook-manager.js";
+import {
+  HookManager,
+  setupFailureMessage,
+  type HookHealth,
+} from "./hook-manager.js";
 import { GatewayIntegration } from "./gateway-integration.js";
 import { LocalRelay } from "./local-relay.js";
 import { customFindingFields } from "./gateway-client.js";
@@ -1139,11 +1143,9 @@ export async function activate(
         modeApplicationFailed = false;
         await refreshUi();
         await offerCodexFinalization();
-      } catch {
+      } catch (error) {
         await refreshUi();
-        await vscode.window.showErrorMessage(
-          "Activation refusée : configuration non gérée, droits insuffisants ou canari local en échec.",
-        );
+        await vscode.window.showErrorMessage(setupFailureMessage(error));
       }
     }),
     vscode.commands.registerCommand("secretGuard.disableHook", async () => {

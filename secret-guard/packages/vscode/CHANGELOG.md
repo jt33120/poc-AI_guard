@@ -14,6 +14,12 @@
   caractères invisibles et analyses incomplètes restent bloqués sur le poste.
 - Le message « session non raccordée » vaut pour la passerelle comme pour le relais
   local.
+- Activation refusée : le message nomme désormais la cause exacte (contrôle du
+  hook en échec, entrée Secret Guard non reconnue, fichier de réglages illisible,
+  ou fichier inaccessible avec son code système), sans jamais citer le contenu
+  du fichier.
+- Windows : le remplacement du hook et des réglages est retenté quelques instants
+  quand un antivirus ou un autre programme tient le fichier ouvert.
 
 ## 0.7.1
 

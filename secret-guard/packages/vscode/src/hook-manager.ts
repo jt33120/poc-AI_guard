@@ -32,6 +32,41 @@ import {
 
 const CANARY_TIMEOUT_MS = 5_000;
 const MAX_CANARY_OUTPUT_BYTES = 64 * 1024;
+const RENAME_ATTEMPTS = 6;
+const LOCK_CODES = new Set(["EPERM", "EACCES", "EBUSY"]);
+
+/** Why enabling stopped. The path names the file concerned, never its content. */
+export type SetupFailure =
+  | "hook_canary_failed"
+  | "unrecognized_guard"
+  | "unreadable_config"
+  | "file_access";
+
+export class HookSetupError extends Error {
+  public constructor(
+    public readonly failure: SetupFailure,
+    public readonly path?: string,
+    public readonly code?: string,
+  ) {
+    super(failure);
+  }
+}
+
+/** The message shown when enabling fails: the precise cause, without file content. */
+export function setupFailureMessage(error: unknown): string {
+  if (!(error instanceof HookSetupError))
+    return "Activation refusée : erreur inattendue. Réessayez ; si elle persiste, réinstallez l’extension.";
+  switch (error.failure) {
+    case "hook_canary_failed":
+      return "Activation refusée : le hook local n’a pas passé son contrôle (canari). Rien n’a été modifié.";
+    case "unrecognized_guard":
+      return `Activation refusée : ${error.path ?? "un fichier de réglages"} contient une entrée Secret Guard que cette installation ne reconnaît pas (autre VS Code, ou entrée modifiée à la main). Retirez-la, puis réessayez.`;
+    case "unreadable_config":
+      return `Activation refusée : ${error.path ?? "un fichier de réglages"} n’est pas lisible (JSON invalide ou section « hooks » inattendue). Corrigez-le, puis réessayez.`;
+    case "file_access":
+      return `Activation refusée : accès impossible à ${error.path ?? "un fichier"}${error.code === undefined ? "" : ` (${error.code})`}. Un antivirus ou un autre programme bloque peut-être ce fichier ; réessayez dans un instant.`;
+  }
+}
 
 export type HookHealthState = "off" | "active" | "partial" | "degraded";
 
@@ -66,13 +101,51 @@ interface HookExecution {
   readonly timedOut: boolean;
 }
 
-function isMissingFile(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
+function errorCode(error: unknown): string | undefined {
+  return typeof error === "object" &&
     error !== null &&
     "code" in error &&
-    error.code === "ENOENT"
-  );
+    typeof error.code === "string"
+    ? error.code
+    : undefined;
+}
+
+function isMissingFile(error: unknown): boolean {
+  return errorCode(error) === "ENOENT";
+}
+
+/** Runs a file operation; a failure names the file and its system code. */
+async function onFile<T>(
+  path: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (error instanceof HookSetupError) throw error;
+    throw new HookSetupError("file_access", path, errorCode(error));
+  }
+}
+
+// On Windows a rename fails while another program, often an antivirus scan,
+// holds the target open: retry briefly before giving up.
+async function renameReplacing(from: string, to: string): Promise<void> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await rename(from, to);
+      return;
+    } catch (error) {
+      const code = errorCode(error);
+      if (
+        process.platform !== "win32" ||
+        attempt === RENAME_ATTEMPTS ||
+        code === undefined ||
+        !LOCK_CODES.has(code)
+      )
+        throw error;
+      await new Promise((resolve) => setTimeout(resolve, 50 * 2 ** attempt));
+    }
+  }
 }
 
 async function readOptional(path: string): Promise<string | null> {
@@ -124,7 +197,7 @@ async function writeAtomically(
   await rm(temporary, { force: true });
   await writeFile(temporary, content, { mode: 0o600 });
   try {
-    await rename(temporary, path);
+    await renameReplacing(temporary, path);
   } catch (error) {
     await rm(temporary, { force: true });
     throw error;
@@ -398,33 +471,44 @@ export class HookManager {
     const previousConfigs = await Promise.all(
       this.hosts.map(async (host) => ({
         host,
-        content: await readOptional(host.configPath),
+        content: await onFile(host.configPath, () =>
+          readOptional(host.configPath),
+        ),
       })),
     );
     const nextConfigs = previousConfigs.map(({ host, content }) => ({
       host,
-      content: configureHost(
-        content,
-        host,
-        this.executable,
-        this.installedHook,
-        mode,
-      ),
+      content: this.configured(content, host, mode),
     }));
-    const previousHook = await readOptionalBytes(this.installedHook);
+    const previousHook = await onFile(this.installedHook, () =>
+      readOptionalBytes(this.installedHook),
+    );
     const candidate = `${this.installedHook}.${process.pid}.candidate`;
-    await mkdir(dirname(this.installedHook), { recursive: true });
-    await rm(candidate, { force: true });
-    await copyFile(this.bundledHook, candidate);
+    await onFile(candidate, async () => {
+      await mkdir(dirname(this.installedHook), { recursive: true });
+      await rm(candidate, { force: true });
+      await copyFile(this.bundledHook, candidate);
+    });
     if (!(await verifyCanaries(this.executable, candidate, this.hosts, mode))) {
       await rm(candidate, { force: true });
-      throw new Error("hook_canary_failed");
+      throw new HookSetupError("hook_canary_failed");
     }
-    await rename(candidate, this.installedHook);
+    try {
+      await renameReplacing(candidate, this.installedHook);
+    } catch (error) {
+      await rm(candidate, { force: true });
+      throw new HookSetupError(
+        "file_access",
+        this.installedHook,
+        errorCode(error),
+      );
+    }
 
     const written: HostDefinition[] = [];
+    let current: HostDefinition | undefined;
     try {
       for (const next of nextConfigs) {
+        current = next.host;
         await writeAtomically(next.host.configPath, next.content);
         written.push(next.host);
       }
@@ -436,9 +520,38 @@ export class HookManager {
         await restoreOptional(host.configPath, previous?.content ?? null);
       }
       await restoreOptional(this.installedHook, previousHook);
-      throw error;
+      throw new HookSetupError(
+        "file_access",
+        current?.configPath,
+        errorCode(error),
+      );
     }
     return this.getHealth();
+  }
+
+  private configured(
+    content: string | null,
+    host: HostDefinition,
+    mode: ProtectionMode,
+  ): string {
+    try {
+      return configureHost(
+        content,
+        host,
+        this.executable,
+        this.installedHook,
+        mode,
+      );
+    } catch (error) {
+      // A parse error can quote the file: only the path is kept.
+      throw new HookSetupError(
+        error instanceof Error &&
+          error.message === "refusing_to_replace_unrecognized_guard"
+          ? "unrecognized_guard"
+          : "unreadable_config",
+        host.configPath,
+      );
+    }
   }
 
   public async refreshIfConfigured(mode: ProtectionMode): Promise<HookHealth> {
