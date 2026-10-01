@@ -6,7 +6,7 @@
 .guard-offers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: var(--signal-border) solid var(--border); }
 .guard-offers article { display: flex; flex-direction: column; gap: var(--sp-4); padding: var(--sp-6); min-width: 0; }
 .guard-offers article + article { border-left: var(--signal-border) solid var(--border); }
-.guard-offers article[data-offer="team"] { background: var(--signal-base); border-top: var(--sp-1) solid var(--signal-accent-text); }
+.guard-offers article[data-offer="pro"] { background: var(--signal-base); border-top: var(--sp-1) solid var(--signal-accent-text); }
 .guard-offer-families article[data-offer="software"] { background: var(--signal-base); }
 .guard-offer-families .guard-offers__badge { min-height: 0; }
 .guard-offers__badge { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--signal-accent-text); min-height: var(--sp-8); }
@@ -33,3 +33,30 @@
 @media (min-width: 1000px) {
   .guard-offer-families h2 { font-size: clamp(1.8rem, 3vw, 3rem); white-space: nowrap; letter-spacing: -.035em; }
 }
+
+/* Offer diagrams: one small flow per offer, drawn from the theme tokens. */
+.offer-diagram { display: grid; gap: var(--sp-2); margin: 0 0 var(--sp-4); padding: var(--sp-3); border: var(--signal-border) solid var(--border); background: var(--signal-surface); }
+.offer-diagram__caption { font-family: var(--font-mono); font-size: var(--fs-xs); letter-spacing: 0.06em; text-transform: uppercase; color: var(--signal-muted); }
+.offer-diagram svg { display: block; width: 100%; height: auto; }
+.offer-diagram__text { font-size: var(--fs-sm); color: var(--signal-muted); }
+.od-pc { fill: none; stroke: var(--signal-muted); stroke-width: 1; stroke-dasharray: 5 4; }
+.od-pc-label { fill: var(--signal-muted); font: 500 9px var(--font-mono); letter-spacing: 0.08em; }
+.od-box { fill: var(--signal-base); stroke: var(--border); stroke-width: 1.2; }
+.od-box--relay { fill: var(--signal-accent-wash); stroke: var(--signal-accent); stroke-width: 1.6; }
+.od-box--xsom { stroke: var(--signal-accent); stroke-dasharray: 3 3; }
+.od-box--deny { stroke: var(--signal-deny); }
+.od-text { fill: var(--signal-text); font: 600 11px var(--font-body); }
+.od-small { fill: var(--signal-muted); font: 500 9px var(--font-mono); }
+.od-line { fill: none; stroke: var(--signal-text); stroke-width: 1.3; }
+.od-line--meta { stroke: var(--signal-accent); stroke-dasharray: 2 3; }
+.od-line--deny { stroke: var(--signal-deny); stroke-dasharray: 3 3; }
+.od-head { fill: var(--signal-text); }
+.od-head--meta { fill: var(--signal-accent); }
+.od-head--deny { fill: var(--signal-deny); }
+.od-chip { fill: var(--signal-base); stroke-width: 1; }
+.od-chip--secret { stroke: var(--signal-copper); }
+.od-chip--safe { stroke: var(--signal-allow); }
+.od-chip-text { font: 500 10px var(--font-mono); }
+.od-chip-text--secret { fill: var(--signal-copper-text); }
+.od-chip-text--safe { fill: var(--signal-allow); }
+.od-cross { stroke: var(--signal-deny); stroke-width: 2.4; stroke-linecap: round; }

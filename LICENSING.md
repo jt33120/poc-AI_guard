@@ -2,19 +2,19 @@
 
 This repository is **source-available**. Its code is public so that anyone can audit
 it, but using it in production requires an xSOM subscription. The one exception is
-the free offer: the **Secret Guard Local** detector and its command-line hook are
+the free offer: the **Secret Guard Basic** detector, its command-line hook and its local relay are
 open source under Apache 2.0.
 
 | Offer on the site | Price | License of the code |
 |---|---|---|
-| **Secret Guard Local** | Free | Detector and CLI hook: [Apache 2.0](LICENSE-APACHE). VS Code extension: free to use under its [end-user licence](docs/legal/LICENCE-SECRET-GUARD-LOCAL.md), code under the commercial license for now. |
-| **Secret Guard Équipe** | Paid | [xSOM Commercial License](LICENSE-COMMERCIAL.md) |
-| **Secret Guard Renforcé** | Quoted | [xSOM Commercial License](LICENSE-COMMERCIAL.md) |
+| **Secret Guard Basic** | Free | Detector, CLI hook and local relay: [Apache 2.0](LICENSE-APACHE). VS Code extension: free to use under its [end-user licence](docs/legal/LICENCE-SECRET-GUARD-LOCAL.md), code under the commercial license for now. |
+| **Secret Guard Pro** | Paid | [xSOM Commercial License](LICENSE-COMMERCIAL.md) |
+| **Secret Guard Entreprise** | Quoted | [xSOM Commercial License](LICENSE-COMMERCIAL.md) |
 | **AI Guard platform** (gateway, traces, console) | Paid or quoted | [xSOM Commercial License](LICENSE-COMMERCIAL.md) |
 
 ## Why the detector is open
 
-Secret Guard Local reads every prompt a developer sends to an AI assistant. Anyone
+Secret Guard Basic reads every prompt a developer sends to an AI assistant. Anyone
 can now check that the detector runs locally, without network access, telemetry or
 a language model. The paid editions do not depend on keeping this code secret. Their
 value lies in the policies and rules packs that xSOM calibrates and signs. Signature
@@ -32,9 +32,10 @@ moved file stays commercial until someone deliberately adds it here.
 
 <!-- open-source-scope:start -->
 ```text
-# Detector and command-line hook
+# Detector, command-line hook and local relay
 secret-guard/packages/core/
 secret-guard/packages/cli/
+secret-guard/packages/relay/
 secret-guard/tsconfig.base.json
 
 # Their tests
@@ -46,11 +47,13 @@ secret-guard/tests/core/sha256.test.ts
 secret-guard/tests/core/text.test.ts
 secret-guard/tests/cli/file-guard.test.ts
 secret-guard/tests/cli/hook.test.ts
+secret-guard/tests/relay/clean.test.ts
+secret-guard/tests/relay/server.test.ts
 ```
 <!-- open-source-scope:end -->
 
-The VS Code extension still mixes Local and Équipe code in the same files. Its Local
-part will join this list once the Équipe code sits behind a separate extension
+The VS Code extension still mixes Basic and paid-edition code in the same files. Its
+Basic part will join this list once the paid code sits behind a separate extension
 point. Third-party files keep their own license, such as the fonts in
 `frontend/design-system/licenses/`.
 

@@ -27,7 +27,7 @@ export default defineConfig({
     testTimeout: 5_000,
     coverage: {
       provider: "v8",
-      include: ["packages/core/src/**/*.ts"],
+      include: ["packages/core/src/**/*.ts", "packages/relay/src/**/*.ts"],
       reporter: ["text", "json-summary"],
       thresholds: {
         branches: 85,
