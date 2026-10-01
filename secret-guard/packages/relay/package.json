@@ -1,0 +1,29 @@
+{
+  "name": "@xsom/secret-guard-relay",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local relay that redacts secrets from Claude Code requests before they reach Anthropic",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@xsom/secret-guard-core": "0.1.0"
+  },
+  "engines": {
+    "node": ">=22.13"
+  }
+}

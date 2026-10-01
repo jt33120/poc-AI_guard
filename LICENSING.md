@@ -32,9 +32,10 @@ moved file stays commercial until someone deliberately adds it here.
 
 <!-- open-source-scope:start -->
 ```text
-# Detector and command-line hook
+# Detector, command-line hook and local relay
 secret-guard/packages/core/
 secret-guard/packages/cli/
+secret-guard/packages/relay/
 secret-guard/tsconfig.base.json
 
 # Their tests
@@ -46,6 +47,8 @@ secret-guard/tests/core/sha256.test.ts
 secret-guard/tests/core/text.test.ts
 secret-guard/tests/cli/file-guard.test.ts
 secret-guard/tests/cli/hook.test.ts
+secret-guard/tests/relay/clean.test.ts
+secret-guard/tests/relay/server.test.ts
 ```
 <!-- open-source-scope:end -->
 

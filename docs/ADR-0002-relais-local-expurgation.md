@@ -39,7 +39,7 @@ sur le poste avec le cœur TypeScript, et la requête part directement chez Anth
 ```text
 Claude Code (VS Code)
   → http://127.0.0.1:<port>/<capacité 256 bits>/v1/messages
-  → relais local : lecture du JSON → XXX → nouveau scan (refus s'il reste un secret)
+  → relais local : lecture du JSON → <REDACTED_type> → nouveau scan (refus s'il reste un secret)
   → https://api.anthropic.com/v1/messages  (adresse fixe, sans redirection)
   ← réponse relayée telle quelle, en streaming
 ```
@@ -63,10 +63,11 @@ détecteur TypeScript, celui du hook. Le hook et le relais voient donc la même 
 
 - Champs inspectés : `messages` (historique compris), `system`, `tools`. Le modèle
   et les paramètres ne sont pas touchés.
-- Chaque texte est scanné, ses secrets remplacés par `XXX`, puis il est rescanné.
-  S'il reste un secret, la requête est refusée.
+- Chaque texte est scanné, ses secrets remplacés par un marqueur `<REDACTED_type>`
+  (celui du presse-papiers purgé), puis il est rescanné. S'il reste un secret, la
+  requête est refusée.
 - Une clé d'objet sensible (`password`, `token`, `api_key`…) voit sa valeur
-  remplacée par `XXX`.
+  remplacée par `<REDACTED_sensitive_field>`.
 - Les identifiants de protocole (`type`, `role`, `id`, `tool_use_id`, `name`) ne
   sont jamais modifiés : un secret à cet endroit fait refuser la requête.
 - Un bloc `thinking` signé est relayé tel quel s'il est propre. S'il contient un
@@ -79,6 +80,13 @@ détecteur TypeScript, celui du hook. Le hook et le relais voient donc la même 
   « Secret Guard a refusé l'envoi : … ». Cas de refus : JSON invalide, profondeur
   supérieure à 40, requête de plus de 16 Mio, bloc de texte de plus de 1 Mio, scan
   incomplet. Jamais de suffixe non scanné transmis (CLAUDE.md §4.11).
+- **Mémoire de session.** Claude Code renvoie toute la conversation à chaque tour.
+  Chaque texte n'est analysé qu'une fois, puis son résultat est réutilisé : en RAM
+  seulement, borné à 64 Mio, jamais écrit. Mesure sur des fichiers source réels :
+  un tour courant coûte 50 à 170 ms ; le premier tour d'une session reprise de
+  1 à 4 Mio coûte 1,5 à 4 s, une fois.
+- L'analyse est synchrone : dans l'extension, le relais tourne hors du processus
+  de l'hôte d'extensions (worker ou processus Node séparé) pour ne jamais le figer.
 - La réponse du modèle est relayée sans analyse en v1.
 - Rien n'est écrit sur disque : ni prompt, ni valeur, ni empreinte. Seuls les
   compteurs par type sont conservés, pour l'affichage.
@@ -152,7 +160,7 @@ Tous les tests utilisent un faux fournisseur local, jamais Anthropic.
 | D1 | Images dans la requête (captures que Claude lit) | Réglage **Images non analysées** : *Refuser* par défaut, conformément à §4.11 ; *Laisser passer en le signalant* sur choix explicite, avec un message à chaque fois. |
 | D2 | Activation | La proposer une fois quand l'utilisateur choisit Expurger et que Claude Code est installé, avec une phrase claire : « vos requêtes Claude passeront par un relais sur ce PC ». Pas de bascule silencieuse d'un réglage de Claude. |
 | D3 | Blocs `redacted_thinking` (chiffrés par Anthropic) | Les relayer tels quels. Ils viennent du modèle, sont chiffrés et ne contiennent aucune saisie en clair. Le serveur les refuse aujourd'hui, ce qui coupe des sessions. |
-| D4 | Budget de texte total par requête | Plafond de 1 Mio par bloc, et un plafond total fixé après mesure, pour qu'une longue session ordinaire ne soit jamais refusée. Le serveur limite à 1 Mio au total, trop bas pour Claude Code. |
+| D4 | Budget de texte total par requête | 1 Mio par bloc et **8 Mio au total**, soit environ deux millions de tokens, au-delà de la fenêtre de contexte des modèles. Le serveur limite à 1 Mio au total, trop bas pour Claude Code. |
 
 ## 10. Découpage
 
