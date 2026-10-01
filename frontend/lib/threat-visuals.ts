@@ -34,7 +34,7 @@ const THREAT_VISUALS: Record<string, string> = {
   "extraction-par-api": "modelextractionviaapi.webp",
   "inversion-de-modele": "modelinversion.webp",
   "inference-appartenance": "membershipinference.webp",
-  "exemples-adverses": "Adversarial examples : evasion.webp",
+  "exemples-adverses": "adversarial-examples-evasion.webp",
   "attaque-adverse-physique": "Physical adversarial attack.webp",
   "patchs-adverses": "Adversarial patches.webp",
   "attaques-par-transfert": "Transfer attacks.webp",
