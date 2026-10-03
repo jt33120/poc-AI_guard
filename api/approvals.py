@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -28,6 +28,7 @@ def list_approvals(
     request: Request,
     user: CurrentUser = Depends(get_current_user),
     status_filter: str | None = Query(default=None, alias="status"),
+    product: Literal["secret_guard", "ai_guard"] | None = None,
 ) -> list[dict[str, Any]]:
     if status_filter is not None and status_filter not in _STATUSES:
         raise HTTPException(status_code=422, detail="invalid status filter")
@@ -36,7 +37,7 @@ def list_approvals(
     with db.tenant_reader(
         url, user_id=user.user_id, tenant_id=tenant_id, role=(user.role or Role.viewer)
     ) as conn:
-        return approvals.list_for_tenant(conn, status_filter)
+        return approvals.list_for_tenant(conn, status_filter, product=product)
 
 
 @router.post("/{approval_id}/decision", response_model=ApprovalOut)

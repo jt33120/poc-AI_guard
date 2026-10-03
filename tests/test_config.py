@@ -26,6 +26,7 @@ _DEPLOYMENT_ENV_VARS: dict[str, str] = {
     "XSOM_TENANT_TOKEN": "gateway/server.py TENANT_TOKEN_ENV — the agent's token",
     "XSOM_ADMIN_PASSWORD": "cli/main.py ADMIN_PASSWORD_ENV — `cli bootstrap --email`",
     "NEXT_PUBLIC_XSOM_API_URL": "baked into the console by `next build`",
+    "EXTENSION_API_PUBLIC_URL": "frontend/lib/config.ts — public extension ingestion endpoint",
     "XSOM_API_PORT": "docker-compose.yml — published control API port",
     "XSOM_DB_PORT": "docker-compose.yml — published database port",
     "FORWARDED_ALLOW_IPS": (

@@ -1,4 +1,7 @@
+import { mockWorkspace } from "./workspace-fixture";
 import { expect, test } from "@playwright/test";
+
+test.beforeEach(async ({ page }) => { await mockWorkspace(page); });
 
 test("workstations distinguish client claims and gateway evidence", async ({
   page,
@@ -67,9 +70,9 @@ test("workstations distinguish client claims and gateway evidence", async ({
   await page.route("**/api/control/v1/extensions/verify", (route) =>
     route.fulfill({ json: { valid: true } }),
   );
-  await page.goto("/extensions");
+  await page.goto("/extensions/activity");
   await expect(
-    page.getByRole("heading", { name: "Les postes. Les faits. Les preuves." }),
+    page.getByRole("heading", { name: "Journal des protections", level: 1 }),
   ).toBeVisible();
   await expect(
     page.getByText("Observé par la passerelle", { exact: true }),
@@ -89,6 +92,6 @@ test("workstations distinguish client claims and gateway evidence", async ({
 });
 
 test("extension inventory requires a console session", async ({ page }) => {
-  await page.goto("/extensions");
+  await page.goto("/extensions/activity");
   await expect(page).toHaveURL(/\/login/);
 });

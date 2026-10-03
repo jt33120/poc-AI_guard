@@ -1,4 +1,7 @@
+import { mockWorkspace, WORKSPACE } from "./workspace-fixture";
 import { expect, type Page, test } from "@playwright/test";
+
+test.beforeEach(async ({ page }) => { await mockWorkspace(page); });
 
 async function prepareConsole(page: Page) {
   await page
@@ -7,7 +10,7 @@ async function prepareConsole(page: Page) {
       { name: "xsom_e2e", value: "1", url: "http://127.0.0.1:3100" },
     ]);
   await page.route("**/api/control/**", async (route) =>
-    route.fulfill({ json: [] }),
+    route.fulfill({ json: route.request().url().endsWith("/v1/workspace") ? WORKSPACE : [] }),
   );
 }
 

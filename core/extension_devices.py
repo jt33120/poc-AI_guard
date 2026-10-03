@@ -165,7 +165,10 @@ def record(
             "values (%s,%s,%s,%s,%s::jsonb,%s,%s,%s)",
             (tenant, device, event_id, source, json.dumps(payload), prev, digest, received),
         )
-        conn.execute("update extension_devices set last_seen_at=now() where id=%s", (device,))
+        conn.execute(
+            "update extension_devices set last_seen_at=now(),mode=coalesce(%s,mode) where id=%s",
+            (payload.get("mode") if source == "extension" else None, device),
+        )
 
 
 def verify(conn: psycopg.Connection, tenant: str) -> bool:

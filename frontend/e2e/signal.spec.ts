@@ -1,4 +1,7 @@
+import { mockWorkspace, WORKSPACE } from "./workspace-fixture";
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
+
+test.beforeEach(async ({ page }) => { await mockWorkspace(page); });
 
 const APPROVAL = {
   id: "22222222-2222-2222-2222-222222222222",
@@ -35,6 +38,7 @@ async function authenticate(context: BrowserContext) {
 
 async function emptyControlResponses(page: Page) {
   await page.route("**/api/control/**", async (route) => {
+    if (new URL(route.request().url()).pathname.endsWith("/v1/workspace")) { await route.fulfill({ json: WORKSPACE }); return; }
     const pathname = new URL(route.request().url()).pathname;
     if (pathname === "/api/control/v1/policy") {
       await route.fulfill({ json: { yaml: "tools: []\n", version: 1 } });
@@ -48,6 +52,7 @@ test("an expired approval cannot be accepted from the console", async ({ page, c
   await authenticate(context);
   let writes = 0;
   await page.route("**/api/control/**", async (route) => {
+    if (new URL(route.request().url()).pathname.endsWith("/v1/workspace")) { await route.fulfill({ json: WORKSPACE }); return; }
     if (route.request().method() !== "GET") writes += 1;
     await route.fulfill({ json: route.request().url().includes("/v1/approvals")
       ? [{ ...APPROVAL, expires_at: "2000-01-01T00:00:00Z" }] : [] });
@@ -62,6 +67,7 @@ test("an expired approval cannot be accepted from the console", async ({ page, c
 test("an open approval becomes unavailable at its deadline without a reload", async ({ page, context }) => {
   await authenticate(context);
   await page.route("**/api/control/**", async (route) => {
+    if (new URL(route.request().url()).pathname.endsWith("/v1/workspace")) { await route.fulfill({ json: WORKSPACE }); return; }
     await route.fulfill({ json: route.request().url().includes("/v1/approvals")
       ? [{ ...APPROVAL, expires_at: new Date(Date.now() + 3_000).toISOString() }] : [] });
   });
@@ -78,6 +84,7 @@ test("an approval stays held until the server confirms the decision", async ({ p
   let confirm: () => void = () => undefined;
   const confirmation = new Promise<void>((resolve) => { confirm = resolve; });
   await page.route("**/api/control/**", async (route) => {
+    if (new URL(route.request().url()).pathname.endsWith("/v1/workspace")) { await route.fulfill({ json: WORKSPACE }); return; }
     if (route.request().method() === "POST") {
       expect(route.request().postDataJSON()).toEqual({ decision: "approve" });
       requested = true;
@@ -101,6 +108,7 @@ test("an approval stays held until the server confirms the decision", async ({ p
 test("a rejected approval write leaves the pending action visible", async ({ page, context }) => {
   await authenticate(context);
   await page.route("**/api/control/**", async (route) => {
+    if (new URL(route.request().url()).pathname.endsWith("/v1/workspace")) { await route.fulfill({ json: WORKSPACE }); return; }
     if (route.request().method() === "POST") {
       await route.fulfill({ status: 503, json: { detail: "Approval service unavailable" } });
       return;
@@ -119,6 +127,7 @@ test("a rejected approval write leaves the pending action visible", async ({ pag
 test("an unavailable queue is not presented as an empty queue", async ({ page, context }) => {
   await authenticate(context);
   await page.route("**/api/control/**", async (route) => {
+    if (new URL(route.request().url()).pathname.endsWith("/v1/workspace")) { await route.fulfill({ json: WORKSPACE }); return; }
     await route.fulfill({ status: 503, json: { detail: "Approval service unavailable" } });
   });
   await page.goto("/approvals");
@@ -179,6 +188,7 @@ test("the inspector selects actual evidence without executing an action", async 
   await authenticate(context);
   let writes = 0;
   await page.route("**/api/control/**", async (route) => {
+    if (new URL(route.request().url()).pathname.endsWith("/v1/workspace")) { await route.fulfill({ json: WORKSPACE }); return; }
     if (route.request().method() !== "GET") writes += 1;
     const pathname = new URL(route.request().url()).pathname;
     await route.fulfill({ json: pathname.endsWith("/tools") ? TOOLS : pathname.endsWith("/audit") ? [AUDIT] : [] });
@@ -219,6 +229,7 @@ test("risk reports observed trust and drift without inventing a numerical risk s
 test("unavailable risk feeds remain unknown rather than showing reassuring zeroes", async ({ page, context }) => {
   await authenticate(context);
   await page.route("**/api/control/**", async (route) => {
+    if (new URL(route.request().url()).pathname.endsWith("/v1/workspace")) { await route.fulfill({ json: WORKSPACE }); return; }
     await route.fulfill({ status: 503, json: { detail: "Telemetry unavailable" } });
   });
   await page.goto("/risk");
@@ -235,6 +246,7 @@ test("the executive view never counts uninspected or unknown events as authoriza
     "future_verdict", null, "monitor_deny", "tool_drift",
   ];
   await page.route("**/api/control/**", async (route) => {
+    if (new URL(route.request().url()).pathname.endsWith("/v1/workspace")) { await route.fulfill({ json: WORKSPACE }); return; }
     const pathname = new URL(route.request().url()).pathname;
     const json = pathname.endsWith("/audit")
       ? decisions.map((decision, index) => ({ ...AUDIT, id: index + 1, decision }))
@@ -256,6 +268,7 @@ test("the redesigned console keeps English after reloading", async ({ page, cont
   await emptyControlResponses(page);
   await page.goto("/risk");
   await expect(page.getByRole("heading", { name: "La confiance se gagne.", exact: true })).toBeVisible();
+  await page.getByLabel("Mon compte", { exact: true }).click();
   await page.getByRole("button", { name: "EN", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Trust is earned.", exact: true })).toBeVisible();
   await expect(page.locator("signal-risk").getByText("Risk × trust", { exact: true })).toBeVisible();
@@ -264,6 +277,7 @@ test("the redesigned console keeps English after reloading", async ({ page, cont
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await expect(page.getByRole("heading", { name: "Trust is earned.", exact: true })).toBeVisible();
   await expect(page.locator("signal-risk").getByText("Risk × trust", { exact: true })).toBeVisible();
+  await page.getByLabel("My account", { exact: true }).click();
   await page.getByRole("button", { name: "FR", exact: true }).click();
   await expect(page.locator("signal-risk").getByText("Risque × confiance", { exact: true })).toBeVisible();
   await expect(page.locator("signal-preferences").getByRole("button", { name: "Thème clair", exact: true })).toBeVisible();
@@ -273,10 +287,11 @@ test("the interactive overview labels its demonstration and never writes to the 
   await authenticate(context);
   let writes = 0;
   await page.route("**/api/control/**", async (route) => {
+    if (new URL(route.request().url()).pathname.endsWith("/v1/workspace")) { await route.fulfill({ json: WORKSPACE }); return; }
     if (route.request().method() !== "GET") writes += 1;
     await route.fulfill({ json: [] });
   });
-  await page.goto("/home");
+  await page.goto("/ai-guard");
   const demo = page.locator('signal-flow[mode="demo"]');
   await expect(demo.getByText("Démonstration · données illustratives", { exact: true })).toBeVisible();
   await demo.getByRole("button", { name: "Guarded", exact: true }).click();
@@ -292,7 +307,7 @@ test("theme and reduced motion persist, and operating-system motion always wins"
   await emptyControlResponses(page);
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/settings");
-  const preferences = page.locator("signal-preferences").first();
+  const preferences = page.getByRole("main").locator("signal-preferences").first();
   const html = page.locator("html");
 
   await expect(html).toHaveAttribute("data-theme", "light");
@@ -331,7 +346,7 @@ for (const width of [390, 768, 1440]) {
         for (const theme of ["light", "dark"]) {
           if (theme === "dark") {
             const themeButton = page.locator('signal-preferences [data-action="theme"]').first();
-            const menu = page.getByRole("button", { name: "Menu", exact: true });
+            const menu = page.getByLabel("Mon compte", { exact: true });
             const openMenu = !(await themeButton.isVisible());
             if (openMenu) await menu.click();
             await themeButton.click();

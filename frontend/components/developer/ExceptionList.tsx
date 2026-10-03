@@ -6,7 +6,7 @@ export function ExceptionList() {
   return (
     <p className="console-note">
       Les exceptions d’action sont des approbations à usage unique et durée
-      courte. <Link href="/approvals">Ouvrir la file d’approbation</Link>.
+      courte. <Link href="/extensions/approvals">Ouvrir la file d’approbation</Link>.
     </p>
   );
 }

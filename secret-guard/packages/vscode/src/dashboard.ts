@@ -7,6 +7,7 @@ import { observeCapLine, type ObserveCap } from "./observe-window.js";
 
 export interface DashboardGateway {
   readonly state: GatewayState;
+  readonly relayActive?: boolean;
   readonly status: string;
   readonly audit?: string;
 }
@@ -19,6 +20,7 @@ export const DASHBOARD_COMMANDS = [
   "secretGuard.scanClipboard",
   "secretGuard.purgeClipboard",
   "secretGuard.scanDocument",
+  "secretGuard.connectOrganization",
   "secretGuard.connectGateway",
   "secretGuard.disconnectGateway",
   "secretGuard.requestRulesPack",
@@ -72,9 +74,14 @@ export function dashboardHtml(
     degraded: "Non garanti",
     off: "Non surveillé",
   }[health.state];
-  const attachmentsCovered = gateway.state === "online";
-  const gatewayAction =
+  const attachmentsCovered =
+    gateway.state === "online" && gateway.relayActive === true;
+  const organizationAction =
     gateway.state === "offline"
+      ? '<a class="button" href="command:secretGuard.connectOrganization">Relier à mon entreprise →</a>'
+      : '<a href="command:secretGuard.disconnectGateway">Déconnecter le poste</a>';
+  const gatewayAction =
+    gateway.relayActive !== true
       ? '<a class="button" href="command:secretGuard.connectGateway">Raccorder ce poste →</a>'
       : '<a class="button" href="command:secretGuard.disconnectGateway">Déconnecter le relais</a>';
   const hosts = health.hosts
@@ -114,6 +121,7 @@ export function dashboardHtml(
 <section aria-labelledby="mode"><div class="section-heading"><h2 id="mode">Votre mode de protection</h2><a class="button" href="command:secretGuard.chooseMode">Changer de mode ▾</a></div><div class="policy"><strong>${modeLabel(mode)}</strong><p>${PROTECTION_MODES.find((entry) => entry.mode === mode)?.description}</p><p>${PROTECTION_MODES.find((entry) => entry.mode === mode)?.detail}</p>${capNote}</div><p class="note">Réglage commun aux assistants de cette installation. Après un changement, ouvrez une nouvelle session de votre assistant ; Codex peut demander de valider le hook actualisé.</p></section>
 <section aria-labelledby="scope"><div class="section-heading"><h2 id="scope">Périmètre surveillé</h2><span>État de cette installation</span></div><div class="policy"><strong>Prompts · ${promptCoverage}</strong><p>Les assistants configurés utilisent la protection locale. Un test dans chaque assistant confirme l’interception.</p></div><div class="policy"><strong>Pièces jointes · ${attachmentsCovered ? "Analysées" : "Non analysées"}</strong><p>${attachmentsCovered ? "PNG, PDF et Markdown sont analysés dans les sessions Claude raccordées au relais xSOM." : "Hors relais Claude raccordé, les pièces jointes ne sont pas analysées. Les pièces natives Codex et Copilot ne sont pas interceptées."}</p></div><p class="note">Le presse-papiers est vérifié à la demande avec les actions ci-dessus.</p></section>
 ${rulesSection}
+<section aria-labelledby="organization"><div class="section-heading"><h2 id="organization">Dev Guard · Mon entreprise</h2></div><div class="policy"><strong>${escapeHtml(gateway.status)}</strong><p>Reliez ce poste pour suivre sa présence, sa version et ses protections dans votre entreprise. Le rattachement fonctionne sans relais Claude.</p>${organizationAction}<p>Seules des métadonnées de protection sont envoyées dans cet inventaire, sans prompt ni secret.</p></div></section>
 <section aria-labelledby="gateway"><div class="section-heading"><h2 id="gateway">Relais de protection · Claude</h2></div><div class="policy"><strong>${escapeHtml(gateway.status)}</strong>${gateway.audit === undefined ? "" : `<p>${escapeHtml(gateway.audit)}</p>`}<p>Nettoyage obligatoire avant transmission, dans les sessions Claude raccordées. L’abonnement et la connexion restent gérés par Claude. Les autres assistants gardent leurs protections locales.</p><p>Après connexion, seules des métadonnées d’audit sont enregistrées : poste, date, résultat et nombre de détections. Aucun prompt ni secret dans ce journal. Le contenu original transite par votre passerelle pour être nettoyé.</p><p>La passerelle reste en mode Expurger, même si le mode local change. Pièces jointes non analysables : envoi refusé.</p>${gatewayAction}</div></section>
 <footer><span>Analyse locale · Aucun appel réseau du détecteur</span><span>Audit distant uniquement après raccordement xSOM</span></footer>
 </main></body></html>`;

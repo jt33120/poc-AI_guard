@@ -68,3 +68,4 @@ secret-guard/**/.vscode-test/
 backup/
 /coverage/.sequences.json
 /coverage/.demo_snapshot.json
+.vercel

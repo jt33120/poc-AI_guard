@@ -121,14 +121,15 @@ def resolve_principal(conn: psycopg.Connection, raw_token: str) -> tuple[str, st
     if not raw_token:
         return None
     row = conn.execute(
-        "select id, tenant_id from gateway_tokens where token_hash = %s and revoked_at is null",
+        "select id, tenant_id from gateway_tokens where token_hash = %s and revoked_at is null "
+        "and purpose = 'agent'",
         (hash_token(raw_token),),
     ).fetchone()
     return (str(row[0]), str(row[1])) if row else None
 
 
 def resolve_principal_and_debits(
-    conn: psycopg.Connection, raw_token: str
+    conn: psycopg.Connection, raw_token: str, *, allow_extension: bool = False
 ) -> tuple[str, str, int | None, int | None] | None:
     """``(token_id, tenant_id, authorize_rpm, proxy_rpm)`` — en **une** instruction.
 
@@ -165,8 +166,9 @@ def resolve_principal_and_debits(
         "           and (o.expires_at is null or o.expires_at > now()) "
         "    where l.plan = t.plan and l.metric = 'proxy_rpm') "
         "from gateway_tokens g join tenants t on t.id = g.tenant_id "
-        "where g.token_hash = %s and g.revoked_at is null",
-        (hash_token(raw_token),),
+        "where g.token_hash = %s and g.revoked_at is null "
+        "and (g.purpose = 'agent' or %s)",
+        (hash_token(raw_token), allow_extension),
     ).fetchone()
     if not row:
         return None
@@ -190,7 +192,7 @@ def resolve_client_id(conn: psycopg.Connection, raw_token: str) -> str | None:
 
 
 def authenticate_gateway_principal(
-    conn: psycopg.Connection, raw_token: str
+    conn: psycopg.Connection, raw_token: str, *, allow_extension: bool = False
 ) -> tuple[str, str, int | None, int | None]:
     """``(token_id, tenant_id, authorize_rpm, proxy_rpm)`` pour un appelant, ou lève.
 
@@ -205,7 +207,7 @@ def authenticate_gateway_principal(
     Raises:
         PermissionError: if the token is missing, unknown, or revoked.
     """
-    principal = resolve_principal_and_debits(conn, raw_token)
+    principal = resolve_principal_and_debits(conn, raw_token, allow_extension=allow_extension)
     if principal is None:
         raise PermissionError("invalid or missing tenant token")
     conn.execute(

@@ -1,6 +1,8 @@
+import { mockWorkspace } from "./workspace-fixture";
 import { expect, test, type Page } from "@playwright/test";
 
 async function authenticated(page: Page): Promise<void> {
+  await mockWorkspace(page);
   await page
     .context()
     .addCookies([
@@ -86,7 +88,7 @@ test("admin flow exposes policy assignment, one-shot approvals and escaped evide
       ],
     }),
   );
-  await page.goto("/extensions");
+  await page.goto("/extensions/policies");
 
   await expect(
     page.getByRole("heading", { name: "Politiques Secret Guard" }),
@@ -96,7 +98,8 @@ test("admin flow exposes policy assignment, one-shot approvals and escaped evide
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Ouvrir la file d’approbation" }),
-  ).toHaveAttribute("href", "/approvals");
+  ).toHaveAttribute("href", "/extensions/approvals");
+  await page.goto("/extensions/devices");
   await expect(
     page
       .getByLabel("Couverture des postes")
@@ -109,6 +112,7 @@ test("admin flow exposes policy assignment, one-shot approvals and escaped evide
     await page.evaluate(() => (window as Window & { __xss?: number }).__xss),
   ).toBeUndefined();
 
+  await page.goto("/extensions/policies");
   await page.getByLabel("Politique à attribuer").selectOption("team-default");
   await page.getByLabel("Poste à attribuer").selectOption("device-1");
   await expect(page.getByRole("button", { name: "Attribuer" })).toBeEnabled();
@@ -133,7 +137,7 @@ test("policy publication reports insufficient rights without claiming success", 
     "**/api/control/v1/developer-policies/team-default",
     (route) => route.fulfill({ status: 403, json: {} }),
   );
-  await page.goto("/extensions");
+  await page.goto("/extensions/policies");
   await page.getByRole("button", { name: "Publier la politique" }).click();
   await expect(
     page.getByRole("status").filter({ hasText: "Request failed (403)" }),
@@ -220,7 +224,7 @@ test("an admin caps Avertir while composing a policy and sees it in the summary"
       published = body;
     },
   );
-  await page.goto("/extensions");
+  await page.goto("/extensions/policies");
   const panel = page.getByRole("region", { name: "Politiques Secret Guard" });
   const summary = panel.getByRole("region", { name: "Politiques publiées" });
   await expect(
@@ -293,7 +297,7 @@ test("the policy summary shows loading, failure, retry and empty states", async 
     }
     return [];
   });
-  await page.goto("/extensions");
+  await page.goto("/extensions/policies");
   const summary = page
     .getByRole("region", { name: "Politiques Secret Guard" })
     .getByRole("region", { name: "Politiques publiées" });
@@ -317,7 +321,7 @@ test("the Avertir cap reads in English", async ({ page }) => {
       { name: "xsom_lang", value: "en", url: "http://127.0.0.1:3100" },
     ]);
   await policyConsole(page, () => PUBLISHED);
-  await page.goto("/extensions");
+  await page.goto("/extensions/policies");
   const panel = page.getByRole("region", { name: "Secret Guard policies" });
   await expect(
     panel.getByRole("group", { name: "Warn mode (Avertir) on workstations" }),

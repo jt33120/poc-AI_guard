@@ -39,11 +39,11 @@ _SUFFIXE_INTERPOLE = re.compile(r"(?<![/])\$\{[^}]*\}")
 
 
 def _sources() -> list[Path]:
-    """Le code de la console, hors artefacts de build."""
+    """Le code de la console, hors artefacts et requêtes de test volontairement invalides."""
     return [
         chemin
         for chemin in (*_FRONT.rglob("*.ts"), *_FRONT.rglob("*.tsx"))
-        if ".next" not in chemin.parts and "node_modules" not in chemin.parts
+        if not {".next", "node_modules", "e2e"}.intersection(chemin.parts)
     ]
 
 

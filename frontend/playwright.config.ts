@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const PORT = 3100;
+const PORT = Number(process.env.XSOM_E2E_PORT ?? 3100);
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 
 export default defineConfig({
@@ -18,6 +18,9 @@ export default defineConfig({
     timeout: 180_000,
     env: {
       E2E_TEST_MODE: "1",
+      CONTROL_API_URL: "http://127.0.0.1:3181",
+      EXTENSION_API_PUBLIC_URL: "https://extension.example.test",
+      CONSOLE_LOCAL_PREVIEW: "1", // A production test server must still require its session.
       NEXT_PUBLIC_SUPABASE_URL: "http://localhost:54321",
       NEXT_PUBLIC_SUPABASE_ANON_KEY: "e2e-anon-key",
     },

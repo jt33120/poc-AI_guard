@@ -52,7 +52,16 @@ def resolve_gateway_principal(request: Request, raw_token: str | None) -> Gatewa
     try:
         with db.connection(url) as conn:
             token_id, tenant_id, authorize_rpm, proxy_rpm = (
-                tenant_tokens.authenticate_gateway_principal(conn, raw_token)
+                tenant_tokens.authenticate_gateway_principal(
+                    conn,
+                    raw_token,
+                    allow_extension=request.url.path.startswith("/v1/extension/")
+                    or request.url.path
+                    in {
+                        "/proxy/extension/anthropic/v1/messages",
+                        "/proxy/extension/anthropic/v1/messages/count_tokens",
+                    },
+                )
             )
             conn.commit()
     except PermissionError:
