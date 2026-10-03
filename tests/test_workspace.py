@@ -1,6 +1,7 @@
 """Product access is tenant-scoped, explicit and independent of gateway execution."""
 
 from collections.abc import Callable
+from pathlib import Path
 from uuid import uuid4
 
 import psycopg
@@ -107,3 +108,26 @@ def test_approval_queues_are_separated_by_recorded_workstation_origin(
     assert client.get("/v1/approvals?product=wrong", headers=headers).status_code == 422
     other_headers = {"Authorization": f"Bearer {make_token(tenant_id=other, role='admin')}"}
     assert client.get("/v1/approvals?product=secret_guard", headers=other_headers).json() == []
+
+
+def test_migration_preserves_existing_paid_agent_access_only(db: DBHandle) -> None:
+    tenants = {plan: str(uuid4()) for plan in ("free", "pro", "entreprise")}
+    for plan, tenant in tenants.items():
+        db.conn.execute(
+            "insert into tenants(id,name,plan) values (%s,%s,%s)", (tenant, "Migration test", plan)
+        )
+    # Reproduce the upgrade on this disposable test database, with tenants that
+    # existed before the product-access table. No production connection is used.
+    db.conn.execute("drop table tenant_product_access")
+    migration = (
+        Path(__file__).resolve().parent.parent
+        / "supabase/migrations/0039_console_product_access.sql"
+    )
+    db.conn.execute(migration.read_text())
+    rows = db.conn.execute(
+        "select tenant_id::text,product,status,edition from tenant_product_access order by edition"
+    ).fetchall()
+    assert rows == [
+        (tenants["entreprise"], "ai_guard", "active", "Entreprise"),
+        (tenants["pro"], "ai_guard", "active", "Pro"),
+    ]

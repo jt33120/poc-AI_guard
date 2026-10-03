@@ -17,4 +17,8 @@ create policy tenant_product_access_read on tenant_product_access
     using (tenant_id = (auth.jwt()->'app_metadata'->>'tenant_id')::uuid);
 grant select on tenant_product_access to authenticated;
 -- Provisioning is an operator action. No browser write policy or self-upgrade.
--- No automatic migration of the legacy plan into a paid subscription.
+-- Preserve Agent Guard access already granted by a paid legacy plan. This is
+-- a one-time migration of existing rights, never an inferred Dev Guard purchase.
+insert into tenant_product_access (tenant_id, product, status, edition)
+select id, 'ai_guard', 'active', case plan when 'pro' then 'Pro' else 'Entreprise' end
+from tenants where plan in ('pro', 'entreprise');
