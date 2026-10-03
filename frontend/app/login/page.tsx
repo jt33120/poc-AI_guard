@@ -28,7 +28,9 @@ export default function LoginPage() {
     });
     if (res.ok) {
       setRedirecting(true);
-      router.push("/home");
+      const next = new URLSearchParams(window.location.search).get("next");
+      // Device confirmation is the only return path accepted here. No external redirects.
+      router.push(next && /^\/extensions\/connect(?:\?code=[A-Z2-9]{5}-[A-Z2-9]{5})?$/.test(next) ? next : "/home");
       router.refresh();
     } else {
       setBusy(false);

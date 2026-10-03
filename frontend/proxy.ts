@@ -17,11 +17,23 @@ const PROTECTED = [
   "/settings",
   "/extensions",
   "/xsom",
+  "/ai-guard",
+  "/subscriptions",
 ];
 
 export async function proxy(request: NextRequest) {
   // Segment-aware match, so a public path that merely starts like a console path is not caught.
   const path = request.nextUrl.pathname;
+  // Native device-code initiation has no browser session; confirmation remains protected.
+  if (["/api/enrollment/start", "/api/enrollment/status", "/api/enrollment/cancel"].includes(path)) {
+    return NextResponse.next({ request });
+  }
+  if (appConfig.localPreview) {
+    if (!["localhost", "127.0.0.1", "[::1]"].includes(request.nextUrl.hostname)) {
+      return new NextResponse("Local preview only", { status: 403 });
+    }
+    return NextResponse.next({ request });
+  }
   const isProtected = PROTECTED.some(
     (p) => path === p || path.startsWith(`${p}/`),
   );
@@ -29,7 +41,9 @@ export async function proxy(request: NextRequest) {
   // Hermetic E2E mode: gate on a marker cookie instead of a real session.
   if (appConfig.e2e) {
     if (isProtected && !request.cookies.get("xsom_e2e")) {
-      return NextResponse.redirect(new URL("/login", request.url));
+      const login = new URL("/login", request.url);
+      login.searchParams.set("next", path + request.nextUrl.search);
+      return NextResponse.redirect(login);
     }
     return NextResponse.next({ request });
   }
@@ -64,7 +78,9 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
   if (isProtected && !user) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    const login = new URL("/login", request.url);
+    login.searchParams.set("next", path + request.nextUrl.search);
+    return NextResponse.redirect(login);
   }
   return response;
 }

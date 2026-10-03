@@ -14,6 +14,24 @@ from core import extension_devices as devices
 router = APIRouter(prefix="/v1/extension", tags=["extension-ingest"])
 
 
+@router.post("/disconnect")
+@limiter.limit("10/minute")
+def disconnect(
+    request: Request,
+    principal: GatewayPrincipal = Depends(get_gateway_principal),
+) -> dict[str, bool]:
+    try:
+        with db.connection(database_url(request)) as conn, conn.transaction():
+            devices.device_for(conn, principal.tenant_id, principal.token_id)
+            conn.execute(
+                "update gateway_tokens set revoked_at=now() where id=%s and tenant_id=%s",
+                (principal.token_id, principal.tenant_id),
+            )
+    except LookupError:
+        raise HTTPException(409, "No workstation is bound to this token") from None
+    return {"disconnected": True}
+
+
 @router.post("/register")
 @limiter.limit("30/minute")
 def register(

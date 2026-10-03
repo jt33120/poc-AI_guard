@@ -71,6 +71,36 @@ pas le fichier original ni son rendu visuel. L'extraction se fait sur le backend
 xSOM, pas nécessairement sur ce poste. Cette capacité nécessite son redéploiement
 et ne couvre pas les pièces des conversations natives Codex/Copilot.
 
+### Relier ce poste à l’entreprise (0.8.1)
+
+1. Lancez **Secret Guard: Relier à mon entreprise** depuis la palette de commandes
+   ou le centre de protection.
+2. Indiquez l’adresse de votre console xSOM. Un code valable dix minutes ouvre
+   **Dev Guard → Relier un poste** dans votre navigateur.
+3. Connectez-vous avec un compte administrateur de l’entreprise, vérifiez le code
+   et renseignez le nom du poste, le membre et l’équipe, puis confirmez.
+
+Le poste apparaît dans **Dev Guard → Postes de l’équipe**. L’extension envoie son
+état toutes les trente secondes pendant que VS Code est ouvert. Le tableau montre
+l’OS, la version, le mode de protection et le dernier contact. « Contact récent »
+signifie moins de deux minutes ; il ne certifie pas l’activité de chaque assistant.
+Le rattachement fonctionne sans Claude et conserve le mode de protection choisi.
+
+L’identifiant est propre à cette installation/profil VS Code, pas une empreinte
+matérielle du Mac. Aucun nom de machine, chemin de projet, prompt ou secret n’est
+collecté automatiquement. Le nom, le membre et l’équipe sont déclarés lors de la
+confirmation. La clé du poste est générée localement et conservée dans le coffre
+VS Code ; seul le code de confirmation apparaît dans le navigateur.
+
+**Déconnecter ce poste de l’entreprise** révoque sa clé, libère sa place et garde
+son historique. La connexion réseau est nécessaire pour confirmer cette révocation.
+Un nouveau rattachement à la même entreprise retrouve le poste ; il ne le déplace
+pas automatiquement vers une autre entreprise. La détection locale reste active.
+
+La console et les API doivent être à jour (migration `0040_extension_pairing.sql`
+et `EXTENSION_API_PUBLIC_URL` côté console). L’aperçu local sans backend affiche
+explicitement un inventaire non connecté et ne permet pas de rattachement réel.
+
 ## Un poste de travail plus serein
 
 - 🛡️ **Contrôles rapides** : cliquez sur Secret Guard dans la barre d’état,

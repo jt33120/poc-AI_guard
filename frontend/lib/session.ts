@@ -6,6 +6,7 @@ import { createSupabaseServerClient } from "@/lib/supabaseServer";
 export type Role = "admin" | "operator" | "viewer";
 
 export interface Session {
+  email: string | null;
   userId: string;
   tenantId: string | null;
   role: Role | null;
@@ -13,10 +14,14 @@ export interface Session {
 }
 
 export async function getSession(): Promise<Session | null> {
+  if (config.localPreview) {
+    return { userId: "local-preview", email: "julian.talou@xsom.fr", tenantId: "local-preview-xsom", role: "admin", accessToken: "" };
+  }
   // Hermetic E2E bypass: a marker cookie stands in for a real Supabase session.
   if (config.e2e && (await cookies()).get("xsom_e2e")) {
     return {
       userId: "e2e-user",
+      email: "admin@example.test",
       tenantId: "e2e-tenant",
       role: "admin",
       accessToken: "e2e-token",
@@ -39,6 +44,7 @@ export async function getSession(): Promise<Session | null> {
   };
   return {
     userId: user.id,
+    email: user.email ?? null,
     tenantId: appMeta.tenant_id ?? null,
     role: appMeta.role ?? null,
     accessToken: session?.access_token ?? "",

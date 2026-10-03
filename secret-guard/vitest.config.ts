@@ -5,6 +5,9 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: {
     alias: {
+      vscode: fileURLToPath(
+        new URL("./tests/fixtures/vscode.ts", import.meta.url),
+      ),
       "@xsom/secret-guard-cli/hook": fileURLToPath(
         new URL("./packages/cli/src/hook.ts", import.meta.url),
       ),

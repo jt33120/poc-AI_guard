@@ -33,6 +33,8 @@ const SEG = "[A-Za-z0-9_-]{1,64}";
 const POLICY_SEG = "[a-z0-9][a-z0-9._-]{0,127}";
 
 export const CONTROL_ROUTES: readonly Route[] = [
+  { pattern: new RegExp("^v1/workspace$"), methods: ["GET"] },
+  { pattern: new RegExp("^v1/extensions/enrollment$"), methods: ["GET", "POST"] },
   { pattern: new RegExp("^v1/extensions/devices$"), methods: ["GET"] },
   { pattern: new RegExp("^v1/extensions/events$"), methods: ["GET"] },
   { pattern: new RegExp("^v1/extensions/verify$"), methods: ["GET"] },
