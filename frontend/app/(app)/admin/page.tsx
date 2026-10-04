@@ -1,115 +1,21 @@
 "use client";
-import { useEffect, useState } from "react";
+import Link from "next/link";
 import { ApiKeys } from "@/components/ApiKeys";
-import { ClientsManager } from "@/components/ClientsManager";
-import {
-  ConsoleError,
-  ConsoleHeader,
-  ConsoleSkeleton,
-} from "@/components/ConsoleUI";
-import { DlpSettings } from "@/components/DlpSettings";
-import { PolicyEditor } from "@/components/PolicyEditor";
-import { ProviderCredentials } from "@/components/ProviderCredentials";
-import { ReadTokens } from "@/components/ReadTokens";
-import { VerdictBadge } from "@/design-system/react";
-import { apiGet } from "@/lib/client";
+import { ConsoleHeader } from "@/components/ConsoleUI";
+import { ConsoleIcon } from "@/components/ConsoleIcon";
+import { useConsoleRole } from "@/components/AppShell";
 import { useT } from "@/lib/i18n";
-interface ServerRow {
-  id: string;
-  name: string;
-  transport: string;
-  enabled: boolean;
-}
+
 export default function AdminPage() {
-  const { t, lang } = useT();
-  const [servers, setServers] = useState<ServerRow[]>([]);
-  const [error, setError] = useState<unknown>(null);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    apiGet<ServerRow[]>("v1/servers")
-      .then(setServers)
-      .catch(setError)
-      .finally(() => setLoading(false));
-  }, []);
-  return (
-    <section className="console-page">
-      <ConsoleHeader
-        eyebrow="10 / ADMINISTRATION"
-        title={lang === "fr" ? "Les clés du contrôle." : "The keys to control."}
-        description={
-          lang === "fr"
-            ? "Périmètres, accès et fournisseurs. La configuration de ce tenant."
-            : "Scopes, access and providers. This tenant’s configuration."
-        }
-      />
-      <nav
-        className="console-anchor-nav"
-        aria-label={
-          lang === "fr"
-            ? "Sections d’administration"
-            : "Administration sections"
-        }
-      >
-        <a href="#admin-access">{lang === "fr" ? "Accès" : "Access"}</a>
-        <a href="#admin-clients">{lang === "fr" ? "Projets" : "Projects"}</a>
-        <a href="#admin-dlp">DLP</a>
-        <a href="#admin-providers">
-          {lang === "fr" ? "Fournisseurs" : "Providers"}
-        </a>
-        <a href="#admin-policy">Policies</a>
-      </nav>
-      <section className="console-panel">
-        <div className="console-panel-heading">
-          <h2>{t("admin.servers.title")}</h2>
-          <span className="console-count">
-            {loading || error ? "—" : servers.length}
-          </span>
-        </div>
-        {error != null && <ConsoleError error={error} />}
-        {loading ? (
-          <ConsoleSkeleton rows={2} />
-        ) : (
-          <ul className="risk-tool-list">
-            {servers.map((server) => (
-              <li key={server.id}>
-                <div>
-                  <strong>{server.name}</strong>
-                  <span>{server.transport}</span>
-                </div>
-                <VerdictBadge value={server.enabled ? "allow" : "deny"} />
-                <span>
-                  {server.enabled
-                    ? lang === "fr"
-                      ? "Activé"
-                      : "Enabled"
-                    : lang === "fr"
-                      ? "Désactivé"
-                      : "Disabled"}
-                </span>
-              </li>
-            ))}
-            {servers.length === 0 && !error && (
-              <li className="console-note">{t("admin.servers.empty")}</li>
-            )}
-          </ul>
-        )}
-      </section>
-      <div id="admin-access" className="console-two-columns admin-access">
-        <ApiKeys />
-        <ReadTokens />
-      </div>
-      <section id="admin-clients">
-        <ClientsManager />
-      </section>
-      <section id="admin-dlp">
-        <DlpSettings />
-      </section>
-      <section id="admin-providers">
-        <ProviderCredentials />
-      </section>
-      <section id="admin-policy">
-        <PolicyEditor />
-      </section>
-    </section>
-  );
+  const { lang } = useT();
+  const role = useConsoleRole();
+  const tr = (fr: string, en: string) => lang === "fr" ? fr : en;
+  return <section className="console-page">
+    <ConsoleHeader title={tr("Accès & intégrations", "Access & integrations")} description={tr("Les accès de connexion de votre entreprise. Créez un jeton dédié à chaque poste ou agent raccordé.", "Your organization’s connection access. Create a dedicated token for each connected workstation or agent.")} />
+    {role === "admin" ? <section id="admin-access"><ApiKeys /></section> : <p className="console-note">{tr("Un administrateur gère les accès de l’entreprise.", "An administrator manages organization access.")}</p>}
+    <div className="workspace-products-grid">
+      <section className="workspace-step" data-product="secret_guard"><ConsoleIcon name="secret_guard" /><h2>Dev Guard</h2><p>{tr("Retrouvez les règles d’équipe et l’état des postes dans l’espace des développeurs.", "Find team policies and workstation status in the developer workspace.")}</p><Link href="/extensions/policies">{tr("Gérer les politiques d’équipe", "Manage team policies")}</Link></section>
+      <section className="workspace-step" data-product="ai_guard"><ConsoleIcon name="ai_guard" /><h2>Agent Guard</h2><p>{tr("Configurez les projets, les fournisseurs et les intégrations de vos agents en production.", "Configure projects, providers and integrations for your production agents.")}</p><Link href="/ai-guard/settings">{tr("Configurer les agents", "Configure agents")}</Link></section>
+    </div>
+  </section>;
 }

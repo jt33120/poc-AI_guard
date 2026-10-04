@@ -777,6 +777,7 @@ export async function activate(
           ? undefined
           : {
               state: gateway.state,
+              relayActive: gateway.relayActive,
               status: gateway.status,
               ...(gateway.audit === undefined ? {} : { audit: gateway.audit }),
             },
@@ -791,6 +792,14 @@ export async function activate(
     await refreshUi();
   };
   context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "secretGuard.connectOrganization",
+      async () => {
+        closeStatusControls();
+        await gateway?.connectOrganization();
+        await refreshUi();
+      },
+    ),
     vscode.commands.registerCommand("secretGuard.connectGateway", async () => {
       closeStatusControls();
       // The gateway takes over Claude's route: the local relay steps aside.
@@ -803,7 +812,7 @@ export async function activate(
       async () => {
         closeStatusControls();
         const answer = await vscode.window.showWarningMessage(
-          "Déconnecter xSOM retire le nettoyage transparent de Claude dans les nouvelles sessions. Les hooks locaux restent actifs.",
+          "Déconnecter ce poste arrête son suivi dans l’entreprise et retire le relais Claude s’il était activé. Les hooks locaux restent actifs.",
           { modal: true },
           "Déconnecter",
         );

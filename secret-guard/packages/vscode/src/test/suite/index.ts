@@ -37,6 +37,7 @@ function registerTests(mocha: Mocha): void {
       for (const command of [
         "secretGuard.showDashboard",
         "secretGuard.chooseMode",
+        "secretGuard.connectOrganization",
         "secretGuard.connectGateway",
         "secretGuard.disconnectGateway",
         "secretGuard.scanSelection",

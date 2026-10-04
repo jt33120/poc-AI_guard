@@ -176,7 +176,8 @@ def test_a_hot_plane_serves_only_its_declared_prefixes(chaud: Plane) -> None:
 #: +1 sur le plan LLM : `GET /v1/extension/rules-pack` (RULES-PACK.md §7) sert au poste
 #: son réglage sur mesure signé, avec la même authentification que
 #: `/v1/extension/policy`, qui vit déjà ici. En lecture seule, sans contenu client.
-_BUDGET_CHAUD: dict[Plane, int] = {Plane.DECISION: 6, Plane.LLM: 18}
+#: +1 LLM : un poste peut révoquer son propre jeton lors de sa déconnexion.
+_BUDGET_CHAUD: dict[Plane, int] = {Plane.DECISION: 6, Plane.LLM: 19}
 
 
 @pytest.mark.parametrize("chaud", [Plane.DECISION, Plane.LLM])

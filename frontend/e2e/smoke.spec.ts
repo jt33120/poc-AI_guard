@@ -1,4 +1,7 @@
+import { mockWorkspace, WORKSPACE } from "./workspace-fixture";
 import { type BrowserContext, expect, test } from "@playwright/test";
+
+test.beforeEach(async ({ page }) => { await mockWorkspace(page); });
 
 const APPROVAL = {
   id: "11111111-1111-1111-1111-111111111111",
@@ -49,6 +52,7 @@ test("approving a held action from the UI clears it from the queue", async ({ pa
   let decided = false;
 
   await page.route("**/api/control/**", async (route) => {
+    if (new URL(route.request().url()).pathname.endsWith("/v1/workspace")) { await route.fulfill({ json: WORKSPACE }); return; }
     const url = route.request().url();
     const method = route.request().method();
     if (url.includes("/v1/approvals/") && url.includes("/decision") && method === "POST") {
@@ -94,6 +98,7 @@ test("audit explorer lists entries and offers exports", async ({ page, context }
 test("editing the policy saves a new version", async ({ page, context }) => {
   await authed(context);
   await page.route("**/api/control/**", async (route) => {
+    if (new URL(route.request().url()).pathname.endsWith("/v1/workspace")) { await route.fulfill({ json: WORKSPACE }); return; }
     const url = route.request().url();
     const method = route.request().method();
     if (url.includes("/v1/policy") && method === "PUT") {
@@ -107,7 +112,7 @@ test("editing the policy saves a new version", async ({ page, context }) => {
     await route.fulfill({ json: [] });
   });
 
-  await page.goto("/admin");
+  await page.goto("/policy");
   await expect(page.getByText("version 1")).toBeVisible();
   await page.getByRole("button", { name: "Enregistrer la politique" }).click();
   await expect(page.getByText("Politique enregistrée (version 2).")).toBeVisible();

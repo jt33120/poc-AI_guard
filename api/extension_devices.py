@@ -35,7 +35,10 @@ def inventory(
             "'rules_pack_id',pack.payload->'rules_pack_id',"
             "'rules_pack_version',pack.payload->'rules_pack_version',"
             "'rules_pack_digest',pack.payload->'rules_pack_digest',"
-            "'received_at',pack.received_at) end "
+            "'received_at',pack.received_at) end, "
+            "d.member_label,d.team, "
+            "case when g.revoked_at is not null then 'revoked' "
+            "when d.last_seen_at>now()-interval '2 minutes' then 'recent' else 'stale' end "
             "from extension_devices d join gateway_tokens g on g.id=d.gateway_token_id "
             "left join developer_policy_assignments a "
             "on a.tenant_id=d.tenant_id and a.device_id=d.id "
@@ -67,6 +70,9 @@ def inventory(
         "posture_received_at",
         "posture",
         "rules_pack",
+        "member_label",
+        "team",
+        "presence",
     )
     return [dict(zip(columns, row, strict=True)) for row in rows]
 

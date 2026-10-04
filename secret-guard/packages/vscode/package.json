@@ -1,7 +1,7 @@
 {
   "name": "xsom-secret-guard-vscode",
   "displayName": "xSOM Secret Guard",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Vos idées à l’IA, vos secrets à l’abri. Détection locale et protection des prompts pour Claude Code, Codex et GitHub Copilot.",
   "publisher": "xsom",
   "type": "module",
@@ -106,12 +106,12 @@
     "commands": [
       {
         "command": "secretGuard.connectGateway",
-        "title": "Secret Guard: Raccorder ce poste à xSOM",
+        "title": "Secret Guard: Activer le relais Claude (avancé)",
         "icon": "$(plug)"
       },
       {
         "command": "secretGuard.disconnectGateway",
-        "title": "Secret Guard: Déconnecter la passerelle xSOM"
+        "title": "Secret Guard: Déconnecter ce poste de l’entreprise"
       },
       {
         "command": "secretGuard.enableLocalRelay",
@@ -180,6 +180,10 @@
       {
         "command": "secretGuard.importRulesPack",
         "title": "Secret Guard: Importer un réglage xSOM (poste hors ligne)"
+      },
+      {
+        "command": "secretGuard.connectOrganization",
+        "title": "Secret Guard: Relier à mon entreprise"
       }
     ],
     "menus": {

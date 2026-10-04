@@ -120,12 +120,23 @@ describe("protection dashboard boundaries", () => {
     const online = dashboardHtml(healthy, "block", "nonce", false, {
       state: "online",
       status: "Claude raccordé",
+      relayActive: true,
       audit: "Audit : 0 en attente",
     });
     expect(online).toContain("Pièces jointes · Analysées");
     expect(online).toContain("Audit : 0 en attente");
     expect(online).toContain('href="command:secretGuard.disconnectGateway"');
     expect(online).not.toContain('href="command:secretGuard.connectGateway"');
+
+    const inventoryOnly = dashboardHtml(healthy, "block", "nonce", false, {
+      state: "online",
+      status: "Poste rattaché",
+      relayActive: false,
+    });
+    expect(inventoryOnly).toContain("Pièces jointes · Non analysées");
+    expect(inventoryOnly).toContain(
+      'href="command:secretGuard.connectGateway"',
+    );
 
     const off = dashboardHtml(
       { ...healthy, state: "off", reason: "not_configured" },

@@ -1,3 +1,4 @@
+import { WORKSPACE } from "./workspace-fixture";
 import { type BrowserContext, type Page, expect, test } from "@playwright/test";
 
 // The supervision room on the overview: a deterministic day of decisions, served
@@ -138,6 +139,7 @@ async function serve(page: Page, empty = false) {
   const windows: string[] = [];
   await page.route("**/api/control/**", async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname.endsWith("/v1/workspace")) return route.fulfill({ json: WORKSPACE });
     if (url.pathname.endsWith("/v1/supervision")) {
       const window = url.searchParams.get("window") ?? "24h";
       windows.push(window);
@@ -156,7 +158,7 @@ async function serve(page: Page, empty = false) {
 test("the overview shows the supervision room, measured", async ({ page, context }) => {
   await authed(context);
   const windows = await serve(page);
-  await page.goto("/home");
+  await page.goto("/ai-guard");
 
   const room = page.locator(".sup-root");
   await expect(room.locator(".sup-hero-figure")).toHaveText(/\d/);
@@ -182,7 +184,7 @@ test("the overview shows the supervision room, measured", async ({ page, context
 test("keyboard reaches every point of the timeline", async ({ page, context }) => {
   await authed(context);
   await serve(page);
-  await page.goto("/home");
+  await page.goto("/ai-guard");
   const timeline = page.locator(".sup-root .sup-chart").first();
   await timeline.focus();
   await expect(page.locator(".sup-tooltip")).toBeVisible();
@@ -195,7 +197,7 @@ test("keyboard reaches every point of the timeline", async ({ page, context }) =
 test("an empty tenant is invited to connect an agent", async ({ page, context }) => {
   await authed(context);
   await serve(page, true);
-  await page.goto("/home");
+  await page.goto("/ai-guard");
   await expect(
     page.getByText("La salle attend son premier appel d’outil."),
   ).toBeVisible();

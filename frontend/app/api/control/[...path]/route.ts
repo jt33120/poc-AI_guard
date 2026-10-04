@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { config } from "@/lib/config";
+import { previewResponse } from "@/lib/console-preview";
+import { canOpenProduct, isWorkspace, productForApi } from "@/lib/workspace";
 import { routeAllowed } from "@/lib/controlRoutes";
 import { getSession } from "@/lib/session";
 
@@ -27,6 +29,33 @@ async function forward(
   if (!routeAllowed(request.method, path)) {
     return NextResponse.json({ detail: "Not found" }, { status: 404 });
   }
+  if (config.localPreview) {
+    if (request.method !== "GET") {
+      return NextResponse.json({ detail: "L’aperçu local ne modifie aucune donnée." }, { status: 409 });
+    }
+    const preview = previewResponse(path.join("/"));
+    return preview === undefined
+      ? NextResponse.json({ detail: "Donnée indisponible dans l’aperçu local." }, { status: 503 })
+      : NextResponse.json(preview);
+  }
+  const product = productForApi(path.join("/"), request.nextUrl.searchParams);
+  if (product) {
+    try {
+      const accessResponse = await fetch(`${config.controlApiUrl}/v1/workspace`, {
+        headers: { Authorization: `Bearer ${session.accessToken}` },
+        cache: "no-store",
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!accessResponse.ok) throw new Error("Workspace unavailable");
+      const workspace: unknown = await accessResponse.json();
+      if (!isWorkspace(workspace)) throw new Error("Invalid workspace");
+      if (!workspace.subscriptions.some((s) => (product === "either" || s.product === product) && canOpenProduct(s))) {
+        return NextResponse.json({ detail: "Product access required", product }, { status: 402 });
+      }
+    } catch {
+      return NextResponse.json({ detail: "Product access could not be verified" }, { status: 503 });
+    }
+  }
   const target = `${config.controlApiUrl}/${path.join("/")}${request.nextUrl.search}`;
   const init: RequestInit = {
     method: request.method,
@@ -38,7 +67,12 @@ async function forward(
   if (request.method !== "GET" && request.method !== "HEAD") {
     init.body = await request.text();
   }
-  const upstream = await fetch(target, init);
+  let upstream: Response;
+  try {
+    upstream = await fetch(target, { ...init, cache: "no-store", signal: AbortSignal.timeout(15000) });
+  } catch {
+    return NextResponse.json({ detail: "Control API unavailable" }, { status: 503 });
+  }
   // 204/304 carry no body — constructing a Response with a body for these
   // statuses throws (which surfaced as a spurious 500 on token revocation).
   if (upstream.status === 204 || upstream.status === 304) {

@@ -58,6 +58,13 @@ _PUBLIC = frozenset(
         ("GET", "/health"),  # sonde de liveness
         ("GET", "/health/ready"),  # quatre booléens, cf. tests/test_health.py
         ("POST", "/v1/signup"),  # créer un compte suppose de ne pas en avoir
+        # Native device enrollment precedes console authentication. Start stores
+        # a hash only (10-minute expiry, bounded capacity + rate limit). Status
+        # and cancellation require the extension's 256-bit possession proof;
+        # none grants access. Confirmation remains on the admin-only route.
+        ("POST", "/v1/extension-enrollment/start"),
+        ("POST", "/v1/extension-enrollment/status"),
+        ("POST", "/v1/extension-enrollment/cancel"),
         ("POST", "/v1/triage"),  # le diagnostic public (`QO-7`)
         # Le relevé des menaces (`L3`). Publique délibérément, et c'est la moitié de
         # sa raison d'être : la faire passer par `/v1/triage` obligerait à donner son

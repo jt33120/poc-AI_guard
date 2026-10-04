@@ -250,15 +250,23 @@ def get_view(conn: psycopg.Connection, tenant_id: str, approval_id: str) -> dict
     return _row_to_view(row) if row else None
 
 
-def list_for_tenant(conn: psycopg.Connection, status: str | None = None) -> list[dict[str, Any]]:
-    """RLS-scoped list of the tenant's approvals (optionally filtered by status)."""
-    if status is None:
-        rows = conn.execute(
-            f"select {_VIEW_COLS} from approvals order by created_at desc"
-        ).fetchall()
-    else:
-        rows = conn.execute(
-            f"select {_VIEW_COLS} from approvals where status = %s order by created_at desc",
-            (status,),
-        ).fetchall()
+def list_for_tenant(
+    conn: psycopg.Connection, status: str | None = None, *, product: str | None = None
+) -> list[dict[str, Any]]:
+    """RLS-scoped queue, separated by the recorded source of the approval."""
+    clauses: list[str] = []
+    params: list[str] = []
+    if status is not None:
+        clauses.append("status = %s")
+        params.append(status)
+    if product == "secret_guard":
+        clauses.append("developer_device_id is not null")
+    elif product == "ai_guard":
+        clauses.append("developer_device_id is null")
+    elif product is not None:
+        raise ValueError("Unknown approval product")
+    where = " where " + " and ".join(clauses) if clauses else ""
+    rows = conn.execute(
+        f"select {_VIEW_COLS} from approvals{where} order by created_at desc", tuple(params)
+    ).fetchall()
     return [_row_to_view(r) for r in rows]

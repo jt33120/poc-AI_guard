@@ -52,7 +52,7 @@ def create_gateway_token(
             Metric.agents,
             compte_sql=(
                 "select count(*) from gateway_tokens "
-                "where tenant_id::text = %s and revoked_at is null"
+                "where tenant_id::text = %s and revoked_at is null and purpose='agent'"
             ),
             etiquette="agents",
         )

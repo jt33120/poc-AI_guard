@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { productForPage } from "@/lib/workspace";
 import {
   createContext,
   useCallback,
@@ -78,6 +80,8 @@ export function ClientScopeProvider({
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+  const enabled = productForPage(pathname) === "ai_guard";
   const [customer, setCustomer] = useState<string | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -86,6 +90,7 @@ export function ClientScopeProvider({
   const [selected, setSelectedState] = useState("all");
 
   const reload = useCallback(() => {
+    if (!enabled) { setLoading(false); return; }
     setLoading(true);
     setError(null);
     Promise.allSettled([
@@ -115,7 +120,7 @@ export function ClientScopeProvider({
         }
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [enabled]);
 
   useEffect(() => reload(), [reload]);
 

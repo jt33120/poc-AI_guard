@@ -17,7 +17,7 @@ dependencies = [
     "psycopg[binary]>=3.3.4",
     "httpx>=0.28.1",
     "fpdf2>=2.8.7",
-    "litellm>=1.89.0",
+    "litellm>=1.89.7",
     "slowapi>=0.1.10",
     # Attachment extraction runs offline in a bounded worker, never through a vision API.
     "pillow>=12.1.1",

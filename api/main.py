@@ -36,6 +36,7 @@ from api.entitlement_guard import requires
 from api.errors import register_exception_handlers
 from api.extension_devices import router as extension_devices_router
 from api.extension_ingest import router as extension_ingest_router
+from api.extension_pairing import router as extension_pairing_router
 from api.gateway_tokens import router as gateway_tokens_router
 from api.health import router as health_router
 from api.integrity import router as integrity_router
@@ -58,6 +59,7 @@ from api.triage import router as triage_router
 from api.trust import router as trust_router
 from api.usage import router as usage_router
 from api.verdicts import router as verdicts_router
+from api.workspace import router as workspace_router
 from core import db
 from core.config import Settings, get_settings
 from core.entitlements import Capability
@@ -126,6 +128,8 @@ _PLANS: dict[Plane, tuple[APIRouter, ...]] = {
         rules_pack_ingest_router,
     ),
     Plane.CONSOLE: (
+        workspace_router,
+        extension_pairing_router,
         servers_router,
         policy_router,
         developer_policies_router,
@@ -171,6 +175,8 @@ _PLANS: dict[Plane, tuple[APIRouter, ...]] = {
 #:
 #: Les `None` sont des décisions, pas des oublis, et chacun porte sa raison.
 _CAPACITE_PAR_ROUTEUR: tuple[tuple[APIRouter, Capability | None], ...] = (
+    (extension_pairing_router, None),  # public initiation; admin + product rights at confirmation
+    (workspace_router, None),  # identity and subscriptions remain visible without a paid product
     # --- Le socle qui ne se vend pas ---------------------------------------------
     (health_router, None),  # une sonde derrière un paywall ne sert à rien
     (signup_router, None),  # on ne peut pas exiger un palier avant d'avoir un tenant

@@ -1,3 +1,4 @@
+import { WORKSPACE } from "./workspace-fixture";
 import {
   type BrowserContext,
   expect,
@@ -129,6 +130,7 @@ type Handler = (route: Route) => Promise<void> | void;
 async function control(page: Page, handlers: Record<string, Handler>) {
   await page.route("**/api/control/**", async (route) => {
     const path = new URL(route.request().url()).pathname.replace("/api/control/", "");
+    if (path === "v1/workspace") return route.fulfill({ json: WORKSPACE });
     const handler = handlers[path];
     if (handler) return handler(route);
     if (path === "v1/clients") return route.fulfill({ json: [] });

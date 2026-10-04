@@ -124,6 +124,7 @@ class Sentinel:
 #: and cannot safely be replayed (0012 is a grandfathered gap). 0034--0036 were
 #: initially deployed through the same manual path and create objects without a
 #: complete ``if not exists`` guard, so adoption must prove and record them too.
+#: 0037 also supports explicit adoption when an operator applies its SQL by hand.
 #: Adoption walks this list and stops at the first absent sentinel; anything
 #: present after that gap is a state we refuse to explain.
 _BASELINE: tuple[Sentinel, ...] = (
@@ -171,6 +172,13 @@ _BASELINE: tuple[Sentinel, ...] = (
         "approvals",
         "developer_action_binding",
     ),
+    Sentinel(
+        "0039_console_product_access.sql",
+        "policy",
+        "tenant_product_access",
+        "tenant_product_access_read",
+    ),
+    Sentinel("0040_extension_pairing.sql", "column", "extension_devices", "enrolled_by"),
 )
 
 
