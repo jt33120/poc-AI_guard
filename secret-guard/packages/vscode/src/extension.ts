@@ -86,6 +86,7 @@ import {
   observeCapLine,
   observeDurationLabel,
   observeDurationsWithin,
+  observeWindowOnModeChange,
   observeWindowOpen,
   openObserveWindow,
   readObserveDeadline,
@@ -672,6 +673,13 @@ export async function activate(
   let observeTimer: ReturnType<typeof setTimeout> | undefined;
   const expireObserveWindow = async (): Promise<void> => {
     if (configuredMode() !== "observe") return;
+    // Another VS Code window may have restarted Avertir with another length.
+    if (
+      observeWindowOpen(readObserveDeadline(storage), Date.now(), observeCap)
+    ) {
+      scheduleObserveExpiry();
+      return;
+    }
     await saveMode("redact");
     void vscode.window.showInformationMessage(
       "⏱️ La durée d’Avertir est écoulée : Secret Guard repasse en Expurger.",
@@ -702,13 +710,25 @@ export async function activate(
     observeMinutes = minutes;
     await context.globalState.update(OBSERVE_MINUTES_KEY, minutes);
   };
-  // Choosing Avertir opens a fresh window, never longer than the
-  // organization's cap; leaving it closes the window.
-  const syncObserveWindow = async (): Promise<void> => {
+  // Choosing a length opens a fresh window, never longer than the
+  // organization's cap.
+  const restartObserveWindow = async (): Promise<void> => {
     const minutes = cappedObserveMinutes(observeMinutes, observeCap);
-    if (configuredMode() === "observe" && minutes !== undefined)
+    if (minutes !== undefined)
       await openObserveWindow(storage, Date.now(), minutes);
-    else await closeObserveWindow(storage);
+    scheduleObserveExpiry();
+  };
+  // A change of the mode setting, seen by every VS Code window: leaving
+  // Avertir closes the window, entering it keeps the one already written.
+  const syncObserveWindow = async (): Promise<void> => {
+    const change = observeWindowOnModeChange(
+      configuredMode(),
+      readObserveDeadline(storage),
+      Date.now(),
+      observeCap,
+    );
+    if (change === "close") await closeObserveWindow(storage);
+    else if (change === "open") await restartObserveWindow();
     scheduleObserveExpiry();
   };
   // Re-read on every decision: never trust an earlier reading of the file.
@@ -764,6 +784,9 @@ export async function activate(
     );
     if (chosen === undefined) return false;
     await chooseObserveMinutes(chosen);
+    // Written before the mode is saved, so that every window sees this
+    // length when the setting changes.
+    await restartObserveWindow();
     return true;
   };
   context.subscriptions.push({
@@ -904,7 +927,7 @@ export async function activate(
           return;
         }
         await chooseObserveMinutes(minutes);
-        await syncObserveWindow();
+        await restartObserveWindow();
         await refreshUi();
         const until = observeUntil();
         void vscode.window.showInformationMessage(

@@ -15,6 +15,7 @@ import {
   observeCapLine,
   observeDurationLabel,
   observeDurationsWithin,
+  observeWindowOnModeChange,
   observeWindowOpen,
   openObserveWindow,
   readObserveDeadline,
@@ -94,6 +95,21 @@ describe("Avertir window", () => {
     await closeObserveWindow(storage);
     await closeObserveWindow(storage);
     expect(readObserveDeadline(storage)).toBeUndefined();
+  });
+
+  it("keeps an eight-hour window chosen in another VS Code window", () => {
+    const now = 1_800_000_000_000;
+    // Every window sees the mode change; only one chose the length.
+    expect(observeWindowOnModeChange("observe", now + 8 * HOUR, now)).toBe(
+      "keep",
+    );
+    expect(observeWindowOnModeChange("observe", undefined, now)).toBe("open");
+    expect(observeWindowOnModeChange("observe", now - 1, now)).toBe("open");
+    expect(observeWindowOnModeChange("observe", now + 8 * HOUR, now, 60)).toBe(
+      "open",
+    );
+    expect(observeWindowOnModeChange("redact", now + HOUR, now)).toBe("close");
+    expect(observeWindowOnModeChange("block", undefined, now)).toBe("close");
   });
 });
 

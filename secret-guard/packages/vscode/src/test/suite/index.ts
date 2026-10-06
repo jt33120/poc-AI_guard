@@ -159,20 +159,48 @@ function registerTests(mocha: Mocha): void {
         );
         await remainingMinutes(near(480));
 
+        const leaveObserve = async (): Promise<void> => {
+          await config().update(
+            "mode",
+            undefined,
+            vscode.ConfigurationTarget.Global,
+          );
+          for (let attempt = 0; attempt < 50; attempt += 1) {
+            try {
+              await readFile(deadlineFile, "utf8");
+            } catch {
+              return;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
+          throw new Error("leaving Avertir must close its window");
+        };
+        // This window last chose fifteen minutes.
+        await vscode.commands.executeCommand(
+          "secretGuard.setObserveDuration",
+          15,
+        );
+        await remainingMinutes(near(15));
+        await leaveObserve();
+
+        // Another VS Code window chose eight hours: it wrote the window, then
+        // saved the mode. This window must keep that length, not restart it
+        // with its own fifteen minutes.
+        await writeFile(
+          deadlineFile,
+          String(Date.now() + 480 * 60_000),
+          "utf8",
+        );
         await config().update(
           "mode",
-          undefined,
+          "observe",
           vscode.ConfigurationTarget.Global,
         );
-        for (let attempt = 0; attempt < 50; attempt += 1) {
-          try {
-            await readFile(deadlineFile, "utf8");
-          } catch {
-            return;
-          }
+        for (let attempt = 0; attempt < 20; attempt += 1) {
+          await remainingMinutes(near(480));
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
-        throw new Error("leaving Avertir must close its window");
+        await leaveObserve();
       },
     ),
   );
