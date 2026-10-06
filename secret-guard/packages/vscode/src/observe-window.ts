@@ -120,6 +120,23 @@ export function observeCapChange(
     : "none";
 }
 
+/**
+ * What a change of the mode setting does to the window. The setting is shared
+ * by every VS Code window and each one reacts to it, so a running window is
+ * kept: the window where the length was chosen already wrote it, and another
+ * must not restart it with its own, older length. Avertir with no running
+ * window (set by hand) starts one.
+ */
+export function observeWindowOnModeChange(
+  mode: ProtectionMode,
+  deadline: number | undefined,
+  now: number,
+  cap?: ObserveCap,
+): "close" | "keep" | "open" {
+  if (mode !== "observe") return "close";
+  return observeWindowOpen(deadline, now, cap) ? "keep" : "open";
+}
+
 export async function openObserveWindow(
   storage: string,
   now: number,

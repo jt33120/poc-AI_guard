@@ -1,5 +1,15 @@
 # Journal des versions
 
+## 0.8.2
+
+- **Avertir tient la durée choisie avec plusieurs fenêtres VS Code ouvertes** :
+  choisir 8 h dans une fenêtre ne repasse plus en Expurger au bout d’une heure.
+  Chaque fenêtre réagissait au changement de mode en relançant Avertir avec sa
+  propre durée en mémoire (souvent 1 h), et sa minuterie remettait ensuite tout
+  le poste en Expurger. Désormais, la fenêtre où l’on choisit la durée l’écrit
+  avant d’enregistrer le mode, les autres la conservent, et une minuterie
+  relit l’échéance avant de mettre fin à Avertir.
+
 ## 0.8.1
 
 - **Désinstaller retire tout** : les hooks Claude Code, Codex et GitHub Copilot
