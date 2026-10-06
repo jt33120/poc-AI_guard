@@ -6,6 +6,7 @@ import { beginActivity } from "./hook-activity.js";
 import { effectiveMode, readObserveDeadline } from "./observe-window.js";
 import { RUNNER_VERSION } from "./runner-version.js";
 import { delegation } from "./relay-delegation.js";
+import { extensionRemoved, retireHook } from "./uninstall.js";
 
 import {
   parseHookMode,
@@ -282,7 +283,14 @@ async function policyResponseFor(
 
 async function main(): Promise<void> {
   // The installed hook lives in the extension's storage folder.
-  const storage = dirname(process.argv[1] ?? "");
+  const hookPath = process.argv[1] ?? "";
+  const storage = dirname(hookPath);
+  if (await extensionRemoved(storage)) {
+    // The user uninstalled Secret Guard: its hooks must not outlive it.
+    await retireHook(hookPath);
+    process.stdout.write(`${JSON.stringify({ continue: true })}\n`);
+    return;
+  }
   const done = beginActivity(storage);
   try {
     await check(storage);

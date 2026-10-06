@@ -238,7 +238,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:extension": "node ../../scripts/run-vscode-tests.mjs",
     "package": "vsce package --no-dependencies --out dist/xsom-secret-guard-vscode.vsix",
-    "vscode:prepublish": "npm run build"
+    "vscode:prepublish": "npm run build",
+    "vscode:uninstall": "node ./dist/uninstall.cjs"
   },
   "dependencies": {
     "@xsom/developer-guard-adapters": "0.1.0",

@@ -6,4 +6,5 @@ dist/**
 !dist/extension.cjs
 !dist/hook.cjs
 !dist/relay-worker.cjs
+!dist/uninstall.cjs
 **/*.map

@@ -4,7 +4,6 @@ import {
   mkdir,
   mkdtemp,
   readFile,
-  rename,
   rm,
   stat,
   writeFile,
@@ -20,6 +19,14 @@ import {
   type ProtectionMode,
 } from "@xsom/secret-guard-cli/hook";
 
+import {
+  errorCode,
+  isMissingFile,
+  readOptional,
+  renameReplacing,
+  restoreOptional,
+  writeAtomically,
+} from "./config-files.js";
 import { QUIET_ACTIVITY_ENV } from "./hook-activity.js";
 import {
   configureHost,
@@ -32,8 +39,6 @@ import {
 
 const CANARY_TIMEOUT_MS = 5_000;
 const MAX_CANARY_OUTPUT_BYTES = 64 * 1024;
-const RENAME_ATTEMPTS = 6;
-const LOCK_CODES = new Set(["EPERM", "EACCES", "EBUSY"]);
 
 /** Why enabling stopped. The path names the file concerned, never its content. */
 export type SetupFailure =
@@ -101,19 +106,6 @@ interface HookExecution {
   readonly timedOut: boolean;
 }
 
-function errorCode(error: unknown): string | undefined {
-  return typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    typeof error.code === "string"
-    ? error.code
-    : undefined;
-}
-
-function isMissingFile(error: unknown): boolean {
-  return errorCode(error) === "ENOENT";
-}
-
 /** Runs a file operation; a failure names the file and its system code. */
 async function onFile<T>(
   path: string,
@@ -124,36 +116,6 @@ async function onFile<T>(
   } catch (error) {
     if (error instanceof HookSetupError) throw error;
     throw new HookSetupError("file_access", path, errorCode(error));
-  }
-}
-
-// On Windows a rename fails while another program, often an antivirus scan,
-// holds the target open: retry briefly before giving up.
-async function renameReplacing(from: string, to: string): Promise<void> {
-  for (let attempt = 1; ; attempt += 1) {
-    try {
-      await rename(from, to);
-      return;
-    } catch (error) {
-      const code = errorCode(error);
-      if (
-        process.platform !== "win32" ||
-        attempt === RENAME_ATTEMPTS ||
-        code === undefined ||
-        !LOCK_CODES.has(code)
-      )
-        throw error;
-      await new Promise((resolve) => setTimeout(resolve, 50 * 2 ** attempt));
-    }
-  }
-}
-
-async function readOptional(path: string): Promise<string | null> {
-  try {
-    return await readFile(path, "utf8");
-  } catch (error) {
-    if (isMissingFile(error)) return null;
-    throw error;
   }
 }
 
@@ -186,30 +148,6 @@ async function filesMatch(left: string, right: string): Promise<boolean> {
     readFile(right),
   ]);
   return leftContent.equals(rightContent);
-}
-
-async function writeAtomically(
-  path: string,
-  content: string | Buffer,
-): Promise<void> {
-  const temporary = `${path}.${process.pid}.tmp`;
-  await mkdir(dirname(path), { recursive: true });
-  await rm(temporary, { force: true });
-  await writeFile(temporary, content, { mode: 0o600 });
-  try {
-    await renameReplacing(temporary, path);
-  } catch (error) {
-    await rm(temporary, { force: true });
-    throw error;
-  }
-}
-
-async function restoreOptional(
-  path: string,
-  content: string | Buffer | null,
-): Promise<void> {
-  if (content === null) await rm(path, { force: true });
-  else await writeAtomically(path, content);
 }
 
 function promptInput(prompt: string): string {

@@ -49,6 +49,12 @@ await Promise.all([
     format: "cjs",
     outfile: "dist/hook.cjs",
   }),
+  build({
+    ...common,
+    entryPoints: ["src/uninstall-entry.ts"],
+    format: "cjs",
+    outfile: "dist/uninstall.cjs",
+  }),
   // The local relay scans synchronously: it runs off the extension host thread.
   build({
     ...common,

@@ -179,6 +179,17 @@ Analyse cette configuration : PASSWORD=XXX
 Le centre de protection n’affiche ni prompts ni valeurs détectées. Il ne charge
 aucune ressource distante et n’exécute aucun JavaScript dans sa vue.
 
+### Désinstallation
+
+Désinstaller l’extension retire aussi ses hooks de Claude Code, Codex et GitHub
+Copilot : dès le message suivant, le hook constate que VS Code ne liste plus
+l’extension, retire ses propres entrées des réglages des assistants (les hooks
+des autres outils restent), supprime son script et laisse passer le message. Au
+redémarrage suivant de VS Code, le script de désinstallation retire les entrées
+qu’aucun assistant n’a déclenchées entre-temps. Tant que la désinstallation
+n’est pas prouvée (index de VS Code illisible, installation de développement),
+la protection reste active.
+
 ## Integration details & coverage
 
 Local-first prompt secret detection. The primary surface is automatic:
