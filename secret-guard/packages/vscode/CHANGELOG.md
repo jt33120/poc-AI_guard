@@ -1,6 +1,6 @@
 # Journal des versions
 
-## Non publié
+## 0.8.1
 
 - **Désinstaller retire tout** : les hooks Claude Code, Codex et GitHub Copilot
   ne survivent plus à l’extension. Le hook détecte lui-même la désinstallation à
