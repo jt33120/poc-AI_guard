@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { dirname } from "node:path";
 import * as vscode from "vscode";
 import type { ProtectionMode } from "@xsom/secret-guard-cli/hook";
 
@@ -30,6 +31,7 @@ import {
   setupFailureMessage,
   type HookHealth,
 } from "./hook-manager.js";
+import { recordInstallation } from "./uninstall.js";
 import { GatewayIntegration } from "./gateway-integration.js";
 import { LocalRelay } from "./local-relay.js";
 import { customFindingFields } from "./gateway-client.js";
@@ -587,6 +589,15 @@ export async function activate(
   );
   const manager = new HookManager(context, { hosts });
   const storage = context.globalStorageUri.fsPath;
+  try {
+    await recordInstallation(storage, {
+      extensionId: context.extension.id,
+      extensionsDir: dirname(context.extensionUri.fsPath),
+    });
+  } catch {
+    // Without the record the hook stays on after an uninstall until VS Code
+    // restarts and runs the uninstall script.
+  }
   // Set once the interface exists; the gateway may sync before that.
   let refreshAfterRules: () => Promise<void> = () => Promise.resolve();
   let afterPolicySync: () => Promise<void> = () => Promise.resolve();

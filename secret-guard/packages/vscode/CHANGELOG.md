@@ -1,5 +1,15 @@
 # Journal des versions
 
+## Non publié
+
+- **Désinstaller retire tout** : les hooks Claude Code, Codex et GitHub Copilot
+  ne survivent plus à l’extension. Le hook détecte lui-même la désinstallation à
+  l’appel suivant (VS Code ne liste plus l’extension), retire ses entrées des
+  réglages des assistants sans toucher aux autres hooks, supprime son script et
+  laisse passer le message. Un script `vscode:uninstall` nettoie au redémarrage
+  de VS Code les entrées restées sans appel. Avant cette version, désinstaller
+  laissait des hooks actifs qui continuaient de bloquer ou d’expurger.
+
 ## 0.8.0
 
 - **Purge transparente pour Claude Code, sans compte (Secret Guard Basic)** : en

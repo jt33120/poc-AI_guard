@@ -293,6 +293,19 @@ entrée marquée, conserve les autres réglages/hooks et valide localement les c
 sain et bloqué avant activation. Ce contrôle ne prouve pas que Claude a chargé
 la configuration ni qu’un administrateur local ne l’a pas retirée.
 
+Désinstallation : VS Code ne nettoie pas les fichiers des assistants. À chaque
+activation, l’extension inscrit dans son stockage son identifiant et le dossier
+d’extensions où elle est installée (`installation.json`). Le hook ne se retire
+que si l’index `extensions.json` de ce dossier se lit comme une liste qui ne
+contient plus l’extension ; un enregistrement absent, un index absent, illisible
+ou d’une autre forme le laissent actif (fail-closed). Retiré, il supprime toutes
+les entrées marquées `xsom-secret-guard-v1` des trois assistants, son script, et
+laisse passer l’appel en cours. Un script `vscode:uninstall` fait le même
+nettoyage au redémarrage de VS Code. Écrire dans `extensions.json` ou
+`installation.json` pour neutraliser le hook demande les mêmes droits
+qu’éditer `~/.claude/settings.json` : aucun privilège nouveau, l’utilisateur
+local reste hors modèle de menace.
+
 ### 7.3 Codex
 
 Les [Hooks Codex](https://learn.chatgpt.com/fr-FR/docs/hooks) fournissent UserPromptSubmit et un blocage par JSON ou code 2. Les hooks non gérés exigent une revue de confiance ; les hooks projet sont ignorés dans un projet non fiable. Les hooks MCP ne bloquent pas sur erreur/absence.

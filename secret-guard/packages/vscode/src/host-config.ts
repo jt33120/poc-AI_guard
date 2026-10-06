@@ -684,3 +684,28 @@ export function unconfigureHost(
   if (isEmptyObject(hooks)) delete root.hooks;
   return isEmptyObject(root) ? null : `${JSON.stringify(root, null, 2)}\n`;
 }
+
+/**
+ * Drops every entry that carries the managed marker, whatever editor,
+ * executable or version wrote it: once the extension is uninstalled none of
+ * them can still be checked. Entries of other tools are kept untouched.
+ */
+export function removeMarkedHooks(content: string | null): string | null {
+  if (content === null) return null;
+  const root = parseRoot(content);
+  const hooks = root.hooks;
+  if (typeof hooks !== "object" || hooks === null || Array.isArray(hooks))
+    return content;
+  const hookMap = hooks as Record<string, unknown>;
+  let changed = false;
+  for (const [eventName, entries] of Object.entries(hookMap)) {
+    if (!Array.isArray(entries) || !entries.some(containsMarker)) continue;
+    changed = true;
+    const retained = entries.filter((entry) => !containsMarker(entry));
+    if (retained.length === 0) Reflect.deleteProperty(hookMap, eventName);
+    else hookMap[eventName] = retained;
+  }
+  if (!changed) return content;
+  if (isEmptyObject(hookMap)) delete root.hooks;
+  return isEmptyObject(root) ? null : `${JSON.stringify(root, null, 2)}\n`;
+}
