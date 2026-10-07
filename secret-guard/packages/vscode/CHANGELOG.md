@@ -1,5 +1,17 @@
 # Journal des versions
 
+## Non publié
+
+- **Un message bloqué ne part plus pour le titre de session de Claude Code** :
+  lancé depuis son extension VS Code, Claude Code demandait au modèle un titre
+  de session dès l’envoi du message, avant la décision de Secret Guard. Un
+  message retenu partait donc quand même chez Anthropic, secret compris, dans
+  cette requête de titre. Secret Guard ajoute désormais
+  `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1` à la clé `env` des réglages de Claude
+  Code, ce qui supprime cette requête sans toucher à la télémétrie, et la
+  retire à la désactivation comme à la désinstallation. Une installation
+  existante est complétée au rafraîchissement suivant.
+
 ## 0.8.2
 
 - **Avertir tient la durée choisie avec plusieurs fenêtres VS Code ouvertes** :

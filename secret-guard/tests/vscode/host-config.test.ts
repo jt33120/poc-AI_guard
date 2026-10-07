@@ -7,6 +7,7 @@ import { buildSync } from "esbuild";
 
 import {
   CLAUDE_STATUS_MESSAGES,
+  CLAUDE_TITLE_GUARD,
   configureHost,
   defaultHostDefinitions,
   inspectHostConfig,
@@ -647,5 +648,49 @@ describe("multi-host hook configuration", () => {
     expect(
       configureHost(null, codex, executable, hookPath, "block"),
     ).not.toContain("statusMessage");
+  });
+
+  it("turns off Claude's session-title request, which leaks a blocked prompt", () => {
+    const hosts = defaultHostDefinitions();
+    const claude = hosts.find((candidate) => candidate.id === "claude")!;
+    const configured = configureHost(
+      JSON.stringify({ env: { KEEP: "me" } }),
+      claude,
+      executable,
+      hookPath,
+      "block",
+    );
+    expect((JSON.parse(configured) as { env: unknown }).env).toEqual({
+      KEEP: "me",
+      [CLAUDE_TITLE_GUARD.name]: CLAUDE_TITLE_GUARD.value,
+    });
+    expect(inspectHostConfig(configured, claude, executable, hookPath)).toBe(
+      "configured",
+    );
+
+    // An install from before the guard is completed on the next refresh.
+    const before = JSON.parse(configured) as { env: Record<string, string> };
+    Reflect.deleteProperty(before.env, CLAUDE_TITLE_GUARD.name);
+    expect(
+      inspectHostConfig(JSON.stringify(before), claude, executable, hookPath),
+    ).toBe("outdated");
+
+    expect(
+      JSON.parse(unconfigureHost(configured, claude, executable, hookPath)!),
+    ).toEqual({ env: { KEEP: "me" } });
+
+    for (const host of hosts.filter((candidate) => candidate.id !== "claude"))
+      expect(
+        configureHost(null, host, executable, hookPath, "block"),
+      ).not.toContain(CLAUDE_TITLE_GUARD.name);
+  });
+
+  it("refuses a Claude env that is not an object", () => {
+    const claude = defaultHostDefinitions().find(
+      (candidate) => candidate.id === "claude",
+    )!;
+    expect(() =>
+      configureHost('{"env":[]}', claude, executable, hookPath, "block"),
+    ).toThrow("invalid_host_env_config");
   });
 });
