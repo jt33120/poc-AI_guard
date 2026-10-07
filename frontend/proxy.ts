@@ -2,6 +2,7 @@ import { type CookieOptions, createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { config as appConfig } from "@/lib/config";
+import { routeForSite, siteForHost } from "@/lib/sites";
 
 const PROTECTED = [
   "/home",
@@ -24,6 +25,17 @@ const PROTECTED = [
 export async function proxy(request: NextRequest) {
   // Segment-aware match, so a public path that merely starts like a console path is not caught.
   const path = request.nextUrl.pathname;
+  // Chaque adresse publique montre son site (voir `lib/sites.ts`), avant tout le reste.
+  // L'adresse vient de l'en-tête `Host` : `next start` remplit `nextUrl` avec sa propre
+  // adresse d'écoute, pas avec celle que le visiteur a demandée.
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "";
+  const route = routeForSite(siteForHost(host), path, request.nextUrl.search);
+  if (route.kind === "redirect") return NextResponse.redirect(route.url, 308);
+  if (route.kind === "rewrite") {
+    const target = request.nextUrl.clone();
+    target.pathname = route.path;
+    return NextResponse.rewrite(target);
+  }
   // Native device-code initiation has no browser session; confirmation remains protected.
   if (["/api/enrollment/start", "/api/enrollment/status", "/api/enrollment/cancel"].includes(path)) {
     return NextResponse.next({ request });
