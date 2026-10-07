@@ -8,6 +8,9 @@ from __future__ import annotations
 
 import base64
 import json
+import ntpath
+import os
+import posixpath
 import re
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Annotated, Any, Literal
@@ -190,6 +193,48 @@ class DeveloperActionRequest(BaseModel):
     capability_verified: bool = Field(alias="capabilityVerified")
 
 
+_DRIVE_PATH = re.compile(r"^[a-z]:[\\/]", re.IGNORECASE)
+_IDENTIFIER = re.compile(r"^[a-z][a-z0-9+.-]+:", re.IGNORECASE)
+
+
+def _normalize_path(raw: str) -> tuple[str, str]:
+    """Mirror of ``normalizePath`` (policy/resources.ts): (flavor, lexical form).
+
+    Pure string work, like the TypeScript side: symbolic links are not followed.
+    """
+    if _DRIVE_PATH.match(raw):
+        return "win32", ntpath.normpath(raw).lower()
+    return "posix", posixpath.normpath(posixpath.join(os.getcwd(), raw))
+
+
+def _is_within(candidate: tuple[str, str], root: tuple[str, str]) -> bool:
+    """Mirror of ``isWithin``: equality or a segment boundary, same flavor only."""
+    if candidate[0] != root[0]:
+        return False
+    if candidate[1] == root[1]:
+        return True
+    sep = "\\" if root[0] == "win32" else "/"
+    base = root[1] if root[1].endswith(sep) else root[1] + sep
+    return candidate[1].startswith(base)
+
+
+def _identifier_within(resource: str, prefix: str) -> bool:
+    base = prefix if prefix.endswith("/") else prefix + "/"
+    return resource == prefix.rstrip("/") or resource.startswith(base)
+
+
+def _prefix_matches(prefixes: list[str], resource: str | None) -> bool:
+    """Mirror of ``prefixMatches`` (policy/evaluate.ts)."""
+    if resource is None:
+        return False
+    if _IDENTIFIER.match(resource):
+        return any(_IDENTIFIER.match(p) and _identifier_within(resource, p) for p in prefixes)
+    candidate = _normalize_path(resource)
+    return any(
+        not _IDENTIFIER.match(p) and _is_within(candidate, _normalize_path(p)) for p in prefixes
+    )
+
+
 def evaluate(
     policy: DeveloperPolicyBody | None,
     request: DeveloperActionRequest,
@@ -212,9 +257,8 @@ def evaluate(
             continue
         if match.action_classes is not None and request.action_class not in match.action_classes:
             continue
-        if match.resource_prefixes is not None and not (
-            request.resource is not None
-            and any(request.resource.startswith(prefix) for prefix in match.resource_prefixes)
+        if match.resource_prefixes is not None and not _prefix_matches(
+            list(match.resource_prefixes), request.resource
         ):
             continue
         if match.tools is not None and request.tool not in match.tools:
