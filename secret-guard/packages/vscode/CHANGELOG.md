@@ -1,5 +1,15 @@
 # Journal des versions
 
+## Non publié
+
+- **Préfixes de ressources de la politique Developer Guard comparés sur des
+  chemins normalisés** : une règle sur `/repo/src` ne s’applique plus à
+  `/repo/src-secrets` ni à `/repo/src/../../etc/passwd`. Les chemins sont
+  normalisés (`.`, `..`, séparateurs) et comparés segment par segment ; les
+  chemins Windows à lettre de lecteur sont comparés sans tenir compte de la
+  casse ni du séparateur (`C:\Repo\src` équivaut à `c:/repo/src`). Les liens
+  symboliques ne sont pas résolus par la politique.
+
 ## 0.8.2
 
 - **Avertir tient la durée choisie avec plusieurs fenêtres VS Code ouvertes** :

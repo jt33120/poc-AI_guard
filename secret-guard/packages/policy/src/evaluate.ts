@@ -5,19 +5,45 @@ import type {
   PolicyEffect,
   PolicyMatch,
 } from "./types.js";
+import { isWithin, normalizePath } from "./resources.js";
 
 function contains<T>(values: readonly T[] | undefined, value: T): boolean {
   return values === undefined || values.includes(value);
 }
 
+/** A scheme of two or more characters (`https:`, `mcp:`…) marks a non-path identifier; `c:` stays a drive. */
+function isIdentifier(value: string): boolean {
+  return /^[a-z][a-z0-9+.-]+:/i.test(value);
+}
+
+/** Literal match for identifiers: equality or a `/` segment boundary, no normalization. */
+function identifierWithin(resource: string, prefix: string): boolean {
+  const base = prefix.endsWith("/") ? prefix : `${prefix}/`;
+  return resource === prefix.replace(/\/+$/, "") || resource.startsWith(base);
+}
+
+/**
+ * Filesystem prefixes compare on normalized paths and segment boundaries, so
+ * `/repo/src` covers `/repo/src/a` but not `/repo/src-secrets` nor
+ * `/repo/src/../../etc`. Symbolic links are not resolved here (this package does
+ * no I/O): the caller must pass a realpath when links matter. Identifiers (URLs,
+ * tool URIs) only match identifier prefixes, literally; a path never matches an
+ * identifier prefix and vice versa.
+ */
 function prefixMatches(
   prefixes: readonly string[] | undefined,
   resource: string | undefined,
 ): boolean {
   if (prefixes === undefined) return true;
-  return (
-    resource !== undefined &&
-    prefixes.some((prefix) => resource.startsWith(prefix))
+  if (resource === undefined) return false;
+  if (isIdentifier(resource))
+    return prefixes.some(
+      (prefix) => isIdentifier(prefix) && identifierWithin(resource, prefix),
+    );
+  const candidate = normalizePath(resource);
+  return prefixes.some(
+    (prefix) =>
+      !isIdentifier(prefix) && isWithin(candidate, normalizePath(prefix)),
   );
 }
 
