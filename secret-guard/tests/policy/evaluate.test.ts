@@ -124,4 +124,86 @@ describe("developer policy evaluation", () => {
       reason: "outside_allowed_roots",
     });
   });
+
+  describe("resource prefixes", () => {
+    const scoped = (prefix: string): DeveloperPolicy => ({
+      ...policy,
+      rules: [
+        {
+          id: "deny-scope",
+          effect: "deny",
+          match: { resourcePrefixes: [prefix] },
+        },
+      ],
+      defaults: { unknownAction: "allow" },
+    });
+    const hits = (prefix: string, resource: string): boolean =>
+      evaluatePolicy(
+        scoped(prefix),
+        {
+          assistant: "claude",
+          event: "read",
+          actionClass: "read",
+          capabilityVerified: true,
+          resource,
+        },
+        new Date("2026-09-30T00:00:00Z"),
+      ).matchedRuleIds.includes("deny-scope");
+
+    it("matches the prefix itself and paths below it", () => {
+      expect(hits("/repo/src", "/repo/src")).toBe(true);
+      expect(hits("/repo/src", "/repo/src/a/b.ts")).toBe(true);
+      expect(hits("/repo/src", "/repo/src/./a/../b.ts")).toBe(true);
+    });
+
+    it("ignores a trailing separator on the prefix", () => {
+      expect(hits("/repo/src/", "/repo/src")).toBe(true);
+      expect(hits("/repo/src/", "/repo/src/a.ts")).toBe(true);
+      expect(hits("/repo/src", "/repo/src/")).toBe(true);
+    });
+
+    it("never matches a sibling that shares the prefix text", () => {
+      expect(hits("/repo/src", "/repo/src-secrets")).toBe(false);
+      expect(hits("/repo/src/", "/repo/src-secrets/key")).toBe(false);
+    });
+
+    it("never matches a path that escapes the prefix with ..", () => {
+      expect(hits("/repo/src", "/repo/src/../../etc/passwd")).toBe(false);
+      expect(hits("/repo/src", "/repo/src/../src-secrets")).toBe(false);
+    });
+
+    it("compares Windows drive paths case- and separator-insensitively", () => {
+      expect(hits("C:\\Repo\\src", "c:/repo/src/a.ts")).toBe(true);
+      expect(hits("c:/repo/src/", "C:\\REPO\\SRC")).toBe(true);
+      expect(hits("C:\\Repo\\src", "C:\\Repo\\src-secrets")).toBe(false);
+      expect(hits("C:\\Repo\\src", "C:\\Repo\\src\\..\\..\\Windows")).toBe(
+        false,
+      );
+      expect(hits("C:\\Repo\\src", "D:\\Repo\\src\\a.ts")).toBe(false);
+    });
+
+    it("covers the whole tree from a root prefix", () => {
+      expect(hits("/", "/etc/passwd")).toBe(true);
+    });
+
+    it("matches identifiers literally and never against path prefixes", () => {
+      expect(
+        hits("https://api.example.com/v1", "https://api.example.com/v1/x"),
+      ).toBe(true);
+      expect(
+        hits("https://api.example.com/v1", "https://api.example.com/v1-admin"),
+      ).toBe(false);
+      expect(hits("/repo", "https://api.example.com/repo")).toBe(false);
+      expect(hits("https://api.example.com", "/repo/a.ts")).toBe(false);
+    });
+  });
+
+  it("keeps allowed roots on segment boundaries", () => {
+    expect(
+      evaluateResource("/workspace-other/a.ts", ["/workspace"]),
+    ).toMatchObject({ allowed: false, reason: "outside_allowed_roots" });
+    expect(evaluateResource("C:/Work/a.ts", ["c:\\work"])).toMatchObject({
+      allowed: true,
+    });
+  });
 });

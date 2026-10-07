@@ -2,15 +2,13 @@
 
 ## Non publié
 
-- **Un message bloqué ne part plus pour le titre de session de Claude Code** :
-  lancé depuis son extension VS Code, Claude Code demandait au modèle un titre
-  de session dès l’envoi du message, avant la décision de Secret Guard. Un
-  message retenu partait donc quand même chez Anthropic, secret compris, dans
-  cette requête de titre. Secret Guard ajoute désormais
-  `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1` à la clé `env` des réglages de Claude
-  Code, ce qui supprime cette requête sans toucher à la télémétrie, et la
-  retire à la désactivation comme à la désinstallation. Une installation
-  existante est complétée au rafraîchissement suivant.
+- **Préfixes de ressources de la politique Developer Guard comparés sur des
+  chemins normalisés** : une règle sur `/repo/src` ne s’applique plus à
+  `/repo/src-secrets` ni à `/repo/src/../../etc/passwd`. Les chemins sont
+  normalisés (`.`, `..`, séparateurs) et comparés segment par segment ; les
+  chemins Windows à lettre de lecteur sont comparés sans tenir compte de la
+  casse ni du séparateur (`C:\Repo\src` équivaut à `c:/repo/src`). Les liens
+  symboliques ne sont pas résolus par la politique.
 
 ## 0.8.2
 

@@ -99,3 +99,27 @@ def test_the_extension_that_applies_the_cap_meets_the_floor_the_platform_sets() 
     shipped = tuple(int(part) for part in manifest["version"].split("."))
     floor = tuple(int(part) for part in developer_policies.WORKSTATION_MIN_RUNNER.split("."))
     assert shipped >= floor
+
+
+@pytest.mark.parametrize(
+    ("resource", "prefix", "expected"),
+    [
+        ("/repo/src", "/repo/src", True),
+        ("/repo/src/a.ts", "/repo/src", True),
+        ("/repo/src/a.ts", "/repo/src/", True),
+        ("/repo/src-secrets/a", "/repo/src", False),
+        ("/repo/src/../../etc/passwd", "/repo/src", False),
+        ("C:\\Repo\\src\\a.ts", "c:/repo/src", True),
+        ("C:\\Repo\\src-secrets", "c:/repo/src", False),
+        ("D:\\repo\\src", "c:/repo/src", False),
+        ("/etc/passwd", "/", True),
+        ("https://example.com/a/b", "https://example.com/a", True),
+        ("https://example.com/ab", "https://example.com/a", False),
+        ("/repo/src", "https://example.com", False),
+    ],
+)
+def test_resource_prefixes_compare_normalized_paths_on_segment_boundaries(
+    resource: str, prefix: str, expected: bool
+) -> None:
+    """Same contract as `prefixMatches` in secret-guard/packages/policy/src/evaluate.ts."""
+    assert developer_policies._prefix_matches([prefix], resource) is expected
