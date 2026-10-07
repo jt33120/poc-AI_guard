@@ -100,7 +100,7 @@ export async function removeManagedHooks(
   for (const host of hosts) {
     try {
       const content = await readOptional(host.configPath);
-      const next = removeMarkedHooks(content);
+      const next = removeMarkedHooks(content, host.id);
       if (next !== content) await restoreOptional(host.configPath, next);
     } catch {
       // An unreadable file is left as the user wrote it.

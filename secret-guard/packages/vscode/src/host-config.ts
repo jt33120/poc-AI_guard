@@ -22,6 +22,17 @@ export interface HostDefinition {
 }
 
 export const FILE_READ_EVENT = "PreToolUse";
+
+/**
+ * Launched by its VS Code extension, Claude Code asks the model for a session
+ * title as soon as a prompt is submitted, before the UserPromptSubmit hook has
+ * decided: a prompt the hook blocks would still reach the provider, secret
+ * included. This variable skips that request; it leaves telemetry untouched.
+ */
+export const CLAUDE_TITLE_GUARD = {
+  name: "CLAUDE_CODE_DISABLE_TERMINAL_TITLE",
+  value: "1",
+} as const;
 export const FILE_READ_MATCHER = "Read";
 
 export function defaultHostDefinitions(
@@ -577,8 +588,40 @@ function managedEvents(
   ];
 }
 
-// "outdated": the prompt guard is installed but a newer guard (file reads) is
-// not yet; refreshing the configuration completes it.
+function envMap(
+  root: Record<string, unknown>,
+  create: boolean,
+): Record<string, unknown> | null {
+  if (root.env === undefined && create) root.env = {};
+  const env = root.env;
+  if (env === undefined) return null;
+  if (typeof env !== "object" || env === null || Array.isArray(env))
+    throw new Error("invalid_host_env_config");
+  return env as Record<string, unknown>;
+}
+
+function hasTitleGuard(root: Record<string, unknown>): boolean {
+  return (
+    envMap(root, false)?.[CLAUDE_TITLE_GUARD.name] === CLAUDE_TITLE_GUARD.value
+  );
+}
+
+function addTitleGuard(root: Record<string, unknown>): void {
+  const env = envMap(root, true);
+  if (env === null) throw new Error("invalid_host_env_config");
+  env[CLAUDE_TITLE_GUARD.name] = CLAUDE_TITLE_GUARD.value;
+}
+
+// Only the value Secret Guard writes is removed; any other value is the user's.
+function removeTitleGuard(root: Record<string, unknown>): void {
+  const env = envMap(root, false);
+  if (env?.[CLAUDE_TITLE_GUARD.name] !== CLAUDE_TITLE_GUARD.value) return;
+  Reflect.deleteProperty(env, CLAUDE_TITLE_GUARD.name);
+  if (isEmptyObject(env)) delete root.env;
+}
+
+// "outdated": the prompt guard is installed but a newer guard (file reads, the
+// Claude title guard) is not yet; refreshing the configuration completes it.
 export type HostConfigState = "off" | "configured" | "outdated" | "degraded";
 
 type EventState = "off" | "configured" | "degraded";
@@ -609,7 +652,10 @@ export function inspectHostConfig(
     );
     const states = [prompt, ...others];
     if (states.includes("degraded")) return "degraded";
-    if (states.every((state) => state === "configured")) return "configured";
+    if (states.every((state) => state === "configured"))
+      return host.id === "claude" && !hasTitleGuard(root)
+        ? "outdated"
+        : "configured";
     if (prompt === "configured") return "outdated";
     return states.every((state) => state === "off") ? "off" : "degraded";
   } catch {
@@ -647,6 +693,7 @@ export function configureHost(
     retained.push(event.entry(warnMode));
     (root.hooks as Record<string, unknown>)[event.eventName] = retained;
   }
+  if (host.id === "claude") addTitleGuard(root);
   return `${JSON.stringify(root, null, 2)}\n`;
 }
 
@@ -682,15 +729,20 @@ export function unconfigureHost(
     else hooks[event.eventName] = retained;
   }
   if (isEmptyObject(hooks)) delete root.hooks;
+  if (host.id === "claude") removeTitleGuard(root);
   return isEmptyObject(root) ? null : `${JSON.stringify(root, null, 2)}\n`;
 }
 
 /**
  * Drops every entry that carries the managed marker, whatever editor,
  * executable or version wrote it: once the extension is uninstalled none of
- * them can still be checked. Entries of other tools are kept untouched.
+ * them can still be checked. Entries of other tools are kept untouched. In
+ * Claude's settings, the title guard Secret Guard wrote goes with its hooks.
  */
-export function removeMarkedHooks(content: string | null): string | null {
+export function removeMarkedHooks(
+  content: string | null,
+  host?: HookHost,
+): string | null {
   if (content === null) return null;
   const root = parseRoot(content);
   const hooks = root.hooks;
@@ -707,5 +759,6 @@ export function removeMarkedHooks(content: string | null): string | null {
   }
   if (!changed) return content;
   if (isEmptyObject(hookMap)) delete root.hooks;
+  if (host === "claude") removeTitleGuard(root);
   return isEmptyObject(root) ? null : `${JSON.stringify(root, null, 2)}\n`;
 }
