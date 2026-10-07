@@ -7,6 +7,7 @@ import { buildSync } from "esbuild";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  CLAUDE_TITLE_GUARD,
   configureHost,
   defaultHostDefinitions,
   removeMarkedHooks,
@@ -60,11 +61,37 @@ describe("removeMarkedHooks", () => {
       "/storage/hook.cjs",
       "redact",
     );
-    const cleaned = JSON.parse(removeMarkedHooks(configured)!) as unknown;
+    const cleaned = JSON.parse(
+      removeMarkedHooks(configured, "claude")!,
+    ) as unknown;
     expect(cleaned).toEqual({
       hooks: { UserPromptSubmit: [OTHER_TOOL] },
       model: "x",
     });
+  });
+
+  it("takes the Claude title guard away with the hooks, and only its own value", () => {
+    const configured = JSON.parse(
+      configureHost(
+        JSON.stringify({ env: { OTHER: "kept" } }),
+        claude!,
+        "/usr/bin/code",
+        "/storage/hook.cjs",
+        "block",
+      ),
+    ) as { env: Record<string, string> };
+    expect(configured.env).toEqual({
+      OTHER: "kept",
+      [CLAUDE_TITLE_GUARD.name]: CLAUDE_TITLE_GUARD.value,
+    });
+    expect(
+      JSON.parse(removeMarkedHooks(JSON.stringify(configured), "claude")!),
+    ).toEqual({ env: { OTHER: "kept" } });
+
+    configured.env[CLAUDE_TITLE_GUARD.name] = "0";
+    expect(
+      JSON.parse(removeMarkedHooks(JSON.stringify(configured), "claude")!),
+    ).toEqual({ env: { OTHER: "kept", [CLAUDE_TITLE_GUARD.name]: "0" } });
   });
 
   it("deletes a file it alone filled", () => {
@@ -75,7 +102,7 @@ describe("removeMarkedHooks", () => {
       "/storage/hook.cjs",
       "block",
     );
-    expect(removeMarkedHooks(configured)).toBeNull();
+    expect(removeMarkedHooks(configured, "claude")).toBeNull();
   });
 
   it("leaves a file without Secret Guard byte for byte", () => {
